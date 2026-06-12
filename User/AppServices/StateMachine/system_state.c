@@ -1,0 +1,367 @@
+/**
+ * @file        system_state.c
+ * @brief 系统状态机实现文件
+ * @details 仅负责状态管理：顶层主状态机（INIT/IDLE/READY/RUN/FAULT/SAFETY/
+ *
+ * @author      name (name@robot.com)
+ * @version     1.1
+ * @date        2026-06-11
+ *
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ *
+ * @par 修改日志:
+ * | 日期       | 版本 | 作者   | 修改内容                              |
+ * |------------|------|--------|---------------------------------------|
+ * | 2026-06-11 | 1.0  | yangsl | 初始创建                              |
+ * | 2026-06-11 | 1.1  | yangsl | 加 READY 态/转移许可表，剥离控制逻辑  |
+ *
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
+ */
+
+#include "system_state.h"
+#include <string.h>
+
+/**
+ * @brief 运行模式平滑过渡的调用次数
+ * @details 过渡时长以 motor_control_loop（建议置于电流环）的调用次数计，
+ *          而非软件定时器。可在运行期配置：调用次数 = 期望过渡时长 / 电流环周期。
+ *          例：电流环 50us，期望过渡 5ms，则置为 100。
+ */
+uint32_t g_run_state_trans_count = 1000;
+
+/**
+ * @brief 控制指令到运行状态的映射表
+ * @details 上层运动控制指令（ctrl_mode_e）到底层运行状态（run_state_e）的映射。
+ */
+static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
+	[CONTROL_MODE_IDLE] = RUN_STATE_IDLE,
+	[CONTROL_MODE_HOLD] = RUN_STATE_IDLE,
+	[CONTROL_MODE_BRAKE] = RUN_STATE_IDLE,
+
+	[CONTROL_MODE_OPEN_LOOP] = RUN_STATE_OPEN_LOOP,
+	[CONTROL_MODE_CURRENT] = RUN_STATE_CURRENT,
+	[CONTROL_MODE_TORQUE] = RUN_STATE_TORQUE,
+	[CONTROL_MODE_MIT] = RUN_STATE_MIT,
+	[CONTROL_MODE_VELOCITY] = RUN_STATE_VELOCITY,
+	[CONTROL_MODE_POSITION] = RUN_STATE_POSITION,
+	[CONTROL_MODE_POSITION_VELOCITY] = RUN_STATE_POSITION_VELOCITY,
+	[CONTROL_MODE_POSITION_TORQUE] = RUN_STATE_POSITION_TORQUE,
+	[CONTROL_MODE_VELOCITY_TORQUE] = RUN_STATE_VELOCITY_TORQUE,
+	[CONTROL_MODE_DUTY_CYCLE] = RUN_STATE_DUTY_CYCLE,
+	[CONTROL_MODE_VOLTAGE_VECTOR] = RUN_STATE_VOLTAGE_VECTOR,
+	[CONTROL_MODE_FIELD_WEAKENING] = RUN_STATE_FIELD_WEAKENING,
+	[CONTROL_MODE_SENSORLESS] = RUN_STATE_SENSORLESS,
+
+	[CONTROL_MODE_IMPEDANCE] = RUN_STATE_IMPEDANCE,
+	[CONTROL_MODE_ADMITTANCE] = RUN_STATE_ADMITTANCE,
+	[CONTROL_MODE_FORCE_CONTROL] = RUN_STATE_FORCE_CONTROL,
+	[CONTROL_MODE_FORCE_POSITION_HYBRID] = RUN_STATE_FORCE_POSITION_HYBRID,
+	[CONTROL_MODE_GRAVITY_COMPENSATION] = RUN_STATE_GRAVITY_COMPENSATION,
+	[CONTROL_MODE_COLLISION_DETECTION] = RUN_STATE_COLLISION_DETECTION,
+	[CONTROL_MODE_ZERO_FORCE] = RUN_STATE_ZERO_FORCE,
+	[CONTROL_MODE_CONSTANT_FORCE] = RUN_STATE_CONSTANT_FORCE,
+	[CONTROL_MODE_VARIABLE_IMPEDANCE] = RUN_STATE_VARIABLE_IMPEDANCE,
+	[CONTROL_MODE_ADAPTIVE_GRAVITY_COMP] = RUN_STATE_ADAPTIVE_GRAVITY_COMP,
+	[CONTROL_MODE_LANDING_BUFFER] = RUN_STATE_LANDING_BUFFER,
+
+	[CONTROL_MODE_PVT] = RUN_STATE_PVT,
+	[CONTROL_MODE_CUBIC_SPLINE] = RUN_STATE_CUBIC_SPLINE,
+	[CONTROL_MODE_TRAPEZOIDAL_TRAJ] = RUN_STATE_TRAPEZOIDAL_TRAJ,
+	[CONTROL_MODE_S_CURVE_TRAJ] = RUN_STATE_S_CURVE_TRAJ,
+	[CONTROL_MODE_HOMING] = RUN_STATE_HOMING,
+	[CONTROL_MODE_ELECTRONIC_GEAR] = RUN_STATE_ELECTRONIC_GEAR,
+	[CONTROL_MODE_ELECTRONIC_CAM] = RUN_STATE_ELECTRONIC_CAM,
+
+	[CONTROL_MODE_STEP_DIR] = RUN_STATE_STEP_DIR,
+	[CONTROL_MODE_ANALOG_INPUT] = RUN_STATE_ANALOG_INPUT,
+	[CONTROL_MODE_PWM_INPUT] = RUN_STATE_PWM_INPUT,
+	[CONTROL_MODE_JOG] = RUN_STATE_JOG,
+	[CONTROL_MODE_SAFE_TEACH] = RUN_STATE_SAFE_TEACH,
+
+	[CONTROL_MODE_TEST_AGING] = RUN_STATE_TEST_AGING,
+	[CONTROL_MODE_TEST_SWEEP_FREQ] = RUN_STATE_TEST_SWEEP_FREQ,
+	[CONTROL_MODE_TEST_COGGING] = RUN_STATE_TEST_COGGING,
+	[CONTROL_MODE_TEST_FRICTION] = RUN_STATE_TEST_FRICTION,
+	[CONTROL_MODE_TEST_INERTIA] = RUN_STATE_TEST_INERTIA,
+	[CONTROL_MODE_DIAGNOSTIC] = RUN_STATE_DIAGNOSTIC,
+	[CONTROL_MODE_HIGH_SPEED_DAQ] = RUN_STATE_HIGH_SPEED_DAQ,
+	[CONTROL_MODE_SINGLE_STEP] = RUN_STATE_SINGLE_STEP,
+};
+
+/**
+ * @brief 顶层状态转移许可表
+ * @details 表驱动的状态机：s_top_fsm_allowed[from][to] 为 true 表示允许该转移。
+ *          FAULT/SAFETY 作为最高优先级，可从任意状态进入（在判断函数中单独处理）。
+ *          对照状态机图核对/修改本表即可调整全部转移规则。
+ *  
+ *          转移逻辑：
+ *            INIT  → IDLE
+ *            IDLE  → READY / CALIB / CONFIG / BOOTLOADER
+ *            READY → RUN / IDLE
+ *            RUN   → READY            （停止运行后回就绪，再回 IDLE 下使能）
+ *            FAULT → IDLE             （清除故障）
+ *            SAFETY→ IDLE             （解除急停）
+ *            CALIB → IDLE
+ *            CONFIG→ IDLE
+ *            BOOTLOADER→ IDLE
+ */
+static const bool s_top_fsm_allowed[TOP_FSM_MAX][TOP_FSM_MAX] = {
+	[TOP_FSM_INIT] = {[TOP_FSM_IDLE] = true},
+	[TOP_FSM_IDLE] = {[TOP_FSM_READY] = true, [TOP_FSM_CALIB] = true, [TOP_FSM_CONFIG] = true, [TOP_FSM_BOOTLOADER] = true},
+	[TOP_FSM_READY] = {[TOP_FSM_RUN] = true, [TOP_FSM_IDLE] = true},
+	[TOP_FSM_RUN] = {[TOP_FSM_READY] = true},
+	[TOP_FSM_FAULT] = {[TOP_FSM_IDLE] = true},
+	[TOP_FSM_SAFETY] = {[TOP_FSM_IDLE] = true},
+	[TOP_FSM_CALIB] = {[TOP_FSM_IDLE] = true},
+	[TOP_FSM_CONFIG] = {[TOP_FSM_IDLE] = true},
+	[TOP_FSM_BOOTLOADER] = {[TOP_FSM_IDLE] = true},
+};
+
+/**
+ * @brief 判断顶层状态转移是否合法
+ * @param from 源状态
+ * @param to 目标状态
+ * @return true 允许 / false 禁止
+ * @note FAULT 与 SAFETY 可从任意状态进入（最高优先级），不受许可表限制。
+ */
+static bool top_fsm_transition_allowed(top_fsm_e from, top_fsm_e to)
+{
+	if (to >= TOP_FSM_MAX || from >= TOP_FSM_MAX)
+		return false;
+
+	// 故障/安全：任意状态可进入
+	if (to == TOP_FSM_FAULT || to == TOP_FSM_SAFETY)
+		return true;
+
+	return s_top_fsm_allowed[from][to];
+}
+
+/**
+ * @brief 初始化系统状态机（具体实现）
+ */
+void system_state_init(system_state_t *sys, motor_param_t *param, float dt)
+{
+	memset(sys, 0, sizeof(system_state_t));
+
+	motor_ctrl_init(&sys->motor, param, dt);
+	transition_init(&sys->transition);
+
+	sys->top_state = TOP_FSM_INIT;
+	sys->fault_code = 0;
+
+	top_fsm_switch(sys, TOP_FSM_IDLE);
+}
+
+/**
+ * @brief 切换顶层有限状态机状态（具体实现）
+ * @details 表驱动 + 进入/退出动作。非法转移直接拒绝。
+ */
+void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
+{
+	// 没有切换状态就直接返回
+	if (new_state == sys->top_state)
+		return;
+
+	// 转移许可表校验
+	if (!top_fsm_transition_allowed(sys->top_state, new_state))
+		return;
+
+	switch (sys->top_state)
+	{
+		case TOP_FSM_RUN:
+			// 退出运行：停止参考输出，强制结束过渡
+			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+			transition_force_complete(&sys->transition);
+			break;
+
+		case TOP_FSM_CALIB:
+		case TOP_FSM_CONFIG:
+			break;
+
+		default:
+			break;
+	}
+
+	/* ---- 进入动作（进入新状态的初始化）---- */
+	switch (new_state)
+	{
+		case TOP_FSM_IDLE:
+			// 待机：伺服失能，运行子状态归零
+			sys->motor.run_state = RUN_STATE_IDLE;
+			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+			break;
+
+		case TOP_FSM_READY:
+			// 就绪：已使能但不运动，运行子状态置空闲保持
+			sys->motor.run_state = RUN_STATE_IDLE;
+			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+			break;
+
+		case TOP_FSM_FAULT:
+		case TOP_FSM_SAFETY:
+			// 故障/急停：立即失能输出
+			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+			transition_force_complete(&sys->transition);
+			break;
+
+		default:
+			break;
+	}
+
+	sys->top_state = new_state;
+}
+
+/**
+ * @brief 切换电机运行状态（具体实现，仅在 RUN 态内有效）
+ * @details 启动参考层平滑过渡
+ */
+void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans_ms)
+{
+	if (new_state >= RUN_STATE_MAX || new_state == sys->motor.run_state)
+		return;
+
+	sys->target_run_state = new_state;
+	transition_start(&sys->transition, trans_ms, &sys->motor.ref);
+}
+
+/**
+ * @brief 电机控制主循环（具体实现）
+ * @details 仅 RUN 态生成运动参考；其余状态参考保持 IDLE。
+ *          控制逻辑（参考生成）经 motor_ctrl_dispatch 调用，本文件不含。
+ */
+void motor_control_loop(system_state_t *sys)
+{
+	fault_check(sys);
+
+	// 非运行态：失能输出，不生成运动参考
+	if (sys->top_state != TOP_FSM_RUN)
+	{
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		return;
+	}
+
+	// 运行态：处理模式切换的平滑过渡
+	if (sys->transition.state == TRANSITION_IN_PROGRESS)
+	{
+		// 生成目标状态参考（过渡起点已记录在 transition 内）
+		run_state_e old_state = sys->motor.run_state;
+		sys->motor.run_state = sys->target_run_state;
+		motor_ctrl_dispatch(&sys->motor);
+		motor_ref_t new_ref = sys->motor.ref;
+		sys->motor.run_state = old_state;
+
+		// 参考层混合输出
+		motor_ref_t mixed_ref;
+		bool trans_done = transition_update(&sys->transition, &new_ref, &mixed_ref);
+		sys->motor.ref = mixed_ref;
+
+		// 过渡完成后正式切换运行状态
+		if (trans_done)
+			sys->motor.run_state = sys->target_run_state;
+	}
+	else
+	{
+		// 无过渡：直接生成当前状态参考
+		motor_ctrl_dispatch(&sys->motor);
+	}
+}
+
+/**
+ * @brief 系统故障检测（具体实现，预留）
+ */
+void fault_check(system_state_t *sys)
+{
+	(void)sys;
+	return;
+}
+
+/**
+ * @brief 处理上层控制指令（具体实现）
+ * @details 指令分发与状态切换，三段式使能流程：
+ *            IDLE --ENABLE--> READY --运动指令--> RUN
+ *            RUN  --STOP----> READY --DISABLE--> IDLE
+ *          系统指令（IDLE/ENABLE/DISABLE/STOP/ESTOP/BOOTLOADER等）单独处理；
+ *          运动指令仅在 READY/RUN 态被接受，经映射表转为运行子状态。
+ */
+void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
+{
+	if (cmd >= CONTROL_MODE_MAX)
+		return;
+
+	/* ---- 急停：任意状态最高优先级响应 ---- */
+	if (cmd == CONTROL_MODE_ESTOP)
+	{
+		top_fsm_switch(sys, TOP_FSM_SAFETY);
+		return;
+	}
+
+	/* ---- 故障态：仅响应清除故障 ---- */
+	if (sys->top_state == TOP_FSM_FAULT)
+	{
+		if (cmd == CONTROL_MODE_CLEAR_FAULT)
+			top_fsm_switch(sys, TOP_FSM_IDLE);
+		return;
+	}
+
+	/* ---- 安全态：仅响应清除故障（解除急停）---- */
+	if (sys->top_state == TOP_FSM_SAFETY)
+	{
+		if (cmd == CONTROL_MODE_CLEAR_FAULT)
+			top_fsm_switch(sys, TOP_FSM_IDLE);
+		return;
+	}
+
+	/* ---- 系统级指令 ---- */
+	switch (cmd)
+	{
+		case CONTROL_MODE_IDLE:
+		case CONTROL_MODE_DISABLE:
+			// 下使能：READY/RUN 经许可表逐级回到 IDLE
+			if (sys->top_state == TOP_FSM_RUN)
+				top_fsm_switch(sys, TOP_FSM_READY);
+
+			top_fsm_switch(sys, TOP_FSM_IDLE);
+			return;
+
+		case CONTROL_MODE_ENABLE:
+			// 上使能：IDLE → READY
+			top_fsm_switch(sys, TOP_FSM_READY);
+			return;
+
+		case CONTROL_MODE_STOP:
+			// 停止运行：RUN → READY（保持使能）
+			top_fsm_switch(sys, TOP_FSM_READY);
+			return;
+
+		case CONTROL_MODE_ENTER_BOOTLOADER:
+			top_fsm_switch(sys, TOP_FSM_BOOTLOADER);
+			return;
+
+		case CONTROL_MODE_SAVE_CONFIG:
+			// extern int motor_param_save(const motor_param_t *cfg);
+			return;
+
+		case CONTROL_MODE_FACTORY_RESET:
+			// extern int motor_param_load_default(motor_param_t * cfg);
+			return;
+
+		default:
+			break;
+	}
+
+	/* ---- 运动控制指令：需已使能（READY 或 RUN）---- */
+	if (sys->top_state == TOP_FSM_READY)
+	{
+		// READY → RUN，并设置目标运行子状态
+		top_fsm_switch(sys, TOP_FSM_RUN);
+		run_state_e target = s_ctrl_mode_to_run_state[cmd];
+		sys->motor.run_state = target; // 首次进入直接置位，无需过渡
+		sys->target_run_state = target;
+	}
+	else if (sys->top_state == TOP_FSM_RUN)
+	{
+		// RUN 态内运动模式切换：走平滑过渡，时长由全局调用次数配置
+		run_state_e target = s_ctrl_mode_to_run_state[cmd];
+		run_state_switch(sys, target, g_run_state_trans_count);
+	}
+}
