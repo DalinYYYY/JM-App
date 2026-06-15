@@ -35,6 +35,19 @@
 /* 滑动滤波窗口最大长度（编译期分配，避免动态内存） */
 #define MOTION_SLIDE_WINDOW_MAX 32u
 
+/* 最小二乘差分窗口最大长度（编译期分配） */
+#define MOTION_LSQ_WINDOW_MAX 16u
+
+/**
+ * @brief 速度解算方法（运行时可切换）
+ */
+typedef enum
+{
+	VEL_METHOD_DIFF = 0, // 后向差分 + 滑动平均（默认，兼容旧行为）
+	VEL_METHOD_LSQ = 1,	 // N 点最小二乘差分（FIR 微分器，低噪声、固定群延迟）
+	VEL_METHOD_PLL = 2,	 // PLL/龙伯格观测器（速度积分得到，低滞后、平滑）
+} motion_vel_method_e;
+
 /**
  * @brief 电机ID
  */
@@ -65,6 +78,16 @@ typedef struct
 	uint8_t poles;				// 极对数
 	uint16_t slide_window_size; // 速度滑动滤波窗口（<= MOTION_SLIDE_WINDOW_MAX）
 	uint32_t update_freq_hz;	// 速度解算频率 (Hz)，用于 d(angle)/dt
+
+	/* ---- 速度解算方法选择 ---- */
+	motion_vel_method_e vel_method; // 速度解算方法，默认 VEL_METHOD_DIFF
+
+	/* ---- 最小二乘差分参数（vel_method=VEL_METHOD_LSQ 时生效）---- */
+	uint16_t lsq_window_size; // 拟合窗口点数 (3 ~ MOTION_LSQ_WINDOW_MAX)，0=默认 5
+
+	/* ---- PLL 观测器参数（vel_method=VEL_METHOD_PLL 时生效）---- */
+	float pll_bandwidth_hz;	// 观测器带宽 (Hz)，0=默认 50Hz；越大跟随快、滤波弱
+	float pll_damping;		// 阻尼比，0=默认 1.0（临界阻尼）
 } motion_param_config_t;
 
 /**
@@ -73,10 +96,11 @@ typedef struct
 typedef struct
 {
 	float buf[MOTION_SLIDE_WINDOW_MAX];
-	uint16_t size;	// 实际窗口长度
-	uint16_t head;	// 写入位置
-	uint16_t count; // 已填充样本数
-	float sum;		// 窗口内样本和
+	uint16_t size;	 // 实际窗口长度
+	uint16_t head;	 // 写入位置
+	uint16_t count;	 // 已填充样本数
+	float sum;		 // 窗口内样本和
+	float inv_count; // 1/count 缓存：窗口填满后恒定，用乘法代替除法
 } motion_slide_filter_t;
 
 /**
@@ -97,9 +121,11 @@ typedef struct motion_param
 	bool ele_angle_update_status;	 // 电角度更新状态
 
 	/* ---- 速度 / 加速度 ---- */
+	motion_vel_method_e vel_method;			// 当前速度解算方法
 	motion_slide_filter_t slide_filter;		// 速度滑动滤波器
 	motion_slide_filter_t slide_acc_filter; // 加速度滑动滤波器
 	float prev_mech_angle;					// 上一次机械角度（速度解算用）
+	bool vel_initialized;					// 速度解算首次标志：首次只记角度不算速度，消除上电尖峰
 	int32_t deg_s;							// 度每秒
 	volatile float rad_s;					// 弧度每秒
 	volatile float slide_rad_s;				// 弧度每秒（滑动滤波）
@@ -108,6 +134,19 @@ typedef struct motion_param
 	float acceleration;						// 当前角加速度 (rad/s^2)
 	bool rpm_update_status;					// 转速更新状态
 
+	/* ---- 最小二乘差分 (VEL_METHOD_LSQ) ---- */
+	float lsq_buf[MOTION_LSQ_WINDOW_MAX]; // 连续(去跳变)角度历史，单位 deg
+	float lsq_buf_last_raw;				  // 上一次原始(未展开)机械角，用于算连续增量
+	uint16_t lsq_size;					  // 拟合窗口点数
+	uint16_t lsq_count;					  // 已填充点数
+	float lsq_inv_denom;				  // 1/Σ(i-mean)^2 缓存，满窗后恒定
+
+	/* ---- PLL 观测器 (VEL_METHOD_PLL) ---- */
+	float pll_theta;	// 观测器跟踪角度 (deg)
+	float pll_omega;	// 观测器速度状态 (deg/s)
+	float pll_kp;		// 比例增益 (1/s)
+	float pll_ki;		// 积分增益 (1/s^2)
+
 	/* ---- 前馈补偿 ---- */
 	float ff_expect_angle;				 // 期望前馈角度
 	float ff_prev_angle;				 // 上一次前馈角度
@@ -115,6 +154,7 @@ typedef struct motion_param
 	float ff_rad_s;						 // 前馈补偿速度
 	float ff_slide_rad_s;				 // 前馈补偿速度（滑动滤波）
 	float ff_prev_rad_s;				 // 上一次前馈速度
+	bool ff_initialized;				 // 前馈首次标志：首次只记角度不算速度/加速度
 	float ff_delta_rad_s;				 // 前馈补偿速度差
 	float ff_accel;						 // 前馈补偿加速度
 	float ff_slide_acc;					 // 前馈补偿加速度（滑动滤波）
@@ -134,6 +174,7 @@ typedef struct motion_param
 
 	/* ---- 配置接口 ---- */
 	void (*set_update_freq)(struct motion_param *pobj, uint32_t freq_hz);
+	void (*set_vel_method)(struct motion_param *pobj, motion_vel_method_e method); // 运行时切换速度解算方法
 
 	/* ---- 更新接口 ---- */
 	void (*update)(struct motion_param *pobj, motion_type_e type, float mechanical_angle);

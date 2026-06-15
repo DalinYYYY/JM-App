@@ -53,8 +53,7 @@
 /* 把角度归一化到 [0, 360) */
 static float normalize_angle(float angle)
 {
-	int n = (int)(angle / 360.0f);
-	float remainder = angle - n * 360.0f;
+	float remainder = fmodf(angle, 360.0f);
 	return remainder >= 0.0f ? remainder : (remainder + 360.0f);
 }
 
@@ -81,11 +80,17 @@ static float slide_filter_calc(motion_slide_filter_t *f, float sample)
 	else
 	{
 		f->count++;
+		f->inv_count = 1.0f / (float)f->count; /* 仅填充阶段更新，满后恒定 */
 	}
 	f->buf[f->head] = sample;
 	f->sum += sample;
-	f->head = (uint16_t)((f->head + 1u) % f->size);
-	return f->sum / (float)f->count;
+
+	/* 环形递增，用比较复位代替取模，消除整数除法 */
+	if (++f->head >= f->size)
+		f->head = 0u;
+
+	/* 用逆数乘法代替除法 */
+	return f->sum * f->inv_count;
 }
 
 /* ------------------------------------------------------------------ */
@@ -132,31 +137,153 @@ static void update_deg_s(struct motion_param *pobj)
 
 /**
  * @brief 解算角速度（rad/s）与角加速度（rad/s^2）
- * @note  update_freq_hz 为每秒解算次数，rad_s = delta_deg * deg2rad * freq。
+ * @note  update_freq_hz 为每秒解算次数。支持三种方法（pobj->vel_method）：
+ *        - DIFF：后向差分 + 滑动平均（兼容旧行为）
+ *        - LSQ ：N 点最小二乘差分（FIR 微分器，固定群延迟，低噪声）
+ *        - PLL ：二阶观测器，速度由积分得到，低滞后、平滑
+ *        三者统一输出 rad_s / slide_rad_s；加速度统一对最终速度做差分滤波。
  */
-static void update_rad_s(struct motion_param *pobj, float mechanical_angle)
-{
-	float freq = (float)pobj->update_freq_hz;
 
-	/* 角度变化量，处理 ±180° 跳变 */
-	float delta = mechanical_angle - pobj->prev_mech_angle;
+/* 处理 ±180° 跳变，返回归一化到 (-180,180] 的角度增量(deg) */
+static float wrap_delta_deg(float delta)
+{
 	if (fabsf(delta) > 180.0f)
 	{
 		delta = (delta > 0.0f) ? (delta - 360.0f) : (delta + 360.0f);
 	}
+	return delta;
+}
 
-	/* 角速度 (rad/s) = 角度增量(rad) * 解算频率 */
-	pobj->rad_s = delta * (MOTION_DEG2RAD * freq);
-	pobj->slide_rad_s = slide_filter_calc(&pobj->slide_filter, pobj->rad_s);
+/* 方法一：后向差分 + 滑动平均。out_raw 返回未滤波速度，函数返回滤波后速度，单位 rad/s */
+static float vel_calc_diff(struct motion_param *pobj, float mechanical_angle, float *out_raw)
+{
+	float freq = (float)pobj->update_freq_hz;
+	float delta = wrap_delta_deg(mechanical_angle - pobj->prev_mech_angle);
+	float rad_s = delta * (MOTION_DEG2RAD * freq);
+	pobj->prev_mech_angle = mechanical_angle;
+	*out_raw = rad_s;
+	return slide_filter_calc(&pobj->slide_filter, rad_s);
+}
 
-	/* 加速度：对滤波后速度做差分，再滑动滤波 */
+/* 方法二：N 点最小二乘差分（对最近 N 个角度拟合直线，斜率即速度）。
+ * 角度先去跳变累加成连续序列，避免 360° 折返污染拟合。返回 rad/s。 */
+static float vel_calc_lsq(struct motion_param *pobj, float mechanical_angle)
+{
+	float freq = (float)pobj->update_freq_hz;
+	uint16_t n = pobj->lsq_size;
+	uint16_t i;
+
+	/* 连续角度 = 上一连续角度 + 去跳变增量 */
+	float cont = pobj->prev_mech_angle + wrap_delta_deg(mechanical_angle - pobj->lsq_buf_last_raw);
+	pobj->lsq_buf_last_raw = mechanical_angle;
+	pobj->prev_mech_angle = cont;
+
+	/* 左移历史，推入新点（窗口小，O(N) 可接受） */
+	for (i = 0u; i + 1u < n; i++)
+		pobj->lsq_buf[i] = pobj->lsq_buf[i + 1u];
+	pobj->lsq_buf[n - 1u] = cont;
+
+	if (pobj->lsq_count < n)
+		pobj->lsq_count++;
+
+	uint16_t m = pobj->lsq_count;
+	if (m < 2u)
+		return 0.0f; /* 点不足，速度记 0 */
+
+	/* 斜率 = Σ(i-ī)(y-ȳ) / Σ(i-ī)^2，样本索引 i=0..m-1，间隔 1/freq */
+	float mean_i = (float)(m - 1u) * 0.5f;
+	float num = 0.0f;
+	float denom;
+	/* 用最近 m 个点：buf 尾部 m 个 */
+	uint16_t base = n - m;
+	for (i = 0u; i < m; i++)
+	{
+		num += ((float)i - mean_i) * pobj->lsq_buf[base + i];
+	}
+	if (m == n && pobj->lsq_inv_denom > 0.0f)
+	{
+		/* 满窗：分母恒定，用缓存逆数 */
+		float slope_deg_per_sample = num * pobj->lsq_inv_denom;
+		return slope_deg_per_sample * freq * MOTION_DEG2RAD;
+	}
+	/* 未满窗：现算分母 */
+	denom = 0.0f;
+	for (i = 0u; i < m; i++)
+	{
+		float d = (float)i - mean_i;
+		denom += d * d;
+	}
+	if (m == n)
+		pobj->lsq_inv_denom = (denom > 0.0f) ? (1.0f / denom) : 0.0f;
+	float slope = (denom > 0.0f) ? (num / denom) : 0.0f;
+	return slope * freq * MOTION_DEG2RAD;
+}
+
+/* 方法三：PLL/龙伯格二阶观测器。位置误差驱动 PI，速度状态积分得位置。
+ * 返回 rad/s（取观测器速度状态 pll_omega）。 */
+static float vel_calc_pll(struct motion_param *pobj, float mechanical_angle)
+{
+	float dt = 1.0f / (float)pobj->update_freq_hz;
+
+	/* 位置误差（去跳变，归一化到 (-180,180]） */
+	float err = wrap_delta_deg(mechanical_angle - pobj->pll_theta);
+
+	/* 速度积分：ω += Ki·err·dt */
+	pobj->pll_omega += pobj->pll_ki * err * dt;
+
+	/* 位置积分：θ += (ω + Kp·err)·dt，并归一化 */
+	pobj->pll_theta += (pobj->pll_omega + pobj->pll_kp * err) * dt;
+	pobj->pll_theta = normalize_angle(pobj->pll_theta);
+
+	pobj->prev_mech_angle = mechanical_angle;
+	return pobj->pll_omega * MOTION_DEG2RAD; /* deg/s -> rad/s */
+}
+
+static void update_rad_s(struct motion_param *pobj, float mechanical_angle)
+{
+	float freq = (float)pobj->update_freq_hz;
+
+	/* 首次调用：只初始化各方法状态，不算速度，避免上电尖峰 */
+	if (!pobj->vel_initialized)
+	{
+		pobj->prev_mech_angle = mechanical_angle;
+		pobj->lsq_buf_last_raw = mechanical_angle;
+		pobj->pll_theta = mechanical_angle;
+		pobj->pll_omega = 0.0f;
+		pobj->vel_initialized = true;
+		pobj->rad_s = 0.0f;
+		pobj->slide_rad_s = slide_filter_calc(&pobj->slide_filter, 0.0f);
+		motor_set_speed_update_state(pobj, true);
+		return;
+	}
+
+	float rad_s;
+	float slide_rad_s;
+	switch (pobj->vel_method)
+	{
+		case VEL_METHOD_LSQ:
+			rad_s = vel_calc_lsq(pobj, mechanical_angle);
+			slide_rad_s = rad_s; /* LSQ 自带平滑，不再叠滑窗 */
+			break;
+		case VEL_METHOD_PLL:
+			rad_s = vel_calc_pll(pobj, mechanical_angle);
+			slide_rad_s = rad_s; /* PLL 自带平滑，不再叠滑窗 */
+			break;
+		case VEL_METHOD_DIFF:
+		default:
+			slide_rad_s = vel_calc_diff(pobj, mechanical_angle, &rad_s);
+			break;
+	}
+	pobj->rad_s = rad_s;
+	pobj->slide_rad_s = slide_rad_s;
+
+	/* 加速度：对最终速度做差分，再滑动滤波（三种方法统一） */
 	pobj->omegaHistory[0] = pobj->omegaHistory[1];
 	pobj->omegaHistory[1] = pobj->omegaHistory[2];
-	pobj->omegaHistory[2] = pobj->slide_rad_s;
+	pobj->omegaHistory[2] = slide_rad_s;
 	float acc = (pobj->omegaHistory[2] - pobj->omegaHistory[1]) * freq;
 	pobj->acceleration = slide_filter_calc(&pobj->slide_acc_filter, acc);
 
-	pobj->prev_mech_angle = mechanical_angle;
 	motor_set_speed_update_state(pobj, true);
 }
 
@@ -183,6 +310,33 @@ static void set_update_freq(struct motion_param *pobj, uint32_t freq_hz)
 	pobj->update_freq_hz = (freq_hz == 0u) ? 1u : freq_hz;
 }
 
+/* 由带宽/阻尼算 PLL 二阶增益：ωn=2π·bw, Kp=2ζωn, Ki=ωn^2 */
+static void pll_set_gains(struct motion_param *pobj, float bandwidth_hz, float damping)
+{
+	if (bandwidth_hz <= 0.0f)
+		bandwidth_hz = 50.0f;
+	if (damping <= 0.0f)
+		damping = 1.0f;
+	float wn = MOTION_2PI * bandwidth_hz;
+	pobj->pll_kp = 2.0f * damping * wn;
+	pobj->pll_ki = wn * wn;
+}
+
+/* 运行时切换速度解算方法：复位相关状态，下一帧按首次重新初始化，避免切换瞬间尖峰 */
+static void set_vel_method(struct motion_param *pobj, motion_vel_method_e method)
+{
+	pobj->vel_method = method;
+	/* 复位各方法历史，强制走首次初始化路径 */
+	slide_filter_init(&pobj->slide_filter, pobj->slide_filter.size);
+	slide_filter_init(&pobj->slide_acc_filter, pobj->slide_acc_filter.size);
+	pobj->lsq_count = 0u;
+	pobj->lsq_inv_denom = 0.0f;
+	pobj->omegaHistory[0] = 0.0f;
+	pobj->omegaHistory[1] = 0.0f;
+	pobj->omegaHistory[2] = 0.0f;
+	pobj->vel_initialized = false;
+}
+
 /* ------------------------------------------------------------------ */
 /* 前馈补偿                                                            */
 /* ------------------------------------------------------------------ */
@@ -191,6 +345,16 @@ static void feedforword_compute(struct motion_param *pobj, float expect_angle)
 	float freq = (float)pobj->update_freq_hz;
 
 	pobj->ff_expect_angle = expect_angle;
+
+	/* 首次调用：只记录角度，不算速度/加速度，避免 prev=0 造成的尖峰 */
+	if (!pobj->ff_initialized)
+	{
+		pobj->ff_prev_angle = expect_angle;
+		pobj->ff_prev_rad_s = 0.0f;
+		pobj->ff_initialized = true;
+		return;
+	}
+
 	pobj->ff_delta_angle = pobj->ff_expect_angle - pobj->ff_prev_angle;
 
 	/* 角速度 (rad/s) */
@@ -265,6 +429,22 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 	pobj->poles = cfg->poles;
 	pobj->update_freq_hz = (cfg->update_freq_hz == 0u) ? 1u : cfg->update_freq_hz;
 
+	/* 速度解算方法 */
+	pobj->vel_method = cfg->vel_method;
+
+	/* 最小二乘窗口：默认 5，限幅到 [3, MOTION_LSQ_WINDOW_MAX] */
+	{
+		uint16_t lw = (cfg->lsq_window_size == 0u) ? 5u : cfg->lsq_window_size;
+		if (lw < 3u)
+			lw = 3u;
+		if (lw > MOTION_LSQ_WINDOW_MAX)
+			lw = MOTION_LSQ_WINDOW_MAX;
+		pobj->lsq_size = lw;
+	}
+
+	/* PLL 增益：由带宽/阻尼算出（0 走默认 50Hz / ζ=1） */
+	pll_set_gains(pobj, cfg->pll_bandwidth_hz, cfg->pll_damping);
+
 	/* 滤波器：速度用配置窗口，加速度/前馈用固定小窗口（沿用原值 5） */
 	slide_filter_init(&pobj->slide_filter, cfg->slide_window_size);
 	slide_filter_init(&pobj->slide_acc_filter, 5u);
@@ -284,6 +464,7 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 
 	/* 配置接口 */
 	pobj->set_update_freq = set_update_freq;
+	pobj->set_vel_method = set_vel_method;
 
 	/* 更新接口 */
 	pobj->update = motor_param_handle;
@@ -304,7 +485,7 @@ void motion_param_init(motion_param_t *pobj, uint8_t poles, uint16_t slide_windo
 
 	cfg.poles = poles;
 	cfg.slide_window_size = slide_window_size;
-	cfg.update_freq_hz = 2000u; /* 沿用原默认 2000Hz */
+	cfg.update_freq_hz = 1000u;
 
 	motion_param_init_cfg(pobj, &cfg);
 }
