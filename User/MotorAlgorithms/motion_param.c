@@ -1,18 +1,29 @@
 /**
- * @file motion_param.c
- * @brief 电机运动参数解算模块实现（自包含，无外部幻影依赖）
+ * @file        motion_param.c
+ * @brief       电机运动参数解算模块（仅角度/速度，不含多圈计数）
+ * 
+ * @author      Dalin (dalin@robot.com)
+ * @version     1.0
+ * @date        2026-06-12
+ * 
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ * 
+ * 输入机械角度，按照配置的极对数 / 更新频率解算出：
+ *   - 电角度 / 电弧度
+ *   - 机械角度（透传）
+ *   - 角速度（deg/s、rad/s、滑动滤波、rpm）与角加速度
+ *   - 前馈补偿（速度 / 加速度）
  *
- * @author Eamon (eamon.zhang@hyfoss-tec.com)
- * @version 3.0
- * @date 2025-04-07
- *
+ * 多圈/绝对位置计数已拆分到独立的 multiturn 模块（multiturn.h），二者由调用方
+ * 组合使用：本模块吃机械角度出运动量，multiturn 吃齿轮角度出绝对圈数/位置。
+ * 
  * @par 修改日志:
- * <table>
- * <tr><th>Date       <th>Version <th>Author  <th>Description
- * <tr><td>2025-04-07 <td>1.0     <td>Eamon   <td>初始化
- * <tr><td>2025-04-17 <td>2.0     <td>Dalin   <td>重构代码，增加速度位置获取接口
- * <tr><td>2026-06-12 <td>3.0     <td>Dalin   <td>完全重构，模块自包含，新增齿轮游标绝对多圈
- * </table>
+ * | 日期       | 版本 | 作者   | 修改内容   |
+ * |------------|------|--------|------------|
+ * | 2026-06-12     | 1.0  | yangsl | 初始创建   |
+ * | 2026-06-15     | 1.1  | yangsl | 拆分：多圈计数移至 multiturn 模块，本模块仅保留角度/速度   |
+ * 
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
 
 #include "motion_param.h"
@@ -29,9 +40,6 @@
 #define MOTION_DEG2RAD (MOTION_PI / 180.0f) // °  -> rad
 #define MOTION_RAD2DEG (180.0f / MOTION_PI) // rad -> °
 
-/* 上电后丢弃的解算拍数（等待编码器稳定，沿用原 1000 拍） */
-#define MOTION_POS_SETTLE_TICKS 1000u
-
 /* NULL 防护：替代缺失的 assert_report，非法入参直接返回 */
 #define MOTION_GUARD(cond) \
 	do                     \
@@ -40,14 +48,6 @@
 		{                  \
 			return;        \
 		}                  \
-	} while (0)
-#define MOTION_GUARD_RET(cond, rv) \
-	do                             \
-	{                              \
-		if (!(cond))               \
-		{                          \
-			return (rv);           \
-		}                          \
 	} while (0)
 
 /* 把角度归一化到 [0, 360) */
@@ -58,18 +58,8 @@ static float normalize_angle(float angle)
 	return remainder >= 0.0f ? remainder : (remainder + 360.0f);
 }
 
-/* 把弧度差归一化到 (-pi, pi]，用于处理过零跳变 */
-static float wrap_rad_pi(float delta)
-{
-	while (delta > MOTION_PI)
-		delta -= MOTION_2PI;
-	while (delta <= -MOTION_PI)
-		delta += MOTION_2PI;
-	return delta;
-}
-
 /* ------------------------------------------------------------------ */
-/* 轻量滑动平均滤波器（替代缺失的 slide_filter）                        */
+/* 轻量滑动平均滤波器                                                   */
 /* ------------------------------------------------------------------ */
 static void slide_filter_init(motion_slide_filter_t *f, uint16_t size)
 {
@@ -142,8 +132,7 @@ static void update_deg_s(struct motion_param *pobj)
 
 /**
  * @brief 解算角速度（rad/s）与角加速度（rad/s^2）
- * @note  原实现把采样频率(Hz)放在 dt 字段里，rad_s = delta_deg * deg2rad * freq。
- *        这里 update_freq_hz 即每秒解算次数，保持同一量纲。
+ * @note  update_freq_hz 为每秒解算次数，rad_s = delta_deg * deg2rad * freq。
  */
 static void update_rad_s(struct motion_param *pobj, float mechanical_angle)
 {
@@ -178,150 +167,6 @@ static float update_rpm(struct motion_param *pobj)
 }
 
 /* ------------------------------------------------------------------ */
-/* 位置：单编码器软件累圈（掉电丢失）                                   */
-/* ------------------------------------------------------------------ */
-static float update_position_soft(struct motion_param *pobj)
-{
-	/* 编码器上电需要稳定一定时间 */
-	if (pobj->pos_settle_ticks < MOTION_POS_SETTLE_TICKS)
-	{
-		pobj->pos_settle_ticks++;
-		pobj->last_single_rad = pobj->mechanical_angle * MOTION_DEG2RAD;
-		return 0.0f;
-	}
-
-	/* 当前单圈弧度（含设备补偿），归一化到 [0, 2pi) */
-	float comp = (pobj->device_compensation_callback != NULL)
-					 ? pobj->device_compensation_callback()
-					 : 0.0f;
-	float curr_rad = pobj->mechanical_angle * MOTION_DEG2RAD - comp;
-	curr_rad = curr_rad >= MOTION_2PI ? (curr_rad - MOTION_2PI)
-									  : (curr_rad < 0.0f ? (curr_rad + MOTION_2PI) : curr_rad);
-
-	/* 过零跳变修正后累加 */
-	float delta = wrap_rad_pi(curr_rad - pobj->last_single_rad);
-	pobj->position += delta;
-	pobj->rotation_count = (int32_t)(pobj->position / MOTION_2PI);
-	pobj->last_single_rad = curr_rad;
-
-	/* SOFT 模式下绝对多圈量等于软件累圈量 */
-	pobj->multiturn_position = pobj->position;
-	pobj->multiturn_turns = pobj->rotation_count;
-	return pobj->position;
-}
-
-/* ------------------------------------------------------------------ */
-/* 位置：齿轮游标(Nonius)绝对多圈                                       */
-/* ------------------------------------------------------------------ */
-/**
- * @brief 圆周距离：两个单圈位置 [0,1) 的最近角差，范围 [0, 0.5]
- */
-static float circular_dist(float a, float b)
-{
-	float d = a - b;
-	d -= floorf(d); /* mod 1 -> [0,1) */
-	return (d <= 0.5f) ? d : (1.0f - d);
-}
-
-/**
- * @brief 齿轮游标绝对多圈解算（predict-match 法）
- *
- * 物理模型：主齿轮（齿数 Nm）与副齿轮（齿数 Ns）啮合，主齿轮转 1 圈，副齿轮转
- * Nm/Ns 圈。已知主齿轮绝对圈数 P 时，副齿轮单圈位置可预测为 frac(P * Nm/Ns)。
- *
- * 重建：主齿轮单圈位置 θm 已由主编码器测得（[0,1)）。遍历候选整圈数 T，预测各副
- * 齿轮单圈位置 frac((T+θm)*Nm/Ns_i)，与实测副齿轮位置做圆周距离求和，取误差最小
- * 的 T。单游标(双齿轮)量程 = Ns1 圈；双游标(三齿轮)量程 = Ns1*Ns2 圈（齿数两两
- * 互质时），且第二个游标提供交叉校验抗噪。
- *
- * 该法相比解析相位差更鲁棒：无需齿数模逆，误差以圆周距离显式度量，可用于异常判定。
- *
- * @param pobj 运动参数对象
- * @param gear_angles 各齿轮机械角度 (deg)，[0]=主齿轮
- * @param count 齿轮数量
- */
-static float update_position_nonius(struct motion_param *pobj,
-									const float *gear_angles, uint8_t count)
-{
-	const multiturn_config_t *cfg = &pobj->multiturn_cfg;
-	uint16_t Nm = cfg->gear_teeth[0];
-
-	/* 主齿轮单圈位置 θm [0,1) */
-	int8_t dir_m = (cfg->gear_dir[0] != 0) ? cfg->gear_dir[0] : 1;
-	float theta_m = normalize_angle((float)dir_m * gear_angles[0]) / 360.0f;
-
-	/* 各副齿轮单圈位置与齿数（最多 2 个） */
-	uint8_t nsec = (count >= MOTION_NONIUS_GEAR_MAX) ? (MOTION_NONIUS_GEAR_MAX - 1u)
-													 : (uint8_t)(count - 1u);
-	if (cfg->mode == MULTITURN_MODE_NONIUS_2GEAR && nsec > 1u)
-		nsec = 1u;
-
-	float theta_s[MOTION_NONIUS_GEAR_MAX - 1u];
-	uint16_t teeth_s[MOTION_NONIUS_GEAR_MAX - 1u];
-	int32_t period = 1;
-	for (uint8_t i = 0; i < nsec; i++)
-	{
-		int8_t dir = (cfg->gear_dir[i + 1u] != 0) ? cfg->gear_dir[i + 1u] : 1;
-		theta_s[i] = normalize_angle((float)dir * gear_angles[i + 1u]) / 360.0f;
-		teeth_s[i] = cfg->gear_teeth[i + 1u];
-		period *= (int32_t)teeth_s[i]; /* 量程 = 各副齿轮齿数之积 */
-	}
-
-	/* predict-match：扫描候选整圈数，取副齿轮预测误差最小者 */
-	int32_t best_turns = 0;
-	float best_err = 1.0e30f;
-	for (int32_t T = 0; T < period; T++)
-	{
-		float p_abs = (float)T + theta_m; /* 主齿轮绝对圈数 */
-		float err = 0.0f;
-		for (uint8_t i = 0; i < nsec; i++)
-		{
-			float pred = p_abs * (float)Nm / (float)teeth_s[i];
-			pred -= floorf(pred); /* 预测副齿轮单圈位置 */
-			err += circular_dist(pred, theta_s[i]);
-		}
-		if (err < best_err)
-		{
-			best_err = err;
-			best_turns = T;
-		}
-	}
-
-	/* 绝对多圈位置 = 整圈数 + 主齿轮单圈位置，转成弧度 */
-	pobj->multiturn_turns = best_turns;
-	pobj->multiturn_position = ((float)best_turns + theta_m) * MOTION_2PI;
-
-	/* position 与 multiturn 对齐，rotation_count 给出整圈数 */
-	pobj->position = pobj->multiturn_position;
-	pobj->rotation_count = best_turns;
-	return pobj->multiturn_position;
-}
-
-/* 位置解算分发：按多圈模式选择 */
-static float update_position(struct motion_param *pobj,
-							 const float *gear_angles, uint8_t count)
-{
-	switch (pobj->multiturn_cfg.mode)
-	{
-		case MULTITURN_MODE_NONIUS_2GEAR:
-			if (count >= 2u)
-				return update_position_nonius(pobj, gear_angles, count);
-			return update_position_soft(pobj); /* 副齿轮缺失则回退软件累圈 */
-
-		case MULTITURN_MODE_NONIUS_3GEAR:
-			/* 三齿轮模式：齐全(>=3)用双游标，缺一路(==2)自动退化为单游标 */
-			if (count >= 2u)
-				return update_position_nonius(pobj, gear_angles, count);
-			return update_position_soft(pobj);
-
-		case MULTITURN_MODE_SOFT:
-		case MULTITURN_MODE_NONE:
-		default:
-			return update_position_soft(pobj);
-	}
-}
-
-/* ------------------------------------------------------------------ */
 /* 获取接口                                                            */
 /* ------------------------------------------------------------------ */
 static float get_mechanical_angle(struct motion_param *pobj)
@@ -331,18 +176,6 @@ static float get_mechanical_angle(struct motion_param *pobj)
 static float get_ele_radian(struct motion_param *pobj)
 {
 	return pobj->ele_radian;
-}
-static float get_position(struct motion_param *pobj)
-{
-	return pobj->position;
-}
-static float get_multiturn_position(struct motion_param *pobj)
-{
-	return pobj->multiturn_position;
-}
-static int32_t get_turns(struct motion_param *pobj)
-{
-	return pobj->multiturn_turns;
 }
 
 static void set_update_freq(struct motion_param *pobj, uint32_t freq_hz)
@@ -385,14 +218,12 @@ static float feedforword_get_acc(struct motion_param *pobj)
 /* ------------------------------------------------------------------ */
 /* 更新分发                                                            */
 /* ------------------------------------------------------------------ */
-static void motor_param_handle_ex(struct motion_param *pobj, motion_type_e type,
-								  const float *gear_angles, uint8_t count)
+static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
+							   float mechanical_angle)
 {
 	MOTION_GUARD(pobj != NULL);
-	MOTION_GUARD(gear_angles != NULL);
-	MOTION_GUARD(count >= 1u);
 
-	pobj->mechanical_angle = gear_angles[0];
+	pobj->mechanical_angle = mechanical_angle;
 
 	switch (type)
 	{
@@ -409,30 +240,16 @@ static void motor_param_handle_ex(struct motion_param *pobj, motion_type_e type,
 			update_rpm(pobj);
 			break;
 
-		case MOTION_TYPE_ELE_POS:
-		case MOTION_TYPE_ELE_POS_RADIAN:
-			update_ele_radian(pobj);
-			update_position(pobj, gear_angles, count);
-			break;
-
 		case MOTION_TYPE_ALL:
 			update_ele_radian(pobj);
 			update_rad_s(pobj, pobj->mechanical_angle);
 			update_deg_s(pobj);
 			update_rpm(pobj);
-			update_position(pobj, gear_angles, count);
 			break;
 
 		default:
 			break;
 	}
-}
-
-static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
-							   float mechanical_angle)
-{
-	/* 单角度入口：等价于 count=1 的多角度入口 */
-	motor_param_handle_ex(pobj, type, &mechanical_angle, 1u);
 }
 
 /* ------------------------------------------------------------------ */
@@ -447,8 +264,6 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 
 	pobj->poles = cfg->poles;
 	pobj->update_freq_hz = (cfg->update_freq_hz == 0u) ? 1u : cfg->update_freq_hz;
-	pobj->multiturn_cfg = cfg->multiturn;
-	pobj->device_compensation_callback = cfg->device_compensation_callback;
 
 	/* 滤波器：速度用配置窗口，加速度/前馈用固定小窗口（沿用原值 5） */
 	slide_filter_init(&pobj->slide_filter, cfg->slide_window_size);
@@ -466,16 +281,12 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 	pobj->get_ele_radian = get_ele_radian;
 	pobj->get_rpm = update_rpm;
 	pobj->get_mechanical_angle = get_mechanical_angle;
-	pobj->get_position = get_position;
-	pobj->get_multiturn_position = get_multiturn_position;
-	pobj->get_turns = get_turns;
 
 	/* 配置接口 */
 	pobj->set_update_freq = set_update_freq;
 
 	/* 更新接口 */
 	pobj->update = motor_param_handle;
-	pobj->update_ex = motor_param_handle_ex;
 
 	/* 前馈补偿接口 */
 	pobj->feedforword_compute = feedforword_compute;
@@ -484,16 +295,16 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 }
 
 void motion_param_init(motion_param_t *pobj, uint8_t poles, uint16_t slide_window_size,
-					   float (*device_compensation_callback)(void))
+					   float (*unused_compensation_callback)(void))
 {
 	motion_param_config_t cfg;
 	memset(&cfg, 0, sizeof(cfg));
 
+	(void)unused_compensation_callback; /* 设备补偿已移至 multiturn 模块 */
+
 	cfg.poles = poles;
 	cfg.slide_window_size = slide_window_size;
-	cfg.update_freq_hz = 2000u;				  /* 沿用原默认 2000Hz */
-	cfg.multiturn.mode = MULTITURN_MODE_SOFT; /* 兼容旧行为：单编码器软件累圈 */
-	cfg.device_compensation_callback = device_compensation_callback;
+	cfg.update_freq_hz = 2000u; /* 沿用原默认 2000Hz */
 
 	motion_param_init_cfg(pobj, &cfg);
 }

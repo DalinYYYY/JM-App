@@ -24,8 +24,9 @@
 #define __DEV_MOTOR_STUB_H__
 
 #include <stdint.h>
-#include "foc.h"		  // 真实且自包含：focCurrent_t / foc_t
+#include "foc_core.h"		  // 真实且自包含：focCurrent_t / foc_t
 #include "motion_param.h" // 真实且自包含：motion_param_t
+#include "multiturn_counter.h"	  // 真实且自包含：multiturn_t
 
 /*
  * 真实 dev_motor.h 与本 stub 的互斥由 dev_motor_select.h 保证（按
@@ -92,6 +93,7 @@ typedef struct dev_motor
 
 	dev_mt6701_t mt6701;			   // 编码器
 	motion_param_t motor_param;		   // 运动参数解算
+	multiturn_t multiturn;			   // 绝对多圈计数
 	foc_t foc;						   // FOC
 	dev_half_bridge_t half_bridge;	   // 半桥
 	dev_phase_current_t phase_current; // 三相电流采样

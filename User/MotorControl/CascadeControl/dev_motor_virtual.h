@@ -38,8 +38,9 @@
 #define __DEV_MOTOR_VIRTUAL_H__
 
 #include <stdint.h>
-#include "foc.h"		  // 真实 foc_t / focCurrent_t（虚拟实现复用其类型）
+#include "foc_core.h"		  // 真实 foc_t / focCurrent_t（虚拟实现复用其类型）
 #include "motion_param.h" // 真实 motion_param_t（虚拟实现复用其类型）
+#include "multiturn_counter.h"	  // 真实 multiturn_t（虚拟实现复用其类型）
 
 typedef enum
 {
@@ -138,6 +139,7 @@ typedef struct dev_motor
 
 	dev_encoder_t encoder;			   // 抽象编码器（型号无关）
 	motion_param_t motor_param;		   // 运动参数解算
+	multiturn_t multiturn;			   // 绝对多圈计数
 	foc_t foc;						   // FOC（函数指针指向虚拟实现）
 	dev_half_bridge_t half_bridge;	   // 半桥（set_3pwm 触发物理积分）
 	dev_phase_current_t phase_current; // 三相电流采样（输出模型电流）

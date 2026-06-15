@@ -16,7 +16,7 @@
 
 #include "current_loop.h"
 #include "pid_profile.h"
-#include "foc.h"
+#include "foc_core.h"
 
 void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, float dt)
 {

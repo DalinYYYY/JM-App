@@ -19,11 +19,12 @@
 
 #include <stdint.h>
 #include "dev_mt6701.h"
-#include "foc.h"
+#include "foc_core.h"
 #include "dev_adc.h"
 #include "dev_half_bridge.h"
 #include "dev_mt6835.h"
 #include "motion_param.h"
+#include "multiturn_counter.h"
 #include "dev_control_signal_acq.h"
 #include "dev_motor_phase_current.h"
 
@@ -99,6 +100,7 @@ typedef struct dev_motor
 	dev_mt6835_t mt6835;   // mt6835（具体芯片实体，由 encoder.ctx 绑定）
 
 	motion_param_t motor_param;		   // motor_param
+	multiturn_t multiturn;			   // 绝对多圈计数
 	dev_control_signal_acq_t acq;	   // control signal acquisition
 	foc_t foc;						   // foc
 	dev_half_bridge_t half_bridge;	   // dev_half_bridge

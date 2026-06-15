@@ -492,14 +492,19 @@
           <GroupName>MotorAlgorithms</GroupName>
           <Files>
             <File>
-              <FileName>foc.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\MotorAlgorithms\foc.c</FilePath>
-            </File>
-            <File>
               <FileName>motion_param.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\MotorAlgorithms\motion_param.c</FilePath>
+            </File>
+            <File>
+              <FileName>foc_core.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\MotorAlgorithms\foc_core.c</FilePath>
+            </File>
+            <File>
+              <FileName>multiturn_counter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\MotorAlgorithms\multiturn_counter.c</FilePath>
             </File>
           </Files>
         </Group>

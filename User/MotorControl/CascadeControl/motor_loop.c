@@ -15,6 +15,7 @@
 #include "pid_profile.h"
 #include "runtime_param.h"
 #include "motion_param.h"
+#include "multiturn_counter.h"
 
 /* 全局电机三环控制上下文 */
 static motor_loop_t s_motor_loop;
@@ -92,16 +93,20 @@ void motor_loop_init(float current_freq_hz)
 static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool update_vel, bool update_pos)
 {
 	motion_param_t *mp = &m->motor.motor_param;
+	multiturn_t *mt = &m->motor.multiturn;
 
 	// 基于已刷新的机械角度解算速度/位置（不重复触发编码器采样）
 	// 虚拟模式下 update 指向物理模型实现，直接给出运动量
 	if (update_pos)
+	{
 		mp->update(mp, MOTION_TYPE_ALL, mp->mechanical_angle);
+		mt->update_single(mt, mp->mechanical_angle); // 多圈位置解算（单编码器/软件累圈）
+	}
 	else if (update_vel)
 		mp->update(mp, MOTION_TYPE_ELE_VEL_RADIAN, mp->mechanical_angle);
 
-	// 组织级联反馈：位置/速度来自运动解算，电流来自 FOC park 结果
-	fb->pos = mp->get_position(mp);
+	// 组织级联反馈：位置来自多圈解算，速度来自运动解算，电流来自 FOC park 结果
+	fb->pos = mt->get_position(mt);
 	fb->vel = mp->slide_rad_s;
 	fb->id = m->motor.foc.i_dq.d;
 	fb->iq = m->motor.foc.i_dq.q;

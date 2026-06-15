@@ -1,5 +1,5 @@
 /**
- * @file        foc.h
+ * @file        foc_core.h
  * @brief       BLDC FOC算法核心接口定义
  * 
  * @author      name (name@robot.com)

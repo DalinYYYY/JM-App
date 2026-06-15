@@ -1,5 +1,5 @@
 /**
- * @file        foc.c
+ * @file        foc_core.c
  * @brief 		FOC算法实现
  * 
  * @author      name (name@robot.com)
@@ -16,7 +16,7 @@
  * 
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
-#include "foc.h"
+#include "foc_core.h"
 #include <stdio.h>
 #include "utils.h"
 

@@ -137,8 +137,15 @@ void dev_motor_init(dev_motor_t *pobj,
 #error "未知的 DEV_MOTOR_ENCODER_TYPE，请在 dev_motor.h 选择支持的编码器型号"
 #endif
 
-	// 初始化角度转化器
-	motion_param_init(&pobj->motor_param, pobj->poles, 10, device_compensation);
+	// 初始化角度转化器（仅角度/速度，不含多圈）
+	motion_param_init(&pobj->motor_param, pobj->poles, 10, NULL);
+
+	// 初始化绝对多圈计数（单编码器软件累圈，设备补偿回调注入）
+	multiturn_config_t mt_cfg;
+	memset(&mt_cfg, 0, sizeof(mt_cfg));
+	mt_cfg.mode = MULTITURN_MODE_SOFT;
+	mt_cfg.device_compensation_callback = device_compensation;
+	multiturn_init(&pobj->multiturn, &mt_cfg);
 
 	// 初始化控制信号采集器
 	// dev_control_signal_acq_init(&pobj->acq);

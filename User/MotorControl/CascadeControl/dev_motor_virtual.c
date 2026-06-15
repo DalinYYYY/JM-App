@@ -32,7 +32,7 @@
 #if !(MOTOR_LOOP_ENABLE_DEV_DRIVER)
 
 #include "dev_motor_virtual.h"
-#include "foc.h"
+#include "foc_core.h"
 #include "motor_param.h"
 #include "runtime_param.h"
 #include <string.h>
@@ -193,17 +193,39 @@ static void virt_motion_update(struct motion_param *mp, motion_type_e type, floa
 	mp->ele_radian = m->model.theta_e;
 	mp->rad_s = m->model.omega;
 	mp->slide_rad_s = m->model.omega;
-	mp->position = m->model.theta_m; /* 连续累计机械角(rad) 即多圈位置 */
-}
-
-static float virt_motion_get_position(struct motion_param *mp)
-{
-	return mp->position;
 }
 
 static float virt_motion_get_ele_radian(struct motion_param *mp)
 {
 	return mp->ele_radian;
+}
+
+/*============================================================================
+ * multiturn 虚拟实现：连续累计机械角(rad)即绝对多圈位置，不做齿轮解算
+ *==========================================================================*/
+
+static float virt_multiturn_update(struct multiturn *mt, const float *gear_angles, uint8_t count)
+{
+	dev_motor_t *m = s_virtual_self;
+	(void)gear_angles;
+	(void)count;
+	if (m == NULL)
+		return 0.0f;
+	mt->position = m->model.theta_m; /* 连续累计机械角(rad) 即多圈位置 */
+	mt->multiturn_position = mt->position;
+	mt->turns = (int32_t)(mt->position / (2.0f * 3.14159265358979f));
+	return mt->position;
+}
+
+static float virt_multiturn_update_single(struct multiturn *mt, float mechanical_angle)
+{
+	(void)mechanical_angle;
+	return virt_multiturn_update(mt, NULL, 0u);
+}
+
+static float virt_multiturn_get_position(struct multiturn *mt)
+{
+	return mt->position;
 }
 
 /*============================================================================
@@ -295,8 +317,12 @@ void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
 	/* 装配 motion_param 函数指针（虚拟运动量） */
 	pobj->motor_param.poles = vm->poles;
 	pobj->motor_param.update = virt_motion_update;
-	pobj->motor_param.get_position = virt_motion_get_position;
 	pobj->motor_param.get_ele_radian = virt_motion_get_ele_radian;
+
+	/* 装配 multiturn 函数指针（虚拟绝对多圈位置） */
+	pobj->multiturn.update = virt_multiturn_update;
+	pobj->multiturn.update_single = virt_multiturn_update_single;
+	pobj->multiturn.get_position = virt_multiturn_get_position;
 
 	s_virtual_self = pobj;
 }
