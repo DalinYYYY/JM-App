@@ -1,7 +1,7 @@
 {
     "python-envs.pythonProjects": [
         {
-            "path": "User/Tools/motor_param_gen/generate_config_header_v9.py",
+            "path": "User/Tools/motor_param_gen/motor_param_generate_v9.py",
             "envManager": "ms-python.python:venv",
             "packageManager": "ms-python.python:pip"
         }
