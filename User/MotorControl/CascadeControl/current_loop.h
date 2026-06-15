@@ -24,7 +24,7 @@
 
 #include <stdint.h>
 #include "pid_core.h"
-#include "dev_motor.h"
+#include "dev_motor_select.h"
 
 /**
  * @brief 电流环控制器

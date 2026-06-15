@@ -42,9 +42,9 @@ void cur_loop_run(cur_loop_t *cl, float id_ref, float iq_ref)
 {
 	dev_motor_t *m = cl->motor;
 
-	// step1: 刷新编码器机械角度并解算电弧度（供 Park 变换）
-	m->mt6701.update(&m->mt6701);
-	// m->motor_param.update(&m->motor_param, MOTION_TYPE_ELE_RADIAN, m->mt6701.mechanical_angle);
+	// step1: 刷新编码器机械角度（抽象接口，与具体芯片型号无关）
+	m->encoder.update(&m->encoder);
+	// m->motor_param.update(&m->motor_param, MOTION_TYPE_ELE_RADIAN, m->encoder.mechanical_angle);
 
 	// step2: 三相电流采样
 	m->phase_current.update(&m->phase_current);
@@ -67,6 +67,7 @@ void cur_loop_run(cur_loop_t *cl, float id_ref, float iq_ref)
 	m->foc.pfsvpwm(&m->foc);
 
 	// step8: PWM 输出
+	// 真实模式：驱动半桥定时器；虚拟模式：用本拍 u_dq 推进物理模型一步（一拍延迟）
 	m->half_bridge.set_3pwm(&m->half_bridge,
 							(uint32_t)(PWM_PERIOD * m->foc.svpwm.ta),
 							(uint32_t)(PWM_PERIOD * m->foc.svpwm.tb),

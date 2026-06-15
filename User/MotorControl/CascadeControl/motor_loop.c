@@ -26,6 +26,7 @@ motor_loop_t *motor_loop_get(void)
 
 /**
  * @brief FOC 三相电流回调：从相电流采样对象读取 ia/ib/ic
+ * @note  真实模式来自 ADC 采样；虚拟模式来自 dq 物理模型反算的三相电流。
  */
 static focCurrent_t motor_loop_current_cb(void)
 {
@@ -60,8 +61,13 @@ void motor_loop_init(float current_freq_hz)
 	// PID 参数管理器（位置/速度/电流环共用同一套 profile 体系）
 	pid_profile_init(param);
 
-	// 底层电机设备（FOC/编码器/半桥/ADC）
+	// 底层电机设备（真实硬件 或 虚拟 dq 物理模型，由 select 头决定）
 	dev_motor_init(&m->motor, DEV_MOTOR_1, motor_loop_current_cb, motor_loop_ele_radian_cb);
+
+#if !(MOTOR_LOOP_ENABLE_DEV_DRIVER)
+	// 虚拟电机：用实际电流环周期设置物理模型积分步长，保证仿真 dt 与控制 dt 一致
+	virtual_motor_set_period(&m->motor, dt_current);
+#endif
 
 	// 上层状态机（模式管理 + 参考生成）
 	system_state_init(&m->sys, param, dt_current);
@@ -88,6 +94,7 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 	motion_param_t *mp = &m->motor.motor_param;
 
 	// 基于已刷新的机械角度解算速度/位置（不重复触发编码器采样）
+	// 虚拟模式下 update 指向物理模型实现，直接给出运动量
 	if (update_pos)
 		mp->update(mp, MOTION_TYPE_ALL, mp->mechanical_angle);
 	else if (update_vel)

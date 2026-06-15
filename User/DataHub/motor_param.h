@@ -1,7 +1,12 @@
 /**
  * @file    motor_param.h
  * @brief   关节电机配置参数API接口
- * @date    2026-06-11
+ * @date    2026-06-12
+ *
+ * @warning 【自动生成文件，请勿手动修改】
+ *          本文件由脚本 generate_config_header_v9.py 根据配置表自动生成，
+ *          任何手动改动都会在下次运行脚本时被覆盖。
+ *          如需修改参数定义，请编辑源 CSV 配置表后重新生成。
  */
 
 #ifndef __MOTOR_PARAM_H__
@@ -14,6 +19,10 @@ extern "C"
 
 #include <stdint.h>
 #include <stdbool.h>
+
+/* ===== 自动生成元信息 ===== */
+#define MOTOR_PARAM_GEN_DATE "2026-06-12"
+#define MOTOR_PARAM_PARAM_COUNT 83
 
 	/* 配置结构体前向声明 */
 	typedef struct motor_param motor_param_t;
@@ -210,7 +219,7 @@ extern "C"
 	/**
  * @brief   校验电机配置参数范围
  * @param   cfg 电机配置指针
- * @return  0=成功, 其他=错误码
+ * @return  0=全部通过, >0=首个越界参数的 id(见CSV), -EINVAL=空指针
  */
 	int motor_param_validate(const motor_param_t *cfg);
 
@@ -238,6 +247,21 @@ extern "C"
  * @return  0=成功, -EINVAL=参数错误
  */
 	int motor_param_set_motor_id(motor_param_t *cfg, uint8_t value);
+
+	/**
+ * @brief   获取电机名称字符串
+ * @param   cfg 电机配置指针
+ * @return  指向电机名称字符串字符串的指针
+ */
+	const char *motor_param_get_motor_name(const motor_param_t *cfg);
+
+	/**
+ * @brief   设置电机名称字符串
+ * @param   cfg 电机配置指针
+ * @param   value 源字符串(以\0结尾)
+ * @return  0=成功, -EINVAL=参数错误
+ */
+	int motor_param_set_motor_name(motor_param_t *cfg, const char *value);
 
 	/******************************************************************************
  * @brief   电机本体参数

@@ -24,7 +24,7 @@
 #define __MOTOR_LOOP_H__
 
 #include <stdint.h>
-#include "dev_motor.h"
+#include "dev_motor_select.h"
 #include "system_state.h"
 #include "cascade_control.h"
 #include "current_loop.h"

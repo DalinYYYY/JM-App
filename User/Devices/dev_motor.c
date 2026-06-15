@@ -23,13 +23,13 @@ ffc_lpf_filter_t ffc_filter;
 lf_notch_filter_t lf_notch_filter;
 
 dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
-    {"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
-    // {"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
+	{"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
+	// {"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
 };
 
 static void dev_motor_enable(void)
 {
-    drv_gpio_write(motor_enable_list[DEV_MOTOR_1].gpio, (drvPinState_e)1);
+	drv_gpio_write(motor_enable_list[DEV_MOTOR_1].gpio, (drvPinState_e)1);
 }
 
 static uint8_t dev_motor_search_poles(dev_motor_t *pobj)
@@ -39,75 +39,127 @@ static uint8_t dev_motor_search_poles(dev_motor_t *pobj)
 //
 float device_compensation(void)
 {
-    return motor_info.device.device_compensation;
+	return motor_info.device.device_compensation;
 }
 
 // 待增加自动获取电机极对数函数
 static uint8_t dev_motor_get_poles(motor_id_e id)
 {
-    uint8_t poles = 0;
-    switch (id)
-    {
-        case DEV_MOTOR_1: poles = 7; break;
-        // case DEV_MOTOR_2: poles = 3;    break;
-        default: poles = 7; break;
-    }
-    return poles;
+	uint8_t poles = 0;
+	switch (id)
+	{
+		case DEV_MOTOR_1: poles = 7; break;
+		// case DEV_MOTOR_2: poles = 3;    break;
+		default: poles = 7; break;
+	}
+	return poles;
 }
 
-void dev_motor_init(dev_motor_t *pobj,
-                    motor_id_e id,
-                    focCurrent_t (*current_callback)(void),
-                    float (*ele_radian_callback)(void))
+/*============================================================================
+ * 抽象编码器适配层
+ *   把具体芯片(mt6701/mt6835/...)适配到 dev_encoder_t 抽象接口。
+ *   控制层只调 encoder.update / encoder.get_mechanical_angle，不感知型号。
+ *   只编译 DEV_MOTOR_ENCODER_TYPE 选中型号的那套适配函数。
+ *==========================================================================*/
+
+#if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
+/** @brief MT6701 → 抽象编码器：刷新并同步机械角到 enc->mechanical_angle */
+static void encoder_mt6701_update(struct dev_encoder *enc)
 {
-    assert_report(pobj != NULL);
-    assert_report(&pobj->mt6835 != NULL);
-    assert_report(&pobj->foc != NULL);
-    assert_report(current_callback != NULL);
-    assert_report(ele_radian_callback != NULL);
-    assert_report(id < DEV_MOTOR_MAX);
-    memset(pobj, 0, sizeof(dev_motor_t));
+	dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+	chip->update(chip);
+	enc->mechanical_angle = chip->mechanical_angle; // mt6701 无 getter，直接读字段
+}
 
-    pobj->id = id;
-    pobj->poles = dev_motor_get_poles((motor_id_e)id);
+static float encoder_mt6701_get_mechanical_angle(struct dev_encoder *enc)
+{
+	return enc->mechanical_angle;
+}
 
-    pobj->fsm_tim = DRV_TIM2; // 定时器2
+#elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
+/** @brief MT6835 → 抽象编码器：刷新并经 get_mechanical_angle 取角 */
+static void encoder_mt6835_update(struct dev_encoder *enc)
+{
+	dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+	chip->update(chip);
+	enc->mechanical_angle = chip->get_mechanical_angle(chip);
+}
 
-    // 初始化编码器
-    dev_mt6701_init(&pobj->mt6701, (mt6701_id_e)id);
-    pobj->mt6701.set_zero_angle(&pobj->mt6701, usr.motor[id].encoder_param.encoder_offset);
-    if(usr.motor[id].encoder_param.change_dir)
-        pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CCW);
-    else
-        pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CW);
+static float encoder_mt6835_get_mechanical_angle(struct dev_encoder *enc)
+{
+	return enc->mechanical_angle;
+}
+#endif
 
-//    dev_mt6835_init(&pobj->mt6835, (mt6835_id_e)id);
-    // pobj->mt6835.set_offset(&pobj->mt6835, usr.motor[id].encoder_param.encoder_offset);
-    // pobj->mt6835.set_dir(&pobj->mt6835, usr.motor[id].encoder_param.change_dir);
+void dev_motor_init(dev_motor_t *pobj,
+					motor_id_e id,
+					focCurrent_t (*current_callback)(void),
+					float (*ele_radian_callback)(void))
+{
+	assert_report(pobj != NULL);
+	assert_report(&pobj->mt6835 != NULL);
+	assert_report(&pobj->foc != NULL);
+	assert_report(current_callback != NULL);
+	assert_report(ele_radian_callback != NULL);
+	assert_report(id < DEV_MOTOR_MAX);
+	memset(pobj, 0, sizeof(dev_motor_t));
 
-    // 初始化角度转化器
-    motion_param_init(&pobj->motor_param, pobj->poles, 10, device_compensation);
+	pobj->id = id;
+	pobj->poles = dev_motor_get_poles((motor_id_e)id);
 
-    // 初始化控制信号采集器
-    // dev_control_signal_acq_init(&pobj->acq);
-    //   pobj->acq.update(&pobj->acq);
+	pobj->fsm_tim = DRV_TIM2; // 定时器2
 
-    // 初始化半桥驱动器
-    dev_half_bridge_init(&pobj->half_bridge, (half_bridge_id_e)id);
+	// 初始化编码器（型号由 DEV_MOTOR_ENCODER_TYPE 选择，控制层不感知）
+#if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
+	dev_mt6701_init(&pobj->mt6701, (mt6701_id_e)id);
+	pobj->mt6701.set_zero_angle(&pobj->mt6701, usr.motor[id].encoder_param.encoder_offset);
+	if (usr.motor[id].encoder_param.change_dir)
+		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CCW);
+	else
+		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CW);
 
-    // 初始化三相adc电流采样
-    dev_phase_current_init(&pobj->phase_current, 50.0F, 0.01F);                             // 采样增益倍数 10 和采样电阻 0.01欧姆
-    pobj->phase_current.set_offset(&pobj->phase_current, (dev_current_i3axis_t){1660, 1660, 1660}); // 电流零位时adc采样值偏移
+	/* 装配抽象编码器接口 → MT6701 */
+	pobj->encoder.ctx = &pobj->mt6701;
+	pobj->encoder.update = encoder_mt6701_update;
+	pobj->encoder.get_mechanical_angle = encoder_mt6701_get_mechanical_angle;
 
-    // 初始化FOC
-    pobj->current_callback = current_callback;
-    pobj->ele_radian_callback = ele_radian_callback;
-    foc_init(&pobj->foc, pobj->current_callback, pobj->ele_radian_callback);
+#elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
+	dev_mt6835_init(&pobj->mt6835, (mt6835_id_e)id);
+	pobj->mt6835.set_zero_angle(&pobj->mt6835, usr.motor[id].encoder_param.encoder_offset);
+	pobj->mt6835.set_dir(&pobj->mt6835, usr.motor[id].encoder_param.change_dir ? 1 : 0);
 
-    dev_motor_enable();
+	/* 装配抽象编码器接口 → MT6835 */
+	pobj->encoder.ctx = &pobj->mt6835;
+	pobj->encoder.update = encoder_mt6835_update;
+	pobj->encoder.get_mechanical_angle = encoder_mt6835_get_mechanical_angle;
 
-    //初始化滤波器
-    ffc_lpfilter_init(&ffc_filter); //低通滤波器
-    // notch_filter_init(&notch_filter);//Notch filter滤波器
-    lf_notch_filter_init(&lf_notch_filter); //Notch filter滤波器
+#else
+#error "未知的 DEV_MOTOR_ENCODER_TYPE，请在 dev_motor.h 选择支持的编码器型号"
+#endif
+
+	// 初始化角度转化器
+	motion_param_init(&pobj->motor_param, pobj->poles, 10, device_compensation);
+
+	// 初始化控制信号采集器
+	// dev_control_signal_acq_init(&pobj->acq);
+	//   pobj->acq.update(&pobj->acq);
+
+	// 初始化半桥驱动器
+	dev_half_bridge_init(&pobj->half_bridge, (half_bridge_id_e)id);
+
+	// 初始化三相adc电流采样
+	dev_phase_current_init(&pobj->phase_current, 50.0F, 0.01F);										// 采样增益倍数 10 和采样电阻 0.01欧姆
+	pobj->phase_current.set_offset(&pobj->phase_current, (dev_current_i3axis_t){1660, 1660, 1660}); // 电流零位时adc采样值偏移
+
+	// 初始化FOC
+	pobj->current_callback = current_callback;
+	pobj->ele_radian_callback = ele_radian_callback;
+	foc_init(&pobj->foc, pobj->current_callback, pobj->ele_radian_callback);
+
+	dev_motor_enable();
+
+	//初始化滤波器
+	ffc_lpfilter_init(&ffc_filter); //低通滤波器
+	// notch_filter_init(&notch_filter);//Notch filter滤波器
+	lf_notch_filter_init(&lf_notch_filter); //Notch filter滤波器
 }

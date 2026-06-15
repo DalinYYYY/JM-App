@@ -83,7 +83,7 @@
             <RunUserProg1>0</RunUserProg1>
             <RunUserProg2>1</RunUserProg2>
             <UserProg1Name></UserProg1Name>
-            <UserProg2Name>.\keil5_disp_size_bar.exe</UserProg2Name>
+            <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
             <nStopA1X>0</nStopA1X>
@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../User/AppEntry;../User/AppServices/ErrorManager;../User/AppServices/ParamService;../User/AppServices/SafetyManager;../User/AppServices/StateMachine;../User/AppServices/ThreadManager;../User/AppServices/Watchdog;../User/Common;../User/Config;../User/DataHub;../User/Devices;../User/Driver;../User/MotorAlgorithms;..\User\MotorControl\Calibration;../User/Protocol;..\User\MotorControl\ControlModes;..\User\MotorControl\ControlProcess;..\User\MotorControl\CascadeControl</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../User/AppEntry;../User/AppServices/ErrorManager;../User/AppServices/ParamService;../User/AppServices/SafetyManager;../User/AppServices/StateMachine;../User/AppServices/ThreadManager;../User/AppServices/Watchdog;../User/Common;../User/Config;../User/DataHub;../User/Devices;../User/Driver;../User/MotorAlgorithms;../User/MotorControl/Calibration;../User/Protocol;../User/MotorControl/ControlModes;../User/MotorControl/ControlProcess;../User/MotorControl/CascadeControl</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -481,10 +481,27 @@
               <FileType>1</FileType>
               <FilePath>..\User\MotorControl\CascadeControl\motor_loop.c</FilePath>
             </File>
+            <File>
+              <FileName>dev_motor_virtual.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\MotorControl\CascadeControl\dev_motor_virtual.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
           <GroupName>MotorAlgorithms</GroupName>
+          <Files>
+            <File>
+              <FileName>foc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\MotorAlgorithms\foc.c</FilePath>
+            </File>
+            <File>
+              <FileName>motion_param.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\MotorAlgorithms\motion_param.c</FilePath>
+            </File>
+          </Files>
         </Group>
         <Group>
           <GroupName>DataHub</GroupName>

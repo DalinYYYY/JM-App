@@ -45,4 +45,22 @@
 #error "MOTOR_LOOP_POS_DIV 必须为 MOTOR_LOOP_VEL_DIV 的整数倍"
 #endif
 
+/*============================================================================
+ * 设备层来源开关（虚拟电机 / 真实驱动）
+ *   - 0：使用虚拟电机（dev_motor_virtual）。一个完整的 dq PMSM 物理模型伪装成
+ *        dev_motor_t，让 FOC 三环在无硬件时即可闭环运行、调参。编码器角度、
+ *        三相电流采样均由模型实时生成，Clarke/Park/SVPWM/PI 全链路真实参与。
+ *   - 1：使用真实 dev_motor 驱动（编码器/三相采样/半桥PWM 等硬件）。
+ *
+ *        两种模式下三环控制层（current_loop / motor_loop）代码完全一致，
+ *        API（dev_motor_t / dev_motor_init）签名不变。dev_motor_select.h 按本宏
+ *        二选一包含 dev_motor.h 或 dev_motor_virtual.h；dev_motor_virtual.c 实现体
+ *        由本宏控制（=1 时编译为空），与真实 dev_motor.c 零符号冲突。
+ *
+ *        硬件就绪后将本宏置 1 即切换到真实电机，无需改动三环控制层。
+ *==========================================================================*/
+#ifndef MOTOR_LOOP_ENABLE_DEV_DRIVER
+#define MOTOR_LOOP_ENABLE_DEV_DRIVER 0u
+#endif
+
 #endif /* __MOTOR_LOOP_CONFIG_H__ */

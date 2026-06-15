@@ -1,22 +1,23 @@
 /**
- * @file foc.c
- * @brief 
- * @author Dalin
- * @version 1.00
- * @date 2024-11-11
+ * @file        foc.c
+ * @brief 		FOC算法实现
  * 
- * @copyright Copyright (c) 2024  RobotDance Technology Co., Ltd.
+ * @author      name (name@robot.com)
+ * @version     1.0
+ * @date        2026-06-15
+ * 
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ * 
  * 
  * @par 修改日志:
- * <table>
- * <tr><th>Date           <th>Version     <th>Author      <th>Description
- * <tr><td>2024-11-11     <td>1.00        <td>LinHui      <td>Init
- * </table>
+ * | 日期       | 版本 | 作者   | 修改内容   |
+ * |------------|------|--------|------------|
+ * | 2026-06-15     | 1.0  | yangsl | 初始创建   |
+ * 
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
-
 #include "foc.h"
 #include <stdio.h>
-#include "util.h"
 #include "utils.h"
 
 //#define IQ_MATH_ENABLE 0
@@ -30,13 +31,6 @@
 #else
 #include <math.h>
 #endif
-
-/*
- * @foc reference link： https://blog.csdn.net/helaisun/article/details/127153661
- * @clarke: reference link: https://blog.csdn.net/tiange1996/article/details/125494067
- * @park : reference link：https://blog.csdn.net/tiange1996/article/details/125512056?spm=1001.2014.3001.5502
- * @inversePark： reference link：https://blog.csdn.net/tiange1996/article/details/125592133?spm=1001.2014.3001.5502
- */
 
 /*
   * @brief  等幅值Clarke变换：
@@ -259,8 +253,6 @@ static void foc_svpwm(struct foc *pobj)
  */
 void foc_init(foc_t *pobj, focCurrent_t (*current_cb)(void), float (*ele_radian_cb)(void))
 {
-	assert_report(pobj != NULL);
-	assert_report(current_cb != NULL);
 	memset(pobj, 0, sizeof(foc_t));
 
 	pobj->current_callback = current_cb;
