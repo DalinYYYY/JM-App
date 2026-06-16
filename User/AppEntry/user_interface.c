@@ -43,9 +43,16 @@ void user_init(void)
 	thread_init();
 
 	HAL_TIM_Base_Start_IT(&htim2); /* 启动定时器更新中断，进入 user_control 调周期执行 */
+	HAL_TIM_Base_Start_IT(&htim5); /* 启动定时器更新中断，进入 motor_virtual_loop 调周期执行 */
 }
 
 void user_control(void)
+{
+
+	//    motor_ctrl_loop();
+}
+
+void motor_virtual_loop(void)
 {
 	// 在使用虚拟电机时，三环控制在中断里执行，主循环无需调用
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER == 0u)
@@ -59,5 +66,4 @@ void user_control(void)
 
 	dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_TIME);
 #endif
-	//    motor_ctrl_loop();
 }
