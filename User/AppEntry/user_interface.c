@@ -22,6 +22,8 @@
 #include "dev_dwt_counter.h"
 #include "motor_loop.h"
 #include "motor_loop_config.h"
+#include "runtime_param.h"
+#include "tim.h" // TODO: 避免直接依赖具体外设头，改为抽象接口（如 timer.h），或通过 control_irq.c 传入时钟频率等参数实现解耦
 
 static void hardware_init(void)
 {
@@ -39,13 +41,23 @@ void user_init(void)
 
 	/* 创建线程 */
 	thread_init();
+
+	HAL_TIM_Base_Start_IT(&htim2); /* 启动定时器更新中断，进入 user_control 调周期执行 */
 }
 
 void user_control(void)
 {
 	// 在使用虚拟电机时，三环控制在中断里执行，主循环无需调用
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER == 0u)
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_CYCLE); // 测量电流环周期
+	dev_dwt_counter_start(SYS_TIMER_RECORD_CURRENT_LOOP_CYCLE);
+
+	dev_dwt_counter_start(SYS_TIMER_RECORD_CURRENT_LOOP_TIME); // 测量电流环运行时间
+
+	// 三环控制入口（电流20kHz / 速度4kHz / 位置2kHz 分频）
 	motor_loop_isr();
+
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_TIME);
 #endif
 	//    motor_ctrl_loop();
 }

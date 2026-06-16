@@ -47,6 +47,7 @@ void dev_dwt_counter_stop(uint8_t index)
 
 	/* 无符号回环减法天然正确处理CYCCNT溢出 */
 	dwt_timer.duration_records[index] = drv_dwt_timer_get_ticks() - dwt_timer.now_records[index];
+	dwt_timer.duration_us[index] = dwt_timer.ticks_to_us * (float)dwt_timer.duration_records[index];
 }
 
 /**

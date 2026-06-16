@@ -12,6 +12,7 @@ extern "C"
 	{
 		uint32_t now_records[SYS_TIMER_RECORD_MAX_INDEX];	   /* 记录各索引对应的起始时刻(DWT_CYCCNT计数值) */
 		uint32_t duration_records[SYS_TIMER_RECORD_MAX_INDEX]; /* 记录各索引对应的持续时长(时钟周期数) */
+		float duration_us[SYS_TIMER_RECORD_MAX_INDEX];		   /* 记录各索引对应的持续时长(微秒) */
 		uint32_t sys_freq_hz;								   /* 系统时钟频率，单位Hz */
 		float ticks_to_us;									   /* 时钟周期数→微秒的换算系数(1e6/freq)，用于快速换算 */
 	} dwtTimer_t;
