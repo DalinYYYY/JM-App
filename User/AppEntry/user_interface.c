@@ -1,20 +1,20 @@
 /**
- * @file user_interface.c
- * @brief 
+ * @file        user_interface.c
+ * @brief       用户接口层（硬件初始化 + 线程创建 + 主循环调度）
  * 
- * @author dalin (dalin@robot.com)
- * @version 1.0
- * @date 2026-06-10
+ * @author      name (name@robot.com)
+ * @version     1.0
+ * @date        2026-06-16
  * 
- * @copyright Copyright (c) 2026 Robot Tech.co, Ltd. All rights reserved.
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ * 
  * 
  * @par 修改日志:
- * <table>
- * <tr><th>日期</th><th>版本</th><th>作者</th><th>修改内容</th></tr>
- * <tr><td>2026-06-10</td><td>1.0</td><td>yangsl</td><td>初始创建</td></tr>
- * </table>
+ * | 日期       | 版本 | 作者   | 修改内容   |
+ * |------------|------|--------|------------|
+ * | 2026-06-16     | 1.0  | yangsl | 初始创建   |
  * 
- * @note 本文件遵循《嵌入式C代码规范V1.0》开发
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
 
 #include "user_interface.h"
