@@ -165,6 +165,7 @@ static float vel_calc_diff(struct motion_param *pobj, float mechanical_angle, fl
 	return slide_filter_calc(&pobj->slide_filter, rad_s);
 }
 
+// https://k0uhb8quijf.feishu.cn/wiki/Tw7qwWYvkiwY9LkX8TRc6WPunVf?from=from_copylink
 /* 方法二：N 点最小二乘差分（对最近 N 个角度拟合直线，斜率即速度）。
  * 角度先去跳变累加成连续序列，避免 360° 折返污染拟合。返回 rad/s。 */
 static float vel_calc_lsq(struct motion_param *pobj, float mechanical_angle)
@@ -219,6 +220,7 @@ static float vel_calc_lsq(struct motion_param *pobj, float mechanical_angle)
 	return slope * freq * MOTION_DEG2RAD;
 }
 
+// https://k0uhb8quijf.feishu.cn/wiki/Bth6wWwTii7YhWknRvEcAYYknmc?from=from_copylink
 /* 方法三：PLL/龙伯格二阶观测器。位置误差驱动 PI，速度状态积分得位置。
  * 返回 rad/s（取观测器速度状态 pll_omega）。 */
 static float vel_calc_pll(struct motion_param *pobj, float mechanical_angle)

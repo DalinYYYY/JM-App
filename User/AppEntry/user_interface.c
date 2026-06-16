@@ -21,6 +21,7 @@
 #include "thread_management.h"
 #include "dev_dwt_counter.h"
 #include "motor_loop.h"
+#include "motor_loop_config.h"
 
 static void hardware_init(void)
 {
@@ -42,5 +43,9 @@ void user_init(void)
 
 void user_control(void)
 {
+	// 在使用虚拟电机时，三环控制在中断里执行，主循环无需调用
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER == 0u)
+	motor_loop_isr();
+#endif
 	//    motor_ctrl_loop();
 }
