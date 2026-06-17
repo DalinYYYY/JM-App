@@ -79,6 +79,11 @@ void motor_loop_init(float current_freq_hz)
 
 	// 电流采样零位校准
 	cur_loop_calibrate_offset(&m->current);
+
+	m->motor.phase_current.start(&m->motor.phase_current);
+	m->motor.half_bridge.start(&m->motor.half_bridge);
+
+	drv_tim_start_it(m->motor.fsm_tim); // 启动控制定时器
 }
 
 /**
