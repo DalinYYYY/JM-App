@@ -88,4 +88,3 @@ float pid_core_calculate_with_ff(pid_state_t *state,
 								 float dt);
 
 #endif /* __PID_CORE_H__ */
-								 

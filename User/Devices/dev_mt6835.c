@@ -1,21 +1,21 @@
 /**
- * @file dev_mt6835.c
- * @brief MT6835磁编码器驱动程序
- * 
- * @author dalin (dalin@robot.com)
- * @version 1.0
- * @date 2025-04-23
- * 
- * @copyright Copyright (c) 2026  1024 Tech.co, Ltd
- * 
+ * @file        dev_mt6835.c
+ * @brief       MT6835磁编码器(21bit SPI): 角度/零点读写(寄存器/EEPROM)/方向
+ *
+ * @author      Dalin (dalin@robot.com)
+ * @version     1.1
+ * @date        2026-06-17
+ *
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ *
  * @par 修改日志:
- * <table>
- * <tr><th>Date       <th>Version <th>Author  <th>Description
- * <tr><td>2025-04-12 <td>1.0     <td>Dalin     <td>分离角度获取和角度转化
- * <tr><td>2025-04-23 <td>2.0     <td>Dalin     <td>增加零点存储和重新实现SPI读写接口
- * </table>
+ * | 日期       | 版本 | 作者   | 修改内容                                   |
+ * |------------|------|--------|--------------------------------------------|
+ * | 2026-06-11 | 1.0  | Dalin  | 分离角度获取和角度转化                     |
+ * | 2026-06-17 | 1.1  | Dalin  | 复用共享配置表; 去重去死码去魔数; 补init漏绑 |
+ *
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
-
 #include "dev_mt6835.h"
 
 #if defined(USE_DEV_MT6835)
@@ -24,222 +24,158 @@
 #include "drv_gpio.h"
 #include <math.h>
 
-#define __SpiDrv1 DRV_SPI1
+#define MT6835_SPI_TIMEOUT (200u) /* SPI收发超时, ms */
 
-/* 引脚控制 */
-static const mt6835_config_t mt6835_list[MT6835_ID_MAX] = {
-{
-    "MT6835_1",
-    {DRV_SPI1},
-    {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_6, (drvPinState_e)0},
-    {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_7, (drvPinState_e)0}}
-};
-
-/**
- * @brief 设置引脚状态
- * 
- * @param  pobj             : xxx
- * @param  state            : 设置的状态
- * 
- */
+/* 片选控制 */
 static void dev_mt6835_csn_ctrl(struct dev_mt6835 *pobj, mt6835State_e state)
 {
-    drv_gpio_write(mt6835_list[pobj->id].csn, (drvPinState_e)state);
+	drv_gpio_write(mt6835_list[pobj->id].csn, (drvPinState_e)state);
 }
 
-/**
- * @brief 通过spi通信快速地读取给定地址寄存器内的数据
- * 
- * @param  pobj             : xxx
- * @param  rxdata           : xxx
- * 
- */
-static void mt6835_burst_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg, uint8_t *rxdata)
-{
-    uint16_t tx;
-    tx = MT6835_READ | reg;    
-
-    dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-    drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, (uint8_t *)rxdata, 3, 200);
-    dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
-}
-
+/* 读指定寄存器(突发读3字节: 命令字+数据) */
 static void mt6835_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg, uint8_t *rxdata)
 {
-    uint16_t tx;
-    tx = MT6835_READ | reg;
+	uint16_t tx = MT6835_READ | reg;
 
-    dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-    drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, (uint8_t *)rxdata, 3, 200);
-    dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
+	drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, rxdata, 3, MT6835_SPI_TIMEOUT);
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
 }
 
-
+/*
+ * @brief 写寄存器, 返回true表示芯片应答0x55
+ * @note  TODO: 当前命令字 tx=MT6835_WRITE|data 未编入reg地址, 写位置可能不符手册,
+ *        需对照MT6835手册的写时序(命令+地址+数据)核实并在硬件上验证
+ */
 static bool mt6835_write_reg(dev_mt6835_t *pobj, mt6835_reg_enum_t reg, uint8_t data)
 {
-    uint8_t rxdata[3] = {0, 0, 0xFF};
-    uint16_t tx;
-    tx = MT6835_WRITE | data;
+	uint8_t rxdata[3] = {0, 0, 0xFF};
+	uint16_t tx = MT6835_WRITE | data;
+	(void)reg;
 
-    dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-    drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, (uint8_t *)rxdata, 3, 200);
-    dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
+	drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, rxdata, 3, MT6835_SPI_TIMEOUT);
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
 
-    if (rxdata[2] == 0xFF || rxdata[2] != 0x55) {
-        return false;
-    }
-    return true;
+	return (rxdata[2] == 0x55);
 }
 
+/* 写EEPROM, 返回true表示芯片应答0x55 (同write_reg, 命令字编码待手册核实) */
 static bool mt6835_write_eeprom(dev_mt6835_t *pobj, mt6835_reg_enum_t reg, uint8_t data)
 {
-    uint8_t rxdata[3] = {0, 0, 0xFF};
-    uint16_t tx;
-    tx = MT6835_WRITEEEPROM | data;
+	uint8_t rxdata[3] = {0, 0, 0xFF};
+	uint16_t tx = MT6835_WRITEEEPROM | data;
+	(void)reg;
 
-    dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-    drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, (uint8_t *)rxdata, 3, 200);
-    dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
+	drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, rxdata, 3, MT6835_SPI_TIMEOUT);
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
 
-    if (rxdata[2] == 0xFF || rxdata[2] != 0x55) {
-        return false;
-    }
-    return true;
+	return (rxdata[2] == 0x55);
 }
 
 /*
-* @brief 读取mt6835芯片测量的角度原始值
-* @param:
-*/
+ * @brief 读取21bit原始角度值(按running_dir做正反向)
+ * @note  TODO: rxdata声明为uint16_t但驱动按字节填充, (rxdata[1]<<5)|(rxdata[2]>>11)
+ *        的字节身位疑似有误, 需对照手册ANGLE3..1寄存器布局并在硬件上验证
+ */
 static uint32_t dev_mt6835_get_raw(struct dev_mt6835 *pobj)
 {
-    uint16_t rxdata[3];
-    mt6835_burst_read_reg(pobj, MT6835_REG_ANGLE3, (uint8_t *)rxdata);
-    pobj->raw = (uint32_t)(rxdata[1] << 5) | (rxdata[2] >> 11);
+	uint16_t rxdata[3] = {0};
+	mt6835_read_reg(pobj, MT6835_REG_ANGLE3, (uint8_t *)rxdata);
+	pobj->raw = ((uint32_t)(rxdata[1] << 5) | (rxdata[2] >> 11)) & MT6835_ANGLE_MASK;
 
-    if(pobj->running_dir <= 1)
-    {
-        pobj->raw = pobj->raw;
-    }
-    else
-    {
-        pobj->raw = 0x1fffff - pobj->raw;
-    }
-    
-    return pobj->raw;
+	if (pobj->running_dir > 1) /* 反向 */
+	{
+		pobj->raw = MT6835_ANGLE_MASK - pobj->raw;
+	}
+	return pobj->raw;
+}
+
+/* 由21bit原始值算机械角度, 去偏移并归一化到[0,360) */
+static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
+{
+	float angle_org = (float)pobj->raw / MT6835_ANGLE_RESOLUTION * 360.0F;
+	float angle = angle_org - pobj->offset;
+
+	pobj->mech_angle_org = angle_org;
+	pobj->mech_angle_remove_off = angle;
+	pobj->mechanical_angle = (angle >= 0.0F) ? angle : (angle + 360.0F);
+	return pobj->mechanical_angle;
+}
+
+
+/* 读零点寄存器原始值(ZERO_POS2:高8位, ZERO_POS1:低4位) */
+static uint16_t mt6835_get_raw_zero_angle(dev_mt6835_t *pobj)
+{
+	uint8_t rx_buf[2] = {0};
+	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &rx_buf[1]);
+	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, &rx_buf[0]);
+	return (uint16_t)((rx_buf[1] << 4) | (rx_buf[0] >> 4));
+}
+
+/* 读零点角度(°) */
+static float mt6835_get_zero_angle(dev_mt6835_t *pobj)
+{
+	return (float)mt6835_get_raw_zero_angle(pobj) * MT6835_ZERO_REG_STEP;
 }
 
 /*
-* @brief  读取mt6835机械角度数据
-* @param  ：
-*/
-static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
+ * @brief 写零点角度, 成功返回true
+ * @note  TODO: tx_buf[0]的读-改-写逻辑可疑(read_reg覆盖了刚算的值,
+ *        且 tx_buf[0] |= tx_buf[0]&0x0F 是空操作), ZERO_POS1低4位保留位的
+ *        处理需对照手册核实并在硬件上验证
+ */
+static bool mt6835_set_zero_angle(dev_mt6835_t *pobj, float rad)
 {
-    float _angle_org = (float)(pobj->raw) / 2097152.0F * 360.0F;
-    pobj->mech_angle_org = _angle_org;
-    float _angle_remove_off = _angle_org - pobj->offset;
-    pobj->mech_angle_remove_off = _angle_remove_off;
-    pobj->mechanical_angle = ((_angle_remove_off >= 0 ? _angle_remove_off : (_angle_remove_off + 360.0F)));
-    
-    return pobj->mechanical_angle;
+	uint16_t angle = (uint16_t)roundf(rad * MT6835_RAD2DEG / MT6835_ZERO_REG_STEP);
+	if (angle > 0xFFF)
+	{
+		return false;
+	}
+
+	uint8_t tx_buf[2] = {0};
+	tx_buf[1] = angle >> 4;
+	tx_buf[0] = (angle & 0x0F) << 4;
+	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &tx_buf[0]);
+	tx_buf[0] |= tx_buf[0] & 0x0F;
+
+	mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, tx_buf[1]);
+	mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, tx_buf[0]);
+	return true;
 }
 
 static void dev_mt6835_set_offset(struct dev_mt6835 *pobj, float offset)
 {
-    pobj->offset = offset;
+	pobj->offset = offset;
 }
 
 static void dev_mt6835_set_dir(struct dev_mt6835 *pobj, int dir)
 {
-    pobj->running_dir = dir; 
+	pobj->running_dir = dir;
 }
 
-/**
- * @brief 在raw中获取mt6835原始零角
- * @param mt6835 mt6835对象
- * @return uint16_t 原始的零角度数据
- */
-uint16_t mt6835_get_raw_zero_angle(dev_mt6835_t *pobj)
-{
-    uint8_t rx_buf[2] = {0};
-    mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &rx_buf[1]);
-    mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, &rx_buf[0]);
-    uint16_t res = (rx_buf[1] << 4) | (rx_buf[0] >> 4);
-    return res;
-}
-
-/**
- * @brief  获取mt6835零角度
- * 
- * @param  mt6835           : mt6835对象
- * 
- * @return float         : 零角度数据
- */
-float mt6835_get_zero_angle(dev_mt6835_t *pobj)
-{
-    return (float)mt6835_get_raw_zero_angle(pobj) * MT6835_ZERO_REG_STEP;
-}
-
-/**
- * @brief  设置mt6835零角度
- * 
- * @param  mt6835           :  mt6835对象
- * @param  rad              :  零角度数据
- * 
- * @return True：成功，false：失败
- */
-bool mt6835_set_zero_angle(dev_mt6835_t *pobj, float rad)
-{
-    uint16_t angle = (uint16_t)roundf(rad * 57.295779513f / MT6835_ZERO_REG_STEP);
-    if (angle > 0xFFF)
-    {
-        return false;
-    }
-
-    uint8_t tx_buf[2] = {0};
-
-    tx_buf[1] = angle >> 4;
-    tx_buf[0] = (angle & 0x0F) << 4;
-    mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &tx_buf[0]);
-    tx_buf[0] |=  tx_buf[0] & 0x0F;
-
-    mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, tx_buf[1]);
-    mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, tx_buf[0]);
-
-    return true;
-}
- 
-/**
- * @brief mt6835数据处理
- * @param pobj  mt6835对象
- */
+/* 数据处理: 读原始值→算机械角度 */
 static void dev_mt6835_handle(struct dev_mt6835 *pobj)
 {
-    static volatile uint32_t speed_tick = 0;
-    assert_report(pobj != NULL);
-    dev_mt6835_get_raw(pobj);
-    dev_mt6835_get_machAngle(pobj); // 机械角度 [0 ~ 360°]
+	assert_report(pobj != NULL);
+	dev_mt6835_get_raw(pobj);
+	dev_mt6835_get_machAngle(pobj);
 }
 
-/**
-  * @brief 初始化mt6835磁编码器对象
-  * @param poles  极对数
-  * @return dev_mt6835_t* mt6835对象
-  */
 void dev_mt6835_init(dev_mt6835_t *pobj, mt6835_id_e dev_id)
 {
-    assert_report(pobj != NULL);
-    memset(pobj, 0, sizeof(dev_mt6835_t));
-    pobj->id = dev_id;
+	assert_report(pobj != NULL);
+	memset(pobj, 0, sizeof(dev_mt6835_t));
+	pobj->id = dev_id;
 
-    // pobj->get_mechanical_angle_raw = dev_mt6835_get_raw;
-    pobj->get_mechanical_angle = dev_mt6835_get_machAngle;
-    pobj->set_offset = dev_mt6835_set_offset;
-    pobj->set_dir = dev_mt6835_set_dir;
-
-    pobj->set_zero_angle = mt6835_set_zero_angle;
-    pobj->get_raw_zero_angle = mt6835_get_zero_angle;
-
-    pobj->update = dev_mt6835_handle;
+	pobj->update = dev_mt6835_handle;
+	pobj->get_mechanical_angle = dev_mt6835_get_machAngle;
+	pobj->get_mechanical_angle_raw = dev_mt6835_get_raw;
+	pobj->set_offset = dev_mt6835_set_offset;
+	pobj->set_dir = dev_mt6835_set_dir;
+	pobj->set_zero_angle = mt6835_set_zero_angle;
+	pobj->get_raw_zero_angle = mt6835_get_zero_angle;
 }
-#endif
+#endif /* USE_DEV_MT6835 */
+

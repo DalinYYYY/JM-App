@@ -531,6 +531,46 @@
               <FileType>1</FileType>
               <FilePath>..\User\Devices\dev_dwt_counter.c</FilePath>
             </File>
+            <File>
+              <FileName>dev_config.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_config.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_half_bridge.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_half_bridge.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_motor_phase_current.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_motor_phase_current.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_mt6701.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_mt6701.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_mt6835.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_mt6835.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_power_monitor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_power_monitor.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\User\Devices\dev_config.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -545,6 +585,66 @@
               <FileName>drv_dwt_timer.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Driver\drv_dwt_timer.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_adc.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_adc.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_can.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_delay.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_delay.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_flash_g4.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_flash_g4.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_gpio.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_gpio.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_i2c.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_i2c.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_i2c_soft.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_i2c_soft.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_spi.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_spi.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_spi_soft.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_spi_soft.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_tim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_tim.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_usart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Driver\drv_usart.c</FilePath>
+            </File>
+            <File>
+              <FileName>drv_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\User\Driver\drv_config.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -590,6 +690,11 @@
               <FileName>utils.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Common\utils.c</FilePath>
+            </File>
+            <File>
+              <FileName>assert_report.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Common\assert_report.c</FilePath>
             </File>
           </Files>
         </Group>

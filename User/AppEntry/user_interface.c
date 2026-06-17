@@ -42,8 +42,8 @@ void user_init(void)
 	/* 创建线程 */
 	thread_init();
 
-	HAL_TIM_Base_Start_IT(&htim2); /* 启动定时器更新中断，进入 user_control 调周期执行 */
-	HAL_TIM_Base_Start_IT(&htim5); /* 启动定时器更新中断，进入 motor_virtual_loop 调周期执行 */
+	HAL_TIM_Base_Start_IT(&htim2); /* TODO:启动定时器更新中断，进入 user_control 调周期执行 */
+	HAL_TIM_Base_Start_IT(&htim5); /* TODO:启动定时器更新中断，进入 motor_virtual_loop 调周期执行 */
 }
 
 void user_control(void)

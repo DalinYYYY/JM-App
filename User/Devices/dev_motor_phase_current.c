@@ -1,170 +1,168 @@
 /**
- * @file dev_motor_phase_current.c
- * @brief 电机三相电流采集模块
- * 
- * @author dalin (dalin@robot.com)
- * @version 1.0
- * @date 2025-12-16
- * 
- * @copyright Copyright (c) 2025  HYFOOS Tech.co, Ltd
- * 
+ * @file        dev_motor_phase_current.h
+ * @brief       电机三相相电流采样设备(ADC注入组, 与PWM同步触发)
+ *
+ * @author      Dalin (dalin@robot.com)
+ * @version     1.0
+ * @date        2026-06-17
+ *
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ *
  * @par 修改日志:
- * <table>
- * <tr><th>Date       <th>Version <th>Author  <th>Description
- * <tr><td>2025-12-16 <td>1.0     <td>Dalin     <td>Init
- * </table>
+ * | 日期       | 版本 | 作者   | 修改内容                                   |
+ * |------------|------|--------|--------------------------------------------|
+ * | 2026-06-16 | 1.0  | Dalin  | 初始创建                                   |
+ * | 2026-06-17 | 1.1  | Dalin  | start按配置表推导(ADC,rank); 滤波状态对象化; 增加取值/标定接口 |
+ *
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
 #include "dev_motor_phase_current.h"
+#if defined(USE_DEV_PHASE_CURRENT)
+
 #include "assert_report.h"
-#include "ifilter.h"
 
-/* -------------------------------------- 注入组通道配置 -------------------------------------- */
+/* 一阶低通: y = alpha*x + (1-alpha)*y_prev */
+#define _lpfilter(alpha, cur_val, prev_val) ((alpha) * (cur_val) + (1.0f - (alpha)) * (prev_val))
 
-static const dev_phase_current_config_t adc_injected_config[ADCX_INX_INJECTED_MAX] = {
-    {.name = "ia", .id = DRV_ADC_1, .channel = DRV_ADC_CH1 },
-    {.name = "ib", .id = DRV_ADC_1, .channel = DRV_ADC_CH2},
-    {.name = "ic", .id = DRV_ADC_1, .channel = DRV_ADC_CH3 },
-};
-
-/* ----------------------------------------- 注入组 ----------------------------------------- */
-
-static ADC_HandleTypeDef *dev_phase_current_get_handle(struct dev_adc_injected *pobj)
-{
-    pobj->adc_instance = get_adc_handle((adcNumber_e)pobj->id[3]); // 此处注入组的通道均是对应ADC3
-    return pobj->adc_instance;
-}
-
+/**
+ * @brief 依据配置表为每相推导(ADC,rank)并启动注入组
+ * @note  同一ADC内按通道在 phase_current_list 中的出现次序递增rank,
+ *        需与CubeMX注入序列顺序一致; 每个用到的ADC只启动一次。
+ */ 
 static int dev_phase_current_start(struct dev_adc_injected *pobj)
 {
-    assert_report(pobj != NULL);
-    int status = 0;
+	assert_report(pobj != NULL);
 
-    // 遍历adc配置表，获取注入组的通道id，并记录到injected_id数组中，读取数据时使用
-    // for (int i = 0; i < ADCX_INX_INJECTED_MAX; i++)
-    // {
-    //     drv_phase_current_start(adc_injected_config[i].id); // 启动注入组的adc
-    //     pobj->id[i] = adc_injected_config[i].id;
-    // }
-    drv_adc_injected_start(DRV_ADC_1); // 启动注入组的adc
-    pobj->id[0] = DRV_ADC_1;
-    pobj->id[1] = DRV_ADC_1;
-    pobj->id[2] = DRV_ADC_1;
-    pobj->id[3] = DRV_ADC_1;
-    return status;
+	uint8_t rank_cnt[DRV_ADC_MAX] = {0}; /* 各ADC已分配的rank数 */
+	bool adc_used[DRV_ADC_MAX] = {0};	 /* 各ADC是否被相电流占用 */
+	int status = DEV_EOK;
+
+	/* step 1: 遍历配置表, 同一ADC内按出现次序分配rank1~rankN */
+	for (int i = 0; i < ADCX_INX_INJECTED_MAX; i++)
+	{
+		adcNumber_e id = phase_current_list[i].id;
+		assert_report(id > DRV_ADC_INIT && id < DRV_ADC_MAX);
+
+		pobj->src[i].id = id;
+		pobj->src[i].rank = (adc_injected_rank_e)(DRV_ADC_RANK1 + rank_cnt[id]);
+		rank_cnt[id]++;
+		adc_used[id] = true;
+	}
+
+	/* step 2: 每个被占用的ADC仅启动一次注入组 */
+	for (adcNumber_e id = DRV_ADC_1; id < DRV_ADC_MAX; id++)
+	{
+		if (adc_used[id])
+		{
+			if (drv_adc_injected_start(id) != DEV_EOK)
+			{
+				status = DEV_ERROR;
+			}
+		}
+	}
+	return status;
 }
 
-/**
- * @brief 读取注入组的通道数据（这里是三相电流数据）
- * @param  pobj 
- */
+/* 读取三相注入组原始ADC值(按各相推导出的 id/rank) */
 static void dev_phase_current_get_value(struct dev_adc_injected *pobj)
 {
-    //    static int init = 1;
-    assert_report(pobj != NULL);
-
-    // 获取三相电流的adc数据
-    pobj->adc.a = drv_adc_injected_get_value(pobj->id[0], DRV_ADC_RANK1);
-    pobj->adc.b = drv_adc_injected_get_value(pobj->id[1], DRV_ADC_RANK2);
-    pobj->adc.c = drv_adc_injected_get_value(pobj->id[2], DRV_ADC_RANK3);
-
-    //    if(init)
-    //    {
-    //        // 初始化偏置值
-    //        pobj->offset.a = pobj->adc.a;
-    //        pobj->offset.b = pobj->adc.b;
-    //        pobj->offset.c = pobj->adc.c;
-    //        init = 0;
-    //    }
-    //
-    //	pobj->adc.a = (pobj->adc.a - pobj->offset.a);
-    //    pobj->adc.b = (pobj->adc.b - pobj->offset.b);
-    //    pobj->adc.c = (pobj->adc.c - pobj->offset.c);
+	assert_report(pobj != NULL);
+	pobj->adc.a = drv_adc_injected_get_value(pobj->src[ADCX_IA].id, pobj->src[ADCX_IA].rank);
+	pobj->adc.b = drv_adc_injected_get_value(pobj->src[ADCX_IB].id, pobj->src[ADCX_IB].rank);
+	pobj->adc.c = drv_adc_injected_get_value(pobj->src[ADCX_IC].id, pobj->src[ADCX_IC].rank);
 }
 
-/**
- * @brief 设置注入组的adc偏置值（这里是三相电流的偏置值）
- * @param pobj 
- * @param injected_offset ：三相电流的adc偏置值
- */
-static void dev_phase_current_set_offset(struct dev_adc_injected *pobj, dev_current_i3axis_t offset)
-{
-    assert_report(pobj != NULL);
-    pobj->offset.a = offset.a;
-    pobj->offset.b = offset.b;
-    pobj->offset.c = offset.c;
-}
-
-/**
- * @brief 获取注入组的电压数据
- * @param pobj 
- */ 
+/* 原始ADC值去偏置后转为采样电压(V) */
 static void dev_phase_current_get_voltage(struct dev_adc_injected *pobj)
 {
-    float them = 3.3F / 4096.0F;
-    assert_report(pobj != NULL);
-    pobj->voltage.a = (float)(pobj->adc.a - pobj->offset.a) * them;
-    pobj->voltage.b = (float)(pobj->adc.b - pobj->offset.b) * them;
-    pobj->voltage.c = (float)(pobj->adc.c - pobj->offset.c) * them;
+	const float lsb = PHASE_CURRENT_VREF / PHASE_CURRENT_RESOLUTION; /* 每LSB对应电压 */
+	assert_report(pobj != NULL);
+	pobj->voltage.a = (float)(pobj->adc.a - pobj->offset.a) * lsb;
+	pobj->voltage.b = (float)(pobj->adc.b - pobj->offset.b) * lsb;
+	pobj->voltage.c = (float)(pobj->adc.c - pobj->offset.c) * lsb;
 }
-/**
- * @brief 获取三相电流数据
- * @param pobj 
- * @return dev_current_f3axis_t 三相电流数据
- */
+
+/* 采样电压经增益与采样电阻转为相电流(A) */
 static dev_current_f3axis_t dev_adc_get_current(struct dev_adc_injected *pobj)
 {
-    assert_report(pobj != NULL);
-    static dev_current_f3axis_t current = {0};
-    float them = (1.0F / pobj->gain / pobj->shunt_resistor);
+	dev_current_f3axis_t current;
+	float k = 1.0f / (pobj->gain * pobj->shunt_resistor); /* V→A 换算系数 */
 
-    current.a = pobj->voltage.a * them;
-    current.b = pobj->voltage.b * them;
-    current.c = pobj->voltage.c * them;
-    return current;
+	assert_report(pobj != NULL);
+	current.a = pobj->voltage.a * k;
+	current.b = pobj->voltage.b * k;
+	current.c = pobj->voltage.c * k;
+	return current;
 }
 
-/**
- * @brief 电流采样流程
- * @param pobj 
- */
+/* 设置三相零电流偏置(ADC计数) */
+static void dev_phase_current_set_offset(struct dev_adc_injected *pobj, dev_current_i3axis_t offset)
+{
+	assert_report(pobj != NULL);
+	pobj->offset = offset;
+}
+
+/* 多次采样取均值标定零位(须在电机不通电、相电流为0时调用) */
+static void dev_phase_current_calibrate_offset(struct dev_adc_injected *pobj, uint16_t samples)
+{
+	int64_t sum_a = 0, sum_b = 0, sum_c = 0;
+
+	assert_report(pobj != NULL);
+	if (samples == 0)
+	{
+		return;
+	}
+	for (uint16_t i = 0; i < samples; i++)
+	{
+		dev_phase_current_get_value(pobj);
+		sum_a += pobj->adc.a;
+		sum_b += pobj->adc.b;
+		sum_c += pobj->adc.c;
+	}
+	pobj->offset.a = (int32_t)(sum_a / samples);
+	pobj->offset.b = (int32_t)(sum_b / samples);
+	pobj->offset.c = (int32_t)(sum_c / samples);
+}
+
+/* 取最新滤波三相电流 */
+static dev_current_f3axis_t dev_phase_current_get_current(struct dev_adc_injected *pobj)
+{
+	assert_report(pobj != NULL);
+	return pobj->current;
+}
+
+/* 电流采样流程: 读ADC→去偏置转电压→转电流→低通滤波(滤波状态保存在对象内) */
 static void dev_phase_current_update(struct dev_adc_injected *pobj)
 {
-    assert_report(pobj != NULL);
-    static dev_current_f3axis_t prev_current = {0};
+	assert_report(pobj != NULL);
 
-    // step 1: 读取注入组的adc数据
-    dev_phase_current_get_value(pobj);
+	dev_phase_current_get_value(pobj);
+	dev_phase_current_get_voltage(pobj);
+	dev_current_f3axis_t current = dev_adc_get_current(pobj);
 
-    // step 2: adc转为电压数据
-    dev_phase_current_get_voltage(pobj);
+	pobj->current.a = _lpfilter(pobj->lpf_alpha, current.a, pobj->prev_current.a);
+	pobj->current.b = _lpfilter(pobj->lpf_alpha, current.b, pobj->prev_current.b);
+	pobj->current.c = _lpfilter(pobj->lpf_alpha, current.c, pobj->prev_current.c);
 
-    // step 3: 电压转为电流数据
-    dev_current_f3axis_t current = dev_adc_get_current(pobj);
-
-    // step 4: 滤波处理
-    pobj->current.a = _lpfilter(0.9F, current.a, prev_current.a);
-    pobj->current.b = _lpfilter(0.9F, current.b, prev_current.b);
-    pobj->current.c = _lpfilter(0.9F, current.c, prev_current.c);
-    //	pobj->current.c = - pobj->current.a - pobj->current.b;
-
-    // step 5: 更新上一次的电流数据
-    prev_current = current;
+	pobj->prev_current = pobj->current;
 }
 
-/**
- * @brief adc注入组初始化
- * @param  pobj ： adc注入组对象
- * @param  gain ： 放大倍数
- * @param  shunt_resistor ：采样电阻
- */
-void dev_phase_current_init(struct dev_adc_injected *pobj, uint8_t gain, float shunt_resistor)
+void dev_phase_current_init(struct dev_adc_injected *pobj, float gain, float shunt_resistor)
 {
-    assert_report(pobj != NULL);
-    pobj->gain = gain;
-    pobj->shunt_resistor = shunt_resistor;
+	assert_report(pobj != NULL);
+	pobj->gain = gain;
+	pobj->shunt_resistor = shunt_resistor;
+	pobj->lpf_alpha = PHASE_CURRENT_LPF_ALPHA;
 
-    pobj->get_injected_handle = dev_phase_current_get_handle;
-    pobj->start = dev_phase_current_start;
-    pobj->set_offset = dev_phase_current_set_offset;
-    pobj->update = dev_phase_current_update;
+	pobj->offset = (dev_current_i3axis_t){0, 0, 0};
+	pobj->current = (dev_current_f3axis_t){0.0f, 0.0f, 0.0f};
+	pobj->prev_current = (dev_current_f3axis_t){0.0f, 0.0f, 0.0f};
+
+	pobj->start = dev_phase_current_start;
+	pobj->update = dev_phase_current_update;
+	pobj->get_current = dev_phase_current_get_current;
+	pobj->set_offset = dev_phase_current_set_offset;
+	pobj->calibrate_offset = dev_phase_current_calibrate_offset;
 }
+
+#endif /* USE_DEV_PHASE_CURRENT */

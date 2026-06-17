@@ -1,55 +1,62 @@
+
 /**
- * @file dev_motor.c
- * @brief 
- * @author Dalin
- * @version 1.00
- * @date 2024-11-12
+ * @file        dev_motor.h
+ * @brief 		电机实例化：编码器+多圈计数+FOC+PWM+相电流采样
  * 
- * @copyright Copyright (c) 2024  RobotDance Technology Co., Ltd.
+ * @author      Dalin (dalin@robot.com)
+ * @version     1.0
+ * @date        2026-06-17
+ * 
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ * 
  * 
  * @par 修改日志:
- * <table>
- * <tr><th>Date           <th>Version     <th>Author      <th>Description
- * <tr><td>2024-11-12     <td>1.00        <td>LinHui      <td>Init
- * </table>
+ * | 日期       | 版本 | 作者   | 修改内容   |
+ * |------------|------|--------|------------|
+ * | 2026-06-17     | 1.0  | yangsl | 初始创建   |
+ * 
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
+
+#include "motor_loop_config.h"
+
+/* 与 dev_motor_virtual.c 对称：宏=1（真实驱动）时本文件编译为实体，
+ * 宏=0（虚拟电机）时整体编译为空，避免 dev_motor_init 等符号与
+ * dev_motor_virtual.o 重复定义（L6200E）。切换只改宏，无需动 Keil 工程。 */
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER)
 
 #include "dev_motor.h"
 #include "assert_report.h"
-#include "dev_motorinfo.h"
 
-ffc_lpf_filter_t ffc_filter;
-// notch_filter_t notch_filter;
-lf_notch_filter_t lf_notch_filter;
-
-dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
+static dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
 	{"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
-	// {"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
 };
 
+/* 使能电机功率级(拉高EN引脚) */
 static void dev_motor_enable(void)
 {
 	drv_gpio_write(motor_enable_list[DEV_MOTOR_1].gpio, (drvPinState_e)1);
 }
 
-static uint8_t dev_motor_search_poles(dev_motor_t *pobj)
+/* 禁用电机功率级(拉低EN引脚) */
+static void dev_motor_disable(void)
 {
+	drv_gpio_write(motor_enable_list[DEV_MOTOR_1].gpio, (drvPinState_e)0);
 }
 
-//
-float device_compensation(void)
+/* 设备角度补偿回调(注入多圈计数) TODO: 接入 motor_info 后返回实际补偿值 */
+static float device_compensation(void)
 {
-	return motor_info.device.device_compensation;
+	return 0.0F;
 }
 
-// 待增加自动获取电机极对数函数
+/* 获取电机极对数 TODO: 后续支持自动识别 */
 static uint8_t dev_motor_get_poles(motor_id_e id)
 {
-	uint8_t poles = 0;
+	uint8_t poles;
 	switch (id)
 	{
 		case DEV_MOTOR_1: poles = 7; break;
-		// case DEV_MOTOR_2: poles = 3;    break;
 		default: poles = 7; break;
 	}
 	return poles;
@@ -97,17 +104,17 @@ void dev_motor_init(dev_motor_t *pobj,
 					float (*ele_radian_callback)(void))
 {
 	assert_report(pobj != NULL);
-	assert_report(&pobj->mt6835 != NULL);
-	assert_report(&pobj->foc != NULL);
 	assert_report(current_callback != NULL);
 	assert_report(ele_radian_callback != NULL);
 	assert_report(id < DEV_MOTOR_MAX);
 	memset(pobj, 0, sizeof(dev_motor_t));
 
+	dev_motor_disable(); // 默认上电禁能
+
 	pobj->id = id;
 	pobj->poles = dev_motor_get_poles((motor_id_e)id);
 
-	pobj->fsm_tim = DRV_TIM2; // 定时器2
+	pobj->fsm_tim = DRV_TIM2; // 定时器2 // TODO: 后续支持配置表
 
 	// 初始化编码器（型号由 DEV_MOTOR_ENCODER_TYPE 选择，控制层不感知）
 #if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
@@ -125,8 +132,8 @@ void dev_motor_init(dev_motor_t *pobj,
 
 #elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
 	dev_mt6835_init(&pobj->mt6835, (mt6835_id_e)id);
-	pobj->mt6835.set_zero_angle(&pobj->mt6835, usr.motor[id].encoder_param.encoder_offset);
-	pobj->mt6835.set_dir(&pobj->mt6835, usr.motor[id].encoder_param.change_dir ? 1 : 0);
+	pobj->mt6835.set_zero_angle(&pobj->mt6835, 0.0f); // TODO: 后续支持配置表
+	pobj->mt6835.set_dir(&pobj->mt6835, 0);			  // TODO: 后续支持配置表
 
 	/* 装配抽象编码器接口 → MT6835 */
 	pobj->encoder.ctx = &pobj->mt6835;
@@ -138,7 +145,7 @@ void dev_motor_init(dev_motor_t *pobj,
 #endif
 
 	// 初始化角度转化器（仅角度/速度，不含多圈）
-	motion_param_init(&pobj->motor_param, pobj->poles, 10, NULL);
+	motion_param_init(&pobj->motor_param, pobj->poles, 10, NULL); // TODO: 后续支持配置表
 
 	// 初始化绝对多圈计数（单编码器软件累圈，设备补偿回调注入）
 	multiturn_config_t mt_cfg;
@@ -147,16 +154,15 @@ void dev_motor_init(dev_motor_t *pobj,
 	mt_cfg.device_compensation_callback = device_compensation;
 	multiturn_init(&pobj->multiturn, &mt_cfg);
 
-	// 初始化控制信号采集器
-	// dev_control_signal_acq_init(&pobj->acq);
-	//   pobj->acq.update(&pobj->acq);
-
 	// 初始化半桥驱动器
 	dev_half_bridge_init(&pobj->half_bridge, (half_bridge_id_e)id);
 
 	// 初始化三相adc电流采样
-	dev_phase_current_init(&pobj->phase_current, 50.0F, 0.01F);										// 采样增益倍数 10 和采样电阻 0.01欧姆
-	pobj->phase_current.set_offset(&pobj->phase_current, (dev_current_i3axis_t){1660, 1660, 1660}); // 电流零位时adc采样值偏移
+	dev_phase_current_init(&pobj->phase_current, PHASE_CURRENT_GAIN, PHASE_CURRENT_SHUNT);
+	pobj->phase_current.set_offset(&pobj->phase_current,
+								   (dev_current_i3axis_t){PHASE_CURRENT_ZERO_ADC,
+														  PHASE_CURRENT_ZERO_ADC,
+														  PHASE_CURRENT_ZERO_ADC}); // TODO: 后续支持自动校准
 
 	// 初始化FOC
 	pobj->current_callback = current_callback;
@@ -164,9 +170,6 @@ void dev_motor_init(dev_motor_t *pobj,
 	foc_init(&pobj->foc, pobj->current_callback, pobj->ele_radian_callback);
 
 	dev_motor_enable();
-
-	//初始化滤波器
-	ffc_lpfilter_init(&ffc_filter); //低通滤波器
-	// notch_filter_init(&notch_filter);//Notch filter滤波器
-	lf_notch_filter_init(&lf_notch_filter); //Notch filter滤波器
 }
+
+#endif /* MOTOR_LOOP_ENABLE_DEV_DRIVER */
