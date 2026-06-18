@@ -20,7 +20,7 @@
 // <h>MCU ENABLE DRIVER
 // <c1>
 // ENABLE DRIVER ---> USART
-//#define USE_USART_DRIVER
+#define USE_USART_DRIVER
 // </c>
 
 // <c1>
@@ -87,7 +87,7 @@
 //  <4=>USERT4
 //  <5=>USERT5
 //  <6=>USERT6
-#define VOFA_PORT 0x01
+#define VOFA_PORT 0x02
 
 // <o.0..3>FLASH MCU
 //  <i> Default:STM32F103

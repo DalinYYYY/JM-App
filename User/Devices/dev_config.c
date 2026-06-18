@@ -13,6 +13,7 @@
 #include "dev_eeprom.h"
 #include "dev_power_monitor.h"
 #include "dev_motor_phase_current.h"
+#include "dev_commun_vesc.h"
 
 /* ---------------- MT6701 磁编码器 ---------------- */
 #if defined(USE_DEV_MT6701)
@@ -62,6 +63,20 @@ const dev_phase_current_config_t phase_current_list[ADCX_INX_INJECTED_MAX] = {
 	[ADCX_IA] = {.name = "IA", .id = DRV_ADC_1, .channel = DRV_ADC_CH2},
 	[ADCX_IB] = {.name = "IB", .id = DRV_ADC_2, .channel = DRV_ADC_CH3},
 	[ADCX_IC] = {.name = "IC", .id = DRV_ADC_2, .channel = DRV_ADC_CH4},
+};
+#endif
+
+/* ---------------- VESC Tool 串口通信 (USART1 + DMA空闲中断) ---------------- */
+#if defined(USE_DEV_COMMUN_VESC)
+const dev_commun_vesc_config_t commun_vesc_list[VESC_COMM_ID_MAX] = {
+	[VESC_COMM_ID_1] = {
+						.name = "VESC_COMM_1",
+						.uart = DRV_UART1, /* 须为已配置 DMA 收发的串口 */
+						.hw_name = "JointMotor",
+						.fw_name = "JM_FW",
+						.fw_major = 6,
+						.fw_minor = 1,
+						},
 };
 #endif
 

@@ -68,6 +68,11 @@
 // <i> DWT 周期计数器 (微秒计时)
 #define USE_DEV_DWT_COUNTER
 // </c>
+
+// <c1> COMMUN VESC
+// <i> VESC Tool 串口通信 (USART+DMA空闲中断, 伪装成VESC从机)
+// #define USE_DEV_COMMUN_VESC
+// </c>
 // </h>
 /* ===================================================================== */
 /*                                                                       */
@@ -111,6 +116,10 @@
 #define PHASE_CURRENT_RESOLUTION (4096.0f) /* ADC 满量程 (12bit) */
 #define PHASE_CURRENT_LPF_ALPHA (0.9f)	   /* 一阶低通滤波系数, 0~1 */
 #define PHASE_CURRENT_ZERO_ADC (2024u)	   /* 电流零位时 ADC 采样偏移 */
+#endif
+
+#if defined(USE_DEV_COMMUN_VESC)
+#define DEV_VESC_RX_BUF_SIZE (256u) /* VESC 接收缓冲(空闲中断单帧上限, 含组帧余量) */
 #endif
 
 //***<<< end of configuration section >>>***

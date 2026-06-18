@@ -21,6 +21,7 @@
 #include "cmsis_os.h"
 #include "adc.h"
 #include "cordic.h"
+#include "dma.h"
 #include "fdcan.h"
 #include "i2c.h"
 #include "spi.h"
@@ -95,6 +96,7 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
+  MX_DMA_Init();
   MX_ADC1_Init();
   MX_CORDIC_Init();
   MX_I2C1_Init();

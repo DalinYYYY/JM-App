@@ -24,6 +24,7 @@
 #include "thread_commun.h"
 #include "vofa.h"
 #include "main.h"
+#include "dev_commun_vesc.h"
 
 void vofa_update(void)
 {
@@ -33,13 +34,50 @@ void vofa_update(void)
 	vofa_upload((uint8_t *)vofa_buf, VOFA_MAX * 4);
 }
 
+#if defined(USE_DEV_COMMUN_VESC)
+#define RAD_TO_DEG (57.2957795f) /* 弧度转角度 (180/π) */
+
+/* VESC Tool 仪表盘取值回调: 从运行参数填充实时量 */
+static void commun_vesc_fill_values(vesc_values_t *v)
+{
+	const sys_control_data_t *d = &usr.motor_state[M1].ctrl_data;
+
+	//	v->id = d->id;						  /* 直轴电流 A */
+	//	v->iq = d->iq;						  /* 交轴电流 A */
+	//	v->current_motor = d->iq;			  /* 电机电流 A (近似取 iq) */
+	//	v->rpm = d->velocity;				  /* 转速 (单位按实际换算: 若为 rad/s 需转 ERPM) */
+	//	v->pid_pos = d->pos_rad * RAD_TO_DEG; /* PID 位置 ° */
+	//	v->fault_code = 0;
+	//	v->controller_id = 0;
+	v->id = 0.23;			 /* 直轴电流 A */
+	v->iq = 0.45;			 /* 交轴电流 A */
+	v->current_motor = 0.45; /* 电机电流 A (近似取 iq) */
+	v->rpm = 1200.0f;		 /* 转速 (单位按实际换算: 若为 rad/s 需转 ERPM) */
+	v->pid_pos = 45.0f;		 /* PID 位置 ° */
+	v->fault_code = 0;
+	v->controller_id = 0;
+}
+#endif /* USE_DEV_COMMUN_VESC */
+
 void commun_thread(void const *argument)
 {
 	drv_rtos_delay_ms(INTO_THREAD_DELAY / 5);
 
+#if defined(USE_DEV_COMMUN_VESC)
+	/* VESC Tool 串口通信(USART+DMA空闲中断): 初始化协议栈→注入数据源→启动接收 */
+	dev_commun_vesc_init(&dev_commun_vesc, VESC_COMM_ID_1);
+	dev_commun_vesc.set_values_cb(&dev_commun_vesc, commun_vesc_fill_values);
+	dev_commun_vesc.start(&dev_commun_vesc);
+#endif
+
 	for (;;)
 	{
-		vofa_update();
+		// vofa_update();
+
+#if defined(USE_DEV_COMMUN_VESC)
+		/* 取空闲突发数据喂协议栈, 自动完成识别握手与实时值回复 */
+		dev_commun_vesc.poll(&dev_commun_vesc);
+#endif
 
 		usr.sys.task_cnt.commun_cnt++;
 		drv_rtos_delay_ms(THREAD_DELAY_COMMUN * 1);
