@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../User/AppEntry;../User/AppServices/ErrorManager;../User/AppServices/ParamService;../User/AppServices/SafetyManager;../User/AppServices/StateMachine;../User/AppServices/ThreadManager;../User/AppServices/Watchdog;../User/Common;../User/Config;../User/DataHub;../User/Devices;../User/Driver;../User/MotorAlgorithms;../User/MotorControl/Calibration;../User/Protocol;../User/Protocol/vesc_proto;../User/MotorControl/ControlModes;../User/MotorControl/ControlProcess;../User/MotorControl/CascadeControl</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../User/AppEntry;../User/AppServices/ErrorManager;../User/AppServices/ParamService;../User/AppServices/SafetyManager;../User/AppServices/StateMachine;../User/AppServices/ThreadManager;../User/AppServices/Watchdog;../User/Common;../User/Config;../User/DataHub;../User/Devices;../User/Driver;../User/MotorAlgorithms;../User/MotorControl/Calibration;../User/Protocol;../User/Protocol/vesc_proto;../User/Protocol/packer_parser;../User/Protocol/joint_proto;../User/MotorControl/ControlModes;../User/MotorControl/ControlProcess;../User/MotorControl/CascadeControl</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -457,6 +457,26 @@
               <FileName>vesc_slave.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Protocol\vesc_proto\vesc_slave.c</FilePath>
+            </File>
+            <File>
+              <FileName>packer_parser.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Protocol\packer_parser\packer_parser.c</FilePath>
+            </File>
+            <File>
+              <FileName>jm_proto.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Protocol\joint_proto\jm_proto.c</FilePath>
+            </File>
+            <File>
+              <FileName>jm_proto_uart.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>jm_proto_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Protocol\joint_proto\jm_proto_can.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -712,6 +732,11 @@
               <FileName>assert_report.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Common\assert_report.c</FilePath>
+            </File>
+            <File>
+              <FileName>crc16.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Common\crc16.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -1052,9 +1077,6 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>::CMSIS</GroupName>
-        </Group>
-        <Group>
           <GroupName>Middlewares/Library/DSP Library/DSP Library</GroupName>
           <GroupOption>
             <CommonProperty>
@@ -1151,6 +1173,9 @@
               </FileOption>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
     </Target>

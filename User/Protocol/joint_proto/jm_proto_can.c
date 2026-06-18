@@ -1,0 +1,327 @@
+/**
+ * @file        jm_proto_can.c
+ * @brief       关节电机协议-CAN绑定层实现: 定点压缩 + 多帧分包 + 共用dispatch
+ *
+ * @author      Dalin (dalin@robot.com)
+ * @version     1.0
+ * @date        2026-06-18
+ *
+ * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
+ *
+ * @par 修改日志:
+ * | 日期       | 版本 | 作者   | 修改内容   |
+ * |------------|------|--------|------------|
+ * | 2026-06-18 | 1.0  | Dalin  | 初始创建   |
+ *
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
+ */
+#include <string.h>
+#include "jm_proto_can.h"
+
+/* ---------------- 定点压缩助手 ---------------- */
+
+/* float -> 无符号定点(bits位), 截断到范围内 */
+static uint32_t float_to_uint(float x, float xmin, float xmax, uint8_t bits)
+{
+	float span = xmax - xmin;
+	uint32_t fullscale = (bits >= 32) ? 0xFFFFFFFFu : ((1u << bits) - 1u);
+	if (x < xmin)
+		x = xmin;
+	if (x > xmax)
+		x = xmax;
+	if (span <= 0.0f)
+		return 0;
+	return (uint32_t)((x - xmin) * (float)fullscale / span + 0.5f);
+}
+
+/* 无符号定点(bits位) -> float */
+static float uint_to_float(uint32_t v, float xmin, float xmax, uint8_t bits)
+{
+	uint32_t fullscale = (bits >= 32) ? 0xFFFFFFFFu : ((1u << bits) - 1u);
+	if (fullscale == 0)
+		return xmin;
+	return (float)v * (xmax - xmin) / (float)fullscale + xmin;
+}
+
+void jm_mit_pack(uint8_t out[8], float pos, float vel, float kp, float kd, float tff)
+{
+	uint32_t p = float_to_uint(pos, JM_MIT_POS_MIN, JM_MIT_POS_MAX, 16);
+	uint32_t v = float_to_uint(vel, JM_MIT_VEL_MIN, JM_MIT_VEL_MAX, 12);
+	uint32_t kpv = float_to_uint(kp, JM_MIT_KP_MIN, JM_MIT_KP_MAX, 12);
+	uint32_t kdv = float_to_uint(kd, JM_MIT_KD_MIN, JM_MIT_KD_MAX, 12);
+	uint32_t t = float_to_uint(tff, JM_MIT_TFF_MIN, JM_MIT_TFF_MAX, 12);
+
+	out[0] = (uint8_t)(p >> 8);
+	out[1] = (uint8_t)(p & 0xFF);
+	out[2] = (uint8_t)(v >> 4);
+	out[3] = (uint8_t)(((v & 0xF) << 4) | ((kpv >> 8) & 0xF));
+	out[4] = (uint8_t)(kpv & 0xFF);
+	out[5] = (uint8_t)(kdv >> 4);
+	out[6] = (uint8_t)(((kdv & 0xF) << 4) | ((t >> 8) & 0xF));
+	out[7] = (uint8_t)(t & 0xFF);
+}
+
+void jm_mit_unpack(const uint8_t in[8], float *pos, float *vel, float *kp, float *kd, float *tff)
+{
+	uint32_t p = ((uint32_t)in[0] << 8) | in[1];
+	uint32_t v = ((uint32_t)in[2] << 4) | (in[3] >> 4);
+	uint32_t kpv = ((uint32_t)(in[3] & 0xF) << 8) | in[4];
+	uint32_t kdv = ((uint32_t)in[5] << 4) | (in[6] >> 4);
+	uint32_t t = ((uint32_t)(in[6] & 0xF) << 8) | in[7];
+
+	if (pos)
+		*pos = uint_to_float(p, JM_MIT_POS_MIN, JM_MIT_POS_MAX, 16);
+	if (vel)
+		*vel = uint_to_float(v, JM_MIT_VEL_MIN, JM_MIT_VEL_MAX, 12);
+	if (kp)
+		*kp = uint_to_float(kpv, JM_MIT_KP_MIN, JM_MIT_KP_MAX, 12);
+	if (kd)
+		*kd = uint_to_float(kdv, JM_MIT_KD_MIN, JM_MIT_KD_MAX, 12);
+	if (tff)
+		*tff = uint_to_float(t, JM_MIT_TFF_MIN, JM_MIT_TFF_MAX, 12);
+}
+
+/* 反馈帧压缩: pos16 vel16 tq16 temp8 err8 = 8字节 */
+uint8_t jm_fb_pack(uint8_t out[8], const jm_feedback_t *fb)
+{
+	uint32_t p = float_to_uint(fb->pos, JM_MIT_POS_MIN, JM_MIT_POS_MAX, 16);
+	uint32_t v = float_to_uint(fb->vel, JM_MIT_VEL_MIN, JM_MIT_VEL_MAX, 16);
+	uint32_t tq = float_to_uint(fb->torque, JM_MIT_TFF_MIN, JM_MIT_TFF_MAX, 16);
+	uint32_t tp = float_to_uint(fb->temp_motor, JM_FB_TEMP_MIN, JM_FB_TEMP_MAX, 8);
+
+	out[0] = (uint8_t)(p >> 8);
+	out[1] = (uint8_t)(p & 0xFF);
+	out[2] = (uint8_t)(v >> 8);
+	out[3] = (uint8_t)(v & 0xFF);
+	out[4] = (uint8_t)(tq >> 8);
+	out[5] = (uint8_t)(tq & 0xFF);
+	out[6] = (uint8_t)tp;
+	out[7] = (uint8_t)(fb->fault_mask & 0xFF);
+	return 8;
+}
+
+/* ---------------- TX 底层 ---------------- */
+
+/* 发一帧原始CAN(ID已含CMD+电机ID) */
+static void can_send_raw(jm_proto_can_t *c, uint32_t id, const uint8_t *d, uint8_t len)
+{
+	jm_can_frame_t f;
+	if (c->tx == NULL || len > 8)
+	{
+		return;
+	}
+	f.id = id;
+	f.len = len;
+	memset(f.data, 0, sizeof(f.data));
+	if (d != NULL && len > 0)
+	{
+		memcpy(f.data, d, len);
+	}
+	c->tx(&f);
+}
+
+/* 发送一段已确定编码的载荷: <=8字节单帧, 否则多帧分包 */
+static void can_emit_payload(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint16_t len)
+{
+	uint32_t id = JM_CAN_MAKE_ID(cmd, c->motor_id);
+
+	if (len <= JM_CAN_SINGLE_MAX)
+	{
+		can_send_raw(c, id, body, (uint8_t)len);
+		return;
+	}
+
+	/* 多帧: 每帧 data[0]=控制字(序号+末帧标志), data[1..7]=片段 */
+	uint16_t off = 0;
+	uint8_t seq = 0;
+	while (off < len)
+	{
+		uint8_t frame[8];
+		uint16_t chunk = (uint16_t)(len - off);
+		if (chunk > JM_CAN_SEG_PAYLOAD)
+		{
+			chunk = JM_CAN_SEG_PAYLOAD;
+		}
+		frame[0] = (uint8_t)(seq & JM_CAN_SEG_SEQ_MASK);
+		if (off + chunk >= len)
+		{
+			frame[0] |= JM_CAN_SEG_LAST; /* 末帧 */
+		}
+		memcpy(&frame[1], &body[off], chunk);
+		can_send_raw(c, id, frame, (uint8_t)(1 + chunk));
+		off = (uint16_t)(off + chunk);
+		seq++;
+	}
+}
+
+/* 把"逻辑载荷"按cmd编码后发出: 反馈/MIT压缩, 其余原样 */
+static void can_emit_logical(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint16_t len)
+{
+	uint8_t packed[8];
+
+	/* 反馈帧: 逻辑载荷是全精度结构, CAN压缩成8字节 */
+	if (cmd == JM_CMD_READ_FEEDBACK && c->proto.ops && c->proto.ops->get_feedback)
+	{
+		jm_feedback_t fb;
+		memset(&fb, 0, sizeof(fb));
+		if (c->proto.ops->get_feedback(&fb) == JM_ERR_OK)
+		{
+			jm_fb_pack(packed, &fb);
+			can_emit_payload(c, cmd, packed, 8);
+			return;
+		}
+	}
+	/* 其余命令: 载荷原样(<=8单帧, >8分包) */
+	can_emit_payload(c, cmd, body, len);
+}
+
+void jm_proto_can_send(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint16_t len)
+{
+	if (c == NULL)
+	{
+		return;
+	}
+	can_emit_logical(c, cmd, body, len);
+}
+
+/* ---------------- RX: 分发并回送应答 ---------------- */
+
+/* 对已重组好的(cmd + payload)做分发, 应答经CAN压缩/分包发回 */
+static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
+								   const uint8_t *payload, uint16_t plen)
+{
+	uint8_t norm[20]; /* MIT归一化缓冲: 5*f32 */
+
+	/* MIT/阻抗: CAN是8字节压缩, 解压成与串口一致的5*f32再分发,
+	 * 使应用层 set_mode 回调对两种传输完全一致(传输无关)。*/
+	if ((cmd == JM_CMD_MIT || cmd == JM_CMD_IMPEDANCE) && plen >= 8)
+	{
+		float pos, vel, kp, kd, tff;
+		jm_mit_unpack(payload, &pos, &vel, &kp, &kd, &tff);
+		jm_wr_f32(&norm[0], pos);
+		jm_wr_f32(&norm[4], vel);
+		jm_wr_f32(&norm[8], kp);
+		jm_wr_f32(&norm[12], kd);
+		jm_wr_f32(&norm[16], tff);
+		payload = norm;
+		plen = 20;
+	}
+
+	jm_proto_dispatch(&c->proto, cmd, payload, plen);
+
+	/* 广播(电机ID=0)不应答; 有应答则发回 */
+	if (c->proto.reply_len > 0)
+	{
+		uint8_t rcmd = c->proto.reply[0];
+		const uint8_t *rbody = (c->proto.reply_len > 1) ? &c->proto.reply[1] : NULL;
+		uint16_t rlen = (uint16_t)(c->proto.reply_len - 1);
+		/* 反馈类应答在CAN上压缩(can_emit_logical内部按rcmd处理) */
+		can_emit_logical(c, rcmd, rbody, rlen);
+	}
+}
+
+/* 复位多帧重组状态 */
+static void rx_reset(jm_proto_can_t *c)
+{
+	c->rx_active = 0;
+	c->rx_len = 0;
+	c->rx_seq = 0;
+	c->rx_cmd = 0;
+}
+
+void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame)
+{
+	uint8_t cmd, dst;
+
+	if (c == NULL || frame == NULL)
+	{
+		return;
+	}
+
+	cmd = JM_CAN_GET_CMD(frame->id);
+	dst = JM_CAN_GET_MOTOR_ID(frame->id);
+
+	/* 地址过滤: 只收发给本机或广播(0)的帧 */
+	if (dst != c->motor_id && dst != JM_CAN_BROADCAST_ID)
+	{
+		return;
+	}
+
+	/* 判断是否多帧分包: 载荷上限内的命令走单帧;
+	 * 这里以"该CMD在CSV中是否>8字节"无法仅凭帧判断, 故采用约定:
+	 * 单帧命令 data 直接是载荷; 需分包的命令由发送端用控制字标记。
+	 * 接收端策略: 若上一帧未完成重组(rx_active)或本帧带分包语义则按多帧处理。
+	 * 简化实现: 默认按单帧分发; 多帧重组仅用于本层 can_emit_payload 产生的帧,
+	 * 即 data[0] 为控制字。为避免与单帧载荷歧义, 多帧仅对"已知大载荷CMD"启用。*/
+
+	/* 已知需要多帧的大载荷命令(与CSV"CAN需分包"一致) */
+	uint8_t is_multi = (cmd == JM_CMD_PARAM_READ_BULK || cmd == JM_CMD_PARAM_WRITE_BULK || cmd == JM_CMD_READ_DEV_INFO || cmd == JM_CMD_ADMITTANCE || cmd == JM_CMD_FORCE_POSITION_HYBRID || cmd == JM_CMD_VARIABLE_IMPEDANCE || cmd == JM_CMD_PVT || cmd == JM_CMD_CUBIC_SPLINE || cmd == JM_CMD_TRAPEZOIDAL_TRAJ || cmd == JM_CMD_S_CURVE_TRAJ || cmd == JM_CMD_TEST_SWEEP_FREQ);
+
+	if (!is_multi)
+	{
+		/* 单帧: data 即载荷 */
+		can_dispatch_and_reply(c, cmd, frame->data, frame->len);
+		return;
+	}
+
+	/* 多帧重组: data[0]=控制字, data[1..]=片段 */
+	if (frame->len < 1)
+	{
+		return;
+	}
+	{
+		uint8_t ctrl = frame->data[0];
+		uint8_t seq = ctrl & JM_CAN_SEG_SEQ_MASK;
+		uint8_t last = (ctrl & JM_CAN_SEG_LAST) ? 1 : 0;
+		uint8_t frag = (uint8_t)(frame->len - 1);
+
+		if (seq == 0)
+		{
+			/* 新一轮重组 */
+			rx_reset(c);
+			c->rx_active = 1;
+			c->rx_cmd = cmd;
+			c->rx_buf[0] = cmd; /* 重组区[0]存CMD, 与dispatch约定一致 */
+			c->rx_len = 1;
+		}
+		else if (!c->rx_active || cmd != c->rx_cmd || seq != c->rx_seq)
+		{
+			rx_reset(c); /* 序号错乱, 丢弃 */
+			return;
+		}
+
+		if ((uint16_t)(c->rx_len + frag) > sizeof(c->rx_buf))
+		{
+			rx_reset(c);
+			return; /* 溢出保护 */
+		}
+		memcpy(&c->rx_buf[c->rx_len], &frame->data[1], frag);
+		c->rx_len = (uint16_t)(c->rx_len + frag);
+		c->rx_seq++;
+
+		if (last)
+		{
+			/* 重组完成: rx_buf[0]=CMD, [1..]=载荷 */
+			const uint8_t *pl = (c->rx_len > 1) ? &c->rx_buf[1] : NULL;
+			uint16_t plen = (uint16_t)(c->rx_len - 1);
+			can_dispatch_and_reply(c, c->rx_cmd, pl, plen);
+			rx_reset(c);
+		}
+	}
+}
+
+/* ---------------- 初始化 ---------------- */
+int jm_proto_can_init(jm_proto_can_t *c, const jm_proto_ops_t *ops,
+					  uint8_t motor_id, jm_can_tx_fn tx)
+{
+	if (c == NULL || tx == NULL)
+	{
+		return -1;
+	}
+	memset(c, 0, sizeof(*c));
+	jm_proto_init(&c->proto, ops, motor_id);
+	c->tx = tx;
+	c->motor_id = motor_id;
+	rx_reset(c);
+	return 0;
+}
