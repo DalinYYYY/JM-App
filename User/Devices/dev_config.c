@@ -13,7 +13,8 @@
 #include "dev_eeprom.h"
 #include "dev_power_monitor.h"
 #include "dev_motor_phase_current.h"
-#include "dev_commun_vesc.h"
+// #include "dev_commun_vesc.h"
+#include "dev_commun_uart.h"
 
 /* ---------------- MT6701 磁编码器 ---------------- */
 #if defined(USE_DEV_MT6701)
@@ -72,11 +73,22 @@ const dev_commun_vesc_config_t commun_vesc_list[VESC_COMM_ID_MAX] = {
 	[VESC_COMM_ID_1] = {
 						.name = "VESC_COMM_1",
 						.uart = DRV_UART1, /* 须为已配置 DMA 收发的串口 */
-						.hw_name = "JointMotor",
+		.hw_name = "JointMotor",
 						.fw_name = "JM_FW",
 						.fw_major = 6,
 						.fw_minor = 1,
 						},
+};
+#endif
+
+/* ---------------- 关节电机串口通信 (joint_proto, USART+DMA空闲中断) ---------------- */
+#if defined(USE_DEV_COMMUN_UART)
+const dev_commun_uart_config_t commun_uart_list[JM_UART_COMM_ID_MAX] = {
+	[JM_UART_COMM_ID_1] = {
+						   .name = "JM_UART_1",
+						   .uart = DRV_UART1, /* 须为已配置 DMA 收发的串口 */
+						   .motor_id = 1,	  /* 本机地址(串口可忽略, 与CAN保持一致) */
+						   },
 };
 #endif
 

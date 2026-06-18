@@ -449,16 +449,6 @@
           <GroupName>Protocol</GroupName>
           <Files>
             <File>
-              <FileName>vesc_proto.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Protocol\vesc_proto\vesc_proto.c</FilePath>
-            </File>
-            <File>
-              <FileName>vesc_slave.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Protocol\vesc_proto\vesc_slave.c</FilePath>
-            </File>
-            <File>
               <FileName>packer_parser.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Protocol\packer_parser\packer_parser.c</FilePath>
@@ -472,11 +462,6 @@
               <FileName>jm_proto_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
-            </File>
-            <File>
-              <FileName>jm_proto_can.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Protocol\joint_proto\jm_proto_can.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -559,14 +544,19 @@
           <GroupName>Devices</GroupName>
           <Files>
             <File>
-              <FileName>dev_dwt_counter.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_dwt_counter.c</FilePath>
+              <FileName>dev_config.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\User\Devices\dev_config.h</FilePath>
             </File>
             <File>
               <FileName>dev_config.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Devices\dev_config.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_dwt_counter.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Devices\dev_dwt_counter.c</FilePath>
             </File>
             <File>
               <FileName>dev_half_bridge.c</FileName>
@@ -599,14 +589,9 @@
               <FilePath>..\User\Devices\dev_power_monitor.c</FilePath>
             </File>
             <File>
-              <FileName>dev_commun_vesc.c</FileName>
+              <FileName>dev_commun_uart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_commun_vesc.c</FilePath>
-            </File>
-            <File>
-              <FileName>dev_config.h</FileName>
-              <FileType>5</FileType>
-              <FilePath>..\User\Devices\dev_config.h</FilePath>
+              <FilePath>..\User\Devices\dev_commun_uart.c</FilePath>
             </File>
           </Files>
         </Group>

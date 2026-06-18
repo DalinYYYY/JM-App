@@ -73,6 +73,11 @@
 // <i> VESC Tool 串口通信 (USART+DMA空闲中断, 伪装成VESC从机)
 // #define USE_DEV_COMMUN_VESC
 // </c>
+
+// <c1> COMMUN UART
+// <i> 关节电机串口通信 (USART+DMA空闲中断, joint_proto 协议)
+// #define USE_DEV_COMMUN_UART
+// </c>
 // </h>
 /* ===================================================================== */
 /*                                                                       */
@@ -120,6 +125,10 @@
 
 #if defined(USE_DEV_COMMUN_VESC)
 #define DEV_VESC_RX_BUF_SIZE (256u) /* VESC 接收缓冲(空闲中断单帧上限, 含组帧余量) */
+#endif
+
+#if defined(USE_DEV_COMMUN_UART)
+#define DEV_JM_UART_RX_BUF_SIZE (300u) /* 关节电机串口接收缓冲(空闲中断单帧上限) */
 #endif
 
 //***<<< end of configuration section >>>***
