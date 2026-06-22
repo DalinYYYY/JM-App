@@ -437,6 +437,40 @@
             "title": "健康状态 (0xC0)",
             "uniqueId": 10004,
             "widget": ""
+        },
+        {
+            "datasets": [
+                {
+                    "datasetId": 0,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 256,
+                    "fftSamplingRate": 100,
+                    "graph": false,
+                    "groupId": 2,
+                    "index": 7,
+                    "led": false,
+                    "ledHigh": 80,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 0,
+                    "plotMin": 0,
+                    "title": "新建数据集",
+                    "uniqueId": 10010,
+                    "units": "",
+                    "value": "",
+                    "widget": "",
+                    "widgetMax": 0,
+                    "widgetMin": 0,
+                    "xAxis": -2
+                }
+            ],
+            "title": "FOC控制",
+            "uniqueId": 10009,
+            "widget": ""
         }
     ],
     "hexadecimalDelimiters": false,
@@ -461,9 +495,9 @@
         "sslProtocol": 5,
         "topicBase": ""
     },
-    "nextUniqueId": 10009,
+    "nextUniqueId": 10011,
     "plotTimeRange": 10,
-    "pointCount": 100000,
+    "pointCount": 10000,
     "schemaVersion": 3,
     "sources": [
         {
@@ -508,7 +542,7 @@
         },
         "9:0:1": {
             "interpolationMode": 1,
-            "showAreaUnderPlot": true,
+            "showAreaUnderPlot": false,
             "userShowYLabel": true
         },
         "9:0:2": {

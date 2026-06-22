@@ -76,26 +76,29 @@ static jm_err_e commun_uart_set_mode(uint8_t cmd, const uint8_t *payload, uint16
 /* 读实时反馈: 从运行参数填充 */
 static jm_err_e commun_uart_get_feedback(jm_feedback_t *fb)
 {
-	const sys_control_data_t *d = &usr.motor_state[M1].ctrl_data;
+	const motor_state_t *m = &usr.motor_state[M1];
+	const sys_control_data_t *d = &m->ctrl_data;
 
-	fb->pos = d->pos_rad;  /* 输出端位置 rad */
-	fb->vel = d->velocity; /* 输出端速度 rad/s */
-	fb->torque = 0.0f;	   /* 输出端力矩 Nm (暂无) */
-	fb->id = d->id;		   /* d轴电流 A */
-	fb->iq = d->iq;		   /* q轴电流 A */
-	fb->ia = fb->ib = fb->ic = 0.0f;
-	fb->vbus = 0.0f;
-	fb->ibus = 0.0f;
-	fb->temp_fet = 0.0f;
-	fb->temp_motor = 0.0f;
-	fb->multiturn = 0;
-	fb->single = d->pos_rad;
-	fb->fault_mask = 0;
-	fb->warn_mask = 0;
+	fb->pos = m->motion.position_rad;		/* 输出端多圈位置 rad */
+	fb->vel = m->motion.velocity_rad_s;		/* 输出端速度 rad/s */
+	fb->torque = m->power.torque_est;		/* 输出端力矩 Nm (估算) */
+	fb->id = d->id;							/* d轴电流 A */
+	fb->iq = d->iq;							/* q轴电流 A */
+	fb->ia = m->electrical.ia;				/* A 相电流 A */
+	fb->ib = m->electrical.ib;				/* B 相电流 A */
+	fb->ic = m->electrical.ic;				/* C 相电流 A */
+	fb->vbus = m->power.v_bus;				/* 母线电压 V */
+	fb->ibus = m->power.i_bus;				/* 母线电流 A */
+	fb->temp_fet = m->thermal.temp_fet;		/* 功率管温度 ℃ */
+	fb->temp_motor = m->thermal.temp_motor; /* 电机温度 ℃ */
+	fb->multiturn = m->motion.multiturn;	/* 多圈计数 */
+	fb->single = m->motion.single_turn_rad; /* 单圈位置 rad */
+	fb->fault_mask = m->fault.fault_mask;	/* 故障掩码 */
+	fb->warn_mask = m->fault.warn_mask;		/* 警告掩码 */
 	fb->top_fsm = (uint8_t)usr.fsm.motor_fsm[M1];
-	fb->run_state = (uint8_t)usr.motor_state[M1].run_mode;
+	fb->run_state = (uint8_t)m->run_mode;
 	fb->ctrl_mode = (uint8_t)usr.fsm.motor_mode[M1];
-	fb->enable = usr.motor_state[M1].enable_motor ? 1 : 0;
+	fb->enable = m->enable_motor ? 1 : 0;
 	return JM_ERR_OK;
 }
 

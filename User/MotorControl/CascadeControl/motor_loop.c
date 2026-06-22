@@ -16,6 +16,9 @@
 #include "runtime_param.h"
 #include "motion_param.h"
 #include "multiturn_counter.h"
+#include "dev_power_monitor.h"
+
+#define MOTOR_LOOP_DEG_TO_RAD (0.01745329252f) /* π/180 */
 
 /* 全局电机三环控制上下文 */
 static motor_loop_t s_motor_loop;
@@ -123,11 +126,73 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 	m->sys.motor.fb.iq = fb->iq;
 }
 
+/**
+ * @brief 把控制上下文(s_motor_loop)的运行量单向同步到全局数据视图 usr
+ * @note  数据流向: 控制层(私有工作集) → runtime_param(对外遥测快照)。
+ *        供通信(jm_proto)/显示/日志统一读 usr, 不直接耦合控制层内部结构。
+ *        在位置环节拍调用即可(频率足够仪表盘与通信), 不必每个电流环基频都同步。
+ *        单位换算: motion_param 角度为 deg, runtime 统一用 rad。
+ */
+static void motor_loop_sync_runtime(motor_loop_t *m)
+{
+	motor_state_t *st = &usr.motor_state[M1];
+	const motor_param_t *param = &usr.motor_param[M1];
+	const foc_t *foc = &m->motor.foc;
+	const motion_param_t *mp = &m->motor.motor_param;
+	multiturn_t *mt = &m->motor.multiturn;
+
+	/* FOC 内环工作集(现有 ctrl_data) */
+	st->ctrl_data.id = foc->i_dq.d;
+	st->ctrl_data.iq = foc->i_dq.q;
+	st->ctrl_data.uq = foc->u_dq.q;
+	st->ctrl_data.velocity = mp->slide_rad_s;
+	st->ctrl_data.pos_rad = mt->get_position(mt);
+
+	/* 电气测量量 0xC2/0xC3 */
+	st->electrical.ia = foc->current.ia;
+	st->electrical.ib = foc->current.ib;
+	st->electrical.ic = foc->current.ic;
+	st->electrical.i_alpha = foc->i_alphaBeta.alpha;
+	st->electrical.i_beta = foc->i_alphaBeta.beta;
+	st->electrical.id_meas = foc->i_dq.d;
+	st->electrical.iq_meas = foc->i_dq.q;
+	st->electrical.ud = foc->u_dq.d;
+	st->electrical.uq = foc->u_dq.q;
+	st->electrical.u_alpha = foc->u_alphaBeta.alpha;
+	st->electrical.u_beta = foc->u_alphaBeta.beta;
+	st->electrical.duty_a = foc->svpwm.ta;
+	st->electrical.duty_b = foc->svpwm.tb;
+	st->electrical.duty_c = foc->svpwm.tc;
+
+	/* 运动反馈量 0xC6/0xC7 */
+	st->motion.mech_angle_rad = mp->mechanical_angle * MOTOR_LOOP_DEG_TO_RAD;
+	st->motion.elec_angle_rad = mp->ele_radian;
+	st->motion.single_turn_rad = mt->last_single_rad;
+	st->motion.multiturn = mt->get_turns(mt);
+	st->motion.position_rad = mt->get_position(mt);
+	st->motion.velocity_rad_s = mp->slide_rad_s;
+	st->motion.velocity_filt = mp->slide_rad_s;
+	st->motion.accel_rad_s2 = mp->acceleration;
+
+	/* 母线/功率/力矩 0xC4: 母线量来自全局 power_monitor; 力矩 = iq*kt*gear */
+	st->power.v_bus = dev_power_monitor.vbus;
+	st->power.i_bus = dev_power_monitor.ibus;
+	st->power.power_elec_w = dev_power_monitor.vbus * dev_power_monitor.ibus;
+	st->power.torque_est = foc->i_dq.q * param->motor_base.kt * param->gearbox_param.gear_ratio;
+	st->power.power_mech_w = st->power.torque_est * mp->slide_rad_s;
+
+	/* 温度 0xC5 */
+	st->thermal.temp_fet = dev_power_monitor.temp_driver;
+	st->thermal.temp_motor = dev_power_monitor.temp_motor;
+
+	/* 运行/状态 */
+	st->run_mode = (run_state_e)m->sys.top_state;
+}
+
 void motor_loop_isr(void)
 {
 	motor_loop_t *m = &s_motor_loop;
 	cascade_fb_t fb;
-
 	// 分频判断：自增计数器到阈值清零，仅用比较，避免中断内取模/除法
 	uint32_t cnt = m->isr_cnt + 1;
 	bool vel_tick = (cnt >= MOTOR_LOOP_VEL_DIV);
@@ -140,6 +205,10 @@ void motor_loop_isr(void)
 
 	// step1: 解算运动反馈（复用上一拍电流环刷新的角度/电流）
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);
+
+	// 位置环节拍：把运行量同步到全局数据视图 usr（运行/待机态都刷新，供通信/显示）
+	if (pos_tick)
+		motor_loop_sync_runtime(m);
 
 	// step2: 状态机生成参考输出 motor.ref（含模式管理与平滑过渡）
 	motor_control_loop(&m->sys);
