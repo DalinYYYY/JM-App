@@ -80,7 +80,7 @@ void commun_thread(void const *argument)
 
 #if defined(USE_DEV_COMMUN_UART)
 		/* SerialStudio 通信周期处理: 命令分发应答 + 按订阅周期推送遥测帧 */
-		// ss_commun_process();
+		ss_commun_process();
 #endif
 
 		usr.sys.task_cnt.commun_cnt++;

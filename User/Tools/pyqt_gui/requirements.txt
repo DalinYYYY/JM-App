@@ -1,0 +1,8 @@
+PyQt6>=6.5.0
+pyserial>=3.5
+
+# 可选: 实时曲线绘制(plot_panel 后续集成时启用)
+# pyqtgraph>=0.13.0
+
+# 可选: CAN 传输(can_transport 实现时启用)
+# python-can>=4.0.0
