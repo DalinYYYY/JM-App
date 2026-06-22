@@ -1029,12 +1029,13 @@
             "visibleCurves": null
         },
         "2:2:-1": {
-            "interpolationMode": 0,
+            "interpolationMode": 1,
             "visibleCurves": null
         },
         "activeGroup": 5002,
         "externalWindows": {
-            "data": []
+            "data": [
+            ]
         },
         "layout:5000": {
             "data": {
