@@ -25,6 +25,7 @@
 #include "vofa.h"
 #include "main.h"
 #include "dev_commun_vesc.h"
+#include "dev_commun_uart.h"
 
 void vofa_update(void)
 {
@@ -59,6 +60,79 @@ static void commun_vesc_fill_values(vesc_values_t *v)
 }
 #endif /* USE_DEV_COMMUN_VESC */
 
+#if defined(USE_DEV_COMMUN_UART)
+/* ---------------- joint_proto 业务回调: 上位机命令的真正动作落点 ---------------- */
+
+/* 设置控制模式并下发目标(CMD 0x00~0xB8) */
+static jm_err_e commun_uart_set_mode(uint8_t cmd, const uint8_t *payload, uint16_t len)
+{
+	(void)cmd;
+	(void)payload;
+	(void)len;
+	/* TODO: 按 cmd 解析载荷并下发到电机控制层 */
+	return JM_ERR_OK;
+}
+
+/* 读实时反馈: 从运行参数填充 */
+static jm_err_e commun_uart_get_feedback(jm_feedback_t *fb)
+{
+	const sys_control_data_t *d = &usr.motor_state[M1].ctrl_data;
+
+	fb->pos = d->pos_rad;  /* 输出端位置 rad */
+	fb->vel = d->velocity; /* 输出端速度 rad/s */
+	fb->torque = 0.0f;	   /* 输出端力矩 Nm (暂无) */
+	fb->id = d->id;		   /* d轴电流 A */
+	fb->iq = d->iq;		   /* q轴电流 A */
+	fb->ia = fb->ib = fb->ic = 0.0f;
+	fb->vbus = 0.0f;
+	fb->ibus = 0.0f;
+	fb->temp_fet = 0.0f;
+	fb->temp_motor = 0.0f;
+	fb->multiturn = 0;
+	fb->single = d->pos_rad;
+	fb->fault_mask = 0;
+	fb->warn_mask = 0;
+	fb->top_fsm = (uint8_t)usr.fsm.motor_fsm[M1];
+	fb->run_state = (uint8_t)usr.motor_state[M1].run_mode;
+	fb->ctrl_mode = (uint8_t)usr.fsm.motor_mode[M1];
+	fb->enable = usr.motor_state[M1].enable_motor ? 1 : 0;
+	return JM_ERR_OK;
+}
+
+/* 读单个参数 */
+static jm_err_e commun_uart_param_read(uint16_t param_id, uint8_t *value,
+									   uint8_t *out_type, uint8_t *out_len)
+{
+	(void)param_id;
+	(void)value;
+	(void)out_type;
+	(void)out_len;
+	/* TODO: 按 param_id 查参数表并填充 value/out_type/out_len */
+	return JM_ERR_BAD_PARAM_ID;
+}
+
+/* 写单个参数 */
+static jm_err_e commun_uart_param_write(uint16_t param_id, const uint8_t *value, uint8_t len)
+{
+	(void)param_id;
+	(void)value;
+	(void)len;
+	/* TODO: 按 param_id 写入参数表 */
+	return JM_ERR_BAD_PARAM_ID;
+}
+
+static const jm_proto_ops_t commun_uart_ops = {
+	.set_mode = commun_uart_set_mode,
+	.get_feedback = commun_uart_get_feedback,
+	.param_read = commun_uart_param_read,
+	.param_write = commun_uart_param_write,
+	.param_save = NULL,
+	.param_reset = NULL,
+	.get_dev_info = NULL,
+	.get_dev_name = NULL,
+};
+#endif /* USE_DEV_COMMUN_UART */
+
 void commun_thread(void const *argument)
 {
 	drv_rtos_delay_ms(INTO_THREAD_DELAY / 5);
@@ -70,6 +144,13 @@ void commun_thread(void const *argument)
 	dev_commun_vesc.start(&dev_commun_vesc);
 #endif
 
+#if defined(USE_DEV_COMMUN_UART)
+	/* 关节电机串口通信(USART+DMA空闲中断): 初始化→注入业务回调→启动接收 */
+	dev_commun_uart_init(&dev_commun_uart, JM_UART_COMM_ID_1);
+	dev_commun_uart.set_ops(&dev_commun_uart, &commun_uart_ops);
+	dev_commun_uart.start(&dev_commun_uart);
+#endif
+
 	for (;;)
 	{
 		// vofa_update();
@@ -77,6 +158,11 @@ void commun_thread(void const *argument)
 #if defined(USE_DEV_COMMUN_VESC)
 		/* 取空闲突发数据喂协议栈, 自动完成识别握手与实时值回复 */
 		dev_commun_vesc.poll(&dev_commun_vesc);
+#endif
+
+#if defined(USE_DEV_COMMUN_UART)
+		/* 取空闲突发数据喂协议栈, 自动完成命令分发与应答 */
+		dev_commun_uart.poll(&dev_commun_uart);
 #endif
 
 		usr.sys.task_cnt.commun_cnt++;

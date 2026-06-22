@@ -92,14 +92,14 @@
             "txEncoding": 0
         },
         {
-            "autoExecuteOnConnect": false,
+            "autoExecuteOnConnect": true,
             "binary": true,
             "eol": "",
             "icon": "Play Property",
             "repeatCount": 3,
             "sourceId": 0,
-            "timerIntervalMs": 100,
-            "timerMode": 0,
+            "timerIntervalMs": 10,
+            "timerMode": 1,
             "title": "读实时反馈 0xC0",
             "txData": "A55A000100C04CD9",
             "txEncoding": 0
@@ -268,7 +268,7 @@
                     "datasetId": 0,
                     "displayFormat": "0d",
                     "displayTickCount": 5,
-                    "fft": false,
+                    "fft": true,
                     "fftMax": 0,
                     "fftMin": 0,
                     "fftSamples": 1024,
@@ -286,7 +286,7 @@
                     "uniqueId": 0,
                     "units": "rad",
                     "value": "--.--",
-                    "widget": "gauge",
+                    "widget": "",
                     "widgetMax": 12.5,
                     "widgetMin": -12.5,
                     "xAxis": -1
@@ -313,7 +313,7 @@
                     "uniqueId": 1,
                     "units": "rad/s",
                     "value": "--.--",
-                    "widget": "gauge",
+                    "widget": "",
                     "widgetMax": 65,
                     "widgetMin": -65,
                     "xAxis": -1
@@ -340,7 +340,7 @@
                     "uniqueId": 2,
                     "units": "Nm",
                     "value": "--.--",
-                    "widget": "gauge",
+                    "widget": "",
                     "widgetMax": 50,
                     "widgetMin": -50,
                     "xAxis": -1
@@ -374,7 +374,7 @@
                     "uniqueId": 10000,
                     "units": "C",
                     "value": "--.--",
-                    "widget": "bar",
+                    "widget": "",
                     "widgetMax": 120,
                     "widgetMin": 0,
                     "xAxis": -1
@@ -401,7 +401,7 @@
                     "uniqueId": 10001,
                     "units": "V",
                     "value": "--.--",
-                    "widget": "bar",
+                    "widget": "",
                     "widgetMax": 60,
                     "widgetMin": 0,
                     "xAxis": -1
@@ -461,9 +461,9 @@
         "sslProtocol": 5,
         "topicBase": ""
     },
-    "nextUniqueId": 10005,
+    "nextUniqueId": 10009,
     "plotTimeRange": 10,
-    "pointCount": 100,
+    "pointCount": 100000,
     "schemaVersion": 3,
     "sources": [
         {
@@ -471,13 +471,20 @@
             "checksum": "",
             "checksumAlgorithm": "",
             "connection": {
-                "autoReconnect": false,
-                "baudRate": 9600,
+                "autoReconnect": true,
+                "baudRate": 115200,
                 "dataBitsIndex": 3,
+                "deviceId": {
+                    "description": "USB 串行设备",
+                    "pid": "0204",
+                    "portName": "COM3",
+                    "serial": "EF8B8A0E0949B1EF01",
+                    "vid": "0D28"
+                },
                 "dtr": true,
                 "flowControlIndex": 0,
                 "parityIndex": 0,
-                "portIndex": 0,
+                "portIndex": 1,
                 "stopBitsIndex": 0
             },
             "decoder": 3,
@@ -492,6 +499,190 @@
         }
     ],
     "title": "关节电机 JointMotor UART",
+    "widgetSettings": {
+        "10:1:4": {
+            "page": 0
+        },
+        "11:0:2": {
+            "page": 0
+        },
+        "9:0:1": {
+            "interpolationMode": 1,
+            "showAreaUnderPlot": true,
+            "userShowYLabel": true
+        },
+        "9:0:2": {
+            "userShowXLabel": true
+        },
+        "externalWindows": {
+            "data": [
+            ]
+        },
+        "layout:1000": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 931,
+                "canvasWidth": 1705,
+                "geometries": [
+                    {
+                        "height": 466,
+                        "id": 11,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 11,
+                        "width": 341,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 466,
+                        "id": 4,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 341,
+                        "x": 340,
+                        "y": 0
+                    },
+                    {
+                        "height": 466,
+                        "id": 12,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 11,
+                        "width": 341,
+                        "x": 680,
+                        "y": 0
+                    },
+                    {
+                        "height": 466,
+                        "id": 5,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 341,
+                        "x": 1020,
+                        "y": 0
+                    },
+                    {
+                        "height": 466,
+                        "id": 13,
+                        "relativeIndex": 2,
+                        "state": "normal",
+                        "widgetType": 11,
+                        "width": 341,
+                        "x": 1360,
+                        "y": 0
+                    },
+                    {
+                        "height": 465,
+                        "id": 6,
+                        "relativeIndex": 2,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 341,
+                        "x": 0,
+                        "y": 465
+                    },
+                    {
+                        "height": 465,
+                        "id": 9,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 341,
+                        "x": 340,
+                        "y": 465
+                    },
+                    {
+                        "height": 465,
+                        "id": 7,
+                        "relativeIndex": 3,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 341,
+                        "x": 680,
+                        "y": 465
+                    },
+                    {
+                        "height": 465,
+                        "id": 10,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 341,
+                        "x": 1020,
+                        "y": 465
+                    },
+                    {
+                        "height": 465,
+                        "id": 8,
+                        "relativeIndex": 4,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 341,
+                        "x": 1360,
+                        "y": 465
+                    }
+                ],
+                "userReordered": true,
+                "windowOrder": [
+                    11,
+                    4,
+                    12,
+                    5,
+                    13,
+                    6,
+                    9,
+                    7,
+                    10,
+                    8
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 11
+                    },
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 11
+                    },
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 2,
+                        "widgetType": 11
+                    },
+                    {
+                        "relativeIndex": 2,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 10
+                    },
+                    {
+                        "relativeIndex": 3,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 10
+                    },
+                    {
+                        "relativeIndex": 4,
+                        "widgetType": 9
+                    }
+                ]
+            }
+        }
+    },
     "writerVersion": "4.0.1",
     "writerVersionAtCreation": "4.0.1"
 }

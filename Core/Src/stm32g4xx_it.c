@@ -23,6 +23,7 @@
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 //#include "dev_commun_vesc.h"
+#include "dev_commun_uart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -275,6 +276,10 @@ void USART1_IRQHandler(void)
 #if defined(USE_DEV_COMMUN_VESC)
   /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
 //  dev_commun_vesc.on_rx_idle(&dev_commun_vesc);
+#endif
+#if defined(USE_DEV_COMMUN_UART)
+  /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
+  dev_commun_uart.on_rx_idle(&dev_commun_uart);
 #endif
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);

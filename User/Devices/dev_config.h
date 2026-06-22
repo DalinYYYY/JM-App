@@ -76,7 +76,7 @@
 
 // <c1> COMMUN UART
 // <i> 关节电机串口通信 (USART+DMA空闲中断, joint_proto 协议)
-// #define USE_DEV_COMMUN_UART
+#define USE_DEV_COMMUN_UART
 // </c>
 // </h>
 /* ===================================================================== */
