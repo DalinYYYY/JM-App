@@ -9,7 +9,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "上使能 Enable",
+            "title": "【系统】上使能 Enable",
             "txData": "A55A000100048440",
             "txEncoding": 0
         },
@@ -22,7 +22,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "下使能 Disable",
+            "title": "【系统】下使能 Disable",
             "txData": "A55A00010005A550",
             "txEncoding": 0
         },
@@ -35,7 +35,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "停止运行 Stop",
+            "title": "【系统】停止运行 Stop",
             "txData": "A55A00010006C660",
             "txEncoding": 0
         },
@@ -48,7 +48,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "位置保持 Hold",
+            "title": "【系统】位置保持 Hold",
             "txData": "A55A000100012110",
             "txEncoding": 0
         },
@@ -61,7 +61,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "紧急停止 E-Stop",
+            "title": "【系统】紧急停止 E-Stop",
             "txData": "A55A000100036330",
             "txEncoding": 0
         },
@@ -74,7 +74,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "清除故障 ClearFault",
+            "title": "【系统】清除故障 ClearFault",
             "txData": "A55A000100B0DBA7",
             "txEncoding": 0
         },
@@ -87,24 +87,11 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "保存配置 SaveCfg",
+            "title": "【系统】保存配置 SaveCfg",
             "txData": "A55A000100B3B897",
             "txEncoding": 0
         },
         {
-            "autoExecuteOnConnect": true,
-            "binary": true,
-            "eol": "",
-            "icon": "Play Property",
-            "repeatCount": 3,
-            "sourceId": 0,
-            "timerIntervalMs": 10,
-            "timerMode": 1,
-            "title": "读实时反馈 0xC0",
-            "txData": "A55A000100C04CD9",
-            "txEncoding": 0
-        },
-        {
             "autoExecuteOnConnect": false,
             "binary": true,
             "eol": "",
@@ -113,46 +100,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "读电机状态 0xC1",
-            "txData": "A55A000100C16DC9",
-            "txEncoding": 0
-        },
-        {
-            "autoExecuteOnConnect": false,
-            "binary": true,
-            "eol": "",
-            "icon": "Play Property",
-            "repeatCount": 3,
-            "sourceId": 0,
-            "timerIntervalMs": 100,
-            "timerMode": 0,
-            "title": "读故障码 0xC8",
-            "txData": "A55A000100C84458",
-            "txEncoding": 0
-        },
-        {
-            "autoExecuteOnConnect": false,
-            "binary": true,
-            "eol": "",
-            "icon": "Play Property",
-            "repeatCount": 3,
-            "sourceId": 0,
-            "timerIntervalMs": 100,
-            "timerMode": 0,
-            "title": "读设备信息 0xD0",
-            "txData": "A55A000100D07DCB",
-            "txEncoding": 0
-        },
-        {
-            "autoExecuteOnConnect": false,
-            "binary": true,
-            "eol": "",
-            "icon": "Play Property",
-            "repeatCount": 3,
-            "sourceId": 0,
-            "timerIntervalMs": 100,
-            "timerMode": 0,
-            "title": "回零 Homing(法0)",
+            "title": "【运动】回零 Homing",
             "txData": "A55A00020154007BC2",
             "txEncoding": 0
         },
@@ -165,7 +113,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "位置环 -> 0 rad",
+            "title": "【运动】位置环 -> 0 rad",
             "txData": "A55A00050415000000000D27",
             "txEncoding": 0
         },
@@ -178,7 +126,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "位置环 -> 1.0 rad",
+            "title": "【运动】位置环 -> 1.0 rad",
             "txData": "A55A000504150000803F29FB",
             "txEncoding": 0
         },
@@ -191,7 +139,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "位置环 -> -1.0 rad",
+            "title": "【运动】位置环 -> -1.0 rad",
             "txData": "A55A00050415000080BFA16A",
             "txEncoding": 0
         },
@@ -204,20 +152,7 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "速度环 -> 0 rad/s",
-            "txData": "A55A00050414000000005C8D",
-            "txEncoding": 0
-        },
-        {
-            "autoExecuteOnConnect": false,
-            "binary": true,
-            "eol": "",
-            "icon": "Play Property",
-            "repeatCount": 3,
-            "sourceId": 0,
-            "timerIntervalMs": 100,
-            "timerMode": 0,
-            "title": "速度环 -> 5 rad/s",
+            "title": "【运动】速度环 -> 5 rad/s",
             "txData": "A55A000504140000A040E6D8",
             "txEncoding": 0
         },
@@ -230,37 +165,129 @@
             "sourceId": 0,
             "timerIntervalMs": 100,
             "timerMode": 0,
-            "title": "力矩环 -> 0.5 Nm",
+            "title": "【运动】力矩环 -> 0.5 Nm",
             "txData": "A55A000504120000003F6587",
             "txEncoding": 0
         },
         {
-            "autoExecuteOnConnect": false,
+            "autoExecuteOnConnect": true,
             "binary": true,
             "eol": "",
             "icon": "Play Property",
             "repeatCount": 3,
             "sourceId": 0,
-            "timerIntervalMs": 100,
-            "timerMode": 0,
-            "title": "开始日志 100Hz",
-            "txData": "A55A000706B56400FFFFFFFFA54B",
+            "timerIntervalMs": 50,
+            "timerMode": 1,
+            "title": "【轮询】实时反馈 0xC0",
+            "txData": "A55A0001C04CD9",
             "txEncoding": 0
         },
         {
-            "autoExecuteOnConnect": false,
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 3,
+            "sourceId": 0,
+            "timerIntervalMs": 200,
+            "timerMode": 1,
+            "title": "【轮询】电机状态 0xC1",
+            "txData": "A55A0001C16DC9",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 3,
+            "sourceId": 0,
+            "timerIntervalMs": 50,
+            "timerMode": 1,
+            "title": "【轮询】三相电流 0xC2",
+            "txData": "A55A0001C20EF9",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 3,
+            "sourceId": 0,
+            "timerIntervalMs": 50,
+            "timerMode": 1,
+            "title": "【轮询】dq电流 0xC3",
+            "txData": "A55A0001C32FE9",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": true,
             "binary": true,
             "eol": "",
             "icon": "Play Property",
             "repeatCount": 3,
             "sourceId": 0,
             "timerIntervalMs": 100,
-            "timerMode": 0,
-            "title": "停止日志",
-            "txData": "A55A000100B61DC7",
+            "timerMode": 1,
+            "title": "【轮询】母线 0xC4",
+            "txData": "A55A0001C4C899",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 3,
+            "sourceId": 0,
+            "timerIntervalMs": 500,
+            "timerMode": 1,
+            "title": "【轮询】温度 0xC5",
+            "txData": "A55A0001C5E989",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 3,
+            "sourceId": 0,
+            "timerIntervalMs": 50,
+            "timerMode": 1,
+            "title": "【轮询】位置速度 0xC6",
+            "txData": "A55A0001C68AB9",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 3,
+            "sourceId": 0,
+            "timerIntervalMs": 200,
+            "timerMode": 1,
+            "title": "【轮询】多圈 0xC7",
+            "txData": "A55A0001C7ABA9",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 3,
+            "sourceId": 0,
+            "timerIntervalMs": 200,
+            "timerMode": 1,
+            "title": "【轮询】故障码 0xC8",
+            "txData": "A55A0001C84458",
             "txEncoding": 0
         }
     ],
+    "customizeWorkspaces": true,
     "groups": [
         {
             "datasets": [
@@ -268,7 +295,7 @@
                     "datasetId": 0,
                     "displayFormat": "0d",
                     "displayTickCount": 5,
-                    "fft": true,
+                    "fft": false,
                     "fftMax": 0,
                     "fftMin": 0,
                     "fftSamples": 1024,
@@ -283,7 +310,7 @@
                     "plotMax": 12.5,
                     "plotMin": -12.5,
                     "title": "位置 Pos",
-                    "uniqueId": 0,
+                    "uniqueId": 10000,
                     "units": "rad",
                     "value": "--.--",
                     "widget": "",
@@ -310,7 +337,7 @@
                     "plotMax": 65,
                     "plotMin": -65,
                     "title": "速度 Vel",
-                    "uniqueId": 1,
+                    "uniqueId": 10001,
                     "units": "rad/s",
                     "value": "--.--",
                     "widget": "",
@@ -337,16 +364,70 @@
                     "plotMax": 50,
                     "plotMin": -50,
                     "title": "力矩 Torque",
-                    "uniqueId": 2,
+                    "uniqueId": 10002,
                     "units": "Nm",
                     "value": "--.--",
                     "widget": "",
                     "widgetMax": 50,
                     "widgetMin": -50,
                     "xAxis": -1
+                },
+                {
+                    "datasetId": 3,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": true,
+                    "groupId": 0,
+                    "index": 15,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 6.3,
+                    "plotMin": -6.3,
+                    "title": "单圈 Single",
+                    "uniqueId": 10003,
+                    "units": "rad",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 6.3,
+                    "widgetMin": -6.3,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 4,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 0,
+                    "index": 14,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 100,
+                    "plotMin": -100,
+                    "title": "多圈 Multiturn",
+                    "uniqueId": 10004,
+                    "units": "turn",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 100,
+                    "widgetMin": -100,
+                    "xAxis": -1
                 }
             ],
-            "title": "实时反馈 (0xC0)",
+            "title": "运动 (0xC0/C6/C7)",
             "uniqueId": 10003,
             "widget": ""
         },
@@ -363,20 +444,20 @@
                     "fftSamplingRate": -1,
                     "graph": true,
                     "groupId": 1,
-                    "index": 4,
+                    "index": 9,
                     "led": false,
                     "ledHigh": 1,
                     "log": false,
                     "numericValue": 0,
-                    "plotMax": 120,
-                    "plotMin": 0,
-                    "title": "温度 Temp",
-                    "uniqueId": 10000,
-                    "units": "C",
+                    "plotMax": 30,
+                    "plotMin": -30,
+                    "title": "Id 电流",
+                    "uniqueId": 10005,
+                    "units": "A",
                     "value": "--.--",
                     "widget": "",
-                    "widgetMax": 120,
-                    "widgetMin": 0,
+                    "widgetMax": 30,
+                    "widgetMin": -30,
                     "xAxis": -1
                 },
                 {
@@ -390,7 +471,122 @@
                     "fftSamplingRate": -1,
                     "graph": true,
                     "groupId": 1,
-                    "index": 5,
+                    "index": 10,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 30,
+                    "plotMin": -30,
+                    "title": "Iq 电流",
+                    "uniqueId": 10006,
+                    "units": "A",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 30,
+                    "widgetMin": -30,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 2,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": true,
+                    "groupId": 1,
+                    "index": 11,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 30,
+                    "plotMin": -30,
+                    "title": "A相 Ia",
+                    "uniqueId": 10007,
+                    "units": "A",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 30,
+                    "widgetMin": -30,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 3,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": true,
+                    "groupId": 1,
+                    "index": 12,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 30,
+                    "plotMin": -30,
+                    "title": "B相 Ib",
+                    "uniqueId": 10008,
+                    "units": "A",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 30,
+                    "widgetMin": -30,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 4,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": true,
+                    "groupId": 1,
+                    "index": 13,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 30,
+                    "plotMin": -30,
+                    "title": "C相 Ic",
+                    "uniqueId": 10009,
+                    "units": "A",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 30,
+                    "widgetMin": -30,
+                    "xAxis": -1
+                }
+            ],
+            "title": "电气电流 (0xC2/C3)",
+            "uniqueId": 10004,
+            "widget": ""
+        },
+        {
+            "datasets": [
+                {
+                    "datasetId": 0,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 2,
+                    "index": 6,
                     "led": false,
                     "ledHigh": 1,
                     "log": false,
@@ -398,11 +594,187 @@
                     "plotMax": 60,
                     "plotMin": 0,
                     "title": "母线电压 Vbus",
-                    "uniqueId": 10001,
+                    "uniqueId": 10010,
                     "units": "V",
                     "value": "--.--",
-                    "widget": "",
+                    "widget": "bar",
                     "widgetMax": 60,
+                    "widgetMin": 0,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 1,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": true,
+                    "groupId": 2,
+                    "index": 7,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 30,
+                    "plotMin": -30,
+                    "title": "母线电流 Ibus",
+                    "uniqueId": 10011,
+                    "units": "A",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 30,
+                    "widgetMin": -30,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 2,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": true,
+                    "groupId": 2,
+                    "index": 8,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 500,
+                    "plotMin": -500,
+                    "title": "功率 Power",
+                    "uniqueId": 10012,
+                    "units": "W",
+                    "value": "--.--",
+                    "widget": "compass",
+                    "widgetMax": 500,
+                    "widgetMin": -500,
+                    "xAxis": -1
+                }
+            ],
+            "title": "母线功率 (0xC4)",
+            "uniqueId": 10005,
+            "widget": ""
+        },
+        {
+            "datasets": [
+                {
+                    "datasetId": 0,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 3,
+                    "index": 4,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 120,
+                    "plotMin": 0,
+                    "title": "温度FET",
+                    "uniqueId": 10013,
+                    "units": "C",
+                    "value": "--.--",
+                    "widget": "bar",
+                    "widgetMax": 120,
+                    "widgetMin": 0,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 1,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 3,
+                    "index": 5,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 120,
+                    "plotMin": 0,
+                    "title": "电机温度",
+                    "uniqueId": 10014,
+                    "units": "C",
+                    "value": "--.--",
+                    "widget": "bar",
+                    "widgetMax": 120,
+                    "widgetMin": 0,
+                    "xAxis": -1
+                }
+            ],
+            "title": "温度 (0xC5)",
+            "uniqueId": 10006,
+            "widget": ""
+        },
+        {
+            "datasets": [
+                {
+                    "datasetId": 0,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 4,
+                    "index": 18,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 0,
+                    "plotMin": 0,
+                    "title": "顶层状态 TopFSM",
+                    "uniqueId": 10015,
+                    "units": "",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 0,
+                    "widgetMin": 0,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 1,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 4,
+                    "index": 19,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 0,
+                    "plotMin": 0,
+                    "title": "运行状态 RunState",
+                    "uniqueId": 10016,
+                    "units": "",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 0,
                     "widgetMin": 0,
                     "xAxis": -1
                 },
@@ -416,16 +788,97 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 1,
-                    "index": 6,
+                    "groupId": 4,
+                    "index": 20,
                     "led": false,
                     "ledHigh": 1,
                     "log": false,
                     "numericValue": 0,
                     "plotMax": 0,
                     "plotMin": 0,
-                    "title": "故障码 Err",
-                    "uniqueId": 10002,
+                    "title": "控制模式 CtrlMode",
+                    "uniqueId": 10017,
+                    "units": "",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 0,
+                    "widgetMin": 0,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 3,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 4,
+                    "index": 21,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 1,
+                    "plotMin": 0,
+                    "title": "使能 Enable",
+                    "uniqueId": 10018,
+                    "units": "",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 1,
+                    "widgetMin": 0,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 4,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 4,
+                    "index": 16,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 0,
+                    "plotMin": 0,
+                    "title": "故障码 Fault",
+                    "uniqueId": 10019,
+                    "units": "",
+                    "value": "--.--",
+                    "widget": "",
+                    "widgetMax": 0,
+                    "widgetMin": 0,
+                    "xAxis": -1
+                },
+                {
+                    "datasetId": 5,
+                    "displayFormat": "0d",
+                    "displayTickCount": 5,
+                    "fft": false,
+                    "fftMax": 0,
+                    "fftMin": 0,
+                    "fftSamples": 1024,
+                    "fftSamplingRate": -1,
+                    "graph": false,
+                    "groupId": 4,
+                    "index": 17,
+                    "led": false,
+                    "ledHigh": 1,
+                    "log": false,
+                    "numericValue": 0,
+                    "plotMax": 0,
+                    "plotMin": 0,
+                    "title": "警告码 Warn",
+                    "uniqueId": 10020,
                     "units": "",
                     "value": "--.--",
                     "widget": "",
@@ -434,42 +887,15 @@
                     "xAxis": -1
                 }
             ],
-            "title": "健康状态 (0xC0)",
-            "uniqueId": 10004,
+            "title": "状态故障 (0xC1/C8)",
+            "uniqueId": 10007,
             "widget": ""
         },
         {
             "datasets": [
-                {
-                    "datasetId": 0,
-                    "displayFormat": "0d",
-                    "displayTickCount": 5,
-                    "fft": false,
-                    "fftMax": 0,
-                    "fftMin": 0,
-                    "fftSamples": 256,
-                    "fftSamplingRate": 100,
-                    "graph": false,
-                    "groupId": 2,
-                    "index": 7,
-                    "led": false,
-                    "ledHigh": 80,
-                    "log": false,
-                    "numericValue": 0,
-                    "plotMax": 0,
-                    "plotMin": 0,
-                    "title": "新建数据集",
-                    "uniqueId": 10010,
-                    "units": "",
-                    "value": "",
-                    "widget": "",
-                    "widgetMax": 0,
-                    "widgetMin": 0,
-                    "xAxis": -2
-                }
             ],
-            "title": "FOC控制",
-            "uniqueId": 10009,
+            "title": "数据集容器",
+            "uniqueId": 10022,
             "widget": ""
         }
     ],
@@ -495,9 +921,9 @@
         "sslProtocol": 5,
         "topicBase": ""
     },
-    "nextUniqueId": 10011,
+    "nextUniqueId": 10023,
     "plotTimeRange": 10,
-    "pointCount": 10000,
+    "pointCount": 100,
     "schemaVersion": 3,
     "sources": [
         {
@@ -505,7 +931,7 @@
             "checksum": "",
             "checksumAlgorithm": "",
             "connection": {
-                "autoReconnect": true,
+                "autoReconnect": false,
                 "baudRate": 115200,
                 "dataBitsIndex": 3,
                 "deviceId": {
@@ -525,7 +951,7 @@
             "decoderMethod": 3,
             "frameDetection": 2,
             "frameEnd": "",
-            "frameParserCode": "/**\n * 关节电机串口反馈解析器 (Serial Studio - JavaScript)\n *\n * 解码器: Binary (decoder=3)  帧检测: No Delimiters (frameDetection=2)\n * parse(frame) 收到的是\"本次到达的字节数组\"(0~255)，不是字符串。\n * No-Delimiters 模式下 Serial Studio 不做分帧，必须在脚本里自行缓存+拆帧。\n *\n * 帧格式 (与固件 packer_parser.c 一致):\n *   A5 5A | LEN_H LEN_L | HDR_CHK | [CMD + DATA] | CRC_L CRC_H\n *   LEN     = CMD(1)+DATA(n) 总字节数, 大端\n *   HDR_CHK = (0xA5 + 0x5A + LEN_H + LEN_L) & 0xFF\n *   CRC16   = CRC-16/XMODEM(poly 0x1021, init 0x0000) 覆盖数据区(CMD+DATA), 小端落帧\n *\n * 仅解析实时反馈帧 0xC0 (串口应答, 22字节载荷):\n *   {pos:f32, vel:f32, torque:f32, temp:f32, volt:f32, err:u16}\n * 返回值映射到数据集 Frame Index 1..6。\n */\n\nvar __buf = [];          // 跨帧字节缓存\nvar __crcTab = null;     // CRC 查表(首次惰性构建)\n\nvar FB_CMD   = 0xC0;     // 实时反馈命令码\nvar FB_DLEN  = 1 + 22;   // CMD + 22字节载荷\nvar MAX_DLEN = 512;      // 数据区长度上限, 超出视为错位\nvar BUF_CAP  = 4096;     // 缓存上限, 防异常增长\n\nfunction crcInit() {\n    __crcTab = new Array(256);\n    for (var i = 0; i < 256; i++) {\n        var c = (i << 8) & 0xFFFF;\n        for (var k = 0; k < 8; k++)\n            c = (c & 0x8000) ? (((c << 1) ^ 0x1021) & 0xFFFF) : ((c << 1) & 0xFFFF);\n        __crcTab[i] = c;\n    }\n}\n\nfunction crc16(buf, start, len) {\n    if (!__crcTab) crcInit();\n    var crc = 0;\n    for (var i = 0; i < len; i++)\n        crc = ((crc << 8) ^ __crcTab[((crc >> 8) ^ buf[start + i]) & 0xFF]) & 0xFFFF;\n    return crc;\n}\n\nfunction rdF32(buf, o) {\n    var dv = new DataView(new ArrayBuffer(4));\n    dv.setUint8(0, buf[o]); dv.setUint8(1, buf[o + 1]);\n    dv.setUint8(2, buf[o + 2]); dv.setUint8(3, buf[o + 3]);\n    return dv.getFloat32(0, true);   // 小端\n}\n\nfunction rdU16(buf, o) {\n    return (buf[o] | (buf[o + 1] << 8)) & 0xFFFF;\n}\n\nfunction parse(frame) {\n    var i;\n    for (i = 0; i < frame.length; i++) __buf.push(frame[i] & 0xFF);\n    if (__buf.length > BUF_CAP) __buf = __buf.slice(__buf.length - BUF_CAP);\n\n    var rows = [];\n    while (true) {\n        // 1) 对齐帧头 A5 5A\n        while (__buf.length >= 2 && !(__buf[0] === 0xA5 && __buf[1] === 0x5A))\n            __buf.shift();\n        if (__buf.length < 5) break;                       // 头部未齐\n\n        var lenH = __buf[2], lenL = __buf[3];\n        var dlen = (lenH << 8) | lenL;                     // 数据区长度\n        if (dlen > MAX_DLEN) { __buf.shift(); continue; }  // 长度异常, 错位\n\n        var total = 5 + dlen + 2;                          // 头(5)+数据+CRC(2)\n        if (__buf.length < total) break;                   // 整帧未到齐\n\n        var hdrChk = (0xA5 + 0x5A + lenH + lenL) & 0xFF;\n        if (__buf[4] !== hdrChk) { __buf.shift(); continue; }\n\n        var rxCrc = __buf[5 + dlen] | (__buf[6 + dlen] << 8);\n        var ok = (crc16(__buf, 5, dlen) === rxCrc);\n        var data = __buf.slice(5, 5 + dlen);               // data[0]=CMD\n        __buf = __buf.slice(total);                        // 消费整帧\n        if (!ok) continue;\n\n        if (data.length >= FB_DLEN && data[0] === FB_CMD) {\n            rows.push([\n                rdF32(data, 1),    // pos    rad\n                rdF32(data, 5),    // vel    rad/s\n                rdF32(data, 9),    // torque Nm\n                rdF32(data, 13),   // temp   °C\n                rdF32(data, 17),   // volt   V\n                rdU16(data, 21)    // err    bitmask\n            ]);\n        }\n    }\n\n    if (rows.length === 0) return [];\n    if (rows.length === 1) return rows[0];\n    return rows;   // 多帧一次返回 (2D)\n}\n",
+            "frameParserCode": "/**\n * 关节电机串口多命令反馈解析器 (Serial Studio - JavaScript)\n *\n * 解码器: Binary (decoder=3)  帧检测: No Delimiters (frameDetection=2)\n * 帧格式 (与固件 packer_parser.c 一致):\n *   A5 5A | LEN_H LEN_L | HDR_CHK | [CMD + DATA] | CRC_L CRC_H\n *   LEN     = CMD(1)+DATA(n) 总字节数, 大端\n *   HDR_CHK = (0xA5 + 0x5A + LEN_H + LEN_L) & 0xFF\n *   CRC16   = CRC-16/XMODEM(poly 0x1021, init 0x0000) 覆盖数据区(CMD+DATA), 小端落帧\n *\n * 按 CMD 分别解析全部反馈帧, 映射到定长 21 槽 Frame Index:\n *   1 pos  2 vel  3 torque  4 tempFet  5 tempMotor  6 vbus  7 ibus  8 power\n *   9 id  10 iq  11 ia  12 ib  13 ic  14 multiturn  15 single\n *   16 fault  17 warn  18 topFsm  19 runState  20 ctrlMode  21 enable\n * 未刷新的槽保留上一次值(脚本内静态保持)。\n *\n *   0xC0 实时反馈(22B): pos,vel,torque,tempMotor,vbus,fault(u16)\n *   0xC1 状态(4B)     : topFsm,runState,ctrlMode,enable (u8)\n *   0xC2 三相电流(12B): ia,ib,ic\n *   0xC3 dq电流(8B)   : id,iq\n *   0xC4 母线(12B)    : vbus,ibus,power\n *   0xC5 温度(8B)     : tempFet,tempMotor\n *   0xC6 位置速度(8B) : pos,vel\n *   0xC7 多圈(8B)     : multiturn(u32),single(f32)\n *   0xC8 故障(8B)     : fault(u32),warn(u32)\n */\n\nvar __buf = [];\nvar __crcTab = null;\nvar __slots = new Array(21);\nfor (var __i = 0; __i < 21; __i++) __slots[__i] = 0;\n\nvar MAX_DLEN = 512;\nvar BUF_CAP  = 4096;\n\nfunction crcInit() {\n    __crcTab = new Array(256);\n    for (var i = 0; i < 256; i++) {\n        var c = (i << 8) & 0xFFFF;\n        for (var k = 0; k < 8; k++)\n            c = (c & 0x8000) ? (((c << 1) ^ 0x1021) & 0xFFFF) : ((c << 1) & 0xFFFF);\n        __crcTab[i] = c;\n    }\n}\nfunction crc16(buf, start, len) {\n    if (!__crcTab) crcInit();\n    var crc = 0;\n    for (var i = 0; i < len; i++)\n        crc = ((crc << 8) ^ __crcTab[((crc >> 8) ^ buf[start + i]) & 0xFF]) & 0xFFFF;\n    return crc;\n}\nfunction rdF32(b, o) {\n    var dv = new DataView(new ArrayBuffer(4));\n    dv.setUint8(0, b[o]); dv.setUint8(1, b[o + 1]);\n    dv.setUint8(2, b[o + 2]); dv.setUint8(3, b[o + 3]);\n    return dv.getFloat32(0, true);\n}\nfunction rdU16(b, o) { return (b[o] | (b[o + 1] << 8)) & 0xFFFF; }\nfunction rdU32(b, o) {\n    return (b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24)) >>> 0;\n}\n\nfunction applyFrame(data) {\n    var cmd = data[0];\n    if (cmd === 0xC0 && data.length >= 23) {\n        __slots[0]=rdF32(data,1); __slots[1]=rdF32(data,5);\n        __slots[2]=rdF32(data,9); __slots[4]=rdF32(data,13);\n        __slots[5]=rdF32(data,17); __slots[15]=rdU16(data,21);\n    } else if (cmd === 0xC1 && data.length >= 5) {\n        __slots[17]=data[1]; __slots[18]=data[2];\n        __slots[19]=data[3]; __slots[20]=data[4];\n    } else if (cmd === 0xC2 && data.length >= 13) {\n        __slots[10]=rdF32(data,1); __slots[11]=rdF32(data,5); __slots[12]=rdF32(data,9);\n    } else if (cmd === 0xC3 && data.length >= 9) {\n        __slots[8]=rdF32(data,1); __slots[9]=rdF32(data,5);\n    } else if (cmd === 0xC4 && data.length >= 13) {\n        __slots[5]=rdF32(data,1); __slots[6]=rdF32(data,5); __slots[7]=rdF32(data,9);\n    } else if (cmd === 0xC5 && data.length >= 9) {\n        __slots[3]=rdF32(data,1); __slots[4]=rdF32(data,5);\n    } else if (cmd === 0xC6 && data.length >= 9) {\n        __slots[0]=rdF32(data,1); __slots[1]=rdF32(data,5);\n    } else if (cmd === 0xC7 && data.length >= 9) {\n        __slots[13]=rdU32(data,1); __slots[14]=rdF32(data,5);\n    } else if (cmd === 0xC8 && data.length >= 9) {\n        __slots[15]=rdU32(data,1); __slots[16]=rdU32(data,5);\n    }\n}\n\nfunction parse(frame) {\n    var i;\n    for (i = 0; i < frame.length; i++) __buf.push(frame[i] & 0xFF);\n    if (__buf.length > BUF_CAP) __buf = __buf.slice(__buf.length - BUF_CAP);\n\n    var got = false;\n    while (true) {\n        while (__buf.length >= 2 && !(__buf[0] === 0xA5 && __buf[1] === 0x5A))\n            __buf.shift();\n        if (__buf.length < 5) break;\n        var lenH = __buf[2], lenL = __buf[3];\n        var dlen = (lenH << 8) | lenL;\n        if (dlen > MAX_DLEN) { __buf.shift(); continue; }\n        var total = 5 + dlen + 2;\n        if (__buf.length < total) break;\n        var hdrChk = (0xA5 + 0x5A + lenH + lenL) & 0xFF;\n        if (__buf[4] !== hdrChk) { __buf.shift(); continue; }\n        var rxCrc = __buf[5 + dlen] | (__buf[6 + dlen] << 8);\n        var ok = (crc16(__buf, 5, dlen) === rxCrc);\n        var data = __buf.slice(5, 5 + dlen);\n        __buf = __buf.slice(total);\n        if (!ok) continue;\n        applyFrame(data);\n        got = true;\n    }\n    if (!got) return [];\n    return __slots.slice(0);\n}\n",
             "frameStart": "",
             "hexadecimalDelimiters": false,
             "sourceId": 0,
@@ -534,156 +960,202 @@
     ],
     "title": "关节电机 JointMotor UART",
     "widgetSettings": {
-        "10:1:4": {
+        "10:3:4": {
             "page": 0
         },
-        "11:0:2": {
+        "10:3:5": {
+            "page": 1
+        },
+        "11:1:10": {
             "page": 0
         },
-        "9:0:1": {
-            "interpolationMode": 1,
-            "showAreaUnderPlot": false,
-            "userShowYLabel": true
+        "11:1:9": {
+            "page": 1
         },
-        "9:0:2": {
-            "userShowXLabel": true
-        },
+        "activeGroup": 1002,
         "externalWindows": {
             "data": [
             ]
         },
-        "layout:1000": {
+        "layout:1001": {
             "data": {
                 "autoLayout": true,
-                "canvasHeight": 931,
-                "canvasWidth": 1705,
+                "canvasHeight": 1182,
+                "canvasWidth": 2562,
                 "geometries": [
                     {
-                        "height": 466,
-                        "id": 11,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 11,
-                        "width": 341,
-                        "x": 0,
-                        "y": 0
-                    },
-                    {
-                        "height": 466,
+                        "height": 394,
                         "id": 4,
                         "relativeIndex": 0,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 341,
-                        "x": 340,
+                        "width": 427,
+                        "x": 0,
                         "y": 0
                     },
                     {
-                        "height": 466,
-                        "id": 12,
-                        "relativeIndex": 1,
-                        "state": "normal",
-                        "widgetType": 11,
-                        "width": 341,
-                        "x": 680,
-                        "y": 0
-                    },
-                    {
-                        "height": 466,
+                        "height": 394,
                         "id": 5,
                         "relativeIndex": 1,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 341,
-                        "x": 1020,
+                        "width": 427,
+                        "x": 426,
                         "y": 0
                     },
                     {
-                        "height": 466,
-                        "id": 13,
-                        "relativeIndex": 2,
-                        "state": "normal",
-                        "widgetType": 11,
-                        "width": 341,
-                        "x": 1360,
-                        "y": 0
-                    },
-                    {
-                        "height": 465,
+                        "height": 394,
                         "id": 6,
                         "relativeIndex": 2,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 341,
-                        "x": 0,
-                        "y": 465
+                        "width": 427,
+                        "x": 852,
+                        "y": 0
                     },
                     {
-                        "height": 465,
-                        "id": 9,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 341,
-                        "x": 340,
-                        "y": 465
-                    },
-                    {
-                        "height": 465,
+                        "height": 394,
                         "id": 7,
                         "relativeIndex": 3,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 341,
-                        "x": 680,
-                        "y": 465
+                        "width": 427,
+                        "x": 1278,
+                        "y": 0
                     },
                     {
-                        "height": 465,
-                        "id": 10,
-                        "relativeIndex": 1,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 341,
-                        "x": 1020,
-                        "y": 465
-                    },
-                    {
-                        "height": 465,
+                        "height": 394,
                         "id": 8,
                         "relativeIndex": 4,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 341,
-                        "x": 1360,
-                        "y": 465
+                        "width": 427,
+                        "x": 1704,
+                        "y": 0
+                    },
+                    {
+                        "height": 394,
+                        "id": 9,
+                        "relativeIndex": 5,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 427,
+                        "x": 2130,
+                        "y": 0
+                    },
+                    {
+                        "height": 394,
+                        "id": 10,
+                        "relativeIndex": 6,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 427,
+                        "x": 0,
+                        "y": 393
+                    },
+                    {
+                        "height": 394,
+                        "id": 11,
+                        "relativeIndex": 7,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 427,
+                        "x": 426,
+                        "y": 393
+                    },
+                    {
+                        "height": 394,
+                        "id": 12,
+                        "relativeIndex": 8,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 427,
+                        "x": 852,
+                        "y": 393
+                    },
+                    {
+                        "height": 394,
+                        "id": 15,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 427,
+                        "x": 1278,
+                        "y": 393
+                    },
+                    {
+                        "height": 394,
+                        "id": 13,
+                        "relativeIndex": 9,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 427,
+                        "x": 1704,
+                        "y": 393
+                    },
+                    {
+                        "height": 394,
+                        "id": 18,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 12,
+                        "width": 427,
+                        "x": 2130,
+                        "y": 393
+                    },
+                    {
+                        "height": 394,
+                        "id": 14,
+                        "relativeIndex": 10,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 854,
+                        "x": 0,
+                        "y": 786
+                    },
+                    {
+                        "height": 394,
+                        "id": 16,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 854,
+                        "x": 853,
+                        "y": 786
+                    },
+                    {
+                        "height": 394,
+                        "id": 17,
+                        "relativeIndex": 2,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 854,
+                        "x": 1706,
+                        "y": 786
                     }
                 ],
-                "userReordered": true,
+                "userReordered": false,
                 "windowOrder": [
-                    11,
                     4,
-                    12,
                     5,
-                    13,
                     6,
-                    9,
                     7,
+                    8,
+                    9,
                     10,
-                    8
+                    11,
+                    12,
+                    15,
+                    13,
+                    18,
+                    14,
+                    16,
+                    17
                 ],
                 "windowOrderTyped": [
                     {
                         "relativeIndex": 0,
-                        "widgetType": 11
-                    },
-                    {
-                        "relativeIndex": 0,
                         "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 1,
-                        "widgetType": 11
                     },
                     {
                         "relativeIndex": 1,
@@ -691,32 +1163,624 @@
                     },
                     {
                         "relativeIndex": 2,
-                        "widgetType": 11
-                    },
-                    {
-                        "relativeIndex": 2,
                         "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 0,
-                        "widgetType": 10
                     },
                     {
                         "relativeIndex": 3,
                         "widgetType": 9
                     },
                     {
+                        "relativeIndex": 4,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 5,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 6,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 7,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 8,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 10
+                    },
+                    {
+                        "relativeIndex": 9,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 12
+                    },
+                    {
+                        "relativeIndex": 10,
+                        "widgetType": 9
+                    },
+                    {
                         "relativeIndex": 1,
                         "widgetType": 10
                     },
                     {
+                        "relativeIndex": 2,
+                        "widgetType": 10
+                    }
+                ]
+            }
+        },
+        "layout:1002": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 876,
+                "canvasWidth": 1719,
+                "geometries": [
+                    {
+                        "height": 438,
+                        "id": 4,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 860,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 438,
+                        "id": 5,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 860,
+                        "x": 859,
+                        "y": 0
+                    },
+                    {
+                        "height": 438,
+                        "id": 6,
+                        "relativeIndex": 2,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 860,
+                        "x": 0,
+                        "y": 437
+                    },
+                    {
+                        "height": 438,
+                        "id": 7,
+                        "relativeIndex": 3,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 860,
+                        "x": 859,
+                        "y": 437
+                    }
+                ],
+                "userReordered": false,
+                "windowOrder": [
+                    4,
+                    5,
+                    6,
+                    7
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 2,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 3,
+                        "widgetType": 9
+                    }
+                ]
+            }
+        },
+        "layout:1003": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 900,
+                "canvasWidth": 1788,
+                "geometries": [
+                    {
+                        "height": 450,
+                        "id": 8,
                         "relativeIndex": 4,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 894,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 450,
+                        "id": 9,
+                        "relativeIndex": 5,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 894,
+                        "x": 893,
+                        "y": 0
+                    },
+                    {
+                        "height": 450,
+                        "id": 10,
+                        "relativeIndex": 6,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 596,
+                        "x": 0,
+                        "y": 449
+                    },
+                    {
+                        "height": 450,
+                        "id": 11,
+                        "relativeIndex": 7,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 596,
+                        "x": 595,
+                        "y": 449
+                    },
+                    {
+                        "height": 450,
+                        "id": 12,
+                        "relativeIndex": 8,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 596,
+                        "x": 1190,
+                        "y": 449
+                    }
+                ],
+                "userReordered": false,
+                "windowOrder": [
+                    8,
+                    9,
+                    10,
+                    11,
+                    12
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 4,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 5,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 6,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 7,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 8,
+                        "widgetType": 9
+                    }
+                ]
+            }
+        },
+        "layout:1004": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 876,
+                "canvasWidth": 1719,
+                "geometries": [
+                    {
+                        "height": 438,
+                        "id": 15,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 860,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 438,
+                        "id": 13,
+                        "relativeIndex": 9,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 860,
+                        "x": 859,
+                        "y": 0
+                    },
+                    {
+                        "height": 438,
+                        "id": 18,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 12,
+                        "width": 860,
+                        "x": 0,
+                        "y": 437
+                    },
+                    {
+                        "height": 438,
+                        "id": 14,
+                        "relativeIndex": 10,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 860,
+                        "x": 859,
+                        "y": 437
+                    }
+                ],
+                "userReordered": false,
+                "windowOrder": [
+                    15,
+                    13,
+                    18,
+                    14
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 10
+                    },
+                    {
+                        "relativeIndex": 9,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 12
+                    },
+                    {
+                        "relativeIndex": 10,
+                        "widgetType": 9
+                    }
+                ]
+            }
+        },
+        "layout:1005": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 813,
+                "canvasWidth": 1681,
+                "geometries": [
+                    {
+                        "height": 813,
+                        "id": 16,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 841,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 813,
+                        "id": 17,
+                        "relativeIndex": 2,
+                        "state": "normal",
+                        "widgetType": 10,
+                        "width": 841,
+                        "x": 840,
+                        "y": 0
+                    }
+                ],
+                "userReordered": false,
+                "windowOrder": [
+                    16,
+                    17
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 10
+                    },
+                    {
+                        "relativeIndex": 2,
+                        "widgetType": 10
+                    }
+                ]
+            }
+        },
+        "layout:5000": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 1182,
+                "canvasWidth": 2562,
+                "geometries": [
+                    {
+                        "height": 1182,
+                        "id": 4,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 1281,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 591,
+                        "id": 5,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 1282,
+                        "x": 1280,
+                        "y": 0
+                    },
+                    {
+                        "height": 591,
+                        "id": 6,
+                        "relativeIndex": 2,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 1282,
+                        "x": 1280,
+                        "y": 590
+                    }
+                ],
+                "userReordered": false,
+                "windowOrder": [
+                    4,
+                    5,
+                    6
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 2,
                         "widgetType": 9
                     }
                 ]
             }
         }
     },
+    "workspaces": [
+        {
+            "icon": "qrc:/icons/panes/dashboard.svg",
+            "title": "所有数据",
+            "widgetRefs": [
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 0,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 1,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 2,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 3,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 0,
+                    "widgetType": 11
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 4,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 1,
+                    "widgetType": 11
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 5,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 6,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 7,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 8,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 0,
+                    "widgetType": 10
+                },
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 9,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 0,
+                    "widgetType": 12
+                },
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 10,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10006,
+                    "relativeIndex": 1,
+                    "widgetType": 10
+                },
+                {
+                    "groupId": 10006,
+                    "relativeIndex": 2,
+                    "widgetType": 10
+                }
+            ],
+            "workspaceId": 1001
+        },
+        {
+            "title": "运动 (0xC0/C6/C7)",
+            "widgetRefs": [
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 0,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 1,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 2,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 3,
+                    "widgetType": 9
+                }
+            ],
+            "workspaceId": 1002
+        },
+        {
+            "title": "电气电流 (0xC2/C3)",
+            "widgetRefs": [
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 0,
+                    "widgetType": 11
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 4,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 1,
+                    "widgetType": 11
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 5,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 6,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 7,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 8,
+                    "widgetType": 9
+                }
+            ],
+            "workspaceId": 1003
+        },
+        {
+            "title": "母线功率 (0xC4)",
+            "widgetRefs": [
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 0,
+                    "widgetType": 10
+                },
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 9,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 0,
+                    "widgetType": 12
+                },
+                {
+                    "groupId": 10005,
+                    "relativeIndex": 10,
+                    "widgetType": 9
+                }
+            ],
+            "workspaceId": 1004
+        },
+        {
+            "title": "温度 (0xC5)",
+            "widgetRefs": [
+                {
+                    "groupId": 10006,
+                    "relativeIndex": 1,
+                    "widgetType": 10
+                },
+                {
+                    "groupId": 10006,
+                    "relativeIndex": 2,
+                    "widgetType": 10
+                }
+            ],
+            "workspaceId": 1005
+        },
+        {
+            "title": "电机",
+            "widgetRefs": [
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 0,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 1,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 2,
+                    "widgetType": 9
+                }
+            ],
+            "workspaceId": 5000
+        }
+    ],
     "writerVersion": "4.0.1",
     "writerVersionAtCreation": "4.0.1"
 }

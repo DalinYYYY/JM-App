@@ -44,7 +44,7 @@ void cur_loop_run(cur_loop_t *cl, float id_ref, float iq_ref)
 
 	// step1: 刷新编码器机械角度（抽象接口，与具体芯片型号无关）
 	m->encoder.update(&m->encoder);
-	// m->motor_param.update(&m->motor_param, MOTION_TYPE_ELE_RADIAN, m->encoder.mechanical_angle);
+	m->motor_param.update(&m->motor_param, MOTION_TYPE_ELE_RADIAN, m->encoder.mechanical_angle);
 
 	// step2: 三相电流采样
 	m->phase_current.update(&m->phase_current);

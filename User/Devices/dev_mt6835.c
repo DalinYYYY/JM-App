@@ -105,13 +105,15 @@ static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
 }
 
 
-/* 读零点寄存器原始值(ZERO_POS2:高8位, ZERO_POS1:低4位) */
+/* 读零点寄存器原始值(ZERO_POS2:高8位, ZERO_POS1:低4位)
+ * 注: read_reg固定写3字节, 故每个接收缓冲须>=3字节, 否则越界破坏栈 */
 static uint16_t mt6835_get_raw_zero_angle(dev_mt6835_t *pobj)
 {
-	uint8_t rx_buf[2] = {0};
-	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &rx_buf[1]);
-	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, &rx_buf[0]);
-	return (uint16_t)((rx_buf[1] << 4) | (rx_buf[0] >> 4));
+	uint8_t rx_pos2[3] = {0};
+	uint8_t rx_pos1[3] = {0};
+	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, rx_pos2);
+	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, rx_pos1);
+	return (uint16_t)((rx_pos2[0] << 4) | (rx_pos1[0] >> 4));
 }
 
 /* 读零点角度(°) */
@@ -121,10 +123,12 @@ static float mt6835_get_zero_angle(dev_mt6835_t *pobj)
 }
 
 /*
- * @brief 写零点角度, 成功返回true
- * @note  TODO: tx_buf[0]的读-改-写逻辑可疑(read_reg覆盖了刚算的值,
- *        且 tx_buf[0] |= tx_buf[0]&0x0F 是空操作), ZERO_POS1低4位保留位的
- *        处理需对照手册核实并在硬件上验证
+ * @brief 写零点角度, 成功返回true(两个寄存器均应答0x55)
+ * @note  原实现存在栈溢出: read_reg固定写3字节, 而tx_buf仅2字节, 越界1字节
+ *        会破坏栈上相邻内存(如pobj指针); 且该次读取还覆盖了刚算好的高8位。
+ *        现去掉可疑的读-改-写, 直接写入12bit零点值。
+ *        ZERO_POS1低4位为保留位, 此处写0; 若手册要求保留原值需改回读-改-写,
+ *        并使用>=3字节缓冲, 需在硬件上验证。
  */
 static bool mt6835_set_zero_angle(dev_mt6835_t *pobj, float rad)
 {
@@ -134,15 +138,12 @@ static bool mt6835_set_zero_angle(dev_mt6835_t *pobj, float rad)
 		return false;
 	}
 
-	uint8_t tx_buf[2] = {0};
-	tx_buf[1] = angle >> 4;
-	tx_buf[0] = (angle & 0x0F) << 4;
-	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &tx_buf[0]);
-	tx_buf[0] |= tx_buf[0] & 0x0F;
+	uint8_t zero_pos2 = (uint8_t)(angle >> 4);		   /* 高8位 */
+	uint8_t zero_pos1 = (uint8_t)((angle & 0x0F) << 4); /* 低4位置于bit[7:4], bit[3:0]保留位写0 */
 
-	mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, tx_buf[1]);
-	mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, tx_buf[0]);
-	return true;
+	bool ok = mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, zero_pos2);
+	ok = mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, zero_pos1) && ok;
+	return ok;
 }
 
 static void dev_mt6835_set_offset(struct dev_mt6835 *pobj, float offset)

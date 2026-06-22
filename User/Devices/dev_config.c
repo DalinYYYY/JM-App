@@ -32,8 +32,8 @@ const mt6835_config_t mt6835_list[MT6835_ID_MAX] = {
 	[MT6805_ID_1] = {
 					 .name = "MT6835_1",
 					 .spi_num = {.hspi = DRV_SPI1},
-					 .csn = {.gpiox = DRV_GPIOB, .pin = DRV_PIN_6, .ste = DRV_PIN_LOW},
-					 .cal_en = {.gpiox = DRV_GPIOB, .pin = DRV_PIN_7, .ste = DRV_PIN_LOW},
+					 .csn = {.gpiox = DRV_GPIOA, .pin = DRV_PIN_4, .ste = DRV_PIN_LOW},
+					 .cal_en = {.gpiox = DRV_GPIOB, .pin = DRV_PIN_2, .ste = DRV_PIN_LOW},
 					 },
 };
 #endif
@@ -87,8 +87,8 @@ const dev_commun_uart_config_t commun_uart_list[JM_UART_COMM_ID_MAX] = {
 	[JM_UART_COMM_ID_1] = {
 						   .name = "JM_UART_1",
 						   .uart = DRV_UART1, /* 须为已配置 DMA 收发的串口 */
-						   .motor_id = 1,	  /* 本机地址(串口可忽略, 与CAN保持一致) */
-						   },
+		.motor_id = 1,	   /* 本机地址(串口可忽略, 与CAN保持一致) */
+	},
 };
 #endif
 

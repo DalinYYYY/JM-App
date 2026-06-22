@@ -21,7 +21,7 @@
 #define MOTOR_LOOP_DEG_TO_RAD (0.01745329252f) /* π/180 */
 
 /* 全局电机三环控制上下文 */
-static motor_loop_t s_motor_loop;
+motor_loop_t s_motor_loop;
 
 motor_loop_t *motor_loop_get(void)
 {
