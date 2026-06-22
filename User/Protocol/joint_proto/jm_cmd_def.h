@@ -130,6 +130,9 @@ extern "C"
 		JM_CMD_READ_POS_VEL = 0xC6,
 		JM_CMD_READ_MULTITURN = 0xC7,
 		JM_CMD_READ_FAULT = 0xC8,
+		JM_CMD_READ_DEBUG = 0xC9, /* 通用调试通道: float[] 任意挂载量, 免改协议加观测点 */
+		JM_CMD_TELEMETRY = 0xCA,	 /* 同步遥测帧(下位机->上位机): mask + 按位拼接所选数据组 */
+		JM_CMD_SET_TELEMETRY = 0xCB, /* 订阅遥测(上位机->下位机): mask(u16)[+period_ms(u16)] */
 
 		/* 设备信息 0xD0~0xDF */
 		JM_CMD_READ_DEV_INFO = 0xD0,
@@ -150,6 +153,26 @@ extern "C"
 		JM_CMD_BROADCAST_SYNC = 0xF2,
 		JM_CMD_NACK = 0xFE, /* 错误应答 */
 	} jm_cmd_e;
+
+	/* ===================== 同步遥测分组位掩码(0xCA/0xCB 共用) =====================
+	 * 上位机用 SET_TELEMETRY(0xCB) 选择订阅哪些组; 下位机把所选组在同一拍打包成
+	 * 单帧 TELEMETRY(0xCA) 上传。固件打包与上位机解析须按【位序由低到高】拼接,
+	 * 帧内自带 mask, 故增删订阅项时解析器无需改动。
+	 * 新增一组: 在此追加一个 bit, 固件 pack 端按位序补一段, 上位机解析端按位序补一段。*/
+	typedef enum
+	{
+		JM_TLM_POS_VEL = (1u << 0),	  /* pos(f32),vel(f32)            8B */
+		JM_TLM_DQ = (1u << 1),		  /* id(f32),iq(f32)              8B */
+		JM_TLM_PHASE = (1u << 2),	  /* ia,ib,ic(f32)               12B */
+		JM_TLM_BUS = (1u << 3),		  /* vbus,ibus,power(f32)        12B */
+		JM_TLM_TEMP = (1u << 4),	  /* tempFet,tempMotor(f32)       8B */
+		JM_TLM_MULTITURN = (1u << 5), /* multiturn(u32),single(f32)   8B */
+		JM_TLM_TORQUE = (1u << 6),	  /* torque(f32)                  4B */
+		JM_TLM_FAULT = (1u << 7),	  /* fault(u32),warn(u32)         8B */
+		JM_TLM_STATE = (1u << 8),	  /* topFsm,runState,ctrlMode,enable(u8) 4B */
+		JM_TLM_DEBUG = (1u << 9),	  /* jm_dbg[JM_DBG_CH](f32)   N*4B */
+	} jm_telemetry_bit_e;
+
 
 	/* ===================== 错误码(NACK 的 err_code) ===================== */
 	typedef enum

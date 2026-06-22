@@ -81,9 +81,9 @@ typedef struct
 
 /*****************************************************************************
  * @brief   运行时反馈/遥测量(按功能拆分, 由控制层/采集层周期刷新)
- * @note    与 sys_control_data_t(FOC 内环工作集)互补:
- *          ctrl_data 保存闭环计算的核心量, 以下子块保存对外遥测/采样/目标量,
- *          逐字段对应 jm_cmd_def.h 的反馈查询命令(0xC2~0xC8)与控制模式指令。
+ * @note    每个子块对应一个数据源模块与一类 jm_cmd_def.h 反馈查询命令(0xC2~0xC8),
+ *          由对应模块的 *_publish() 接口单向填充(控制层 → runtime 快照),
+ *          供通信(jm_proto)/显示/日志统一读 usr, 不直接耦合控制层内部结构。
  *          字段命名参考 ODrive / VESC / SimpleFOC / MIT Cheetah 常见遥测量。
  *****************************************************************************/
 
@@ -200,7 +200,6 @@ typedef struct
 	bool enable_pwm;
 	run_state_e run_mode;
 	ctrl_mode_e ctrl_mode;
-	sys_control_data_t ctrl_data;  /* FOC 内环工作集(现有) */
 	motor_electrical_t electrical; /* 电气测量量 0xC2/0xC3 */
 	motor_motion_t motion;		   /* 运动反馈量 0xC6/0xC7 */
 	motor_power_t power;		   /* 母线/功率/力矩 0xC4 */
@@ -233,6 +232,19 @@ typedef struct sys_data_
 } sys_data_t;
 
 void user_data_init(void);
+
+/**************************************** 通用调试通道 ****************************************/
+/**
+ * @brief   通用调试观测通道 (对应 READ_DEBUG 0xC9)
+ * @note    免改协议加观测点: 任意处写 jm_dbg[i] = 变量; 即可在上位机看到。
+ *          上报帧把整块 float 一次性发出, 解析器固定映射到连续槽位, 故:
+ *          - 加一个观测量 = 固件写一行 + 上位机加一个数据集(纯 GUI), 解析器不动。
+ *          - 通道含义由使用者自行约定(建议在调用处注释), 不固化字段名。
+ *          若通道不够改 JM_DBG_CH 即可(需同步上位机解析器的映射长度)。
+ */
+#define JM_DBG_CH 8 /* 调试通道数, 改这里即可扩容(同步上位机解析器映射) */
+extern float jm_dbg[JM_DBG_CH];
+
 
 /**************************************** 数据接口 ****************************************/
 extern sys_data_t usr; // 全局变量加g_前缀

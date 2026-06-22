@@ -1,0 +1,47 @@
+{
+    "configurations": [
+        {
+            "name": "STM32G474 (Keil MDK)",
+            "includePath": [
+                "${workspaceFolder}/Core/Inc",
+                "${workspaceFolder}/Drivers/STM32G4xx_HAL_Driver/Inc",
+                "${workspaceFolder}/Drivers/STM32G4xx_HAL_Driver/Inc/Legacy",
+                "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/include",
+                "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS",
+                "${workspaceFolder}/Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F",
+                "${workspaceFolder}/Drivers/CMSIS/Device/ST/STM32G4xx/Include",
+                "${workspaceFolder}/Drivers/CMSIS/Include",
+                "${workspaceFolder}/Middlewares/ST/ARM/DSP/Inc",
+                "${workspaceFolder}/User/AppEntry",
+                "${workspaceFolder}/User/AppServices/ErrorManager",
+                "${workspaceFolder}/User/AppServices/ParamService",
+                "${workspaceFolder}/User/AppServices/SafetyManager",
+                "${workspaceFolder}/User/AppServices/StateMachine",
+                "${workspaceFolder}/User/AppServices/ThreadManager",
+                "${workspaceFolder}/User/AppServices/Watchdog",
+                "${workspaceFolder}/User/Common",
+                "${workspaceFolder}/User/Config",
+                "${workspaceFolder}/User/DataHub",
+                "${workspaceFolder}/User/Devices",
+                "${workspaceFolder}/User/Driver",
+                "${workspaceFolder}/User/MotorAlgorithms",
+                "${workspaceFolder}/User/MotorControl/Calibration",
+                "${workspaceFolder}/User/Protocol",
+                "${workspaceFolder}/User/Protocol/vesc_proto",
+                "${workspaceFolder}/User/Protocol/packer_parser",
+                "${workspaceFolder}/User/Protocol/joint_proto",
+                "${workspaceFolder}/User/MotorControl/ControlModes",
+                "${workspaceFolder}/User/MotorControl/ControlProcess",
+                "${workspaceFolder}/User/MotorControl/CascadeControl"
+            ],
+            "defines": [
+                "USE_HAL_DRIVER",
+                "STM32G474xx"
+            ],
+            "intelliSenseMode": "${default}",
+            "cStandard": "c11",
+            "cppStandard": "c++14"
+        }
+    ],
+    "version": 4
+}

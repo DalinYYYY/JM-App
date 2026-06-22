@@ -446,6 +446,16 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>AppServices</GroupName>
+          <Files>
+            <File>
+              <FileName>serialstudio_commun.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\AppServices\ParamService\serialstudio_commun.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
           <GroupName>Protocol</GroupName>
           <Files>
             <File>
@@ -1062,9 +1072,6 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>::CMSIS</GroupName>
-        </Group>
-        <Group>
           <GroupName>Middlewares/Library/DSP Library/DSP Library</GroupName>
           <GroupOption>
             <CommonProperty>
@@ -1161,6 +1168,9 @@
               </FileOption>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
     </Target>

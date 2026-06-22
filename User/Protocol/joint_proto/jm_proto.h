@@ -82,6 +82,10 @@ extern "C"
 		/* 读设备信息。可为 NULL(不支持则回 NACK)。*/
 		jm_err_e (*get_dev_info)(uint32_t *hw_ver, uint32_t *fw_ver, uint8_t uid[12]);
 		const char *(*get_dev_name)(void); /* 返回名称字符串, 可为 NULL */
+
+		/* 设置同步遥测订阅(CMD 0xCB)。mask 为 jm_telemetry_bit_e 位或; period_ms 为
+		 * 上报周期(0 表示沿用默认/不改)。可为 NULL(不支持订阅则回 NACK)。*/
+		jm_err_e (*set_telemetry)(uint16_t mask, uint16_t period_ms);
 	} jm_proto_ops_t;
 
 	/* ---------------- 协议实例 ---------------- */

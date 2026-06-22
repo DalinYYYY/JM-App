@@ -1,6 +1,71 @@
 {
     "actions": [
         {
+            "autoExecuteOnConnect": true,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 1,
+            "sourceId": 0,
+            "timerIntervalMs": 100,
+            "timerMode": 0,
+            "title": "【遥测】订阅全部基础组",
+            "txData": "A55A000302CBFF01D8C5",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": false,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 1,
+            "sourceId": 0,
+            "timerIntervalMs": 100,
+            "timerMode": 0,
+            "title": "【遥测】仅 pos/vel + dq",
+            "txData": "A55A000302CB03005583",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": false,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 1,
+            "sourceId": 0,
+            "timerIntervalMs": 100,
+            "timerMode": 0,
+            "title": "【遥测】电流环 dq+三相",
+            "txData": "A55A000302CB0600A07C",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": false,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 1,
+            "sourceId": 0,
+            "timerIntervalMs": 100,
+            "timerMode": 0,
+            "title": "【遥测】全部+调试通道",
+            "txData": "A55A000302CBFF039AE5",
+            "txEncoding": 0
+        },
+        {
+            "autoExecuteOnConnect": false,
+            "binary": true,
+            "eol": "",
+            "icon": "Play Property",
+            "repeatCount": 1,
+            "sourceId": 0,
+            "timerIntervalMs": 100,
+            "timerMode": 0,
+            "title": "【遥测】停止上报",
+            "txData": "A55A000302CB000006D6",
+            "txEncoding": 0
+        },
+        {
             "autoExecuteOnConnect": false,
             "binary": true,
             "eol": "",
@@ -486,9 +551,16 @@
                     "widgetMax": 30,
                     "widgetMin": -30,
                     "xAxis": -1
-                },
+                }
+            ],
+            "title": "dq电流 (0xC3)",
+            "uniqueId": 10004,
+            "widget": "multiplot"
+        },
+        {
+            "datasets": [
                 {
-                    "datasetId": 2,
+                    "datasetId": 0,
                     "displayFormat": "0d",
                     "displayTickCount": 5,
                     "fft": false,
@@ -497,7 +569,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": true,
-                    "groupId": 1,
+                    "groupId": 2,
                     "index": 11,
                     "led": false,
                     "ledHigh": 1,
@@ -515,7 +587,7 @@
                     "xAxis": -1
                 },
                 {
-                    "datasetId": 3,
+                    "datasetId": 1,
                     "displayFormat": "0d",
                     "displayTickCount": 5,
                     "fft": false,
@@ -524,7 +596,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": true,
-                    "groupId": 1,
+                    "groupId": 2,
                     "index": 12,
                     "led": false,
                     "ledHigh": 1,
@@ -542,7 +614,7 @@
                     "xAxis": -1
                 },
                 {
-                    "datasetId": 4,
+                    "datasetId": 2,
                     "displayFormat": "0d",
                     "displayTickCount": 5,
                     "fft": false,
@@ -551,7 +623,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": true,
-                    "groupId": 1,
+                    "groupId": 2,
                     "index": 13,
                     "led": false,
                     "ledHigh": 1,
@@ -569,9 +641,9 @@
                     "xAxis": -1
                 }
             ],
-            "title": "电气电流 (0xC2/C3)",
-            "uniqueId": 10004,
-            "widget": ""
+            "title": "三相电流 (0xC2)",
+            "uniqueId": 10025,
+            "widget": "multiplot"
         },
         {
             "datasets": [
@@ -585,7 +657,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 2,
+                    "groupId": 3,
                     "index": 6,
                     "led": false,
                     "ledHigh": 1,
@@ -612,7 +684,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": true,
-                    "groupId": 2,
+                    "groupId": 3,
                     "index": 7,
                     "led": false,
                     "ledHigh": 1,
@@ -639,7 +711,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": true,
-                    "groupId": 2,
+                    "groupId": 3,
                     "index": 8,
                     "led": false,
                     "ledHigh": 1,
@@ -673,7 +745,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 3,
+                    "groupId": 4,
                     "index": 4,
                     "led": false,
                     "ledHigh": 1,
@@ -700,7 +772,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 3,
+                    "groupId": 4,
                     "index": 5,
                     "led": false,
                     "ledHigh": 1,
@@ -734,7 +806,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 4,
+                    "groupId": 5,
                     "index": 18,
                     "led": false,
                     "ledHigh": 1,
@@ -761,7 +833,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 4,
+                    "groupId": 5,
                     "index": 19,
                     "led": false,
                     "ledHigh": 1,
@@ -788,7 +860,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 4,
+                    "groupId": 5,
                     "index": 20,
                     "led": false,
                     "ledHigh": 1,
@@ -815,7 +887,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 4,
+                    "groupId": 5,
                     "index": 21,
                     "led": false,
                     "ledHigh": 1,
@@ -842,7 +914,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 4,
+                    "groupId": 5,
                     "index": 16,
                     "led": false,
                     "ledHigh": 1,
@@ -869,7 +941,7 @@
                     "fftSamples": 1024,
                     "fftSamplingRate": -1,
                     "graph": false,
-                    "groupId": 4,
+                    "groupId": 5,
                     "index": 17,
                     "led": false,
                     "ledHigh": 1,
@@ -889,13 +961,6 @@
             ],
             "title": "状态故障 (0xC1/C8)",
             "uniqueId": 10007,
-            "widget": ""
-        },
-        {
-            "datasets": [
-            ],
-            "title": "数据集容器",
-            "uniqueId": 10022,
             "widget": ""
         }
     ],
@@ -921,9 +986,9 @@
         "sslProtocol": 5,
         "topicBase": ""
     },
-    "nextUniqueId": 10023,
+    "nextUniqueId": 10026,
     "plotTimeRange": 10,
-    "pointCount": 100,
+    "pointCount": 10000,
     "schemaVersion": 3,
     "sources": [
         {
@@ -951,7 +1016,7 @@
             "decoderMethod": 3,
             "frameDetection": 2,
             "frameEnd": "",
-            "frameParserCode": "/**\n * 关节电机串口多命令反馈解析器 (Serial Studio - JavaScript)\n *\n * 解码器: Binary (decoder=3)  帧检测: No Delimiters (frameDetection=2)\n * 帧格式 (与固件 packer_parser.c 一致):\n *   A5 5A | LEN_H LEN_L | HDR_CHK | [CMD + DATA] | CRC_L CRC_H\n *   LEN     = CMD(1)+DATA(n) 总字节数, 大端\n *   HDR_CHK = (0xA5 + 0x5A + LEN_H + LEN_L) & 0xFF\n *   CRC16   = CRC-16/XMODEM(poly 0x1021, init 0x0000) 覆盖数据区(CMD+DATA), 小端落帧\n *\n * 按 CMD 分别解析全部反馈帧, 映射到定长 21 槽 Frame Index:\n *   1 pos  2 vel  3 torque  4 tempFet  5 tempMotor  6 vbus  7 ibus  8 power\n *   9 id  10 iq  11 ia  12 ib  13 ic  14 multiturn  15 single\n *   16 fault  17 warn  18 topFsm  19 runState  20 ctrlMode  21 enable\n * 未刷新的槽保留上一次值(脚本内静态保持)。\n *\n *   0xC0 实时反馈(22B): pos,vel,torque,tempMotor,vbus,fault(u16)\n *   0xC1 状态(4B)     : topFsm,runState,ctrlMode,enable (u8)\n *   0xC2 三相电流(12B): ia,ib,ic\n *   0xC3 dq电流(8B)   : id,iq\n *   0xC4 母线(12B)    : vbus,ibus,power\n *   0xC5 温度(8B)     : tempFet,tempMotor\n *   0xC6 位置速度(8B) : pos,vel\n *   0xC7 多圈(8B)     : multiturn(u32),single(f32)\n *   0xC8 故障(8B)     : fault(u32),warn(u32)\n */\n\nvar __buf = [];\nvar __crcTab = null;\nvar __slots = new Array(21);\nfor (var __i = 0; __i < 21; __i++) __slots[__i] = 0;\n\nvar MAX_DLEN = 512;\nvar BUF_CAP  = 4096;\n\nfunction crcInit() {\n    __crcTab = new Array(256);\n    for (var i = 0; i < 256; i++) {\n        var c = (i << 8) & 0xFFFF;\n        for (var k = 0; k < 8; k++)\n            c = (c & 0x8000) ? (((c << 1) ^ 0x1021) & 0xFFFF) : ((c << 1) & 0xFFFF);\n        __crcTab[i] = c;\n    }\n}\nfunction crc16(buf, start, len) {\n    if (!__crcTab) crcInit();\n    var crc = 0;\n    for (var i = 0; i < len; i++)\n        crc = ((crc << 8) ^ __crcTab[((crc >> 8) ^ buf[start + i]) & 0xFF]) & 0xFFFF;\n    return crc;\n}\nfunction rdF32(b, o) {\n    var dv = new DataView(new ArrayBuffer(4));\n    dv.setUint8(0, b[o]); dv.setUint8(1, b[o + 1]);\n    dv.setUint8(2, b[o + 2]); dv.setUint8(3, b[o + 3]);\n    return dv.getFloat32(0, true);\n}\nfunction rdU16(b, o) { return (b[o] | (b[o + 1] << 8)) & 0xFFFF; }\nfunction rdU32(b, o) {\n    return (b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24)) >>> 0;\n}\n\nfunction applyFrame(data) {\n    var cmd = data[0];\n    if (cmd === 0xC0 && data.length >= 23) {\n        __slots[0]=rdF32(data,1); __slots[1]=rdF32(data,5);\n        __slots[2]=rdF32(data,9); __slots[4]=rdF32(data,13);\n        __slots[5]=rdF32(data,17); __slots[15]=rdU16(data,21);\n    } else if (cmd === 0xC1 && data.length >= 5) {\n        __slots[17]=data[1]; __slots[18]=data[2];\n        __slots[19]=data[3]; __slots[20]=data[4];\n    } else if (cmd === 0xC2 && data.length >= 13) {\n        __slots[10]=rdF32(data,1); __slots[11]=rdF32(data,5); __slots[12]=rdF32(data,9);\n    } else if (cmd === 0xC3 && data.length >= 9) {\n        __slots[8]=rdF32(data,1); __slots[9]=rdF32(data,5);\n    } else if (cmd === 0xC4 && data.length >= 13) {\n        __slots[5]=rdF32(data,1); __slots[6]=rdF32(data,5); __slots[7]=rdF32(data,9);\n    } else if (cmd === 0xC5 && data.length >= 9) {\n        __slots[3]=rdF32(data,1); __slots[4]=rdF32(data,5);\n    } else if (cmd === 0xC6 && data.length >= 9) {\n        __slots[0]=rdF32(data,1); __slots[1]=rdF32(data,5);\n    } else if (cmd === 0xC7 && data.length >= 9) {\n        __slots[13]=rdU32(data,1); __slots[14]=rdF32(data,5);\n    } else if (cmd === 0xC8 && data.length >= 9) {\n        __slots[15]=rdU32(data,1); __slots[16]=rdU32(data,5);\n    }\n}\n\nfunction parse(frame) {\n    var i;\n    for (i = 0; i < frame.length; i++) __buf.push(frame[i] & 0xFF);\n    if (__buf.length > BUF_CAP) __buf = __buf.slice(__buf.length - BUF_CAP);\n\n    var got = false;\n    while (true) {\n        while (__buf.length >= 2 && !(__buf[0] === 0xA5 && __buf[1] === 0x5A))\n            __buf.shift();\n        if (__buf.length < 5) break;\n        var lenH = __buf[2], lenL = __buf[3];\n        var dlen = (lenH << 8) | lenL;\n        if (dlen > MAX_DLEN) { __buf.shift(); continue; }\n        var total = 5 + dlen + 2;\n        if (__buf.length < total) break;\n        var hdrChk = (0xA5 + 0x5A + lenH + lenL) & 0xFF;\n        if (__buf[4] !== hdrChk) { __buf.shift(); continue; }\n        var rxCrc = __buf[5 + dlen] | (__buf[6 + dlen] << 8);\n        var ok = (crc16(__buf, 5, dlen) === rxCrc);\n        var data = __buf.slice(5, 5 + dlen);\n        __buf = __buf.slice(total);\n        if (!ok) continue;\n        applyFrame(data);\n        got = true;\n    }\n    if (!got) return [];\n    return __slots.slice(0);\n}\n",
+            "frameParserCode": "/**\n * 关节电机串口遥测解析器 (Serial Studio) — 固定全量帧\n * 帧: A5 5A | LEN_H LEN_L | HDR_CHK | CMD(0xCA) + 21*f32(小端) | CRC_L CRC_H\n * 返回 21 元素 → Frame Index 1..21\n */\nvar __buf = [];\nvar __crcTab = null;\nvar SLOT_N = 21;\nvar __slots = new Array(SLOT_N);\nfor (var __i = 0; __i < SLOT_N; __i++) __slots[__i] = 0;\nvar MAX_DLEN = 512;\nvar BUF_CAP = 4096;\nfunction crcInit() {\n    __crcTab = new Array(256);\n    for (var i = 0; i < 256; i++) {\n        var c = (i << 8) & 0xFFFF;\n        for (var k = 0; k < 8; k++)\n            c = (c & 0x8000) ? (((c << 1) ^ 0x1021) & 0xFFFF) : ((c << 1) & 0xFFFF);\n        __crcTab[i] = c;\n    }\n}\nfunction crc16(buf, start, len) {\n    if (!__crcTab) crcInit();\n    var crc = 0;\n    for (var i = 0; i < len; i++)\n        crc = ((crc << 8) ^ __crcTab[((crc >> 8) ^ buf[start + i]) & 0xFF]) & 0xFFFF;\n    return crc;\n}\nfunction rdF32(b, o) {\n    /* 纯位运算 IEEE754 小端解码, 不依赖 DataView(部分 SS QJSEngine 不支持) */\n    var bits = (b[o] | (b[o+1]<<8) | (b[o+2]<<16) | (b[o+3]<<24)) >>> 0;\n    var sign = (bits >>> 31) ? -1 : 1;\n    var exp = (bits >>> 23) & 0xFF;\n    var man = bits & 0x7FFFFF;\n    if (exp === 0) return sign * man * Math.pow(2, -149);\n    if (exp === 0xFF) return man ? NaN : sign * Infinity;\n    return sign * (1 + man * Math.pow(2, -23)) * Math.pow(2, exp - 127);\n}\nfunction applyFrame(data) {\n    if (data[0] === 0xCA && data.length >= 1 + SLOT_N * 4) {\n        for (var i = 0; i < SLOT_N; i++) __slots[i] = rdF32(data, 1 + i * 4);\n    }\n}\nfunction parse(frame) {\n    var i, by;\n    for (i = 0; i < frame.length; i++) {\n        by = frame[i];\n        if (typeof by === 'string') by = by.charCodeAt(0);\n        __buf.push(by & 0xFF);\n    }\n    if (__buf.length > BUF_CAP) __buf = __buf.slice(__buf.length - BUF_CAP);\n    while (true) {\n        while (__buf.length >= 2 && !(__buf[0] === 0xA5 && __buf[1] === 0x5A))\n            __buf.shift();\n        if (__buf.length < 5) break;\n        var lenH = __buf[2], lenL = __buf[3];\n        var dlen = (lenH << 8) | lenL;\n        if (dlen > MAX_DLEN) { __buf.shift(); continue; }\n        var total = 5 + dlen + 2;\n        if (__buf.length < total) break;\n        var hdrChk = (0xA5 + 0x5A + lenH + lenL) & 0xFF;\n        if (__buf[4] !== hdrChk) { __buf.shift(); continue; }\n        var rxCrc = __buf[5 + dlen] | (__buf[6 + dlen] << 8);\n        var ok = (crc16(__buf, 5, dlen) === rxCrc);\n        var data = __buf.slice(5, 5 + dlen);\n        __buf = __buf.slice(total);\n        if (!ok) continue;\n        applyFrame(data);\n    }\n    return __slots.slice(0);\n}\n",
             "frameStart": "",
             "hexadecimalDelimiters": false,
             "sourceId": 0,
@@ -960,585 +1025,70 @@
     ],
     "title": "关节电机 JointMotor UART",
     "widgetSettings": {
-        "10:3:4": {
-            "page": 0
+        "2:1:-1": {
+            "visibleCurves": null
         },
-        "10:3:5": {
-            "page": 1
+        "2:2:-1": {
+            "interpolationMode": 0,
+            "visibleCurves": null
         },
-        "11:1:10": {
-            "page": 0
-        },
-        "11:1:9": {
-            "page": 1
-        },
-        "activeGroup": 1002,
+        "activeGroup": 5002,
         "externalWindows": {
-            "data": [
-            ]
-        },
-        "layout:1001": {
-            "data": {
-                "autoLayout": true,
-                "canvasHeight": 1182,
-                "canvasWidth": 2562,
-                "geometries": [
-                    {
-                        "height": 394,
-                        "id": 4,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 0,
-                        "y": 0
-                    },
-                    {
-                        "height": 394,
-                        "id": 5,
-                        "relativeIndex": 1,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 426,
-                        "y": 0
-                    },
-                    {
-                        "height": 394,
-                        "id": 6,
-                        "relativeIndex": 2,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 852,
-                        "y": 0
-                    },
-                    {
-                        "height": 394,
-                        "id": 7,
-                        "relativeIndex": 3,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 1278,
-                        "y": 0
-                    },
-                    {
-                        "height": 394,
-                        "id": 8,
-                        "relativeIndex": 4,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 1704,
-                        "y": 0
-                    },
-                    {
-                        "height": 394,
-                        "id": 9,
-                        "relativeIndex": 5,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 2130,
-                        "y": 0
-                    },
-                    {
-                        "height": 394,
-                        "id": 10,
-                        "relativeIndex": 6,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 0,
-                        "y": 393
-                    },
-                    {
-                        "height": 394,
-                        "id": 11,
-                        "relativeIndex": 7,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 426,
-                        "y": 393
-                    },
-                    {
-                        "height": 394,
-                        "id": 12,
-                        "relativeIndex": 8,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 852,
-                        "y": 393
-                    },
-                    {
-                        "height": 394,
-                        "id": 15,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 427,
-                        "x": 1278,
-                        "y": 393
-                    },
-                    {
-                        "height": 394,
-                        "id": 13,
-                        "relativeIndex": 9,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 427,
-                        "x": 1704,
-                        "y": 393
-                    },
-                    {
-                        "height": 394,
-                        "id": 18,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 12,
-                        "width": 427,
-                        "x": 2130,
-                        "y": 393
-                    },
-                    {
-                        "height": 394,
-                        "id": 14,
-                        "relativeIndex": 10,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 854,
-                        "x": 0,
-                        "y": 786
-                    },
-                    {
-                        "height": 394,
-                        "id": 16,
-                        "relativeIndex": 1,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 854,
-                        "x": 853,
-                        "y": 786
-                    },
-                    {
-                        "height": 394,
-                        "id": 17,
-                        "relativeIndex": 2,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 854,
-                        "x": 1706,
-                        "y": 786
-                    }
-                ],
-                "userReordered": false,
-                "windowOrder": [
-                    4,
-                    5,
-                    6,
-                    7,
-                    8,
-                    9,
-                    10,
-                    11,
-                    12,
-                    15,
-                    13,
-                    18,
-                    14,
-                    16,
-                    17
-                ],
-                "windowOrderTyped": [
-                    {
-                        "relativeIndex": 0,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 1,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 2,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 3,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 4,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 5,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 6,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 7,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 8,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 0,
-                        "widgetType": 10
-                    },
-                    {
-                        "relativeIndex": 9,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 0,
-                        "widgetType": 12
-                    },
-                    {
-                        "relativeIndex": 10,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 1,
-                        "widgetType": 10
-                    },
-                    {
-                        "relativeIndex": 2,
-                        "widgetType": 10
-                    }
-                ]
-            }
-        },
-        "layout:1002": {
-            "data": {
-                "autoLayout": true,
-                "canvasHeight": 876,
-                "canvasWidth": 1719,
-                "geometries": [
-                    {
-                        "height": 438,
-                        "id": 4,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 860,
-                        "x": 0,
-                        "y": 0
-                    },
-                    {
-                        "height": 438,
-                        "id": 5,
-                        "relativeIndex": 1,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 860,
-                        "x": 859,
-                        "y": 0
-                    },
-                    {
-                        "height": 438,
-                        "id": 6,
-                        "relativeIndex": 2,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 860,
-                        "x": 0,
-                        "y": 437
-                    },
-                    {
-                        "height": 438,
-                        "id": 7,
-                        "relativeIndex": 3,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 860,
-                        "x": 859,
-                        "y": 437
-                    }
-                ],
-                "userReordered": false,
-                "windowOrder": [
-                    4,
-                    5,
-                    6,
-                    7
-                ],
-                "windowOrderTyped": [
-                    {
-                        "relativeIndex": 0,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 1,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 2,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 3,
-                        "widgetType": 9
-                    }
-                ]
-            }
-        },
-        "layout:1003": {
-            "data": {
-                "autoLayout": true,
-                "canvasHeight": 900,
-                "canvasWidth": 1788,
-                "geometries": [
-                    {
-                        "height": 450,
-                        "id": 8,
-                        "relativeIndex": 4,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 894,
-                        "x": 0,
-                        "y": 0
-                    },
-                    {
-                        "height": 450,
-                        "id": 9,
-                        "relativeIndex": 5,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 894,
-                        "x": 893,
-                        "y": 0
-                    },
-                    {
-                        "height": 450,
-                        "id": 10,
-                        "relativeIndex": 6,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 596,
-                        "x": 0,
-                        "y": 449
-                    },
-                    {
-                        "height": 450,
-                        "id": 11,
-                        "relativeIndex": 7,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 596,
-                        "x": 595,
-                        "y": 449
-                    },
-                    {
-                        "height": 450,
-                        "id": 12,
-                        "relativeIndex": 8,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 596,
-                        "x": 1190,
-                        "y": 449
-                    }
-                ],
-                "userReordered": false,
-                "windowOrder": [
-                    8,
-                    9,
-                    10,
-                    11,
-                    12
-                ],
-                "windowOrderTyped": [
-                    {
-                        "relativeIndex": 4,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 5,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 6,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 7,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 8,
-                        "widgetType": 9
-                    }
-                ]
-            }
-        },
-        "layout:1004": {
-            "data": {
-                "autoLayout": true,
-                "canvasHeight": 876,
-                "canvasWidth": 1719,
-                "geometries": [
-                    {
-                        "height": 438,
-                        "id": 15,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 860,
-                        "x": 0,
-                        "y": 0
-                    },
-                    {
-                        "height": 438,
-                        "id": 13,
-                        "relativeIndex": 9,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 860,
-                        "x": 859,
-                        "y": 0
-                    },
-                    {
-                        "height": 438,
-                        "id": 18,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 12,
-                        "width": 860,
-                        "x": 0,
-                        "y": 437
-                    },
-                    {
-                        "height": 438,
-                        "id": 14,
-                        "relativeIndex": 10,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 860,
-                        "x": 859,
-                        "y": 437
-                    }
-                ],
-                "userReordered": false,
-                "windowOrder": [
-                    15,
-                    13,
-                    18,
-                    14
-                ],
-                "windowOrderTyped": [
-                    {
-                        "relativeIndex": 0,
-                        "widgetType": 10
-                    },
-                    {
-                        "relativeIndex": 9,
-                        "widgetType": 9
-                    },
-                    {
-                        "relativeIndex": 0,
-                        "widgetType": 12
-                    },
-                    {
-                        "relativeIndex": 10,
-                        "widgetType": 9
-                    }
-                ]
-            }
-        },
-        "layout:1005": {
-            "data": {
-                "autoLayout": true,
-                "canvasHeight": 813,
-                "canvasWidth": 1681,
-                "geometries": [
-                    {
-                        "height": 813,
-                        "id": 16,
-                        "relativeIndex": 1,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 841,
-                        "x": 0,
-                        "y": 0
-                    },
-                    {
-                        "height": 813,
-                        "id": 17,
-                        "relativeIndex": 2,
-                        "state": "normal",
-                        "widgetType": 10,
-                        "width": 841,
-                        "x": 840,
-                        "y": 0
-                    }
-                ],
-                "userReordered": false,
-                "windowOrder": [
-                    16,
-                    17
-                ],
-                "windowOrderTyped": [
-                    {
-                        "relativeIndex": 1,
-                        "widgetType": 10
-                    },
-                    {
-                        "relativeIndex": 2,
-                        "widgetType": 10
-                    }
-                ]
-            }
+            "data": []
         },
         "layout:5000": {
             "data": {
-                "autoLayout": true,
-                "canvasHeight": 1182,
-                "canvasWidth": 2562,
+                "autoLayout": false,
+                "canvasHeight": 963,
+                "canvasWidth": 1921,
                 "geometries": [
                     {
-                        "height": 1182,
-                        "id": 4,
-                        "relativeIndex": 0,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 1281,
-                        "x": 0,
-                        "y": 0
-                    },
-                    {
-                        "height": 591,
-                        "id": 5,
-                        "relativeIndex": 1,
-                        "state": "normal",
-                        "widgetType": 9,
-                        "width": 1282,
-                        "x": 1280,
-                        "y": 0
-                    },
-                    {
-                        "height": 591,
+                        "height": 568,
                         "id": 6,
-                        "relativeIndex": 2,
-                        "state": "normal",
+                        "relativeIndex": 0,
+                        "state": "closed",
                         "widgetType": 9,
-                        "width": 1282,
-                        "x": 1280,
-                        "y": 590
+                        "width": 1047,
+                        "x": 490,
+                        "y": 210
+                    },
+                    {
+                        "height": 568,
+                        "id": 7,
+                        "relativeIndex": 1,
+                        "state": "closed",
+                        "widgetType": 9,
+                        "width": 1047,
+                        "x": 463,
+                        "y": 223
+                    },
+                    {
+                        "height": 520,
+                        "id": 8,
+                        "relativeIndex": 2,
+                        "state": "closed",
+                        "widgetType": 9,
+                        "width": 1047,
+                        "x": 593,
+                        "y": 163
+                    },
+                    {
+                        "height": 568,
+                        "id": 9,
+                        "relativeIndex": 3,
+                        "state": "closed",
+                        "widgetType": 9,
+                        "width": 1047,
+                        "x": 515,
+                        "y": 275
                     }
                 ],
                 "userReordered": false,
                 "windowOrder": [
-                    4,
-                    5,
-                    6
+                    6,
+                    7,
+                    8,
+                    9
                 ],
                 "windowOrderTyped": [
                     {
@@ -1551,6 +1101,128 @@
                     },
                     {
                         "relativeIndex": 2,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 3,
+                        "widgetType": 9
+                    }
+                ]
+            }
+        },
+        "layout:5001": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 963,
+                "canvasWidth": 1921,
+                "geometries": [
+                    {
+                        "height": 963,
+                        "id": 1,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 2,
+                        "width": 961,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 963,
+                        "id": 2,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 2,
+                        "width": 961,
+                        "x": 960,
+                        "y": 0
+                    }
+                ],
+                "userReordered": false,
+                "windowOrder": [
+                    1,
+                    2
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 2
+                    },
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 2
+                    }
+                ]
+            }
+        },
+        "layout:5002": {
+            "data": {
+                "autoLayout": true,
+                "canvasHeight": 963,
+                "canvasWidth": 1921,
+                "geometries": [
+                    {
+                        "height": 482,
+                        "id": 6,
+                        "relativeIndex": 0,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 961,
+                        "x": 0,
+                        "y": 0
+                    },
+                    {
+                        "height": 482,
+                        "id": 7,
+                        "relativeIndex": 1,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 961,
+                        "x": 960,
+                        "y": 0
+                    },
+                    {
+                        "height": 482,
+                        "id": 8,
+                        "relativeIndex": 2,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 961,
+                        "x": 0,
+                        "y": 481
+                    },
+                    {
+                        "height": 482,
+                        "id": 9,
+                        "relativeIndex": 3,
+                        "state": "normal",
+                        "widgetType": 9,
+                        "width": 961,
+                        "x": 960,
+                        "y": 481
+                    }
+                ],
+                "userReordered": false,
+                "windowOrder": [
+                    6,
+                    7,
+                    8,
+                    9
+                ],
+                "windowOrderTyped": [
+                    {
+                        "relativeIndex": 0,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 1,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 2,
+                        "widgetType": 9
+                    },
+                    {
+                        "relativeIndex": 3,
                         "widgetType": 9
                     }
                 ]
@@ -1559,8 +1231,7 @@
     },
     "workspaces": [
         {
-            "icon": "qrc:/icons/panes/dashboard.svg",
-            "title": "所有数据",
+            "title": "我的",
             "widgetRefs": [
                 {
                     "groupId": 10003,
@@ -1580,205 +1251,52 @@
                 {
                     "groupId": 10003,
                     "relativeIndex": 3,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 0,
-                    "widgetType": 11
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 4,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 1,
-                    "widgetType": 11
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 5,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 6,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 7,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 8,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 0,
-                    "widgetType": 10
-                },
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 9,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 0,
-                    "widgetType": 12
-                },
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 10,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10006,
-                    "relativeIndex": 1,
-                    "widgetType": 10
-                },
-                {
-                    "groupId": 10006,
-                    "relativeIndex": 2,
-                    "widgetType": 10
-                }
-            ],
-            "workspaceId": 1001
-        },
-        {
-            "title": "运动 (0xC0/C6/C7)",
-            "widgetRefs": [
-                {
-                    "groupId": 10003,
-                    "relativeIndex": 0,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10003,
-                    "relativeIndex": 1,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10003,
-                    "relativeIndex": 2,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10003,
-                    "relativeIndex": 3,
-                    "widgetType": 9
-                }
-            ],
-            "workspaceId": 1002
-        },
-        {
-            "title": "电气电流 (0xC2/C3)",
-            "widgetRefs": [
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 0,
-                    "widgetType": 11
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 4,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 1,
-                    "widgetType": 11
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 5,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 6,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 7,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10004,
-                    "relativeIndex": 8,
-                    "widgetType": 9
-                }
-            ],
-            "workspaceId": 1003
-        },
-        {
-            "title": "母线功率 (0xC4)",
-            "widgetRefs": [
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 0,
-                    "widgetType": 10
-                },
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 9,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 0,
-                    "widgetType": 12
-                },
-                {
-                    "groupId": 10005,
-                    "relativeIndex": 10,
-                    "widgetType": 9
-                }
-            ],
-            "workspaceId": 1004
-        },
-        {
-            "title": "温度 (0xC5)",
-            "widgetRefs": [
-                {
-                    "groupId": 10006,
-                    "relativeIndex": 1,
-                    "widgetType": 10
-                },
-                {
-                    "groupId": 10006,
-                    "relativeIndex": 2,
-                    "widgetType": 10
-                }
-            ],
-            "workspaceId": 1005
-        },
-        {
-            "title": "电机",
-            "widgetRefs": [
-                {
-                    "groupId": 10003,
-                    "relativeIndex": 0,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10003,
-                    "relativeIndex": 1,
-                    "widgetType": 9
-                },
-                {
-                    "groupId": 10003,
-                    "relativeIndex": 2,
                     "widgetType": 9
                 }
             ],
             "workspaceId": 5000
+        },
+        {
+            "title": "FOC环路",
+            "widgetRefs": [
+                {
+                    "groupId": 10004,
+                    "relativeIndex": 0,
+                    "widgetType": 2
+                },
+                {
+                    "groupId": 10025,
+                    "relativeIndex": 1,
+                    "widgetType": 2
+                }
+            ],
+            "workspaceId": 5001
+        },
+        {
+            "title": "电机状态",
+            "widgetRefs": [
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 0,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 1,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 2,
+                    "widgetType": 9
+                },
+                {
+                    "groupId": 10003,
+                    "relativeIndex": 3,
+                    "widgetType": 9
+                }
+            ],
+            "workspaceId": 5002
         }
     ],
     "writerVersion": "4.0.1",

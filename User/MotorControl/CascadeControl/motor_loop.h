@@ -42,7 +42,9 @@ typedef struct
 	cur_loop_t current;		// 电流环
 	cascade_out_t out;		// 级联输出（dq电流参考）
 
-	uint32_t isr_cnt; // 中断分频计数器（自增比较，避免取模）
+	uint32_t vel_cnt; // 速度环分频计数器（自增比较，避免取模）
+	uint32_t pos_cnt; // 位置环分频计数器（自增比较，避免取模）
+	bool sync_pending; // 遥测同步挂起：位置拍置位，下一拍执行以错开位置环负载
 } motor_loop_t;
 
 /**

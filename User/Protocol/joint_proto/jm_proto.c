@@ -268,6 +268,29 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	}
 	proto->reply_len = 0; /* 默认无应答 */
 
+	/* 订阅同步遥测 0xCB: payload = mask(u16)[+ period_ms(u16)], 小端 */
+	if (cmd == JM_CMD_SET_TELEMETRY)
+	{
+		uint16_t mask, period = 0;
+		if (len < 2)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->set_telemetry == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		mask = jm_rd_u16(payload);
+		if (len >= 4)
+		{
+			period = jm_rd_u16(&payload[2]);
+		}
+		{
+			jm_err_e e = proto->ops->set_telemetry(mask, period);
+			return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+		}
+	}
+
 	/* 反馈查询 0xC0~0xCF */
 	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_FAULT)
 	{
