@@ -130,7 +130,7 @@ extern "C"
 		JM_CMD_READ_POS_VEL = 0xC6,
 		JM_CMD_READ_MULTITURN = 0xC7,
 		JM_CMD_READ_FAULT = 0xC8,
-		JM_CMD_READ_DEBUG = 0xC9, /* 通用调试通道: float[] 任意挂载量, 免改协议加观测点 */
+		JM_CMD_READ_DEBUG = 0xC9,	 /* 通用调试通道: float[] 任意挂载量, 免改协议加观测点 */
 		JM_CMD_TELEMETRY = 0xCA,	 /* 同步遥测帧(下位机->上位机): mask + 按位拼接所选数据组 */
 		JM_CMD_SET_TELEMETRY = 0xCB, /* 订阅遥测(上位机->下位机): mask(u16)[+period_ms(u16)] */
 
@@ -172,7 +172,6 @@ extern "C"
 		JM_TLM_STATE = (1u << 8),	  /* topFsm,runState,ctrlMode,enable(u8) 4B */
 		JM_TLM_DEBUG = (1u << 9),	  /* jm_dbg[JM_DBG_CH](f32)   N*4B */
 	} jm_telemetry_bit_e;
-
 
 	/* ===================== 错误码(NACK 的 err_code) ===================== */
 	typedef enum

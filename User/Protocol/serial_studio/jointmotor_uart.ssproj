@@ -1032,7 +1032,7 @@
             "interpolationMode": 1,
             "visibleCurves": null
         },
-        "activeGroup": 5002,
+        "activeGroup": 5001,
         "externalWindows": {
             "data": [
             ]
@@ -1158,48 +1158,48 @@
         "layout:5002": {
             "data": {
                 "autoLayout": true,
-                "canvasHeight": 862,
-                "canvasWidth": 1556,
+                "canvasHeight": 832,
+                "canvasWidth": 1492,
                 "geometries": [
                     {
-                        "height": 431,
+                        "height": 416,
                         "id": 6,
                         "relativeIndex": 0,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 778,
+                        "width": 746,
                         "x": 0,
                         "y": 0
                     },
                     {
-                        "height": 431,
+                        "height": 416,
                         "id": 7,
                         "relativeIndex": 1,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 778,
-                        "x": 777,
+                        "width": 746,
+                        "x": 745,
                         "y": 0
                     },
                     {
-                        "height": 431,
+                        "height": 416,
                         "id": 8,
                         "relativeIndex": 2,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 778,
+                        "width": 746,
                         "x": 0,
-                        "y": 430
+                        "y": 415
                     },
                     {
-                        "height": 431,
+                        "height": 416,
                         "id": 9,
                         "relativeIndex": 3,
                         "state": "normal",
                         "widgetType": 9,
-                        "width": 778,
-                        "x": 777,
-                        "y": 430
+                        "width": 746,
+                        "x": 745,
+                        "y": 415
                     }
                 ],
                 "userReordered": false,

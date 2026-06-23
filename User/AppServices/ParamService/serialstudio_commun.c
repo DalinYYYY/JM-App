@@ -129,27 +129,48 @@ static const jm_proto_ops_t commun_uart_ops = {
 static uint16_t commun_uart_pack_telemetry(const jm_feedback_t *fb, uint8_t *o)
 {
 	uint16_t n = 0;
-	jm_wr_f32(&o[n], fb->pos);                  n += 4; /* 1  */
-	jm_wr_f32(&o[n], fb->vel);                  n += 4; /* 2  */
-	jm_wr_f32(&o[n], fb->torque);               n += 4; /* 3  */
-	jm_wr_f32(&o[n], fb->temp_fet);             n += 4; /* 4  */
-	jm_wr_f32(&o[n], fb->temp_motor);           n += 4; /* 5  */
-	jm_wr_f32(&o[n], fb->vbus);                 n += 4; /* 6  */
-	jm_wr_f32(&o[n], fb->ibus);                 n += 4; /* 7  */
-	jm_wr_f32(&o[n], fb->vbus * fb->ibus);      n += 4; /* 8 power */
-	jm_wr_f32(&o[n], fb->id);                   n += 4; /* 9  */
-	jm_wr_f32(&o[n], fb->iq);                   n += 4; /* 10 */
-	jm_wr_f32(&o[n], fb->ia);                   n += 4; /* 11 */
-	jm_wr_f32(&o[n], fb->ib);                   n += 4; /* 12 */
-	jm_wr_f32(&o[n], fb->ic);                   n += 4; /* 13 */
-	jm_wr_f32(&o[n], (float)fb->multiturn);     n += 4; /* 14 */
-	jm_wr_f32(&o[n], fb->single);               n += 4; /* 15 */
-	jm_wr_f32(&o[n], (float)fb->fault_mask);    n += 4; /* 16 */
-	jm_wr_f32(&o[n], (float)fb->warn_mask);     n += 4; /* 17 */
-	jm_wr_f32(&o[n], (float)fb->top_fsm);       n += 4; /* 18 */
-	jm_wr_f32(&o[n], (float)fb->run_state);     n += 4; /* 19 */
-	jm_wr_f32(&o[n], (float)fb->ctrl_mode);     n += 4; /* 20 */
-	jm_wr_f32(&o[n], (float)fb->enable);        n += 4; /* 21 */
+	jm_wr_f32(&o[n], fb->pos);
+	n += 4; /* 1  */
+	jm_wr_f32(&o[n], fb->vel);
+	n += 4; /* 2  */
+	jm_wr_f32(&o[n], fb->torque);
+	n += 4; /* 3  */
+	jm_wr_f32(&o[n], fb->temp_fet);
+	n += 4; /* 4  */
+	jm_wr_f32(&o[n], fb->temp_motor);
+	n += 4; /* 5  */
+	jm_wr_f32(&o[n], fb->vbus);
+	n += 4; /* 6  */
+	jm_wr_f32(&o[n], fb->ibus);
+	n += 4; /* 7  */
+	jm_wr_f32(&o[n], fb->vbus * fb->ibus);
+	n += 4; /* 8 power */
+	jm_wr_f32(&o[n], fb->id);
+	n += 4; /* 9  */
+	jm_wr_f32(&o[n], fb->iq);
+	n += 4; /* 10 */
+	jm_wr_f32(&o[n], fb->ia);
+	n += 4; /* 11 */
+	jm_wr_f32(&o[n], fb->ib);
+	n += 4; /* 12 */
+	jm_wr_f32(&o[n], fb->ic);
+	n += 4; /* 13 */
+	jm_wr_f32(&o[n], (float)fb->multiturn);
+	n += 4; /* 14 */
+	jm_wr_f32(&o[n], fb->single);
+	n += 4; /* 15 */
+	jm_wr_f32(&o[n], (float)fb->fault_mask);
+	n += 4; /* 16 */
+	jm_wr_f32(&o[n], (float)fb->warn_mask);
+	n += 4; /* 17 */
+	jm_wr_f32(&o[n], (float)fb->top_fsm);
+	n += 4; /* 18 */
+	jm_wr_f32(&o[n], (float)fb->run_state);
+	n += 4; /* 19 */
+	jm_wr_f32(&o[n], (float)fb->ctrl_mode);
+	n += 4; /* 20 */
+	jm_wr_f32(&o[n], (float)fb->enable);
+	n += 4; /* 21 */
 	return n;
 }
 
@@ -186,11 +207,11 @@ void ss_commun_process(void)
 	dev_commun_uart.poll(&dev_commun_uart);
 
 	/* 周期主动上报遥测: 按订阅周期 s_tlm_period_tick 分频推一帧, 错峰避免 DMA 撞车 */
-	if (++telemetry_tick >= s_tlm_period_tick)
-	{
-		telemetry_tick = 0;
-		commun_uart_push_telemetry(&dev_commun_uart);
-	}
+	// if (++telemetry_tick >= s_tlm_period_tick)
+	// {
+	// 	telemetry_tick = 0;
+	// 	commun_uart_push_telemetry(&dev_commun_uart);
+	// }
 }
 
 #endif /* USE_DEV_COMMUN_UART */

@@ -66,6 +66,7 @@ class SerialTransport(Transport):
             with self._io_lock:
                 self._ser = ser
                 self._decoder.reset()
+                self.reset_stats()
                 self._running = True
             self.connected.emit(True)
             return True
@@ -95,6 +96,8 @@ class SerialTransport(Transport):
                 if not (self._ser and self._ser.is_open and self._running):
                     return False
                 self._ser.write(frame)
+                self.tx_bytes += len(frame)
+                self.tx_frames += 1
                 return True
             except Exception:
                 return False
@@ -112,7 +115,9 @@ class SerialTransport(Transport):
                             if n > 0:
                                 data = self._ser.read(n)
                     if data:
+                        self.rx_bytes += len(data)
                         for cmd, payload in self._decoder.feed(data):
+                            self.rx_frames += 1
                             self.frame_received.emit(cmd, bytes(payload))
                     else:
                         threading.Event().wait(0.002)

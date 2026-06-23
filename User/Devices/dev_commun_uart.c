@@ -132,4 +132,3 @@ void dev_commun_uart_init(dev_commun_uart_t *pobj, jm_uart_comm_id_e id)
 }
 
 #endif /* USE_DEV_COMMUN_UART */
-

@@ -68,6 +68,9 @@ void cur_loop_run(cur_loop_t *cl, float id_ref, float iq_ref)
 
 	// step8: PWM 输出
 	// 真实模式：驱动半桥定时器；虚拟模式：用本拍 u_dq 推进物理模型一步（一拍延迟）
+//	m->foc.svpwm.ta = 0.1f;
+//	m->foc.svpwm.tb = 0.2f;
+//	m->foc.svpwm.tc = 0.3f;
 	m->half_bridge.set_3pwm(&m->half_bridge,
 							(uint32_t)(PWM_PERIOD * m->foc.svpwm.ta),
 							(uint32_t)(PWM_PERIOD * m->foc.svpwm.tb),

@@ -8,7 +8,7 @@ import time
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
-    QGroupBox, QGridLayout, QPushButton, QMessageBox,
+    QGroupBox, QGridLayout, QPushButton, QMessageBox, QLabel,
 )
 from PyQt6.QtCore import QTimer
 
@@ -42,17 +42,26 @@ class MainWindow(QMainWindow):
         self._poll_timer.timeout.connect(self._on_poll_tick)
         self._poll_period = 100
 
+        # 流量统计刷新定时器(状态栏速率/总量)
+        self._stats_timer = QTimer()
+        self._stats_timer.timeout.connect(self._on_stats_tick)
+        self._stats_period = 500   # ms
+        self._last_tx_bytes = 0
+        self._last_rx_bytes = 0
+
         self.setWindowTitle("Joint Motor Controller - 关节电机控制面板")
         self.setMinimumSize(1200, 800)
 
         self._build_ui()
+        self._build_statusbar()
         self._connect_signals()
 
         self._client.start()
+        self._stats_timer.start(self._stats_period)
 
         # 启动告警(CSV 加载情况)
         for w in self._registry.warnings:
-            self._log_panel.log(f"[WARN] {w}")
+            self._log_panel.log_warn(w)
         self._log_panel.log(
             f"协议表加载: 命令 {len(self._registry.commands)} 条, 参数 {len(self._registry.params)} 个")
 
@@ -101,6 +110,47 @@ class MainWindow(QMainWindow):
 
         self.statusBar().showMessage("未连接")
 
+    def _build_statusbar(self):
+        """底部状态栏: 连接状态 + TX/RX 速率与累计总量"""
+        sb = self.statusBar()
+
+        def _mk(text):
+            lbl = QLabel(text)
+            lbl.setStyleSheet("font-family: Consolas, monospace; padding: 0 8px;")
+            return lbl
+
+        self._sb_link = _mk("● 未连接")
+        self._sb_link.setStyleSheet(
+            "font-family: Consolas; padding: 0 8px; color: #999;")
+        self._sb_tx = _mk("TX 0 B/s  Σ0 B")
+        self._sb_rx = _mk("RX 0 B/s  Σ0 B")
+        self._sb_frames = _mk("帧 TX:0 RX:0")
+
+        for w in (self._sb_link, self._sb_tx, self._sb_rx, self._sb_frames):
+            sb.addPermanentWidget(w)
+
+    @staticmethod
+    def _fmt_bytes(n: int) -> str:
+        if n < 1024:
+            return f"{n} B"
+        if n < 1024 * 1024:
+            return f"{n / 1024:.1f} KB"
+        return f"{n / (1024 * 1024):.2f} MB"
+
+    def _fmt_rate(self, bps: float) -> str:
+        return self._fmt_bytes(int(bps)) + "/s"
+
+    def _on_stats_tick(self):
+        tp = self._client.transport
+        dt = self._stats_period / 1000.0
+        tx_rate = (tp.tx_bytes - self._last_tx_bytes) / dt
+        rx_rate = (tp.rx_bytes - self._last_rx_bytes) / dt
+        self._last_tx_bytes = tp.tx_bytes
+        self._last_rx_bytes = tp.rx_bytes
+        self._sb_tx.setText(f"TX {self._fmt_rate(tx_rate)}  Σ{self._fmt_bytes(tp.tx_bytes)}")
+        self._sb_rx.setText(f"RX {self._fmt_rate(rx_rate)}  Σ{self._fmt_bytes(tp.rx_bytes)}")
+        self._sb_frames.setText(f"帧 TX:{tp.tx_frames} RX:{tp.rx_frames}")
+
     def _create_dev_info_group(self) -> QGroupBox:
         grp = QGroupBox("设备信息")
         layout = QGridLayout(grp)
@@ -120,7 +170,8 @@ class MainWindow(QMainWindow):
         c = self._client
         c.connected.connect(self._on_connected)
         c.error_occurred.connect(self._on_error)
-        c.tx_log.connect(self._log_panel.log)
+        c.tx_frame.connect(self._log_panel.log_tx)
+        c.raw_frame.connect(self._log_panel.log_rx)
         c.feedback_updated.connect(self._on_feedback)
         c.state_updated.connect(self._feedback_panel.update_state)
         c.ack_received.connect(self._on_ack)
@@ -128,7 +179,6 @@ class MainWindow(QMainWindow):
         c.dev_info_received.connect(self._on_dev_info)
         c.dev_name_received.connect(self._on_dev_name)
         c.param_read_result.connect(self._on_param_result)
-        c.raw_frame.connect(self._log_panel.log_raw_rx)
 
         # 面板 -> 客户端
         self._conn_panel.connect_requested.connect(self._on_connect)
@@ -145,6 +195,7 @@ class MainWindow(QMainWindow):
     def _on_connect(self, port: str, baud: int):
         if self._client.open(port=port, baudrate=baud):
             self.statusBar().showMessage(f"已连接 {port} @{baud}")
+            self._cur_port = port
 
     def _on_disconnect(self):
         self._poll_timer.stop()
@@ -153,11 +204,18 @@ class MainWindow(QMainWindow):
 
     def _on_connected(self, connected: bool):
         self._conn_panel.set_connected(connected)
-        if not connected:
+        if connected:
+            self._sb_link.setText(f"● {getattr(self, '_cur_port', '')}")
+            self._sb_link.setStyleSheet(
+                "font-family: Consolas; padding: 0 8px; color: #2E7D32; font-weight: bold;")
+        else:
+            self._sb_link.setText("● 未连接")
+            self._sb_link.setStyleSheet(
+                "font-family: Consolas; padding: 0 8px; color: #999;")
             self._poll_timer.stop()
 
     def _on_error(self, msg: str):
-        self._log_panel.log(f"[ERROR] {msg}")
+        self._log_panel.log_err(msg)
         self.statusBar().showMessage(msg)
 
     # ==================== 命令下发 ====================
@@ -227,7 +285,7 @@ class MainWindow(QMainWindow):
         self._log_panel.log(f"[RX] ACK {cmd_name(cmd)}(0x{cmd:02X})")
 
     def _on_nack(self, cmd: int, err: int):
-        self._log_panel.log(f"[RX] NACK {cmd_name(cmd)}(0x{cmd:02X}) err={err_name(err)}(0x{err:02X})")
+        self._log_panel.log_warn(f"NACK {cmd_name(cmd)}(0x{cmd:02X}) err={err_name(err)}(0x{err:02X})")
 
     def _on_dev_info(self, hw: int, fw: int, uid: bytes):
         uid_hex = uid.hex(':').upper()
@@ -243,5 +301,6 @@ class MainWindow(QMainWindow):
     # ==================== 退出 ====================
     def closeEvent(self, event):
         self._poll_timer.stop()
+        self._stats_timer.stop()
         self._client.stop()
         event.accept()

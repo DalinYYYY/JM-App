@@ -22,6 +22,18 @@ class Transport(QObject):
     # 传输类型标识(子类覆盖)
     name = "base"
 
+    def __init__(self):
+        super().__init__()
+        # 流量统计(累计字节/帧数), 子类在收发时累加; 速率由上层按时间差算
+        self.tx_bytes = 0
+        self.rx_bytes = 0
+        self.tx_frames = 0
+        self.rx_frames = 0
+
+    def reset_stats(self):
+        """复位流量统计(打开链路时调用)"""
+        self.tx_bytes = self.rx_bytes = self.tx_frames = self.rx_frames = 0
+
     def start(self):
         """启动后台收发线程(程序初始化时调用一次)"""
         raise NotImplementedError

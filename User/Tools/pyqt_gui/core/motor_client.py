@@ -10,7 +10,7 @@ import struct
 from PyQt6.QtCore import QObject, pyqtSignal
 
 import jmproto as jp
-from jmproto import JmCmd, JmErr, codec, cmd_name
+from jmproto import JmCmd, JmErr, codec
 from transport.base import Transport
 
 
@@ -25,8 +25,8 @@ class JmClient(QObject):
     dev_info_received = pyqtSignal(int, int, bytes)    # hw_ver, fw_ver, uid
     dev_name_received = pyqtSignal(str)
     param_read_result = pyqtSignal(int, int, object)   # param_id, type, value_bytes
-    raw_frame = pyqtSignal(int, bytes)                 # cmd, payload(调试)
-    tx_log = pyqtSignal(str)
+    raw_frame = pyqtSignal(int, bytes)                 # cmd, payload(RX 入口, 日志面板格式化)
+    tx_frame = pyqtSignal(int, bytes)                  # cmd, payload(TX 入口, 日志面板格式化)
 
     connected = pyqtSignal(bool)
     error_occurred = pyqtSignal(str)
@@ -66,8 +66,7 @@ class JmClient(QObject):
     # ---------------- 统一发送(含 TX 日志) ----------------
     def _send(self, cmd: int, payload: bytes = b'') -> bool:
         ok = self._tp.send(cmd, payload)
-        phex = payload.hex(' ') if payload else "(empty)"
-        self.tx_log.emit(f"[TX] -> {cmd_name(cmd)}(0x{cmd:02X}) [{phex}]")
+        self.tx_frame.emit(cmd, payload)
         return ok
 
     # ---------------- 数据驱动命令 ----------------
