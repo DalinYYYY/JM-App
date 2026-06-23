@@ -17,6 +17,7 @@
 *.dbg*
 *.uvguix.*
 .mxproject
+.idea
  
 MDK-ARM/RTE/
 MDK-ARM/JointMotorApp
