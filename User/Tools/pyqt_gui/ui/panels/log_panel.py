@@ -5,7 +5,7 @@ import html
 
 from PyQt6.QtWidgets import (
     QGroupBox, QVBoxLayout, QHBoxLayout, QWidget, QPushButton,
-    QCheckBox, QTextEdit,
+    QCheckBox, QTextEdit, QSizePolicy,
 )
 from PyQt6.QtGui import QFont, QTextCursor
 
@@ -52,10 +52,11 @@ class LogPanel(QGroupBox):
             "QTextEdit { background-color: #FAFAFA; border: 1px solid #DDD; }")
         layout.addWidget(self._log)
 
-        # ---- 开关行 ----
-        opt_row = QWidget()
-        opt_layout = QHBoxLayout(opt_row)
-        opt_layout.setContentsMargins(0, 0, 0, 0)
+        # ---- 底部工具行 ----
+        tool_row = QWidget()
+        tool_layout = QHBoxLayout(tool_row)
+        tool_layout.setContentsMargins(0, 0, 0, 0)
+        tool_layout.setSpacing(8)
 
         self.chk_ts = QCheckBox("时间戳")
         self.chk_ts.setChecked(True)
@@ -70,20 +71,19 @@ class LogPanel(QGroupBox):
 
         for chk in (self.chk_ts, self.chk_tx, self.chk_rx,
                     self.chk_raw, self.chk_autoscroll):
-            opt_layout.addWidget(chk)
-        opt_layout.addStretch()
-        layout.addWidget(opt_row)
-
-        # ---- 按钮行 ----
-        btn_row = QWidget()
-        btn_layout = QHBoxLayout(btn_row)
-        btn_layout.setContentsMargins(0, 0, 0, 0)
+            tool_layout.addWidget(chk)
 
         self._btn_clear = QPushButton("清空日志")
         self._btn_clear.clicked.connect(self._log.clear)
-        btn_layout.addWidget(self._btn_clear)
-        btn_layout.addStretch()
-        layout.addWidget(btn_row)
+        tool_layout.addSpacing(8)
+        tool_layout.addWidget(self._btn_clear)
+
+        self._footer_fill = QWidget()
+        self._footer_fill.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        tool_layout.addWidget(self._footer_fill, 1)
+
+        layout.addWidget(tool_row)
 
     # ---------------- 内部输出 ----------------
     def _emit(self, kind: str, body_html: str):

@@ -3,7 +3,7 @@
 from PyQt6.QtWidgets import (
     QGroupBox, QGridLayout, QLabel, QComboBox, QPushButton,
 )
-from PyQt6.QtCore import pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal
 
 from transport.serial_transport import SerialTransport
 
@@ -21,31 +21,40 @@ class ConnectionPanel(QGroupBox):
         self.refresh_ports()
 
     def _build(self):
-        layout = QGridLayout(self)
+        self._layout = QGridLayout(self)
 
-        layout.addWidget(QLabel("串口号:"), 0, 0)
+        self._layout.addWidget(QLabel("串口号:"), 0, 0)
         self._combo_port = QComboBox()
         self._combo_port.setMinimumWidth(200)
-        layout.addWidget(self._combo_port, 0, 1)
+        self._layout.addWidget(self._combo_port, 0, 1)
 
         self._btn_refresh = QPushButton("刷新")
         self._btn_refresh.setFixedWidth(60)
         self._btn_refresh.clicked.connect(self.refresh_ports)
-        layout.addWidget(self._btn_refresh, 0, 2)
+        self._layout.addWidget(self._btn_refresh, 0, 2)
 
-        layout.addWidget(QLabel("波特率:"), 1, 0)
+        self._layout.addWidget(QLabel("波特率:"), 1, 0)
         self._combo_baud = QComboBox()
         self._combo_baud.addItems(["9600", "19200", "38400", "57600", "115200",
                                    "230400", "460800", "921600"])
         self._combo_baud.setCurrentText("115200")
         self._combo_baud.setEditable(True)
-        layout.addWidget(self._combo_baud, 1, 1, 1, 2)
+        self._layout.addWidget(self._combo_baud, 1, 1, 1, 2)
 
         self._btn_connect = QPushButton("连接")
+        self._btn_connect.setFixedHeight(26)
         self._btn_connect.setStyleSheet(
             "background-color: #4CAF50; color: white; font-weight: bold;")
         self._btn_connect.clicked.connect(self._on_toggle)
-        layout.addWidget(self._btn_connect, 2, 0, 1, 3)
+        self._layout.addWidget(self._btn_connect, 2, 0, 1, 3)
+
+    def set_connect_row_tail_widget(self, widget):
+        """在连接按钮右侧放置一个工具按钮。"""
+        self._layout.removeWidget(self._btn_connect)
+        self._layout.addWidget(
+            self._btn_connect, 2, 0, 1, 2, Qt.AlignmentFlag.AlignVCenter)
+        widget.setFixedHeight(self._btn_connect.height())
+        self._layout.addWidget(widget, 2, 2, Qt.AlignmentFlag.AlignVCenter)
 
     def refresh_ports(self):
         self._combo_port.clear()

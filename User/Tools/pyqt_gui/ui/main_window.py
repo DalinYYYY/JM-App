@@ -8,9 +8,10 @@ import time
 
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
-    QGroupBox, QGridLayout, QPushButton, QMessageBox, QLabel,
+    QGroupBox, QGridLayout, QPushButton, QMessageBox, QLabel, QSplitter,
+    QScrollArea, QLayout,
 )
-from PyQt6.QtCore import QTimer
+from PyQt6.QtCore import Qt, QTimer
 
 import jmproto as jp
 from jmproto import JmCmd, cmd_name, err_name
@@ -71,15 +72,31 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         root = QHBoxLayout(central)
 
-        # 左侧: 控制类面板
-        left = QWidget()
-        left.setMaximumWidth(420)
-        left_layout = QVBoxLayout(left)
+        # 左侧: 控制类面板。整体放入滚动区, 小窗口或参数较多时不挤压控件。
+        left = QScrollArea()
+        left.setWidgetResizable(True)
+        left.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        left.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)
+        left.setMaximumWidth(440)
+        left.setMinimumWidth(420)
+        left.setFrameShape(QScrollArea.Shape.NoFrame)
+
+        left_content = QWidget()
+        left.setWidget(left_content)
+        left_layout = QVBoxLayout(left_content)
+        left_layout.setSizeConstraint(QLayout.SizeConstraint.SetMinAndMaxSize)
+        left_layout.setContentsMargins(0, 0, 0, 0)
 
         self._conn_panel = ConnectionPanel()
         self._control_panel = ControlPanel()
         self._motion_panel = MotionPanel(self._registry)
         self._telemetry_panel = TelemetryPanel()
+        self._feedback_panel = FeedbackPanel()
+        self._param_panel = ParamPanel(self._registry)
+        self._plot_panel = PlotPanel()
+        self._log_panel = LogPanel()
+        self._log_panel_visible = True
+        self._conn_panel.set_connect_row_tail_widget(self._create_log_toggle_button())
 
         left_layout.addWidget(self._conn_panel)
         left_layout.addWidget(self._control_panel)
@@ -92,23 +109,90 @@ class MainWindow(QMainWindow):
         right = QWidget()
         right_layout = QVBoxLayout(right)
 
-        self._feedback_panel = FeedbackPanel()
-        self._param_panel = ParamPanel(self._registry)
-        self._plot_panel = PlotPanel()
-        self._log_panel = LogPanel()
-
         tabs = QTabWidget()
         tabs.addTab(self._feedback_panel, "实时反馈")
         tabs.addTab(self._param_panel, "参数读写")
         tabs.addTab(self._plot_panel, "实时曲线")
 
-        right_layout.addWidget(tabs, 3)
-        right_layout.addWidget(self._log_panel, 2)
+        self._right_splitter = QSplitter(Qt.Orientation.Vertical)
+        self._right_splitter.setChildrenCollapsible(False)
+        self._right_splitter.setHandleWidth(8)
+        self._right_splitter.setStyleSheet("""
+            QSplitter::handle:vertical {
+                background: #3A3A3A;
+                margin: 2px 0;
+            }
+            QSplitter::handle:vertical:hover {
+                background: #5A8DFF;
+            }
+        """)
+        self._right_splitter.addWidget(tabs)
+        self._right_splitter.addWidget(self._log_panel)
+        self._right_splitter.setStretchFactor(0, 3)
+        self._right_splitter.setStretchFactor(1, 2)
+        self._right_splitter.setSizes([480, 300])
+        self._log_splitter_sizes = self._right_splitter.sizes()
+
+        right_layout.addWidget(self._right_splitter)
 
         root.addWidget(left)
         root.addWidget(right, 1)
 
         self.statusBar().showMessage("未连接")
+
+    def _toggle_log_panel(self):
+        visible = not self._log_panel_visible
+        if not visible:
+            sizes = self._right_splitter.sizes()
+            if len(sizes) == 2 and sizes[1] > 0:
+                self._log_splitter_sizes = sizes
+
+        self._log_panel_visible = visible
+        self._log_panel.setVisible(visible)
+        self._btn_toggle_log.setChecked(visible)
+        self._update_log_toggle_button()
+
+        if visible:
+            self._right_splitter.setSizes(self._log_splitter_sizes or [480, 300])
+
+    def _update_log_toggle_button(self):
+        visible = self._log_panel_visible
+        tip = "通信日志：已显示，点击隐藏" if visible else "通信日志：已隐藏，点击显示"
+        self._btn_toggle_log.setText("日志开" if visible else "日志关")
+        self._btn_toggle_log.setToolTip(tip)
+        self._btn_toggle_log.setStatusTip("")
+        self._btn_toggle_log.setAccessibleName(tip)
+
+    def _create_log_toggle_button(self) -> QPushButton:
+        btn = QPushButton(self)
+        btn.setCheckable(True)
+        btn.setChecked(True)
+        btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn.setFixedHeight(26)
+        btn.setMinimumWidth(64)
+        btn.setStyleSheet("""
+            QPushButton {
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 0 8px;
+                background: #2A2A2A;
+                color: #DDD;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background: #3A3A3A;
+                border-color: #777;
+            }
+            QPushButton:checked {
+                background: #03A9F4;
+                border-color: #29B6F6;
+                color: white;
+            }
+        """)
+        btn.clicked.connect(self._toggle_log_panel)
+        self._btn_toggle_log = btn
+        self._update_log_toggle_button()
+        return btn
 
     def _build_statusbar(self):
         """底部状态栏: 连接状态 + TX/RX 速率与累计总量"""

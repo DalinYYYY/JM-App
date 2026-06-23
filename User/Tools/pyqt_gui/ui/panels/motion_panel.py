@@ -112,6 +112,9 @@ class MotionPanel(QGroupBox):
         if spec.unit and spec.unit != '-':
             notes.append(f"单位/范围: {spec.unit}")
         self._hint.setText("  ".join(notes))
+        self._form_host.adjustSize()
+        self.adjustSize()
+        self.updateGeometry()
 
     def _on_send(self):
         spec = self._current_spec()

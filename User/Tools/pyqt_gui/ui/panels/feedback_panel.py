@@ -1,6 +1,7 @@
 """实时反馈 + 设备状态显示面板"""
 
 from PyQt6.QtWidgets import QGroupBox, QGridLayout, QLabel
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
 
@@ -37,6 +38,10 @@ class FeedbackPanel(QGroupBox):
 
     def _build(self):
         layout = QGridLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setHorizontalSpacing(24)
+        layout.setVerticalSpacing(8)
 
         # 反馈数值网格(4列)
         for i, (name, unit, attr, _fmt) in enumerate(self.FIELDS):
