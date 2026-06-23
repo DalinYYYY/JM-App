@@ -1,0 +1,3 @@
+[submodule "User/Tools/pyqt_gui"]
+	path = User/Tools/pyqt_gui
+	url = ./User/Tools/pyqt_gui
