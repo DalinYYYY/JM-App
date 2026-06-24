@@ -168,7 +168,7 @@ int drv_rtos_sem_wait(drv_rtos_sem_handle_t sem, uint32_t timeout_ms)
 		return DRV_ERROR;
 
 	/* osSemaphoreWait返回可用token数，>0为成功获取 */
-	return (osSemaphoreWait((osSemaphoreId)sem, drv_rtos_to_wait(timeout_ms)) > 0) ? DRV_EOK : DRV_ERROR;
+	return (osSemaphoreWait((osSemaphoreId)sem, drv_rtos_to_wait(timeout_ms)) == osOK) ? DRV_EOK : DRV_ERROR;
 }
 
 /**

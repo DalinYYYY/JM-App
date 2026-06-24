@@ -84,6 +84,10 @@ void commun_thread(void const *argument)
 #endif
 
 		usr.sys.task_cnt.commun_cnt++;
+#if defined(USE_DEV_COMMUN_UART)
+		jm_host_commun_wait(THREAD_DELAY_COMMUN);
+#else
 		drv_rtos_delay_ms(THREAD_DELAY_COMMUN * 1);
+#endif
 	}
 }

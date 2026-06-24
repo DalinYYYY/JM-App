@@ -21,6 +21,8 @@
 #include "dev_config.h"
 #if defined(USE_DEV_COMMUN_UART)
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -34,11 +36,23 @@ extern "C"
 	void jm_host_commun_init(void);
 
 	/**
+	 * @brief UART RX IDLE 中断唤醒通信线程
+	 * @note  仅置通信信号量，不在中断中解析协议。
+	 */
+	void jm_host_commun_notify_rx(void);
+
+	/**
 	 * @brief 通信周期处理(在通信线程主循环每拍调用)
 	 * @note  取空闲突发数据喂协议栈(命令分发+应答); 当遥控开关使能时, 按订阅周期
 	 *        分频按 mask 变长打包主动推送 TELEMETRY(0xCA), 全程无需上位机应答。
 	 */
 	void jm_host_commun_process(void);
+
+	/**
+	 * @brief 等待通信事件或周期超时
+	 * @param timeout_ms 最大等待时间，超时后用于维持遥测周期处理。
+	 */
+	void jm_host_commun_wait(uint32_t timeout_ms);
 
 #ifdef __cplusplus
 }

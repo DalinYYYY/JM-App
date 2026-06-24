@@ -24,6 +24,7 @@
 
 #include "runtime_param.h"
 #include "thread_config.h"
+#include "drv_rtos.h"
 #include "dev_commun_uart.h"
 #include "jm_proto_ops.h" /* 传输无关业务回调集(串口/CAN 共用) + 遥测订阅状态 */
 
@@ -34,6 +35,11 @@
 #define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick 发一帧 */
 
 /* 当前上报周期(单位: 通信 tick): 由 ops 记录的 period_ms 换算, 0 表示沿用默认 */
+static drv_rtos_sem_handle_t s_rx_sem = NULL;
+static volatile uint32_t s_rx_notify_count = 0;
+static volatile uint32_t s_rx_wakeup_count = 0;
+static volatile uint32_t s_rx_timeout_count = 0;
+
 static uint16_t commun_uart_telemetry_tick(void)
 {
 	uint16_t period_ms = jm_app_telemetry_period_ms();
@@ -162,9 +168,43 @@ static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 void jm_host_commun_init(void)
 {
 	/* 关节电机串口通信(USART+DMA空闲中断): 初始化→注入业务回调→启动接收 */
+	if (s_rx_sem == NULL)
+	{
+		s_rx_sem = drv_rtos_sem_create(1u, 1u);
+	}
+	if (s_rx_sem != NULL)
+	{
+		(void)drv_rtos_sem_wait(s_rx_sem, 0u);
+	}
 	dev_commun_uart_init(&dev_commun_uart, JM_UART_COMM_ID_1);
 	dev_commun_uart.set_ops(&dev_commun_uart, jm_app_ops_get()); /* 串口/CAN 共用同一份回调 */
 	dev_commun_uart.start(&dev_commun_uart);
+}
+
+void jm_host_commun_notify_rx(void)
+{
+	s_rx_notify_count++;
+	if (s_rx_sem != NULL)
+	{
+		(void)drv_rtos_sem_release(s_rx_sem);
+	}
+}
+
+void jm_host_commun_wait(uint32_t timeout_ms)
+{
+	if (s_rx_sem == NULL)
+	{
+		drv_rtos_delay_ms(timeout_ms);
+		return;
+	}
+	if (drv_rtos_sem_wait(s_rx_sem, timeout_ms) == DRV_EOK)
+	{
+		s_rx_wakeup_count++;
+	}
+	else
+	{
+		s_rx_timeout_count++;
+	}
 }
 
 void jm_host_commun_process(void)

@@ -24,6 +24,7 @@
 /* USER CODE BEGIN Includes */
 //#include "dev_commun_vesc.h"
 #include "dev_commun_uart.h"
+#include "jm_host_commun.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -281,7 +282,12 @@ void USART1_IRQHandler(void)
   /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
   if (dev_commun_uart.on_rx_idle != 0)
   {
+    uint32_t jm_uart_idle = (__HAL_UART_GET_FLAG(&huart1, UART_FLAG_IDLE) != RESET);
     dev_commun_uart.on_rx_idle(&dev_commun_uart);
+    if (jm_uart_idle != 0u)
+    {
+      jm_host_commun_notify_rx();
+    }
   }
 #endif
   /* USER CODE END USART1_IRQn 0 */

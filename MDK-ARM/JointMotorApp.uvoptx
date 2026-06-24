@@ -157,25 +157,9 @@
         <Bp>
           <Number>0</Number>
           <Type>0</Type>
-          <LineNumber>282</LineNumber>
+          <LineNumber>121</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134243614</Address>
-          <ByteObject>0</ByteObject>
-          <HtxType>0</HtxType>
-          <ManyObjects>0</ManyObjects>
-          <SizeOfObject>0</SizeOfObject>
-          <BreakByAccess>0</BreakByAccess>
-          <BreakIfRCount>1</BreakIfRCount>
-          <Filename>../Core/Src/stm32g4xx_it.c</Filename>
-          <ExecCommand></ExecCommand>
-          <Expression>\\JointMotorApp\../Core/Src/stm32g4xx_it.c\282</Expression>
-        </Bp>
-        <Bp>
-          <Number>1</Number>
-          <Type>0</Type>
-          <LineNumber>88</LineNumber>
-          <EnabledFlag>1</EnabledFlag>
-          <Address>134250064</Address>
+          <Address>134250144</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
@@ -184,7 +168,7 @@
           <BreakIfRCount>1</BreakIfRCount>
           <Filename>..\User\Devices\dev_commun_uart.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\JointMotorApp\../User/Devices/dev_commun_uart.c\88</Expression>
+          <Expression>\\JointMotorApp\../User/Devices/dev_commun_uart.c\121</Expression>
         </Bp>
       </Breakpoint>
       <WatchWindow1>
