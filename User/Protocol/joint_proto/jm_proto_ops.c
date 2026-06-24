@@ -442,19 +442,27 @@ static const char *app_get_dev_name(void)
 
 /* ============================================================================
  *  5) 同步遥测订阅: CMD 0xCB  ->  set_telemetry
- *     存订阅掩码与周期, 供绑定层(串口固定全量帧/ CAN 周期帧)读取后自行打包上报。
+ *     存上报总开关/订阅掩码/周期, 供绑定层(串口/CAN 周期帧)读取后自行打包上报。
+ *     enable=1 启动周期上报, enable=0 停止; 数据帧 0xCA 周期主动推送, 不逐帧应答。
  * ==========================================================================*/
+static uint8_t s_tlm_enable = 0u;	  /* 周期上报总开关: 0=停止, 1=启动 */
 static uint16_t s_tlm_mask = 0xFFFFu; /* 默认订阅全部组 */
 static uint16_t s_tlm_period_ms = 0u; /* 0 表示沿用绑定层默认周期 */
 
-static jm_err_e app_set_telemetry(uint16_t mask, uint16_t period_ms)
+static jm_err_e app_set_telemetry(uint8_t enable, uint16_t mask, uint16_t period_ms)
 {
+	s_tlm_enable = enable ? 1u : 0u;
 	s_tlm_mask = mask;
 	if (period_ms != 0u)
 	{
 		s_tlm_period_ms = period_ms;
 	}
 	return JM_ERR_OK;
+}
+
+uint8_t jm_app_telemetry_enabled(void)
+{
+	return s_tlm_enable;
 }
 
 uint16_t jm_app_telemetry_mask(void)

@@ -9,6 +9,10 @@
  * @copyright   Copyright (c) 2026 Robot Tech.co, Ltd. All rights reserved.
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
+ * @note        【已废弃 2026-06-24】SerialStudio 上位机不再使用, 本模块由面向自研
+ *              PyQt 上位机的 jm_host_commun(同目录)取代, 已从 Keil 工程移除编译。
+ *              新模块改用 mask 变长帧 + 使能门控周期上报(遥控模式); 本文件保留仅作
+ *              SerialStudio 固定全量帧的历史参考, 勿再接入通信线程。
  * @note        从 thread_commun 抽出, 收敛 SerialStudio/joint_proto 相关逻辑:
  *              - joint_proto 业务回调(反馈/参数/控制模式)
  *              - 同步遥测订阅(0xCB)与单帧打包上报(0xCA)

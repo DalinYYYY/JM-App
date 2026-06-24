@@ -25,7 +25,7 @@
 #include "vofa.h"
 #include "main.h"
 #include "dev_commun_vesc.h"
-#include "serialstudio_commun.h"
+#include "jm_host_commun.h"
 
 void vofa_update(void)
 {
@@ -65,8 +65,8 @@ void commun_thread(void const *argument)
 #endif
 
 #if defined(USE_DEV_COMMUN_UART)
-	/* SerialStudio 串口通信(joint_proto): 初始化设备→注入业务回调→启动接收 */
-	ss_commun_init();
+	/* 关节电机上位机串口通信(joint_proto): 初始化设备→注入业务回调→启动接收 */
+	jm_host_commun_init();
 #endif
 
 	for (;;)
@@ -79,8 +79,8 @@ void commun_thread(void const *argument)
 #endif
 
 #if defined(USE_DEV_COMMUN_UART)
-		/* SerialStudio 通信周期处理: 命令分发应答 + 按订阅周期推送遥测帧 */
-		ss_commun_process();
+		/* 上位机通信周期处理: 命令分发应答 + 遥控使能时按订阅周期推送遥测帧(无应答) */
+		jm_host_commun_process();
 #endif
 
 		usr.sys.task_cnt.commun_cnt++;

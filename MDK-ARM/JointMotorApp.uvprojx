@@ -453,6 +453,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\AppServices\ParamService\serialstudio_commun.c</FilePath>
             </File>
+            <File>
+              <FileName>jm_host_commun.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\AppServices\ParamService\jm_host_commun.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

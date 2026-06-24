@@ -51,6 +51,12 @@ extern "C"
 	jm_err_e jm_app_get_feedback(jm_feedback_t *fb);
 
 	/**
+	 * @brief  周期遥测上报总开关(SET_TELEMETRY 0xCB 的 enable 字段写入)
+	 * @return 1=已使能周期上报, 0=已停止。绑定层每拍据此决定是否推送 0xCA。
+	 */
+	uint8_t jm_app_telemetry_enabled(void);
+
+	/**
 	 * @brief  当前遥测订阅掩码(SET_TELEMETRY 0xCB 写入), 0 表示订阅全部
 	 */
 	uint16_t jm_app_telemetry_mask(void);

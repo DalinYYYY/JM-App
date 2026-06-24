@@ -268,11 +268,14 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	}
 	proto->reply_len = 0; /* 默认无应答 */
 
-	/* 订阅同步遥测 0xCB: payload = mask(u16)[+ period_ms(u16)], 小端 */
+	/* 订阅同步遥测 0xCB: payload = enable(u8) + mask(u16) [+ period_ms(u16)], 小端。
+	 * enable=1 启动周期上报, enable=0 停止; 仅本订阅命令回单次 ACK 供上位机确认开关,
+	 * 之后的周期性 0xCA 数据帧由绑定层主动推送, 不要求逐帧应答。*/
 	if (cmd == JM_CMD_SET_TELEMETRY)
 	{
+		uint8_t enable;
 		uint16_t mask, period = 0;
-		if (len < 2)
+		if (len < 3)
 		{
 			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		}
@@ -280,13 +283,14 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		{
 			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
 		}
-		mask = jm_rd_u16(payload);
-		if (len >= 4)
+		enable = payload[0];
+		mask = jm_rd_u16(&payload[1]);
+		if (len >= 5)
 		{
-			period = jm_rd_u16(&payload[2]);
+			period = jm_rd_u16(&payload[3]);
 		}
 		{
-			jm_err_e e = proto->ops->set_telemetry(mask, period);
+			jm_err_e e = proto->ops->set_telemetry(enable, mask, period);
 			return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
 		}
 	}

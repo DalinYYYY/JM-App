@@ -131,8 +131,8 @@ extern "C"
 		JM_CMD_READ_MULTITURN = 0xC7,
 		JM_CMD_READ_FAULT = 0xC8,
 		JM_CMD_READ_DEBUG = 0xC9,	 /* 通用调试通道: float[] 任意挂载量, 免改协议加观测点 */
-		JM_CMD_TELEMETRY = 0xCA,	 /* 同步遥测帧(下位机->上位机): mask + 按位拼接所选数据组 */
-		JM_CMD_SET_TELEMETRY = 0xCB, /* 订阅遥测(上位机->下位机): mask(u16)[+period_ms(u16)] */
+		JM_CMD_TELEMETRY = 0xCA,	 /* 周期遥测帧(下位机->上位机, 无应答): mask(u16) + 按位序拼接所选数据组 */
+		JM_CMD_SET_TELEMETRY = 0xCB, /* 遥控开关(上位机->下位机): enable(u8)+mask(u16)[+period_ms(u16)], 回单次ACK */
 
 		/* 设备信息 0xD0~0xDF */
 		JM_CMD_READ_DEV_INFO = 0xD0,
