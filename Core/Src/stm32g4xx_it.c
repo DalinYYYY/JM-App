@@ -279,7 +279,10 @@ void USART1_IRQHandler(void)
 #endif
 #if defined(USE_DEV_COMMUN_UART)
   /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
-  dev_commun_uart.on_rx_idle(&dev_commun_uart);
+  if (dev_commun_uart.on_rx_idle != 0)
+  {
+    dev_commun_uart.on_rx_idle(&dev_commun_uart);
+  }
 #endif
   /* USER CODE END USART1_IRQn 0 */
   HAL_UART_IRQHandler(&huart1);

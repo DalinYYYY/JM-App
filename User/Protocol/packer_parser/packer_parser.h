@@ -29,7 +29,7 @@ extern "C"
 
 // 配置宏
 #define USE_DYNAMIC_MEM 0  // 是否使用动态内存
-#define USE_DATA_CHECK 0   // 是否启用校验检查
+#define USE_DATA_CHECK 1   // 是否启用校验检查
 #define MAX_PACK_SIZE 1024 // 最大数据包长度(数据区 CMD+DATA)
 #define STX_L 0x5A		   // 帧头低位
 #define STX_H 0xA5		   // 帧头高位

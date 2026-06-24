@@ -128,7 +128,7 @@
 #endif
 
 #if defined(USE_DEV_COMMUN_UART)
-#define DEV_JM_UART_RX_BUF_SIZE (300u) /* 关节电机串口接收缓冲(空闲中断单帧上限) */
+#define DEV_JM_UART_RX_BUF_SIZE (256u) /* 关节电机串口接收缓冲 */
 #endif
 
 //***<<< end of configuration section >>>***

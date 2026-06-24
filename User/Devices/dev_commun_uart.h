@@ -86,6 +86,17 @@ extern "C"
 		uint8_t motor_id;
 		uint8_t started;
 		uint8_t rx_tmp[DEV_JM_UART_RX_BUF_SIZE];
+		int last_error;
+		uint32_t init_count;
+		uint32_t start_count;
+		uint32_t start_fail_count;
+		uint32_t poll_count;
+		uint32_t poll_not_started_count;
+		uint32_t poll_rx_count;
+		uint32_t poll_rx_bytes;
+		uint32_t tx_count;
+		uint32_t tx_fail_count;
+		uint32_t idle_irq_count;
 
 		/* public */
 		const jm_proto_ops_t *ops;
@@ -112,4 +123,3 @@ extern "C"
 #endif
 #endif /* USE_DEV_COMMUN_UART */
 #endif /* __DEV_COMMUN_UART_H */
-

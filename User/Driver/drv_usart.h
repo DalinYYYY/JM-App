@@ -35,7 +35,7 @@
 #endif /* printf */
 
 /* 定义接收DMA缓存大小，根据实际修改 */
-#define DMA_IDLE_LEN 1044
+#define DMA_IDLE_LEN 256
 
 /**
  * @brief 串口编号
@@ -70,6 +70,13 @@ typedef struct
 	uint8_t flag;
 	uint16_t len;
 	uint16_t max;
+	uint16_t read_pos;
+	uint16_t write_pos;
+	uint32_t init_count;
+	uint32_t idle_count;
+	uint32_t get_count;
+	uint32_t rx_bytes;
+	int last_error;
 	uint8_t *p;
 } idleData_t;
 
@@ -178,6 +185,13 @@ int drv_uart_idle(usartNumber_e uart);
  * @return       : DRV_EOK成功，DRV_ERROR失败
  */
 int usart_idle_get_data(usartNumber_e uart, uint8_t *data, uint16_t *len);
+
+/**
+ * @brief       获取空闲 DMA 接收状态，供调试观察
+ * @param        uart              : 串口编号
+ * @return       : 内部状态指针，非法编号返回 NULL
+ */
+const idleData_t *usart_idle_get_status(usartNumber_e uart);
 
 /**
  * @brief       空闲中断收发自测示例

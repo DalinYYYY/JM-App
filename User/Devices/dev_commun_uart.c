@@ -30,6 +30,8 @@ dev_commun_uart_t dev_commun_uart;
 /* 当前活动设备(支撑无上下文的 tx 回调; 每次 start/poll/report 前刷新) */
 static dev_commun_uart_t *s_active = NULL;
 
+#define JM_UART_TX_TIMEOUT_MS 20u
+
 /* ==================================================================== */
 /*  协议栈发送回调: jm_proto_uart 组好整帧后, 经串口 DMA 推出              */
 /* ==================================================================== */
@@ -37,7 +39,15 @@ static void jm_uart_tx(uint8_t *data, uint16_t len)
 {
 	if (s_active != NULL)
 	{
-		drv_uart_dma_send(s_active->uart, data, len);
+		if (drv_usart_send(s_active->uart, data, len, JM_UART_TX_TIMEOUT_MS) == DRV_EOK)
+		{
+			s_active->tx_count++;
+		}
+		else
+		{
+			s_active->tx_fail_count++;
+			s_active->last_error = -4;
+		}
 	}
 }
 
@@ -56,6 +66,7 @@ static void dev_commun_uart_set_ops(struct dev_commun_uart *pobj, const jm_proto
 static int dev_commun_uart_start(struct dev_commun_uart *pobj)
 {
 	assert_report(pobj != NULL);
+	pobj->start_count++;
 	if (pobj->started)
 	{
 		return DEV_EOK;
@@ -64,13 +75,18 @@ static int dev_commun_uart_start(struct dev_commun_uart *pobj)
 	s_active = pobj;
 	if (jm_proto_uart_init(&pobj->jm, pobj->ops, pobj->motor_id, jm_uart_tx) != 0)
 	{
+		pobj->start_fail_count++;
+		pobj->last_error = -1;
 		return DEV_ERROR;
 	}
 	if (usart_idle_init(pobj->uart, DEV_JM_UART_RX_BUF_SIZE) != DRV_EOK)
 	{
+		pobj->start_fail_count++;
+		pobj->last_error = -2;
 		return DEV_ERROR;
 	}
 	pobj->started = 1;
+	pobj->last_error = DEV_EOK;
 	return DEV_EOK;
 }
 
@@ -78,6 +94,7 @@ static int dev_commun_uart_start(struct dev_commun_uart *pobj)
 static void dev_commun_uart_on_rx_idle(struct dev_commun_uart *pobj)
 {
 	assert_report(pobj != NULL);
+	pobj->idle_irq_count++;
 	drv_uart_idle(pobj->uart);
 }
 
@@ -86,15 +103,23 @@ static void dev_commun_uart_poll(struct dev_commun_uart *pobj)
 {
 	uint16_t rx_len = 0;
 	assert_report(pobj != NULL);
+	pobj->poll_count++;
 	if (!pobj->started)
 	{
+		pobj->poll_not_started_count++;
 		return;
 	}
 
-	usart_idle_get_data(pobj->uart, pobj->rx_tmp, &rx_len);
+	if (usart_idle_get_data(pobj->uart, pobj->rx_tmp, &rx_len) != DRV_EOK)
+	{
+		pobj->last_error = -3;
+		return;
+	}
 	if (rx_len != 0)
 	{
 		s_active = pobj; /* 锁定当前实例, 保证 tx 回调指向正确串口 */
+		pobj->poll_rx_count++;
+		pobj->poll_rx_bytes += rx_len;
 		jm_proto_uart_feed(&pobj->jm, pobj->rx_tmp, rx_len);
 	}
 }
@@ -122,6 +147,8 @@ void dev_commun_uart_init(dev_commun_uart_t *pobj, jm_uart_comm_id_e id)
 	pobj->uart = cfg->uart;
 	pobj->motor_id = cfg->motor_id;
 	pobj->ops = NULL; /* 由应用 set_ops 注入 */
+
+	pobj->init_count = 1;
 
 	/* public */
 	pobj->set_ops = dev_commun_uart_set_ops;

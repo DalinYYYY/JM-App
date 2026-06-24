@@ -20,6 +20,7 @@
 #ifdef USE_USART_DRIVER
 #include "dma.h"
 #include "usart.h"
+#include "stm32g4xx_hal.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -239,6 +240,7 @@ int drv_uart_dma_recv(usartNumber_e uart, uint8_t *data, uint16_t len)
 /*************************************** DMA+IDLE：不定长接收 ***************************************/
 
 static idleData_t dam_rx[DRV_UART_NUMBER_MAX];
+static uint8_t s_idle_rx_buf[DRV_UART_NUMBER_MAX][DMA_IDLE_LEN];
 
 /**
  * @brief       创建空闲中断不定长接收并启动(内部malloc缓存)
@@ -246,33 +248,42 @@ static idleData_t dam_rx[DRV_UART_NUMBER_MAX];
 int usart_idle_init(usartNumber_e uart, uint16_t len)
 {
 	UART_HandleTypeDef *handle;
-	uint8_t *p;
+	HAL_StatusTypeDef hal_ret;
 
-	if (uart >= DRV_UART_NUMBER_MAX)
+	if (uart >= DRV_UART_NUMBER_MAX || len == 0u || len > DMA_IDLE_LEN)
 	{
 		return DRV_ERROR;
 	}
 
-	p = (uint8_t *)malloc(len);
-	if (p == NULL)
-	{
-		return DRV_ERROR;
-	}
-	dam_rx[uart].p = p;
+	dam_rx[uart].p = s_idle_rx_buf[uart];
 	dam_rx[uart].max = len;
+	dam_rx[uart].len = 0;
+	dam_rx[uart].read_pos = 0;
+	dam_rx[uart].write_pos = 0;
+	dam_rx[uart].flag = 0;
+	dam_rx[uart].last_error = DRV_EOK;
+	memset(dam_rx[uart].p, 0, len);
 
 	handle = get_usart_handle(uart);
 	if (handle == NULL)
 	{
 		dam_rx[uart].p = NULL;
 		dam_rx[uart].max = 0;
-		free(p);
+		dam_rx[uart].last_error = DRV_ERROR;
 		return DRV_ERROR;
 	}
 
-	HAL_UART_Receive_DMA(handle, dam_rx[uart].p, dam_rx[uart].max);
+	hal_ret = HAL_UART_Receive_DMA(handle, dam_rx[uart].p, dam_rx[uart].max);
+	if (hal_ret != HAL_OK)
+	{
+		dam_rx[uart].p = NULL;
+		dam_rx[uart].max = 0;
+		dam_rx[uart].last_error = (int)hal_ret;
+		return DRV_ERROR;
+	}
 	__HAL_UART_ENABLE_IT(handle, UART_IT_IDLE); /* 开启空闲中断 */
 
+	dam_rx[uart].init_count++;
 	return DRV_EOK;
 }
 
@@ -282,13 +293,18 @@ int usart_idle_init(usartNumber_e uart, uint16_t len)
 int uart_start_idle_recv(usartNumber_e uart, uint8_t *data, uint16_t len)
 {
 	UART_HandleTypeDef *handle;
+	HAL_StatusTypeDef hal_ret;
 
 	handle = get_usart_handle(uart);
 	if (handle == NULL)
 	{
 		return DRV_ERROR;
 	}
-	HAL_UART_Receive_DMA(handle, data, len);
+	hal_ret = HAL_UART_Receive_DMA(handle, data, len);
+	if (hal_ret != HAL_OK)
+	{
+		return DRV_ERROR;
+	}
 	__HAL_UART_ENABLE_IT(handle, UART_IT_IDLE);
 
 	return DRV_EOK;
@@ -296,36 +312,24 @@ int uart_start_idle_recv(usartNumber_e uart, uint8_t *data, uint16_t len)
 
 /**
  * @brief       空闲中断处理(需在串口中断服务函数中调用)
- * @note         检测IDLE标志，停止DMA并计算已接收长度，置位接收完成标志
+ * @note         检测IDLE标志并置位接收完成标志；环形DMA长度在 usart_idle_get_data() 中按读写指针计算
  */
 int drv_uart_idle(usartNumber_e uart)
 {
 	UART_HandleTypeDef *handle;
-	DMA_HandleTypeDef *dma_ch;
 	uint32_t tmp_flag;
-	uint32_t temp;
 
 	handle = get_usart_handle(uart);
 	if (handle == NULL)
 	{
 		return DRV_ERROR;
 	}
-	dma_ch = get_usart_dma_rx_ch(uart);
-	if (dma_ch == NULL)
-	{
-		return DRV_ERROR;
-	}
-
 	tmp_flag = __HAL_UART_GET_FLAG(handle, UART_FLAG_IDLE);
 	if (tmp_flag != RESET)
 	{
 		__HAL_UART_CLEAR_IDLEFLAG(handle);
-		HAL_UART_DMAStop(handle);
-
-		/* 总计数减去DMA未传输个数，得到已接收个数 */
-		temp = __HAL_DMA_GET_COUNTER(dma_ch);
-		dam_rx[uart].len = dam_rx[uart].max - temp;
 		dam_rx[uart].flag = 1;
+		dam_rx[uart].idle_count++;
 	}
 	return DRV_EOK;
 }
@@ -336,28 +340,75 @@ int drv_uart_idle(usartNumber_e uart)
 int usart_idle_get_data(usartNumber_e uart, uint8_t *data, uint16_t *len)
 {
 	UART_HandleTypeDef *handle;
+	DMA_HandleTypeDef *dma_ch;
+	uint16_t write_pos;
+	uint16_t read_pos;
+	uint16_t max;
+	uint16_t copy_len = 0;
 
 	handle = get_usart_handle(uart);
-	if (handle == NULL)
+	if (handle == NULL || data == NULL || len == NULL)
 	{
+		if (len != NULL)
+		{
+			*len = 0;
+		}
+		return DRV_ERROR;
+	}
+	dma_ch = get_usart_dma_rx_ch(uart);
+	if (dma_ch == NULL || dam_rx[uart].p == NULL || dam_rx[uart].max == 0)
+	{
+		*len = 0;
 		return DRV_ERROR;
 	}
 
-	if (dam_rx[uart].flag == 1)
+	*len = 0;
+	dam_rx[uart].get_count++;
+	dam_rx[uart].flag = 0;
+	max = dam_rx[uart].max;
+	read_pos = dam_rx[uart].read_pos;
+	write_pos = (uint16_t)(max - __HAL_DMA_GET_COUNTER(dma_ch));
+	if (write_pos >= max)
 	{
-		dam_rx[uart].flag = 0;
+		write_pos = 0;
+	}
+	dam_rx[uart].write_pos = write_pos;
 
-		memcpy(data, dam_rx[uart].p, dam_rx[uart].len);
-		*len = dam_rx[uart].len;
-
-		memset(dam_rx[uart].p, 0, dam_rx[uart].max);
-		dam_rx[uart].len = 0;
-
-		/* 重新使能idle接收 */
-		uart_start_idle_recv(uart, dam_rx[uart].p, dam_rx[uart].max);
+	if (write_pos >= read_pos)
+	{
+		copy_len = (uint16_t)(write_pos - read_pos);
+		if (copy_len != 0)
+		{
+			memcpy(data, &dam_rx[uart].p[read_pos], copy_len);
+		}
+	}
+	else
+	{
+		uint16_t first_len = (uint16_t)(max - read_pos);
+		memcpy(data, &dam_rx[uart].p[read_pos], first_len);
+		if (write_pos != 0)
+		{
+			memcpy(&data[first_len], dam_rx[uart].p, write_pos);
+		}
+		copy_len = (uint16_t)(first_len + write_pos);
 	}
 
+	dam_rx[uart].read_pos = write_pos;
+	dam_rx[uart].len = copy_len;
+	dam_rx[uart].rx_bytes += copy_len;
+	dam_rx[uart].last_error = DRV_EOK;
+	*len = copy_len;
+
 	return DRV_EOK;
+}
+
+const idleData_t *usart_idle_get_status(usartNumber_e uart)
+{
+	if (uart >= DRV_UART_NUMBER_MAX)
+	{
+		return NULL;
+	}
+	return &dam_rx[uart];
 }
 
 /**
