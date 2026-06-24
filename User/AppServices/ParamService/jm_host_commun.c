@@ -1,0 +1,191 @@
+/**
+ * @file        jm_host_commun.c
+ * @brief       关节电机上位机通信(承载 joint_proto 协议)接入层实现
+ *
+ * @author      Dalin (dalin@robot.com)
+ * @version     1.0
+ * @date        2026-06-24
+ *
+ * @copyright   Copyright (c) 2026 Robot Tech.co, Ltd. All rights reserved.
+ *
+ * @note        本文件遵循《嵌入式C代码规范V1.0》开发
+ * @note        面向自研 PyQt 上位机, 取代已废弃的 serialstudio_commun。
+ *              joint_proto 业务回调(反馈/控制/参数/设备信息)统一收敛在 jm_proto_ops.c,
+ *              串口与 CAN 注入同一份 ops; 本文件只负责串口绑定与遥测帧打包上报。
+ * @note        遥控模式(周期无应答上报):
+ *              - 上位机用 SET_TELEMETRY(0xCB)=enable+mask+period 配置开关/种类/周期;
+ *                ops 记录后, 本模块每拍读 jm_app_telemetry_enabled() 决定是否上报。
+ *              - 使能时按 mask 变长打包 TELEMETRY(0xCA): 帧体 = mask(u16) + 按位序拼接
+ *                所选数据组, 位序严格对齐 jm_telemetry_bit_e 与上位机 parse_telemetry。
+ *              - 数据帧不要求上位机逐帧应答; 仅 0xCB 开关回单次 ACK 供上位机确认。
+ */
+#include "jm_host_commun.h"
+#if defined(USE_DEV_COMMUN_UART)
+
+#include "runtime_param.h"
+#include "thread_config.h"
+#include "dev_commun_uart.h"
+#include "jm_proto_ops.h" /* 传输无关业务回调集(串口/CAN 共用) + 遥测订阅状态 */
+
+/* ---------------- 同步遥测周期状态 ----------------
+ * 约束沿用: packer 单全局 send_buffer + 无发送忙查询, 故每个上报节拍只发一帧。
+ * 订阅(0xCB)由共用 ops 统一接收并记录 enable/mask/period; 本文件每拍读其
+ * period_ms 换算成 tick, 读其 enable 作上报门控, 读其 mask 决定变长帧打包内容。*/
+#define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick 发一帧 */
+
+/* 当前上报周期(单位: 通信 tick): 由 ops 记录的 period_ms 换算, 0 表示沿用默认 */
+static uint16_t commun_uart_telemetry_tick(void)
+{
+	uint16_t period_ms = jm_app_telemetry_period_ms();
+	uint16_t tick;
+	if (period_ms == 0u)
+	{
+		return COMMUN_TELEMETRY_TICK;
+	}
+	/* 通信线程周期为 THREAD_DELAY_COMMUN ms, 换算成 tick 数, 至少 1 */
+	tick = (uint16_t)(period_ms / THREAD_DELAY_COMMUN);
+	return (tick == 0u) ? 1u : tick;
+}
+
+/* ---------------- 同步遥测(mask 变长帧上传) ----------------
+ * 帧体: mask(u16, 小端) + 按位序拼接所选数据组。位序严格对齐 jm_telemetry_bit_e:
+ *   POS_VEL DQ PHASE BUS TEMP MULTITURN TORQUE FAULT STATE DEBUG
+ * 帧内自带 mask, 故增删订阅项时上位机解析器无需改动(新增一组: 此处与上位机
+ * parse_telemetry 各按位序补一段即可)。每组字节布局见 jm_cmd_def.h 注释。 */
+static uint16_t commun_uart_pack_telemetry(uint16_t mask, const jm_feedback_t *fb, uint8_t *o)
+{
+	uint16_t n = 0;
+
+	jm_wr_u16(&o[n], mask);
+	n += 2; /* 帧头: 订阅掩码 */
+
+	if (mask & JM_TLM_POS_VEL) /* pos,vel  8B */
+	{
+		jm_wr_f32(&o[n], fb->pos);
+		n += 4;
+		jm_wr_f32(&o[n], fb->vel);
+		n += 4;
+	}
+	if (mask & JM_TLM_DQ) /* id,iq  8B */
+	{
+		jm_wr_f32(&o[n], fb->id);
+		n += 4;
+		jm_wr_f32(&o[n], fb->iq);
+		n += 4;
+	}
+	if (mask & JM_TLM_PHASE) /* ia,ib,ic  12B */
+	{
+		jm_wr_f32(&o[n], fb->ia);
+		n += 4;
+		jm_wr_f32(&o[n], fb->ib);
+		n += 4;
+		jm_wr_f32(&o[n], fb->ic);
+		n += 4;
+	}
+	if (mask & JM_TLM_BUS) /* vbus,ibus,power  12B */
+	{
+		jm_wr_f32(&o[n], fb->vbus);
+		n += 4;
+		jm_wr_f32(&o[n], fb->ibus);
+		n += 4;
+		jm_wr_f32(&o[n], fb->vbus * fb->ibus);
+		n += 4;
+	}
+	if (mask & JM_TLM_TEMP) /* tempFet,tempMotor  8B */
+	{
+		jm_wr_f32(&o[n], fb->temp_fet);
+		n += 4;
+		jm_wr_f32(&o[n], fb->temp_motor);
+		n += 4;
+	}
+	if (mask & JM_TLM_MULTITURN) /* multiturn(u32),single(f32)  8B */
+	{
+		jm_wr_u32(&o[n], (uint32_t)fb->multiturn);
+		n += 4;
+		jm_wr_f32(&o[n], fb->single);
+		n += 4;
+	}
+	if (mask & JM_TLM_TORQUE) /* torque  4B */
+	{
+		jm_wr_f32(&o[n], fb->torque);
+		n += 4;
+	}
+	if (mask & JM_TLM_FAULT) /* fault(u32),warn(u32)  8B */
+	{
+		jm_wr_u32(&o[n], fb->fault_mask);
+		n += 4;
+		jm_wr_u32(&o[n], fb->warn_mask);
+		n += 4;
+	}
+	if (mask & JM_TLM_STATE) /* topFsm,runState,ctrlMode,enable(u8)  4B */
+	{
+		o[n++] = fb->top_fsm;
+		o[n++] = fb->run_state;
+		o[n++] = fb->ctrl_mode;
+		o[n++] = fb->enable;
+	}
+	if (mask & JM_TLM_DEBUG) /* jm_dbg[JM_DBG_CH](f32)  N*4B */
+	{
+		uint8_t i;
+		for (i = 0; i < JM_DBG_CH; i++)
+		{
+			jm_wr_f32(&o[n], jm_dbg[i]);
+			n += 4;
+		}
+	}
+	return n;
+}
+
+static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
+{
+	jm_feedback_t fb;
+	uint8_t o[2 + 64 + JM_DBG_CH * 4]; /* mask(2) + 最大固定组(<=64) + 调试通道 */
+	uint16_t mask;
+	uint16_t n;
+
+	mask = jm_app_telemetry_mask();
+	if (mask == 0u)
+	{
+		return; /* 未选任何组, 无需上报 */
+	}
+	if (jm_app_get_feedback(&fb) != JM_ERR_OK)
+	{
+		return;
+	}
+
+	n = commun_uart_pack_telemetry(mask, &fb, o);
+	dev->report(dev, JM_CMD_TELEMETRY, o, n);
+}
+
+/* ---------------- 对外接口 ---------------- */
+
+void jm_host_commun_init(void)
+{
+	/* 关节电机串口通信(USART+DMA空闲中断): 初始化→注入业务回调→启动接收 */
+	dev_commun_uart_init(&dev_commun_uart, JM_UART_COMM_ID_1);
+	dev_commun_uart.set_ops(&dev_commun_uart, jm_app_ops_get()); /* 串口/CAN 共用同一份回调 */
+	dev_commun_uart.start(&dev_commun_uart);
+}
+
+void jm_host_commun_process(void)
+{
+	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
+
+	/* 取空闲突发数据喂协议栈, 自动完成命令分发与应答 */
+	dev_commun_uart.poll(&dev_commun_uart);
+
+	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。
+	 * 停止时不发, 且复位分频计数, 使下次使能后第一帧及时发出。*/
+	if (!jm_app_telemetry_enabled())
+	{
+		telemetry_tick = 0;
+		return;
+	}
+	if (++telemetry_tick >= commun_uart_telemetry_tick())
+	{
+		telemetry_tick = 0;
+		commun_uart_push_telemetry(&dev_commun_uart);
+	}
+}
+
+#endif /* USE_DEV_COMMUN_UART */
