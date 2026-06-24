@@ -473,6 +473,11 @@
               <FileType>1</FileType>
               <FilePath>..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
             </File>
+            <File>
+              <FileName>jm_proto_ops.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Protocol\joint_proto\jm_proto_ops.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>

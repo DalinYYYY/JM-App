@@ -20,100 +20,32 @@
 #include "runtime_param.h"
 #include "thread_config.h"
 #include "dev_commun_uart.h"
+#include "jm_proto_ops.h" /* 传输无关业务回调集(串口/CAN 共用) */
 
-/* ---------------- joint_proto 业务回调: 上位机命令的真正动作落点 ---------------- */
-
-/* 设置控制模式并下发目标(CMD 0x00~0xB8) */
-static jm_err_e commun_uart_set_mode(uint8_t cmd, const uint8_t *payload, uint16_t len)
-{
-	(void)cmd;
-	(void)payload;
-	(void)len;
-	/* TODO: 按 cmd 解析载荷并下发到电机控制层 */
-	return JM_ERR_OK;
-}
-
-/* 读实时反馈: 从运行参数填充 */
-static jm_err_e commun_uart_get_feedback(jm_feedback_t *fb)
-{
-	const motor_state_t *m = &usr.motor_state[M1];
-
-	fb->pos = m->motion.position_rad;		/* 输出端多圈位置 rad */
-	fb->vel = m->motion.velocity_rad_s;		/* 输出端速度 rad/s */
-	fb->torque = m->power.torque_est;		/* 输出端力矩 Nm (估算) */
-	fb->id = m->electrical.id_meas;			/* d轴电流 A */
-	fb->iq = m->electrical.iq_meas;			/* q轴电流 A */
-	fb->ia = m->electrical.ia;				/* A 相电流 A */
-	fb->ib = m->electrical.ib;				/* B 相电流 A */
-	fb->ic = m->electrical.ic;				/* C 相电流 A */
-	fb->vbus = m->power.v_bus;				/* 母线电压 V */
-	fb->ibus = m->power.i_bus;				/* 母线电流 A */
-	fb->temp_fet = m->thermal.temp_fet;		/* 功率管温度 ℃ */
-	fb->temp_motor = m->thermal.temp_motor; /* 电机温度 ℃ */
-	fb->multiturn = m->motion.multiturn;	/* 多圈计数 */
-	fb->single = m->motion.single_turn_rad; /* 单圈位置 rad */
-	fb->fault_mask = m->fault.fault_mask;	/* 故障掩码 */
-	fb->warn_mask = m->fault.warn_mask;		/* 警告掩码 */
-	fb->top_fsm = (uint8_t)usr.fsm.motor_fsm[M1];
-	fb->run_state = (uint8_t)m->run_mode;
-	fb->ctrl_mode = (uint8_t)usr.fsm.motor_mode[M1];
-	fb->enable = m->enable_motor ? 1 : 0;
-	return JM_ERR_OK;
-}
-
-/* 读单个参数 */
-static jm_err_e commun_uart_param_read(uint16_t param_id, uint8_t *value,
-									   uint8_t *out_type, uint8_t *out_len)
-{
-	(void)param_id;
-	(void)value;
-	(void)out_type;
-	(void)out_len;
-	/* TODO: 按 param_id 查参数表并填充 value/out_type/out_len */
-	return JM_ERR_BAD_PARAM_ID;
-}
-
-/* 写单个参数 */
-static jm_err_e commun_uart_param_write(uint16_t param_id, const uint8_t *value, uint8_t len)
-{
-	(void)param_id;
-	(void)value;
-	(void)len;
-	/* TODO: 按 param_id 写入参数表 */
-	return JM_ERR_BAD_PARAM_ID;
-}
+/* ---------------- joint_proto 业务回调 ----------------
+ * 反馈/控制/参数/设备信息/遥测的真正实现统一收敛在 jm_proto_ops.c,
+ * 串口与 CAN 注入同一份 ops。本文件只负责串口绑定与遥测帧打包上报。
+ * 反馈读取复用 ops 同源接口, 保证遥测打包与命令应答口径一致。*/
 
 /* ---------------- 同步遥测周期状态 ----------------
  * 约束沿用: packer 单全局 send_buffer + 无发送忙查询, 故每个上报节拍只发一帧。
- * 改为固定全量帧后, 不再按 mask 选组; 0xCB 仅用于调节上报周期(period_ms)。*/
+ * 改为固定全量帧后, 不再按 mask 选组; 0xCB 仅用于调节上报周期(period_ms)。
+ * 订阅(0xCB)由共用 ops 统一接收并记录; 本文件每拍读其 period_ms 换算成 tick。*/
 #define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick(≈5ms) 发一帧 */
 
-static uint16_t s_tlm_period_tick = COMMUN_TELEMETRY_TICK; /* 上报周期(单位: 通信 tick) */
-
-/* 设置同步遥测(0xCB): 固定全量帧下 mask 忽略, 仅用 period_ms 调上报周期(0 表示不改)。 */
-static jm_err_e commun_uart_set_telemetry(uint16_t mask, uint16_t period_ms)
+/* 当前上报周期(单位: 通信 tick): 由 ops 记录的 period_ms 换算, 0 表示沿用默认 */
+static uint16_t commun_uart_telemetry_tick(void)
 {
-	(void)mask; /* 固定全量帧: 不再按掩码选组 */
-	if (period_ms != 0u)
+	uint16_t period_ms = jm_app_telemetry_period_ms();
+	uint16_t tick;
+	if (period_ms == 0u)
 	{
-		/* 通信线程周期为 THREAD_DELAY_COMMUN ms, 换算成 tick 数, 至少 1 */
-		uint16_t tick = (uint16_t)(period_ms / THREAD_DELAY_COMMUN);
-		s_tlm_period_tick = (tick == 0u) ? 1u : tick;
+		return COMMUN_TELEMETRY_TICK;
 	}
-	return JM_ERR_OK;
+	/* 通信线程周期为 THREAD_DELAY_COMMUN ms, 换算成 tick 数, 至少 1 */
+	tick = (uint16_t)(period_ms / THREAD_DELAY_COMMUN);
+	return (tick == 0u) ? 1u : tick;
 }
-
-static const jm_proto_ops_t commun_uart_ops = {
-	.set_mode = commun_uart_set_mode,
-	.get_feedback = commun_uart_get_feedback,
-	.param_read = commun_uart_param_read,
-	.param_write = commun_uart_param_write,
-	.param_save = NULL,
-	.param_reset = NULL,
-	.get_dev_info = NULL,
-	.get_dev_name = NULL,
-	.set_telemetry = commun_uart_set_telemetry,
-};
 
 /* ---------------- 同步遥测(固定全量帧上传) ----------------
  * 每拍发送【固定长度、固定字段、固定顺序】的全量帧, 不再用 mask 变长。
@@ -180,7 +112,7 @@ static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 	uint8_t o[SS_TLM_SLOTS * 4]; /* 固定 84 字节全量帧体 */
 	uint16_t n;
 
-	if (commun_uart_get_feedback(&fb) != JM_ERR_OK)
+	if (jm_app_get_feedback(&fb) != JM_ERR_OK)
 	{
 		return;
 	}
@@ -195,7 +127,7 @@ void ss_commun_init(void)
 {
 	/* 关节电机串口通信(USART+DMA空闲中断): 初始化→注入业务回调→启动接收 */
 	dev_commun_uart_init(&dev_commun_uart, JM_UART_COMM_ID_1);
-	dev_commun_uart.set_ops(&dev_commun_uart, &commun_uart_ops);
+	dev_commun_uart.set_ops(&dev_commun_uart, jm_app_ops_get()); /* 串口/CAN 共用同一份回调 */
 	dev_commun_uart.start(&dev_commun_uart);
 }
 
@@ -206,8 +138,8 @@ void ss_commun_process(void)
 	/* 取空闲突发数据喂协议栈, 自动完成命令分发与应答 */
 	dev_commun_uart.poll(&dev_commun_uart);
 
-	/* 周期主动上报遥测: 按订阅周期 s_tlm_period_tick 分频推一帧, 错峰避免 DMA 撞车 */
-	// if (++telemetry_tick >= s_tlm_period_tick)
+	/* 周期主动上报遥测: 按订阅周期分频推一帧, 错峰避免 DMA 撞车 */
+	// if (++telemetry_tick >= commun_uart_telemetry_tick())
 	// {
 	// 	telemetry_tick = 0;
 	// 	commun_uart_push_telemetry(&dev_commun_uart);
