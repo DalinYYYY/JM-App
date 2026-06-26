@@ -15,8 +15,8 @@
 
 ## 软件环境
 
-- **IDE / 工具链**：Keil MDK-ARM（工程 `MDK-ARM/JointMotorApp.uvprojx`）
-- **配置工具**：STM32CubeMX（`JointMotorApp.ioc`）
+- **IDE / 工具链**：Keil MDK-ARM（工程 `Board/V1/MDK-ARM/JointMotorApp.uvprojx`）
+- **配置工具**：STM32CubeMX（`Board/V1/JointMotorApp.ioc`）
 - **RTOS**：FreeRTOS（CMSIS-OS V1，堆 16 KB）
 - **代码风格**：`.clang-format`（项目根，参数生成器会自动套用）
 
@@ -62,7 +62,7 @@ JointMotor_v0.1/
 ├── Core/                   # CubeMX 生成：HAL 初始化、main、中断向量、FreeRTOS 入口
 ├── Drivers/                # ST HAL 驱动与 CMSIS
 ├── Middlewares/            # FreeRTOS 等第三方中间件
-├── MDK-ARM/                # Keil 工程文件
+├── Board/V1/MDK-ARM/       # Keil 工程文件
 ├── User/                   # 用户代码（核心，分层架构，详见 User/User文件结构说明.md）
 │   ├── AppEntry/               # 入口层：初始化 + 主循环调度 + 中断入口
 │   ├── AppServices/            # 系统服务：状态机、线程管理
@@ -76,7 +76,7 @@ JointMotor_v0.1/
 │   ├── Protocol/               # 通信协议（规划中）
 │   ├── Test/                   # 测试体系（规划中）
 │   └── Tools/                  # 离线工具：参数表代码生成器
-├── JointMotorApp.ioc       # CubeMX 工程配置
+├── Board/V1/JointMotorApp.ioc # CubeMX 工程配置
 ├── .clang-format           # 代码格式规范
 └── buildclean.bat          # 清理 Keil 编译中间产物
 ```
@@ -98,13 +98,13 @@ JointMotor_v0.1/
 
 ## 编译与烧录
 
-1. 用 Keil MDK-ARM 打开 `MDK-ARM/JointMotorApp.uvprojx`
+1. 用 Keil MDK-ARM 打开 `Board/V1/MDK-ARM/JointMotorApp.uvprojx`
 2. 选择目标 `JointMotorApp`，编译（F7）
 3. 通过 ST-Link / J-Link 下载到 STM32G474
 
 清理中间产物：运行根目录 `buildclean.bat`。
 
-> 修改外设配置时，用 CubeMX 打开 `JointMotorApp.ioc` 重新生成；用户代码集中在 `User/`，CubeMX 重新生成不会覆盖。
+> 修改外设配置时，用 CubeMX 打开 `Board/V1/JointMotorApp.ioc` 重新生成；用户代码集中在 `User/`，CubeMX 重新生成不会覆盖。
 
 ## 参数表生成
 

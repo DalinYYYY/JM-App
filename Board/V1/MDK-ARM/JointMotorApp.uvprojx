@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../User/AppEntry;../User/AppServices/ErrorManager;../User/AppServices/ParamService;../User/AppServices/SafetyManager;../User/AppServices/StateMachine;../User/AppServices/ThreadManager;../User/AppServices/Watchdog;../User/Common;../User/Config;../User/DataHub;../User/Devices;../User/Driver;../User/MotorAlgorithms;../User/MotorControl/Calibration;../User/Protocol;../User/Protocol/vesc_proto;../User/Protocol/packer_parser;../User/Protocol/joint_proto;../User/MotorControl/ControlModes;../User/MotorControl/ControlProcess;../User/MotorControl/CascadeControl</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorControl/Calibration;../../../User/Protocol;../../../User/Protocol/vesc_proto;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -386,17 +386,17 @@
             <File>
               <FileName>control_irq.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppEntry\control_irq.c</FilePath>
+              <FilePath>..\..\..\User\AppEntry\control_irq.c</FilePath>
             </File>
             <File>
               <FileName>thread_management.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppEntry\thread_management.c</FilePath>
+              <FilePath>..\..\..\User\AppEntry\thread_management.c</FilePath>
             </File>
             <File>
               <FileName>user_interface.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppEntry\user_interface.c</FilePath>
+              <FilePath>..\..\..\User\AppEntry\user_interface.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -406,32 +406,32 @@
             <File>
               <FileName>thread_control.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\ThreadManager\thread_control.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\ThreadManager\thread_control.c</FilePath>
             </File>
             <File>
               <FileName>thread_display.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\ThreadManager\thread_display.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\ThreadManager\thread_display.c</FilePath>
             </File>
             <File>
               <FileName>thread_idle.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\ThreadManager\thread_idle.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\ThreadManager\thread_idle.c</FilePath>
             </File>
             <File>
               <FileName>thread_period.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\ThreadManager\thread_period.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\ThreadManager\thread_period.c</FilePath>
             </File>
             <File>
               <FileName>thread_commun.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\ThreadManager\thread_commun.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\ThreadManager\thread_commun.c</FilePath>
             </File>
             <File>
               <FileName>thread_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\AppServices\ThreadManager\thread_config.h</FilePath>
+              <FilePath>..\..\..\User\AppServices\ThreadManager\thread_config.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -441,7 +441,7 @@
             <File>
               <FileName>system_state.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\StateMachine\system_state.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\StateMachine\system_state.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -451,12 +451,12 @@
             <File>
               <FileName>serialstudio_commun.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\ParamService\serialstudio_commun.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\ParamService\serialstudio_commun.c</FilePath>
             </File>
             <File>
               <FileName>jm_host_commun.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\AppServices\ParamService\jm_host_commun.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\ParamService\jm_host_commun.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -466,22 +466,22 @@
             <File>
               <FileName>packer_parser.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Protocol\packer_parser\packer_parser.c</FilePath>
+              <FilePath>..\..\..\User\Protocol\packer_parser\packer_parser.c</FilePath>
             </File>
             <File>
               <FileName>jm_proto_uart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
+              <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
             </File>
             <File>
               <FileName>jm_proto.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Protocol\joint_proto\jm_proto.c</FilePath>
+              <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto.c</FilePath>
             </File>
             <File>
               <FileName>jm_proto_ops.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Protocol\joint_proto\jm_proto_ops.c</FilePath>
+              <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto_ops.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -491,37 +491,37 @@
             <File>
               <FileName>ctrl_transition.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorControl\ControlProcess\ctrl_transition.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\ControlProcess\ctrl_transition.c</FilePath>
             </File>
             <File>
               <FileName>motor_control.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorControl\ControlProcess\motor_control.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\ControlProcess\motor_control.c</FilePath>
             </File>
             <File>
               <FileName>pid_profile.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorControl\ControlProcess\pid_profile.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\ControlProcess\pid_profile.c</FilePath>
             </File>
             <File>
               <FileName>cascade_control.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorControl\CascadeControl\cascade_control.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\CascadeControl\cascade_control.c</FilePath>
             </File>
             <File>
               <FileName>current_loop.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorControl\CascadeControl\current_loop.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\CascadeControl\current_loop.c</FilePath>
             </File>
             <File>
               <FileName>motor_loop.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorControl\CascadeControl\motor_loop.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\CascadeControl\motor_loop.c</FilePath>
             </File>
             <File>
               <FileName>dev_motor_virtual.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorControl\CascadeControl\dev_motor_virtual.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\CascadeControl\dev_motor_virtual.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -531,17 +531,17 @@
             <File>
               <FileName>motion_param.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorAlgorithms\motion_param.c</FilePath>
+              <FilePath>..\..\..\User\MotorAlgorithms\motion_param.c</FilePath>
             </File>
             <File>
               <FileName>foc_core.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorAlgorithms\foc_core.c</FilePath>
+              <FilePath>..\..\..\User\MotorAlgorithms\foc_core.c</FilePath>
             </File>
             <File>
               <FileName>multiturn_counter.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\MotorAlgorithms\multiturn_counter.c</FilePath>
+              <FilePath>..\..\..\User\MotorAlgorithms\multiturn_counter.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -551,12 +551,12 @@
             <File>
               <FileName>motor_param.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\DataHub\motor_param.c</FilePath>
+              <FilePath>..\..\..\User\DataHub\motor_param.c</FilePath>
             </File>
             <File>
               <FileName>runtime_param.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\DataHub\runtime_param.c</FilePath>
+              <FilePath>..\..\..\User\DataHub\runtime_param.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -566,52 +566,52 @@
             <File>
               <FileName>dev_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\Devices\dev_config.h</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_config.h</FilePath>
             </File>
             <File>
               <FileName>dev_config.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_config.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_config.c</FilePath>
             </File>
             <File>
               <FileName>dev_dwt_counter.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_dwt_counter.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_dwt_counter.c</FilePath>
             </File>
             <File>
               <FileName>dev_half_bridge.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_half_bridge.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_half_bridge.c</FilePath>
             </File>
             <File>
               <FileName>dev_motor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_motor.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_motor.c</FilePath>
             </File>
             <File>
               <FileName>dev_motor_phase_current.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_motor_phase_current.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_motor_phase_current.c</FilePath>
             </File>
             <File>
               <FileName>dev_mt6701.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_mt6701.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_mt6701.c</FilePath>
             </File>
             <File>
               <FileName>dev_mt6835.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_mt6835.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_mt6835.c</FilePath>
             </File>
             <File>
               <FileName>dev_power_monitor.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_power_monitor.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_power_monitor.c</FilePath>
             </File>
             <File>
               <FileName>dev_commun_uart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Devices\dev_commun_uart.c</FilePath>
+              <FilePath>..\..\..\User\Devices\dev_commun_uart.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -621,72 +621,72 @@
             <File>
               <FileName>drv_rtos.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_rtos.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_rtos.c</FilePath>
             </File>
             <File>
               <FileName>drv_dwt_timer.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_dwt_timer.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_dwt_timer.c</FilePath>
             </File>
             <File>
               <FileName>drv_adc.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_adc.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_adc.c</FilePath>
             </File>
             <File>
               <FileName>drv_can.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_can.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_can.c</FilePath>
             </File>
             <File>
               <FileName>drv_delay.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_delay.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_delay.c</FilePath>
             </File>
             <File>
               <FileName>drv_flash_g4.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_flash_g4.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_flash_g4.c</FilePath>
             </File>
             <File>
               <FileName>drv_gpio.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_gpio.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_gpio.c</FilePath>
             </File>
             <File>
               <FileName>drv_i2c.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_i2c.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_i2c.c</FilePath>
             </File>
             <File>
               <FileName>drv_i2c_soft.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_i2c_soft.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_i2c_soft.c</FilePath>
             </File>
             <File>
               <FileName>drv_spi.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_spi.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_spi.c</FilePath>
             </File>
             <File>
               <FileName>drv_spi_soft.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_spi_soft.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_spi_soft.c</FilePath>
             </File>
             <File>
               <FileName>drv_tim.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_tim.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_tim.c</FilePath>
             </File>
             <File>
               <FileName>drv_usart.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Driver\drv_usart.c</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_usart.c</FilePath>
             </File>
             <File>
               <FileName>drv_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\Driver\drv_config.h</FilePath>
+              <FilePath>..\..\..\User\Driver\drv_config.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -696,22 +696,22 @@
             <File>
               <FileName>control_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\Config\control_config.h</FilePath>
+              <FilePath>..\..\..\User\Config\control_config.h</FilePath>
             </File>
             <File>
               <FileName>debug_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\Config\debug_config.h</FilePath>
+              <FilePath>..\..\..\User\Config\debug_config.h</FilePath>
             </File>
             <File>
               <FileName>protocol_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\Config\protocol_config.h</FilePath>
+              <FilePath>..\..\..\User\Config\protocol_config.h</FilePath>
             </File>
             <File>
               <FileName>system_config.h</FileName>
               <FileType>5</FileType>
-              <FilePath>..\User\Config\system_config.h</FilePath>
+              <FilePath>..\..\..\User\Config\system_config.h</FilePath>
             </File>
           </Files>
         </Group>
@@ -721,27 +721,27 @@
             <File>
               <FileName>vofa.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Common\vofa.c</FilePath>
+              <FilePath>..\..\..\User\Common\vofa.c</FilePath>
             </File>
             <File>
               <FileName>pid_core.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Common\pid_core.c</FilePath>
+              <FilePath>..\..\..\User\Common\pid_core.c</FilePath>
             </File>
             <File>
               <FileName>utils.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Common\utils.c</FilePath>
+              <FilePath>..\..\..\User\Common\utils.c</FilePath>
             </File>
             <File>
               <FileName>assert_report.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Common\assert_report.c</FilePath>
+              <FilePath>..\..\..\User\Common\assert_report.c</FilePath>
             </File>
             <File>
               <FileName>crc16.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\User\Common\crc16.c</FilePath>
+              <FilePath>..\..\..\User\Common\crc16.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -1082,6 +1082,9 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>::CMSIS</GroupName>
+        </Group>
+        <Group>
           <GroupName>Middlewares/Library/DSP Library/DSP Library</GroupName>
           <GroupOption>
             <CommonProperty>
@@ -1178,9 +1181,6 @@
               </FileOption>
             </File>
           </Files>
-        </Group>
-        <Group>
-          <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
     </Target>
