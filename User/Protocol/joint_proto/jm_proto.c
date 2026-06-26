@@ -12,6 +12,7 @@
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
  * | 2026-06-18 | 1.0  | Dalin  | 初始创建   |
+ * | 2026-06-25 | 1.1  | Dalin  | 补全 0xC9/0xE2/0xE3/0xF0/0xF1 分发 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
@@ -205,6 +206,39 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 			e = ops->param_reset(jm_rd_u16(pl));
 			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+		/* 批量读参数 0xE2: {start_id:u16;count:u16} -> {start_id:u16;count:u8;[type:u8;value]...} */
+		case JM_CMD_PARAM_READ_BULK:
+		{
+			uint16_t start_id, count, n = 0;
+			uint8_t o[JM_PAYLOAD_MAX];
+			if (len < 4)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			if (ops == NULL || ops->param_read_bulk == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			start_id = jm_rd_u16(&pl[0]);
+			count = jm_rd_u16(&pl[2]);
+			e = ops->param_read_bulk(start_id, count, o, &n);
+			if (e != JM_ERR_OK)
+				return reply_nack(p, cmd, e);
+			reply_set(p, cmd, o, n);
+			return JM_ERR_OK;
+		}
+		/* 批量写参数 0xE3: {start_id:u16;count:u16;values:bytes} -> ACK{status:u8} */
+		case JM_CMD_PARAM_WRITE_BULK:
+		{
+			uint16_t start_id, count;
+			uint8_t status;
+			if (len < 4)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			if (ops == NULL || ops->param_write_bulk == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			start_id = jm_rd_u16(&pl[0]);
+			count = jm_rd_u16(&pl[2]);
+			e = ops->param_write_bulk(start_id, count, &pl[4], (uint16_t)(len - 4));
+			status = (uint8_t)e;
+			reply_set(p, cmd, &status, 1);
+			return e;
+		}
 		default:
 			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 	}
@@ -259,6 +293,42 @@ static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 	}
 }
 
+/* ---- 调试通道 0xC9: 通用 float[] 观测点, 无专用回调时回通用 ACK ---- */
+static jm_err_e handle_read_debug(jm_proto_t *p, uint8_t cmd)
+{
+	/* 无专用返回时按 CSV #88 约定回通用 ACK */
+	if (p->ops == NULL || p->ops->get_debug == NULL)
+	{
+		return reply_ack(p, cmd, 0);
+	}
+	{
+		float dbg[16]; /* 容量 16; 若 JM_DBG_CH 增大需同步扩容 */
+		uint8_t o[sizeof(dbg)];
+		uint8_t cnt = 0;
+		uint8_t cap = (uint8_t)(sizeof(dbg) / sizeof(float));
+		uint16_t n = 0;
+		uint8_t i;
+		jm_err_e e;
+		e = p->ops->get_debug(dbg, &cnt, cap);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(p, cmd, e);
+		}
+		if (cnt > cap)
+		{
+			cnt = cap;
+		}
+		/* 帧内仅 raw f32 拼接(无计数字节), 与 0xCA 遥测 DEBUG 组同构 */
+		for (i = 0; i < cnt; i++)
+		{
+			jm_wr_f32(&o[n], dbg[i]);
+			n += 4;
+		}
+		reply_set(p, cmd, o, n);
+		return JM_ERR_OK;
+	}
+}
+
 /* ---- 主分发: 串口/CAN 解出 cmd+payload 后统一进这里 ---- */
 jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payload, uint16_t len)
 {
@@ -295,10 +365,15 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 	}
 
-	/* 反馈查询 0xC0~0xCF */
+	/* 反馈查询 0xC0~0xC8 */
 	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_FAULT)
 	{
 		return handle_read(proto, cmd);
+	}
+	/* 调试通道 0xC9: 通用 float[] 观测点 */
+	if (cmd == JM_CMD_READ_DEBUG)
+	{
+		return handle_read_debug(proto, cmd);
 	}
 	/* 设备信息 0xD0~0xDF */
 	if (cmd >= JM_CMD_READ_DEV_INFO && cmd <= JM_CMD_HEARTBEAT)
@@ -318,6 +393,53 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 			proto->ops->set_mode(cmd, payload, len);
 		}
 		return JM_ERR_OK;
+	}
+	/* 设置 CAN_ID 0xF0: {new_id:u8} -> ACK{new_id:u8}; 范围 1~127, 需保存重启生效 */
+	if (cmd == JM_CMD_SET_CAN_ID)
+	{
+		uint8_t new_id;
+		jm_err_e e;
+		if (len < 1)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->set_can_id == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		new_id = payload[0];
+		if (new_id < 1u || new_id > 127u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_OUT_OF_RANGE);
+		}
+		e = proto->ops->set_can_id(new_id);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		proto->motor_id = new_id;			  /* 同步 RAM 地址, CAN 滤波重启后生效 */
+		return reply_ack(proto, cmd, new_id); /* ACK{new_id:u8} */
+	}
+	/* 设置波特率 0xF1: {baud_code:u8} -> ACK; 0=1M 1=500K 2=250K 3=125K, 重启生效 */
+	if (cmd == JM_CMD_SET_BAUDRATE)
+	{
+		uint8_t baud;
+		jm_err_e e;
+		if (len < 1)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->set_baudrate == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		baud = payload[0];
+		if (baud > 3u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_OUT_OF_RANGE);
+		}
+		e = proto->ops->set_baudrate(baud);
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
 	}
 
 	/* 其余 0x00~0xB8 控制/校准/诊断类: 统一交给 set_mode 回调,

@@ -12,6 +12,7 @@
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
  * | 2026-06-23 | 1.0  | Dalin  | 初始创建   |
+ * | 2026-06-25 | 1.1  | Dalin  | 增补 jm_app_can_baudrate 声明 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        把 jm_proto_ops_t 的全部回调集中实现在一处, 对接固件应用层:
@@ -65,6 +66,12 @@ extern "C"
 	 * @brief  当前遥测上报周期(ms, SET_TELEMETRY 0xCB 写入), 0 表示沿用默认
 	 */
 	uint16_t jm_app_telemetry_period_ms(void);
+
+	/**
+	 * @brief  当前 CAN 波特率码(SET_BAUDRATE 0xF1 写入)
+	 * @return 0=1M(默认) 1=500K 2=250K 3=125K; 由 CAN 绑定层初始化时读取
+	 */
+	uint8_t jm_app_can_baudrate(void);
 
 	/**
 	 * @brief  参数持久化钩子(可由 Flash 驱动层实现以提供真正掉电保存)

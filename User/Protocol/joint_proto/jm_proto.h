@@ -12,6 +12,7 @@
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
  * | 2026-06-18 | 1.0  | Dalin  | 初始创建   |
+ * | 2026-06-25 | 1.1  | Dalin  | 补全 0xC9/0xE2/0xE3/0xF0/0xF1 ops 回调 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        本层与传输介质无关: 串口(jm_proto_uart)与CAN(jm_proto_can)
@@ -88,6 +89,33 @@ extern "C"
 		 * 上报周期(0 表示沿用默认/不改)。绑定层据此周期主动推送 0xCA 数据帧(无应答)。
 		 * 可为 NULL(不支持订阅则回 NACK)。*/
 		jm_err_e (*set_telemetry)(uint8_t enable, uint16_t mask, uint16_t period_ms);
+
+		/* 读调试通道(CMD 0xC9): 把任意观测 float[] 写入 out, 返回 *out_count 个
+		 * (每个元素为小端 f32, 帧内按位序拼接, 与 0xCA 遥测 DEBUG 组同构, 主机按
+		 * (reply_len-1)/4 解析)。max_count 为 out 容量。可为 NULL(则回通用 ACK)。
+		 * 用途: 免改协议加观测点, 任意处写 jm_dbg[i]=变量 即可上位机查看。*/
+		jm_err_e (*get_debug)(float *out, uint8_t *out_count, uint8_t max_count);
+
+		/* 批量读参数(CMD 0xE2): 从 start_id 起连续读 count 个, 应答体由实现层组织为
+		 * [start_id:u16][count:u8][[type:u8][value]...] 并写入 out, 写回 *out_len。
+		 * out 容量为 JM_PAYLOAD_MAX。可为 NULL(回 NACK)。*/
+		jm_err_e (*param_read_bulk)(uint16_t start_id, uint16_t count,
+								   uint8_t *out, uint16_t *out_len);
+
+		/* 批量写参数(CMD 0xE3): 从 start_id 起连续写 count 个, values 为按参数表类型
+		 * 逐个拼接的原始字节(每个值长度由 (start_id+i) 的类型决定, 字符串亦按完整 size)。
+		 * 可为 NULL(回 NACK)。*/
+		jm_err_e (*param_write_bulk)(uint16_t start_id, uint16_t count,
+									const uint8_t *values, uint16_t len);
+
+		/* 设置本机 CAN 地址(CMD 0xF0): new_id 范围 1~127, 需由实现层持久化。
+		 * 协议层在成功后同步更新 proto->motor_id; CAN 滤波地址重启后由绑定层重新加载生效。
+		 * 可为 NULL(回 NACK)。*/
+		jm_err_e (*set_can_id)(uint8_t new_id);
+
+		/* 设置 CAN 波特率(CMD 0xF1): baud_code 0=1M 1=500K 2=250K 3=125K。
+		 * 重启后由 CAN 绑定层加载生效。可为 NULL(回 NACK)。*/
+		jm_err_e (*set_baudrate)(uint8_t baud_code);
 	} jm_proto_ops_t;
 
 	/* ---------------- 协议实例 ---------------- */

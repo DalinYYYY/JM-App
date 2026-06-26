@@ -12,6 +12,7 @@
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
  * | 2026-06-23 | 1.0  | Dalin  | 初始创建   |
+ * | 2026-06-25 | 1.1  | Dalin  | 补全 0xC9/0xE2/0xE3/0xF0/0xF1 回调实现 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        jm_proto_ops_t 全部回调的统一落点。jm_proto_dispatch() 解析出
@@ -414,6 +415,79 @@ static jm_err_e app_param_reset(uint16_t param_id)
 	return JM_ERR_OK;
 }
 
+/* ---- 批量读参数 0xE2: 复用 s_param_tbl, 按 [type:u8][value] 顺序打包 ----
+ * 应答体布局: [start_id:u16][count:u8][[type:u8][value]...] (count 为实际读到的个数,
+ * 越界或超单帧容量时截断; 主机据每个 type 的字节数顺序解析至帧尾)。*/
+static jm_err_e app_param_read_bulk(uint16_t start_id, uint16_t count,
+									uint8_t *out, uint16_t *out_len)
+{
+	const uint8_t *base = (const uint8_t *)&usr.motor_param[M1];
+	uint16_t n = 0;
+	uint16_t i;
+	uint8_t actual = 0;
+
+	if (start_id >= MOTOR_PARAM_PARAM_COUNT)
+	{
+		return JM_ERR_BAD_PARAM_ID;
+	}
+	/* 头部: start_id(2) + count(1), count 字节稍后回填 */
+	jm_wr_u16(&out[0], start_id);
+	n = 3;
+
+	for (i = 0; i < count; i++)
+	{
+		uint16_t pid = (uint16_t)(start_id + i);
+		const param_desc_t *d;
+		/* 越界则提前结束, 返回实际读到的个数 */
+		if (pid >= MOTOR_PARAM_PARAM_COUNT)
+		{
+			break;
+		}
+		/* 预留 type(1) + 最大 value(STR=16); 超单帧容量则截断 */
+		if ((uint32_t)n + 1u + 16u > JM_PAYLOAD_MAX)
+		{
+			break;
+		}
+		d = &s_param_tbl[pid];
+		out[n++] = d->type;
+		memcpy(&out[n], base + d->offset, d->size);
+		n += d->size;
+		actual++;
+	}
+	out[2] = actual; /* 回填实际参数个数 */
+	*out_len = n;
+	return JM_ERR_OK;
+}
+
+/* ---- 批量写参数 0xE3: values 为按参数表类型逐个拼接的原始字节 ----
+ * 每个值长度由 (start_id+i) 的类型决定(字符串亦按完整 size=16); 不足则 LENGTH。
+ * 任一参数越界则整体失败回 BAD_PARAM_ID(已写入的前序值不回滚, 由主机重读校正)。*/
+static jm_err_e app_param_write_bulk(uint16_t start_id, uint16_t count,
+									 const uint8_t *values, uint16_t len)
+{
+	uint8_t *base = (uint8_t *)&usr.motor_param[M1];
+	uint16_t off = 0;
+	uint16_t i;
+
+	for (i = 0; i < count; i++)
+	{
+		uint16_t pid = (uint16_t)(start_id + i);
+		const param_desc_t *d;
+		if (pid >= MOTOR_PARAM_PARAM_COUNT)
+		{
+			return JM_ERR_BAD_PARAM_ID;
+		}
+		d = &s_param_tbl[pid];
+		if ((uint32_t)off + d->size > len)
+		{
+			return JM_ERR_LENGTH;
+		}
+		memcpy(base + d->offset, &values[off], d->size);
+		off += d->size;
+	}
+	return JM_ERR_OK;
+}
+
 /* ============================================================================
  *  4) 设备信息: CMD 0xD0/0xD1  ->  get_dev_info / get_dev_name
  * ==========================================================================*/
@@ -476,6 +550,53 @@ uint16_t jm_app_telemetry_period_ms(void)
 }
 
 /* ============================================================================
+ *  6) 调试通道: CMD 0xC9  ->  get_debug
+ *     直接读 jm_dbg[JM_DBG_CH](任意处可写的观测点), 与 0xCA 遥测 DEBUG 组同源。
+ * ==========================================================================*/
+static jm_err_e app_get_debug(float *out, uint8_t *out_count, uint8_t max_count)
+{
+	uint8_t i;
+	uint8_t cnt = JM_DBG_CH;
+
+	if (cnt > max_count)
+	{
+		cnt = max_count;
+	}
+	for (i = 0; i < cnt; i++)
+	{
+		out[i] = jm_dbg[i];
+	}
+	*out_count = cnt;
+	return JM_ERR_OK;
+}
+
+/* ============================================================================
+ *  7) CAN 管理: CMD 0xF0/0xF1  ->  set_can_id / set_baudrate
+ *     两者均写入 RAM 配置, 持久化由主机显式发 0xE4 完成, 重启后由 CAN 绑定层加载生效。
+ * ==========================================================================*/
+static uint8_t s_can_baud_code = 0u; /* 0=1M(默认) 1=500K 2=250K 3=125K */
+
+static jm_err_e app_set_can_id(uint8_t new_id)
+{
+	/* 写入参数表 motor_id; 范围 1~127 已由 dispatch 校验。
+	 * CAN 滤波地址在绑定层初始化时读取, 故重启后生效。*/
+	return (motor_param_set_motor_id(&usr.motor_param[M1], new_id) == 0)
+			   ? JM_ERR_OK
+			   : JM_ERR_OUT_OF_RANGE;
+}
+
+static jm_err_e app_set_baudrate(uint8_t baud_code)
+{
+	s_can_baud_code = baud_code;
+	return JM_ERR_OK;
+}
+
+uint8_t jm_app_can_baudrate(void)
+{
+	return s_can_baud_code;
+}
+
+/* ============================================================================
  *  回调集单例
  * ==========================================================================*/
 static const jm_proto_ops_t s_app_ops = {
@@ -488,6 +609,11 @@ static const jm_proto_ops_t s_app_ops = {
 	.get_dev_info = app_get_dev_info,
 	.get_dev_name = app_get_dev_name,
 	.set_telemetry = app_set_telemetry,
+	.get_debug = app_get_debug,
+	.param_read_bulk = app_param_read_bulk,
+	.param_write_bulk = app_param_write_bulk,
+	.set_can_id = app_set_can_id,
+	.set_baudrate = app_set_baudrate,
 };
 
 const jm_proto_ops_t *jm_app_ops_get(void)
