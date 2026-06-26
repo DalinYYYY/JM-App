@@ -23,22 +23,6 @@
 /*                          Device constants                             */
 /* ===================================================================== */
 
-#if defined(USE_DEV_MT6701)
-/* MT6701 SPI mode
- *   0 => Hardware SPI
- *   1 => Software SPI
- */
-#define DEV_MT6701_SPI_DRIVER 0
-#endif
-
-#if defined(USE_DEV_MT6835)
-/* MT6835 SPI mode
- *   0 => Hardware SPI
- *   1 => Software SPI
- */
-#define DEV_MT6835_SPI_DRIVER 0
-#endif
-
 #if defined(USE_DEV_POWER_MONITOR)
 #define PM_VREF (3.3f)
 #define PM_RESOLUTION (4096.0f)

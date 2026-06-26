@@ -67,6 +67,7 @@ extern "C"
 	typedef struct
 	{
 		char name[20];
+		spiDrv_t spi_num;
 		gpioDrv_t csn;
 	} mt6701_config_t;
 

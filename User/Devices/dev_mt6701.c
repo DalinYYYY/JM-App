@@ -23,8 +23,6 @@
 #include "assert_report.h"
 #include <math.h>
 
-#define MT6701_SPI DRV_SPI1 /* MT6701挂载的SPI外设 */
-
 /* CRC6校验表(手册多项式 X^6+X+1) */
 static const uint8_t tableCRC6[64] = {
 	0x00, 0x03, 0x06, 0x05, 0x0C, 0x0F, 0x0A, 0x09,
@@ -47,7 +45,7 @@ static inline float mt6701_norm360(float deg)
 static int8_t mt6701_spi_read(struct dev_mt6701 *pobj, uint8_t *data, uint16_t len)
 {
 	assert_report(pobj != NULL);
-	spiDrv_t dev = {.hspi = MT6701_SPI, .cs = {0}}; /* cs.gpiox=DRV_GPIO_INIT: 驱动不操作CS */
+	spiDrv_t dev = {.hspi = mt6701_list[pobj->id].spi_num.hspi, .cs = {0}}; /* cs.gpiox=DRV_GPIO_INIT: 驱动不操作CS */
 	return (int8_t)drv_spi_read(dev, data, len, 1000);
 }
 

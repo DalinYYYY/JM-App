@@ -1,7 +1,9 @@
+#ifdef JM_BOARD_CONFIG_DEFINE_TABLES
 #if defined(USE_DEV_MT6701)
 const mt6701_config_t mt6701_list[MT6701_ID_MAX] = {
     [MT6701_ID_1] = {
         .name = "MT6701_1",
+        .spi_num = {.hspi = DRV_SPI1},
         .csn = {.gpiox = DRV_GPIOA, .pin = DRV_PIN_4, .ste = DRV_PIN_LOW},
     },
 };
@@ -52,3 +54,5 @@ const dev_commun_uart_config_t commun_uart_list[JM_UART_COMM_ID_MAX] = {
     },
 };
 #endif
+
+#endif /* JM_BOARD_CONFIG_DEFINE_TABLES */

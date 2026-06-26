@@ -2,6 +2,7 @@
  * @file dev_config.c
  * @brief Board-specific device mapping tables.
  */
+#define JM_BOARD_CONFIG_DEFINE_TABLES
 #include "dev_config.h"
 
 #include "dev_led.h"
