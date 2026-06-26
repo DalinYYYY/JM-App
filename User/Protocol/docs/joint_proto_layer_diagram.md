@@ -89,16 +89,16 @@ flowchart TB
     UP <-->|"UART 字节流"| DEV3
     UP <-->|"CAN 扩展帧"| CANBR
 
-    HOST3 -->|驱动/注入ops| DEV3
-    HOST3 -->|读遥测状态| OPS3
+    HOST3 -->|"驱动/注入ops"| DEV3
+    HOST3 -->|"读遥测状态"| OPS3
     DEV3 --> UART2
     CANBR --> CAN2
     DEV3 --> HALU
     CANBR --> HALC
 
-    UART2 -->|dispatch(cmd,payload,len)| CORE
-    CAN2  -->|dispatch(cmd,payload,len)| CORE
-    CORE  -->|回调 ops->xxx| OPS3
+    UART2 -->|"dispatch(cmd,payload,len)"| CORE
+    CAN2  -->|"dispatch(cmd,payload,len)"| CORE
+    CORE  -->|"回调 ops->xxx"| OPS3
     OPS3  --> EXT3
 
     CORE --> DEF
@@ -277,7 +277,7 @@ sequenceDiagram
     H->>O: jm_app_telemetry_mask() 读订阅
     H->>O: jm_app_get_feedback(&fb)
     H->>O: jm_dbg[] 读调试通道
-    H->>H: commun_uart_pack_telemetry<br/>mask(u16)+按位序变长拼接
+    H->>H: commun_uart_pack_telemetry (mask u16, 按位序变长拼接)
     H->>D: report(JM_CMD_TELEMETRY, o, n)
     D->>U: drv_usart_send (DMA) 遥测帧
     Note over U: 数据帧不要求逐帧应答
@@ -358,8 +358,8 @@ flowchart TB
         end
 
         FEED --> FLT --> DECIDE
-        DECIDE -->|否| SINGLE
-        DECIDE -->|是| MULTI
+        DECIDE -->|"否"| SINGLE
+        DECIDE -->|"是"| MULTI
         SINGLE --> MIT
         MULTI --> MIT
         MIT --> DISP --> REPLY
@@ -373,13 +373,13 @@ flowchart TB
     end
 
     UP <-->|"CAN 扩展帧 29bit ID"| BR
-    DRV -->|RX: drvCanMsg_t| BR
-    BR -->|jm_proto_can_feed<br/>jm_can_frame_t| FEED
-    RAW -->|c->tx(jm_can_frame_t)| BR
-    BR -->|drv_can_send(drvCanMsg_t, ide=1)| DRV
+    DRV -->|"RX: drvCanMsg_t"| BR
+    BR -->|"jm_proto_can_feed<br/>jm_can_frame_t"| FEED
+    RAW -->|"c->tx(jm_can_frame_t)"| BR
+    BR -->|"drv_can_send(drvCanMsg_t, ide=1)"| DRV
 
-    DISP -.->|共用| COREDISP
-    COREDISP -.->|reply[]| REPLY
+    DISP -.->|"共用"| COREDISP
+    COREDISP -.->|"reply[]"| REPLY
 ```
 
 ### 4.1 CAN 处理管线要点
@@ -456,11 +456,11 @@ flowchart TB
 ```mermaid
 stateDiagram-v2
     [*] --> IDLE
-    IDLE --> ACTIVE : 收到 seq==0 首帧<br/>rx_reset + 记 rx_cmd<br/>rx_buf[0]=CMD
-    ACTIVE --> ACTIVE : seq==rx_seq 且 CMD 一致<br/>拼接片段, rx_seq++
-    ACTIVE --> IDLE : seq 错乱 / CMD 不一致<br/>rx_reset 丢弃
-    ACTIVE --> IDLE : rx_len+frag > rx_buf<br/>溢出 rx_reset 丢弃
-    ACTIVE --> COMPLETE : 末帧标志(bit7=1)<br/>dispatch(rx_cmd, payload)
+    IDLE --> ACTIVE : 收到 seq=0 首帧<br/>rx_reset 并记录 rx_cmd<br/>写入 rx_buf
+    ACTIVE --> ACTIVE : 序号连续且 CMD 一致<br/>拼接片段, 序号自增
+    ACTIVE --> IDLE : 序号错乱 / CMD 不一致<br/>rx_reset 丢弃
+    ACTIVE --> IDLE : 重组缓冲溢出<br/>rx_reset 丢弃
+    ACTIVE --> COMPLETE : 末帧标志置位<br/>整体 dispatch 分发
     COMPLETE --> IDLE : rx_reset 复位
 ```
 
@@ -610,18 +610,18 @@ flowchart TB
     VER["version.h<br/>HW_/APP_/BOOT_ VERSION_*"]
     FLASH[("Flash<br/>(驱动层强符号覆盖)")]
 
-    O_MODE -->|写目标量触发状态机| ML
-    O_FB -->|读反馈快照| RP
-    O_PARAM -->|查表 offset/type/size| MP
-    O_PARAM -->|按偏移读写字段内存| RP
-    O_SAVE -->|校验+默认值| MP
-    O_SAVE -.->|弱符号 jm_app_param_storage_save| FLASH
-    O_DEV -->|版本号| VER
-    O_DEV -->|device_uid| RP
-    O_DEV -->|motor_name| MP
-    O_DBG -->|jm_dbg[]| RP
-    O_CAN -->|set_motor_id| MP
-    O_TLM -.->|静态变量 enable/mask/period| ST[("静态状态 供host读")]
+    O_MODE -->|"写目标量触发状态机"| ML
+    O_FB -->|"读反馈快照"| RP
+    O_PARAM -->|"查表 offset/type/size"| MP
+    O_PARAM -->|"按偏移读写字段内存"| RP
+    O_SAVE -->|"校验+默认值"| MP
+    O_SAVE -.->|"弱符号 jm_app_param_storage_save"| FLASH
+    O_DEV -->|"版本号"| VER
+    O_DEV -->|"device_uid"| RP
+    O_DEV -->|"motor_name"| MP
+    O_DBG -->|"jm_dbg[]"| RP
+    O_CAN -->|"set_motor_id"| MP
+    O_TLM -.->|"静态变量 enable/mask/period"| ST[("静态状态 供host读")]
 ```
 
 **命令 → 外部模块映射**

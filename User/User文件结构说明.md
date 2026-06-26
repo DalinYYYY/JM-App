@@ -120,7 +120,7 @@ User/
 | `dev_motor_phase_current.c/h` | 三相相电流采样（ADC 注入组，与 PWM 同步） |
 | `dev_power_monitor.c/h` | 电源监控（ADC 规则组 DMA：母线电压/电流/温度等） |
 | `dev_dwt_counter.c/h` | DWT 周期计数设备封装 |
-| `dev_config.c/h` | 设备层统一硬件配置：使能开关 + 换算常量 |
+| `dev_config.c/h` | 设备层统一接口：公共常量 + 板级选择器，板级映射在 `Board/<板名>/Config/` |
 | `dev_eeprom.h` | EEPROM 设备：字节/块读写、跨页写、参数持久化（接口预留） |
 | `dev_led.h` | LED 设备：单色/RGB 统一对象接口（接口预留） |
 

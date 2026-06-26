@@ -337,7 +337,7 @@
             <v6Rtti>0</v6Rtti>
             <VariousControls>
               <MiscControls></MiscControls>
-              <Define>USE_HAL_DRIVER,STM32G474xx</Define>
+              <Define>USE_HAL_DRIVER,STM32G474xx,JM_BOARD_V1</Define>
               <Undefine></Undefine>
               <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorControl/Calibration;../../../User/Protocol;../../../User/Protocol/vesc_proto;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl</IncludePath>
             </VariousControls>
@@ -1082,9 +1082,6 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>::CMSIS</GroupName>
-        </Group>
-        <Group>
           <GroupName>Middlewares/Library/DSP Library/DSP Library</GroupName>
           <GroupOption>
             <CommonProperty>
@@ -1181,6 +1178,9 @@
               </FileOption>
             </File>
           </Files>
+        </Group>
+        <Group>
+          <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
     </Target>
