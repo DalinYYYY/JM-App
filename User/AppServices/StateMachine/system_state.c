@@ -147,6 +147,7 @@ void system_state_init(system_state_t *sys, motor_param_t *param, float dt)
 	transition_init(&sys->transition);
 
 	sys->top_state = TOP_FSM_INIT;
+	sys->ctrl_mode = CONTROL_MODE_IDLE;
 	sys->fault_code = 0;
 
 	top_fsm_switch(sys, TOP_FSM_IDLE);
@@ -291,6 +292,7 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	/* ---- 急停：任意状态最高优先级响应 ---- */
 	if (cmd == CONTROL_MODE_ESTOP)
 	{
+		sys->ctrl_mode = cmd;
 		top_fsm_switch(sys, TOP_FSM_SAFETY);
 		return;
 	}
@@ -299,7 +301,10 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	if (sys->top_state == TOP_FSM_FAULT)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
+		{
+			sys->ctrl_mode = cmd;
 			top_fsm_switch(sys, TOP_FSM_IDLE);
+		}
 		return;
 	}
 
@@ -307,7 +312,10 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	if (sys->top_state == TOP_FSM_SAFETY)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
+		{
+			sys->ctrl_mode = cmd;
 			top_fsm_switch(sys, TOP_FSM_IDLE);
+		}
 		return;
 	}
 
@@ -321,28 +329,38 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 				top_fsm_switch(sys, TOP_FSM_READY);
 
 			top_fsm_switch(sys, TOP_FSM_IDLE);
+			sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_ENABLE:
 			// 上使能：IDLE → READY
 			top_fsm_switch(sys, TOP_FSM_READY);
+			if (sys->top_state == TOP_FSM_READY)
+				sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_STOP:
 			// 停止运行：RUN → READY（保持使能）
-			top_fsm_switch(sys, TOP_FSM_READY);
+			if (sys->top_state == TOP_FSM_RUN)
+				top_fsm_switch(sys, TOP_FSM_READY);
+			if (sys->top_state == TOP_FSM_READY)
+				sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_ENTER_BOOTLOADER:
 			top_fsm_switch(sys, TOP_FSM_BOOTLOADER);
+			if (sys->top_state == TOP_FSM_BOOTLOADER)
+				sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_SAVE_CONFIG:
 			// extern int motor_param_save(const motor_param_t *cfg);
+			sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_FACTORY_RESET:
 			// extern int motor_param_load_default(motor_param_t * cfg);
+			sys->ctrl_mode = cmd;
 			return;
 
 		default:
@@ -357,11 +375,13 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 		run_state_e target = s_ctrl_mode_to_run_state[cmd];
 		sys->motor.run_state = target; // 首次进入直接置位，无需过渡
 		sys->target_run_state = target;
+		sys->ctrl_mode = cmd;
 	}
 	else if (sys->top_state == TOP_FSM_RUN)
 	{
 		// RUN 态内运动模式切换：走平滑过渡，时长由全局调用次数配置
 		run_state_e target = s_ctrl_mode_to_run_state[cmd];
 		run_state_switch(sys, target, g_run_state_trans_count);
+		sys->ctrl_mode = cmd;
 	}
 }

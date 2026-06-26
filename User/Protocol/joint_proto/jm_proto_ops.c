@@ -186,9 +186,9 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 	fb->single = m->motion.single_turn_rad; /* 单圈位置 rad */
 	fb->fault_mask = m->fault.fault_mask;	/* 故障掩码 */
 	fb->warn_mask = m->fault.warn_mask;		/* 警告掩码 */
-	fb->top_fsm = (uint8_t)usr.fsm.motor_fsm[M1];
-	fb->run_state = (uint8_t)m->run_mode;
-	fb->ctrl_mode = (uint8_t)usr.fsm.motor_mode[M1];
+	fb->top_fsm = (uint8_t)m->top_state;
+	fb->run_state = (uint8_t)m->run_state;
+	fb->ctrl_mode = (uint8_t)m->ctrl_mode;
 	fb->enable = m->enable_motor ? 1u : 0u;
 	return JM_ERR_OK;
 }

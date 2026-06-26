@@ -30,6 +30,7 @@
 typedef struct
 {
 	top_fsm_e top_state;		  /*!< 顶层有限状态机状态 */
+	ctrl_mode_e ctrl_mode;	  /*!< 当前控制模式 */
 	uint32_t fault_code;		  /*!< 系统故障码 */
 	motor_ctrl_t motor;			  /*!< 电机控制核心上下文 */
 	transition_t transition;	  /*!< 状态过渡器 */

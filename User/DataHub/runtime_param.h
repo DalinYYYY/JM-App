@@ -198,7 +198,8 @@ typedef struct
 {
 	bool enable_motor;
 	bool enable_pwm;
-	run_state_e run_mode;
+	top_fsm_e top_state;
+	run_state_e run_state;
 	ctrl_mode_e ctrl_mode;
 	motor_electrical_t electrical; /* 电气测量量 0xC2/0xC3 */
 	motor_motion_t motion;		   /* 运动反馈量 0xC6/0xC7 */
@@ -215,17 +216,9 @@ typedef struct
 	sys_runtime_info_t info; /* 运行时系统量 0xD0/0xD2 */
 } system_t;
 
-typedef struct
-{
-	top_fsm_e top_state;			   // 使用统一的top_fsm_e
-	top_fsm_e motor_fsm[MOTOR_MAX];	   // 统一为top_fsm_e，删除重复的motorFsm_e
-	ctrl_mode_e motor_mode[MOTOR_MAX]; // 使用统一的ctrl_mode_e
-} fsm_t;
-
 /************************************* 一级变量 *************************************/
 typedef struct sys_data_
 {
-	fsm_t fsm;
 	system_t sys;
 	motor_state_t motor_state[MOTOR_MAX];
 	motor_param_t motor_param[MOTOR_MAX];

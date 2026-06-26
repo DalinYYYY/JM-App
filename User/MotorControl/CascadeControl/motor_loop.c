@@ -23,6 +23,8 @@
 /* 全局电机三环控制上下文 */
 motor_loop_t s_motor_loop;
 
+static void motor_loop_sync_state(motor_loop_t *m);
+
 motor_loop_t *motor_loop_get(void)
 {
 	return &s_motor_loop;
@@ -77,6 +79,7 @@ void motor_loop_init(float current_freq_hz)
 
 	// 上层状态机（模式管理 + 参考生成）
 	system_state_init(&m->sys, param, dt_current);
+	motor_loop_sync_state(m);
 
 	// 级联外环（位置/速度）与电流环
 	cascade_control_init(&m->cascade, param, dt_position, dt_velocity);
@@ -182,6 +185,19 @@ static void publish_power_thermal(motor_state_t *st, const foc_t *foc,
 	st->thermal.temp_motor = dev_power_monitor.temp_motor;
 }
 
+static void motor_loop_sync_state(motor_loop_t *m)
+{
+	motor_state_t *st = &usr.motor_state[M1];
+	const system_state_t *sys = &m->sys;
+	bool enabled = (sys->top_state == TOP_FSM_READY) || (sys->top_state == TOP_FSM_RUN);
+
+	st->top_state = sys->top_state;
+	st->run_state = sys->motor.run_state;
+	st->ctrl_mode = sys->ctrl_mode;
+	st->enable_motor = enabled;
+	st->enable_pwm = (sys->top_state == TOP_FSM_RUN);
+}
+
 /**
  * @brief 把控制上下文(s_motor_loop)的运行量单向同步到全局数据视图 usr
  * @note  数据流向: 控制层(私有工作集) → runtime_param(对外遥测快照)。
@@ -198,7 +214,7 @@ static void motor_loop_sync_runtime(motor_loop_t *m)
 	publish_motion(&st->motion, &m->motor.motor_param, &m->motor.multiturn);
 	publish_power_thermal(st, &m->motor.foc, &m->motor.motor_param, param);
 
-	st->run_mode = (run_state_e)m->sys.top_state;
+	motor_loop_sync_state(m);
 }
 
 void motor_loop_isr(void)
@@ -229,6 +245,7 @@ void motor_loop_isr(void)
 
 	// step2: 状态机生成参考输出 motor.ref（含模式管理与平滑过渡）
 	motor_control_loop(&m->sys);
+	motor_loop_sync_state(m);
 
 	// 非运行态：电流环输出零电流，外环复位
 	if (m->sys.top_state != TOP_FSM_RUN)
@@ -256,4 +273,5 @@ void motor_loop_isr(void)
 void motor_loop_set_cmd(ctrl_mode_e cmd)
 {
 	process_ctrl_cmd(&s_motor_loop.sys, cmd);
+	motor_loop_sync_state(&s_motor_loop);
 }

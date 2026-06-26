@@ -157,18 +157,18 @@
         <Bp>
           <Number>0</Number>
           <Type>0</Type>
-          <LineNumber>121</LineNumber>
+          <LineNumber>335</LineNumber>
           <EnabledFlag>1</EnabledFlag>
-          <Address>134250144</Address>
+          <Address>134257856</Address>
           <ByteObject>0</ByteObject>
           <HtxType>0</HtxType>
           <ManyObjects>0</ManyObjects>
           <SizeOfObject>0</SizeOfObject>
           <BreakByAccess>0</BreakByAccess>
           <BreakIfRCount>1</BreakIfRCount>
-          <Filename>..\User\Devices\dev_commun_uart.c</Filename>
+          <Filename>..\User\Protocol\joint_proto\jm_proto.c</Filename>
           <ExecCommand></ExecCommand>
-          <Expression>\\JointMotorApp\../User/Devices/dev_commun_uart.c\121</Expression>
+          <Expression>\\JointMotorApp\../User/Protocol/joint_proto/jm_proto.c\335</Expression>
         </Bp>
       </Breakpoint>
       <WatchWindow1>
@@ -451,8 +451,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\User\Protocol\joint_proto\jm_proto.c</PathWithFileName>
-      <FilenameWithoutPath>jm_proto.c</FilenameWithoutPath>
+      <PathWithFileName>..\User\Protocol\joint_proto\jm_proto_uart.c</PathWithFileName>
+      <FilenameWithoutPath>jm_proto_uart.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>
@@ -463,8 +463,8 @@
       <tvExp>0</tvExp>
       <tvExpOptDlg>0</tvExpOptDlg>
       <bDave2>0</bDave2>
-      <PathWithFileName>..\User\Protocol\joint_proto\jm_proto_uart.c</PathWithFileName>
-      <FilenameWithoutPath>jm_proto_uart.c</FilenameWithoutPath>
+      <PathWithFileName>..\User\Protocol\joint_proto\jm_proto.c</PathWithFileName>
+      <FilenameWithoutPath>jm_proto.c</FilenameWithoutPath>
       <RteFlg>0</RteFlg>
       <bShared>0</bShared>
     </File>

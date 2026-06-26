@@ -469,14 +469,14 @@
               <FilePath>..\User\Protocol\packer_parser\packer_parser.c</FilePath>
             </File>
             <File>
-              <FileName>jm_proto.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\User\Protocol\joint_proto\jm_proto.c</FilePath>
-            </File>
-            <File>
               <FileName>jm_proto_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>jm_proto.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\User\Protocol\joint_proto\jm_proto.c</FilePath>
             </File>
             <File>
               <FileName>jm_proto_ops.c</FileName>
