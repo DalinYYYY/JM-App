@@ -37,8 +37,8 @@ extern "C"
 	/* ---------------- 实时反馈数据(读命令的数据源) ---------------- */
 	typedef struct
 	{
-		float pos;			 /* 输出端位置 rad */
-		float vel;			 /* 输出端速度 rad/s */
+		float pos;			 /* 电机端多圈位置 θ_m rad (带符号, ±∞) */
+		float vel;			 /* 电机端机械角速度 rad/s */
 		float torque;		 /* 输出端力矩 Nm */
 		float id;			 /* d轴电流 A */
 		float iq;			 /* q轴电流 A */
@@ -47,8 +47,8 @@ extern "C"
 		float ibus;			 /* 母线电流 A */
 		float temp_fet;		 /* 功率管温度 ℃ */
 		float temp_motor;	 /* 电机温度 ℃ */
-		int32_t multiturn;	 /* 多圈计数 */
-		float single;		 /* 单圈位置 rad */
+		int32_t multiturn;	 /* 多圈计数 (整圈, 带符号) */
+		float single;		 /* 单圈机械角 rad [0,2π) */
 		uint32_t fault_mask; /* 故障位掩码 */
 		uint32_t warn_mask;	 /* 警告位掩码 */
 		uint8_t top_fsm;	 /* 顶层状态 top_fsm_e */

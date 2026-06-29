@@ -10,6 +10,8 @@
 #error "Define only one board macro."
 #endif
 
+#define JM_BOARD_SFOC
+
 #if defined(JM_BOARD_V1)
 #define JM_BOARD_NAME "V1"
 #include "../../Board/V1/Config/dev_config_board.h"

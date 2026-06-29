@@ -170,8 +170,8 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 		return JM_ERR_STATE_DENY;
 	}
 
-	fb->pos = m->motion.position_rad;		/* 输出端多圈位置 rad */
-	fb->vel = m->motion.velocity_rad_s;		/* 输出端速度 rad/s */
+	fb->pos = m->motion.position_rad;		/* 电机端多圈位置 θ_m rad(带符号,±∞) -> UI"电机位置" */
+	fb->vel = m->motion.velocity_rad_s;		/* 电机端机械角速度 rad/s -> UI"电机速度" */
 	fb->torque = m->power.torque_est;		/* 输出端力矩 Nm(估算) */
 	fb->id = m->electrical.id_meas;			/* d轴电流 A */
 	fb->iq = m->electrical.iq_meas;			/* q轴电流 A */
@@ -182,8 +182,8 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 	fb->ibus = m->power.i_bus;				/* 母线电流 A */
 	fb->temp_fet = m->thermal.temp_fet;		/* 功率管温度 ℃ */
 	fb->temp_motor = m->thermal.temp_motor; /* 电机温度 ℃ */
-	fb->multiturn = m->motion.multiturn;	/* 多圈计数 */
-	fb->single = m->motion.single_turn_rad; /* 单圈位置 rad */
+	fb->multiturn = m->motion.multiturn;	/* 多圈计数(整圈,带符号) -> UI"多圈计数" */
+	fb->single = m->motion.single_turn_rad; /* 单圈机械角 rad [0,2π) -> UI"机械角度"(转°)/电角度计算源 */
 	fb->fault_mask = m->fault.fault_mask;	/* 故障掩码 */
 	fb->warn_mask = m->fault.warn_mask;		/* 警告掩码 */
 	fb->top_fsm = (uint8_t)m->top_state;

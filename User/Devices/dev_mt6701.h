@@ -77,26 +77,30 @@ extern "C"
 	/**
 	 * @brief MT6701设备对象
 	 * @param  id                     : 设备编号
-	 * @param  raw_buf                : SPI读回的3字节原始帧
+	 * @param  raw_buf                : SPI读回的4字节原始帧(多读1B以容纳前导空闲bit)
 	 * @param  raw                    : 14bit原始角度值
 	 * @param  mech_angle_org         : 去偏移/方向处理后的机械角度, °
 	 * @param  mechanical_angle       : 最终机械角度, ° [0,360)
 	 * @param  mg_state               : 磁场状态(Mg[3:0]解析, 可叠加)
 	 * @param  crc_code               : 帧中6bit CRC
 	 * @param  crc_check              : CRC校验结果(0=通过, 1=失败)
+	 * @param  err_cnt                : 连续CRC坏帧计数(收到有效帧清零)
+	 * @param  bit_offset             : SSI帧前导bit偏移(0~8, 由CRC自校验锁定)
 	 * @param  offset                 : 角度偏移量(零点), °
 	 * @param  dir                    : 旋转方向
 	 */
 	typedef struct dev_mt6701
 	{
 		mt6701_id_e id;
-		uint8_t raw_buf[3];
+		uint8_t raw_buf[4];
 		uint32_t raw;
 		float mech_angle_org;
 		float mechanical_angle;
 		uint8_t mg_state;
 		uint8_t crc_code;
 		uint8_t crc_check;
+		uint16_t err_cnt;
+		uint8_t bit_offset;
 		float offset;
 		mt6701_dir_e dir;
 
