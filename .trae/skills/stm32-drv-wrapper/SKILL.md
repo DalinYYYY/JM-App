@@ -341,7 +341,24 @@ static void _i2c_delay(void)
 - 热路径（PWM 占空比、ADC 读取）直接操作寄存器宏（`__HAL_TIM_SET_COMPARE`），不触发 HAL 重配置。
 - `static inline` getter 消除调用开销，供高频路径直接调用。
 - DWT 周期计数器用裸寄存器地址，`static inline` 读取，不依赖 HAL/具体型号（Cortex-M0/M0+ 无 DWT，不适用）。
-- ISR 与主循环共享的标志位（如 `idleData_t.flag`）必须考虑中断安全；`volatile` 不保证原子性，多字节共享量需配合关中断。
+- ISR 与主循环共享的标志位（如 `idleData_t.flag`）**必须加 `volatile`**，否则编译器可能缓存旧值导致主循环读不到 ISR 写入的更新。`volatile` 不保证原子性，多字节共享量需配合关中断。
+- ISR 中不调用阻塞 HAL 接口（`HAL_XXX_Transmit` 带超时）、不格式化字符串、不动态申请内存。
+
+## 封装规则
+
+- 公共头只暴露最小稳定 API，HAL 类型不泄漏（见"对外不暴露 HAL 类型"）。
+- `static` 回调表、`static const` 查找表是模块私有，不通过 extern 暴露。
+- 配置参数用 `const` 传递（如 `const drvCanMsg_t *msg`）。
+- 只读句柄查找表用 `const` 指针数组，防止运行时被改写。
+- 外部模块不直接写 drv 层内部状态（如回调表），通过 `drv_xxx_register_callback` 窄接口操作。
+
+## 错误处理
+
+- 返回 `int` 状态码：`DRV_EOK`（0）成功、`DRV_ERROR`（1）失败。
+- 非法参数（NULL 指针、越界编号）返回 `DRV_ERROR`，不依赖断言做运行时故障处理。
+- 断言（`assert_report`）只用于"合法程序中不应发生"的程序员错误，生产固件不依赖断言完成故障保护。
+- 阻塞接口有 `timeout` 参数，超时返回 `DRV_ERROR`，不无限等待。
+- 跨系列差异导致的长度上限（如 F4 CAN ≤8、G4 FDCAN ≤64）在 `.c` 内检查，返回 `DRV_ERROR`。
 
 ## 跨系列运行期自适应
 
@@ -369,7 +386,11 @@ u32 drv_g4_flash_total_size(void);   // 来自 FLASHSIZE 寄存器
 | 软驱动直接调用 `HAL_GPIO_WritePin` | 通过回调注入 GPIO 操作，保持与 HAL 解耦 |
 | FLASH 几何按型号宏硬编码（`#ifdef STM32G474` 写死页大小） | 运行期读 HAL 值/寄存器自适应 |
 | 回调直接在 HAL 中断里做业务逻辑 | HAL 中断回调只转发给用户注册的回调，业务在回调中处理 |
-| 方法指针逐个内联进软驱动对象、每实例存一份 | 收进共享方法表或构造时统一挂载，对象只存状态 |
+| 方法指针逐个内联进软驱动对象、每实例存一份 | 收进共享 `static const ops` 方法表或构造时统一挂载，对象只存状态 |
+| ISR 与主循环共享的标志位未加 `volatile` | 共享量加 `volatile`；多字节量配合关中断 |
+| 外部模块直接写 drv 层的回调表 | 通过 `drv_xxx_register_callback` 窄接口操作 |
+| 断言用于运行时故障保护 | 断言只用于程序员错误；运行时故障用返回状态码 |
+| 阻塞接口无 `timeout`，无限等待 | 加 `timeout` 参数，超时返回 `DRV_ERROR` |
 
 ## 参考资料
 
