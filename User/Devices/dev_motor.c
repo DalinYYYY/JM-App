@@ -120,10 +120,10 @@ void dev_motor_init(dev_motor_t *pobj,
 #if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
 	dev_mt6701_init(&pobj->mt6701, (mt6701_id_e)id);
 	pobj->mt6701.set_zero_angle(&pobj->mt6701, 0.0f);
-//	if (usr.motor[id].encoder_param.change_dir)
-//		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CCW);
-//	else
-//		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CW);
+	//	if (usr.motor[id].encoder_param.change_dir)
+	//		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CCW);
+	//	else
+	//		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CW);
 
 	/* 装配抽象编码器接口 → MT6701 */
 	pobj->encoder.ctx = &pobj->mt6701;

@@ -72,6 +72,16 @@ void motor_loop_init(float current_freq_hz)
 	// 底层电机设备（真实硬件 或 虚拟 dq 物理模型，由 select 头决定）
 	dev_motor_init(&m->motor, DEV_MOTOR_1, motor_loop_current_cb, motor_loop_ele_radian_cb);
 
+	// 速度解算频率必须等于速度环真实节拍(电流环/VEL_DIV)，否则 d(angle)/dt 标定错比例；
+	// dev_motor_init 内按默认 1kHz 初始化，这里用实际派生频率覆盖，并选用 PLL 观测器
+	// (相比后向差分对编码器量化噪声更平滑、低滞后)。
+	{
+		motion_param_t *mp = &m->motor.motor_param;
+		uint32_t vel_freq_hz = (uint32_t)(1.0f / dt_velocity + 0.5f);
+		mp->set_update_freq(mp, vel_freq_hz);
+		mp->set_vel_method(mp, VEL_METHOD_PLL);
+	}
+
 #if !(MOTOR_LOOP_ENABLE_DEV_DRIVER)
 	// 虚拟电机：用实际电流环周期设置物理模型积分步长，保证仿真 dt 与控制 dt 一致
 	virtual_motor_set_period(&m->motor, dt_current);
