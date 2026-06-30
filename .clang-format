@@ -35,7 +35,12 @@ AlignEscapedNewlines: Right
 AlignOperands:   true
 
 # # 是否对齐行尾注释
-AlignTrailingComments: true
+# AlignTrailingComments: true
+
+# # 是否对齐行尾注释
+AlignTrailingComments:
+  Kind: Always
+  OverEmptyLines: 1
 
 # 函数声明的所有参数在放在下一行
 AllowAllParametersOfDeclarationOnNextLine: false
@@ -360,6 +365,7 @@ Standard: Auto
 # # tab宽度
 TabWidth: 4
 
-# # 使用tab字符: Never, ForIndentation, ForContinuationAndIndentation, Always
-UseTab: Always
+# # 使用tab字符: Never, ForIndentation, ForContinuationAndIndentation, AlignWithSpaces, Always
+# -- AlignWithSpaces - 用 Tab 缩进，但对齐(如行尾注释)用空格，保证任意 Tab 宽度下都对齐
+UseTab: AlignWithSpaces
 ---

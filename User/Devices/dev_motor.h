@@ -72,7 +72,7 @@ typedef struct
  */
 typedef struct dev_encoder
 {
-	void *ctx;				// 指向具体编码器对象
+	void *ctx;              // 指向具体编码器对象
 	float mechanical_angle; // 最新机械角度(deg)，update 后刷新
 	void (*update)(struct dev_encoder *pobj);
 	float (*get_mechanical_angle)(struct dev_encoder *pobj);
@@ -88,22 +88,21 @@ typedef struct dev_motor
 	float (*ele_radian_callback)(void);
 
 	motor_ctrl_target_t target; // 电机控制目标
-	timNumber_e fsm_tim;		// 状态机定时器
+	timNumber_e fsm_tim;        // 状态机定时器
 
 	/* public */
-	dev_encoder_t encoder; // 抽象编码器（型号无关，控制层入口）
-	dev_mt6701_t mt6701;   // mt6701（具体芯片实体，由 encoder.ctx 绑定）
-	dev_mt6835_t mt6835;   // mt6835（具体芯片实体，由 encoder.ctx 绑定）
-
-	motion_param_t motor_param;		   // 角度/速度转化
-	multiturn_t multiturn;			   // 绝对多圈计数
-	foc_t foc;						   // foc
-	dev_half_bridge_t half_bridge;	   // dev_half_bridge
+	dev_encoder_t encoder;             // 抽象编码器（型号无关，控制层入口）
+	dev_mt6701_t mt6701;               // mt6701（具体芯片实体，由 encoder.ctx 绑定）
+	dev_mt6835_t mt6835;               // mt6835（具体芯片实体，由 encoder.ctx 绑定）
+	motion_param_t motor_param;        // 角度/速度转化
+	multiturn_t multiturn;             // 绝对多圈计数
+	foc_t foc;                         // foc
+	dev_half_bridge_t half_bridge;     // dev_half_bridge
 	dev_phase_current_t phase_current; // adc for current
 } dev_motor_t;
 
 void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
-					focCurrent_t (*current_callback)(void),
-					float (*ele_radian_callback)(void));
+                    focCurrent_t (*current_callback)(void),
+                    float (*ele_radian_callback)(void));
 
 #endif /* __DEV_MOTOR_H__ */
