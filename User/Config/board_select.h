@@ -10,7 +10,9 @@
 #error "Define only one board macro."
 #endif
 
+#ifndef JM_BOARD_SFOC
 #define JM_BOARD_SFOC
+#endif
 
 #if defined(JM_BOARD_V1)
 #define JM_BOARD_NAME "V1"

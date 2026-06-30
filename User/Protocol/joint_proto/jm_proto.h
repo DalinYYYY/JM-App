@@ -108,6 +108,24 @@ extern "C"
 		jm_err_e (*param_write_bulk)(uint16_t start_id, uint16_t count,
 									const uint8_t *values, uint16_t len);
 
+		/* 电机配置(motor_info)读写 0xE6~0xE8: 与0xE0-0xE5的运行时参数独立, 面向
+		 * Flash/EEPROM持久化的硬件配置/校准数据。帧内 value 固定4字节, 固件按字段类型
+		 * (u8/i8/u16/i16/u32/i32/f32)自动转换。可为 NULL(回 NACK)。*/
+		jm_err_e (*motor_info_read)(uint16_t param_id, uint8_t *value4,
+									uint8_t *out_type, uint8_t *out_len);
+		jm_err_e (*motor_info_write)(uint16_t param_id, const uint8_t *value4, uint8_t len);
+		jm_err_e (*motor_info_save)(void);
+		/* 批量读/写(CMD 0xE9/0xEA): 从 start_id 起连续读/写 count 个, 每值固定4B。
+		 * read 把结果写入 out: [start_id:u16][count:u8][value:4B]..., 写回 *out_len;
+		 * write 的 values 为 count*4B 拼接。块内连续ID有效, 跨块间隔返回 BAD_PARAM_ID。
+		 * 可为 NULL(回 NACK)。*/
+		jm_err_e (*motor_info_read_bulk)(uint16_t start_id, uint16_t count,
+										 uint8_t *out, uint16_t *out_len);
+		jm_err_e (*motor_info_write_bulk)(uint16_t start_id, uint16_t count,
+										  const uint8_t *values, uint16_t len);
+		/* 恢复默认(CMD 0xEB): param_id=0xFFFF 表示全部恢复默认。可为 NULL(回 NACK)。*/
+		jm_err_e (*motor_info_reset)(uint16_t param_id);
+
 		/* 设置本机 CAN 地址(CMD 0xF0): new_id 范围 1~127, 需由实现层持久化。
 		 * 协议层在成功后同步更新 proto->motor_id; CAN 滤波地址重启后由绑定层重新加载生效。
 		 * 可为 NULL(回 NACK)。*/

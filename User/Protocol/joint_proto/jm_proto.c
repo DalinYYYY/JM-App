@@ -239,6 +239,86 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			reply_set(p, cmd, &status, 1);
 			return e;
 		}
+		/* 电机配置读 0xE6: {param_id:u16} -> {param_id:u16;type:u8;value:4B} (固定4字节值) */
+		case JM_CMD_MOTOR_INFO_READ:
+		{
+			uint8_t o[3 + 4];
+			uint8_t type = 0, vlen = 0;
+			if (len < 2)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			if (ops == NULL || ops->motor_info_read == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			pid = jm_rd_u16(pl);
+			e = ops->motor_info_read(pid, &o[3], &type, &vlen);
+			if (e != JM_ERR_OK)
+				return reply_nack(p, cmd, e);
+			jm_wr_u16(&o[0], pid);
+			o[2] = type;
+			reply_set(p, cmd, o, (uint16_t)(3 + vlen));
+			return JM_ERR_OK;
+		}
+		/* 电机配置写 0xE7: {param_id:u16;value:4B} -> ACK{param_id:u16;status:u8} (固定4字节值) */
+		case JM_CMD_MOTOR_INFO_WRITE:
+		{
+			uint8_t o[3];
+			if (len < 6)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			if (ops == NULL || ops->motor_info_write == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			pid = jm_rd_u16(pl);
+			e = ops->motor_info_write(pid, &pl[2], (uint8_t)(len - 2));
+			jm_wr_u16(&o[0], pid);
+			o[2] = (uint8_t)e;
+			reply_set(p, cmd, o, 3);
+			return e;
+		}
+		/* 批量读电机配置 0xE8: {start_id:u16;count:u16} -> {start_id:u16;count:u8;[value:4B]...} */
+		case JM_CMD_MOTOR_INFO_READ_BULK:
+		{
+			uint16_t start_id, count, n = 0;
+			uint8_t o[JM_PAYLOAD_MAX];
+			if (len < 4)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			if (ops == NULL || ops->motor_info_read_bulk == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			start_id = jm_rd_u16(&pl[0]);
+			count = jm_rd_u16(&pl[2]);
+			e = ops->motor_info_read_bulk(start_id, count, o, &n);
+			if (e != JM_ERR_OK)
+				return reply_nack(p, cmd, e);
+			reply_set(p, cmd, o, n);
+			return JM_ERR_OK;
+		}
+		/* 批量写电机配置 0xE9: {start_id:u16;count:u16;[value:4B]...} -> ACK{status:u8} */
+		case JM_CMD_MOTOR_INFO_WRITE_BULK:
+		{
+			uint16_t start_id, count;
+			uint8_t status;
+			if (len < 4)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			if (ops == NULL || ops->motor_info_write_bulk == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			start_id = jm_rd_u16(&pl[0]);
+			count = jm_rd_u16(&pl[2]);
+			e = ops->motor_info_write_bulk(start_id, count, &pl[4], (uint16_t)(len - 4));
+			status = (uint8_t)e;
+			reply_set(p, cmd, &status, 1);
+			return e;
+		}
+		/* 电机配置存Flash 0xEA: 无载荷 -> ACK{status:u8} */
+		case JM_CMD_MOTOR_INFO_SAVE:
+			if (ops == NULL || ops->motor_info_save == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			e = ops->motor_info_save();
+			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+		/* 电机配置恢复默认 0xEB: {param_id:u16=0xFFFF全部} -> ACK{status:u8} */
+		case JM_CMD_MOTOR_INFO_RESET:
+			if (len < 2)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			if (ops == NULL || ops->motor_info_reset == NULL)
+				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+			e = ops->motor_info_reset(jm_rd_u16(pl));
+			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
 		default:
 			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 	}
@@ -381,7 +461,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		return handle_dev(proto, cmd);
 	}
 	/* 参数读写 0xE0~0xEF */
-	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_PARAM_RESET)
+	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_MOTOR_INFO_RESET)
 	{
 		return handle_param(proto, cmd, payload, len);
 	}

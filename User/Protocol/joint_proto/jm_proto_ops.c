@@ -32,6 +32,7 @@
 #include "motor_param.h"   /* motor_param_init / 字段类型 */
 #include "version.h"	   /* HW_/APP_ 版本号 */
 #include "motor_loop.h"	   /* motor_loop_get / motor_loop_set_cmd */
+#include "motor_info.h"		   /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
 
 /* ============================================================================
  *  1) 控制/模式: CMD 0x00~0xB8  ->  set_mode
@@ -597,6 +598,177 @@ uint8_t jm_app_can_baudrate(void)
 }
 
 /* ============================================================================
+ *  8) 电机配置(motor_info)读写: CMD 0xE6~0xEB
+ *     与 0xE0-0xE5 的运行时参数(motor_param_t)独立, 面向 Flash/EEPROM 持久化
+ *     的硬件配置/校准数据。帧内 value 固定 4 字节, 由 motor_info_dispatch
+ *     按字段类型(u8/i8/u16/i16/u32/i32/f32)自动转换。
+ *     实例 g_motor_info 懒加载: 首次访问时调 motor_info_init 填默认值;
+ *     后续接入 Flash 驱动后, 启动时从 Flash 加载覆盖默认值即可。
+ * ==========================================================================*/
+static motor_info_t g_motor_info;
+static uint8_t g_motor_info_inited = 0u;
+
+static motor_info_t *app_motor_info(void)
+{
+	if (g_motor_info_inited == 0u)
+	{
+		(void)motor_info_init(&g_motor_info);
+		g_motor_info_inited = 1u;
+	}
+	return &g_motor_info;
+}
+
+/* motor_info 持久化: 弱实现仅做范围校验, 不落 Flash。
+ * 接入 Flash 驱动后在驱动层提供同名强符号覆盖(类比 jm_app_param_storage_save)。*/
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((weak))
+#elif defined(__CC_ARM) || defined(__ARMCC_VERSION)
+__weak
+#endif
+int jm_app_motor_info_storage_save(const motor_info_t *cfg)
+{
+	return motor_info_validate(cfg); /* 0=全部通过, 否则首个越界 param_id(>0) */
+}
+
+/* dispatch 返回码 -> jm_err_e */
+static jm_err_e mi_dispatch_to_err(int rc)
+{
+	switch (rc)
+	{
+		case MOTOR_INFO_DISPATCH_OK:
+			return JM_ERR_OK;
+		case MOTOR_INFO_DISPATCH_E_BAD_ID:
+			return JM_ERR_BAD_PARAM_ID;
+		case MOTOR_INFO_DISPATCH_E_BOUNDS:
+			return JM_ERR_OUT_OF_RANGE;
+		case MOTOR_INFO_DISPATCH_E_RO:
+			return JM_ERR_READ_ONLY;
+		default:
+			return JM_ERR_FLASH;
+	}
+}
+
+/* ---- 0xE6 读单个电机配置 ---- */
+static jm_err_e app_motor_info_read(uint16_t param_id, uint8_t *value4,
+									uint8_t *out_type, uint8_t *out_len)
+{
+	int rc = motor_info_dispatch_read(param_id, app_motor_info(),
+									  value4, out_type, out_len);
+	return mi_dispatch_to_err(rc);
+}
+
+/* ---- 0xE7 写单个电机配置(RAM, 需 0xEA 固化) ---- */
+static jm_err_e app_motor_info_write(uint16_t param_id, const uint8_t *value4, uint8_t len)
+{
+	int rc = motor_info_dispatch_write(param_id, app_motor_info(), value4, len);
+	return mi_dispatch_to_err(rc);
+}
+
+/* ---- 0xEA 把 motor_info 整块写入 Flash ---- */
+static jm_err_e app_motor_info_save(void)
+{
+	int rc = jm_app_motor_info_storage_save(app_motor_info());
+	if (rc == 0)
+	{
+		return JM_ERR_OK;
+	}
+	return (rc > 0) ? JM_ERR_OUT_OF_RANGE : JM_ERR_FLASH;
+}
+
+/* ---- 0xE8 批量读(块内连续ID有效, 跨块间隔返回 BAD_PARAM_ID) ---- */
+static jm_err_e app_motor_info_read_bulk(uint16_t start_id, uint16_t count,
+										 uint8_t *out, uint16_t *out_len)
+{
+	uint16_t i, n = 0;
+	motor_info_t *cfg = app_motor_info();
+
+	if (out == NULL || out_len == NULL)
+	{
+		return JM_ERR_BAD_PARAM_ID;
+	}
+	/* 应答头: start_id(u16) + count(u8), 预留最多 count*4B */
+	out[0] = (uint8_t)(start_id & 0xFF);
+	out[1] = (uint8_t)((start_id >> 8) & 0xFF);
+	/* count 占位, 末尾回填实际成功数 */
+	n = 3;
+	for (i = 0; i < count; i++)
+	{
+		uint8_t v4[4], tcode = 0, vlen = 0;
+		uint16_t pid = (uint16_t)(start_id + i);
+		int rc = motor_info_dispatch_read(pid, cfg, v4, &tcode, &vlen);
+		if (rc != MOTOR_INFO_DISPATCH_OK)
+		{
+			/* 遇到无效ID(块间隔/越界)即停止, 已读部分仍有效 */
+			break;
+		}
+		/* 超单帧容量(JM_PAYLOAD_MAX)则截断 */
+		if ((uint16_t)(n + 4u) > JM_PAYLOAD_MAX)
+		{
+			break;
+		}
+		out[n++] = v4[0];
+		out[n++] = v4[1];
+		out[n++] = v4[2];
+		out[n++] = v4[3];
+	}
+	out[2] = (uint8_t)i; /* 实际成功读取数 */
+	*out_len = n;
+	return JM_ERR_OK;
+}
+
+/* ---- 0xE9 批量写(块内连续ID有效) ---- */
+static jm_err_e app_motor_info_write_bulk(uint16_t start_id, uint16_t count,
+										  const uint8_t *values, uint16_t len)
+{
+	uint16_t i;
+	motor_info_t *cfg = app_motor_info();
+
+	if (values == NULL || len < (uint16_t)(count * 4u))
+	{
+		return JM_ERR_LENGTH;
+	}
+	for (i = 0; i < count; i++)
+	{
+		uint16_t pid = (uint16_t)(start_id + i);
+		int rc = motor_info_dispatch_write(pid, cfg, &values[i * 4u], 4u);
+		if (rc != MOTOR_INFO_DISPATCH_OK)
+		{
+			/* 首个失败即终止, 返回对应错误码(已写部分保留) */
+			return mi_dispatch_to_err(rc);
+		}
+	}
+	return JM_ERR_OK;
+}
+
+/* ---- 0xEB 恢复默认(param_id=0xFFFF 全部; 单参从默认实例回写) ---- */
+static jm_err_e app_motor_info_reset(uint16_t param_id)
+{
+	motor_info_t *cfg = app_motor_info();
+
+	if (param_id == 0xFFFFu)
+	{
+		return (motor_info_init(cfg) == 0) ? JM_ERR_OK : JM_ERR_FLASH;
+	}
+	/* 单参恢复: 从默认实例读出该参数值, 再写入当前实例 */
+	{
+		motor_info_t def;
+		uint8_t v4[4], tcode = 0, vlen = 0;
+		int rc;
+		if (motor_info_init(&def) != 0)
+		{
+			return JM_ERR_FLASH;
+		}
+		rc = motor_info_dispatch_read(param_id, &def, v4, &tcode, &vlen);
+		if (rc != MOTOR_INFO_DISPATCH_OK)
+		{
+			return mi_dispatch_to_err(rc);
+		}
+		rc = motor_info_dispatch_write(param_id, cfg, v4, vlen);
+		return mi_dispatch_to_err(rc);
+	}
+}
+
+/* ============================================================================
  *  回调集单例
  * ==========================================================================*/
 static const jm_proto_ops_t s_app_ops = {
@@ -614,6 +786,13 @@ static const jm_proto_ops_t s_app_ops = {
 	.param_write_bulk = app_param_write_bulk,
 	.set_can_id = app_set_can_id,
 	.set_baudrate = app_set_baudrate,
+	/* 电机配置(motor_info) 0xE6-0xEB */
+	.motor_info_read = app_motor_info_read,
+	.motor_info_write = app_motor_info_write,
+	.motor_info_save = app_motor_info_save,
+	.motor_info_read_bulk = app_motor_info_read_bulk,
+	.motor_info_write_bulk = app_motor_info_write_bulk,
+	.motor_info_reset = app_motor_info_reset,
 };
 
 const jm_proto_ops_t *jm_app_ops_get(void)

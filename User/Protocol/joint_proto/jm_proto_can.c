@@ -188,7 +188,7 @@ void jm_proto_can_send(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint
 
 /* 对已重组好的(cmd + payload)做分发, 应答经CAN压缩/分包发回 */
 static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
-								   const uint8_t *payload, uint16_t plen)
+                                   const uint8_t *payload, uint16_t plen)
 {
 	uint8_t norm[20]; /* MIT归一化缓冲: 5*f32 */
 
@@ -312,7 +312,7 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame)
 
 /* ---------------- 初始化 ---------------- */
 int jm_proto_can_init(jm_proto_can_t *c, const jm_proto_ops_t *ops,
-					  uint8_t motor_id, jm_can_tx_fn tx)
+                      uint8_t motor_id, jm_can_tx_fn tx)
 {
 	if (c == NULL || tx == NULL)
 	{
