@@ -42,9 +42,20 @@ static void clarke_transfer(struct foc *pobj)
 {
 	pobj->current = pobj->current_callback(); /* 获取当前三相电流 */
 
-	/*三相平衡时使用：两项*/
-	//    pobj->i_alphaBeta.alpha = pobj->current.ia ;
-	//    pobj->i_alphaBeta.beta = (pobj->current.ia + 2*pobj->current.ib) * ONE_BY_SQRT3;
+	/* 两相重构: 丢弃占空比最大(低侧窗口最窄)相, 由其余两相重构 */
+	float da = pobj->svpwm.ta, db = pobj->svpwm.tb, dc = pobj->svpwm.tc;
+	if (da >= db && da >= dc)
+	{
+		pobj->current.ia = -(pobj->current.ib + pobj->current.ic);
+	}
+	else if (db >= da && db >= dc)
+	{
+		pobj->current.ib = -(pobj->current.ia + pobj->current.ic);
+	}
+	else
+	{
+		pobj->current.ic = -(pobj->current.ia + pobj->current.ib);
+	}
 
 	// 等幅值Clarke变换公式
 	pobj->i_alphaBeta.alpha = (2.0f / 3.0f) * (pobj->current.ia - 0.5f * pobj->current.ib - 0.5f * pobj->current.ic);
@@ -62,7 +73,7 @@ static void park_transfer(struct foc *pobj)
 	static float prev_id, prev_iq;
 	pobj->Theta = pobj->ele_radian_callback(); // 获取当前电角度
 
-	/* park变换 */
+											   /* park变换 */
 #ifdef IQ_MATH_ENABLE
 	pobj->i_dq.d = pobj->i_alphaBeta.alpha * _IQ28toF(_IQ28cos(_IQ28(pobj->Theta))) + pobj->i_alphaBeta.beta * _IQ28toF(_IQ28sin(_IQ28(pobj->Theta)));
 	pobj->i_dq.q = -pobj->i_alphaBeta.alpha * _IQ28toF(_IQ28sin(_IQ28(pobj->Theta))) + pobj->i_alphaBeta.beta * _IQ28toF(_IQ28cos(_IQ28(pobj->Theta)));

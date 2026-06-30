@@ -32,7 +32,9 @@
 #endif
 
 #if defined(USE_DEV_HALF_BRIDGE)
-#define HALF_BRIDGE_ADC_TRIG_CCR (8380u)
+/* CC4 比较匹配触发 ADC 注入组: 中心对齐下采样点落在波峰后约 (ARR-CCR)*5.88ns
+ * 8480 距波峰(ARR=8500)约 118ns, 贴近波峰(纹波中点/离开关边沿最远); 留余量避免峰值临界漏触发 */
+#define HALF_BRIDGE_ADC_TRIG_CCR (8480u)
 #endif
 
 #if defined(USE_DEV_PHASE_CURRENT)
