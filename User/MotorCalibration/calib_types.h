@@ -35,10 +35,16 @@ typedef enum
 #define CALIB_L1_VBUS 5           /* 母线电压采样 */
 #define CALIB_L1_DEADTIME 6       /* 驱动死区特性 */
 
-/* ===================== L2 子模式: 电机电气身份 ===================== */
-#define CALIB_L2_PHASE_SEQ 1  /* 相序识别 */
-#define CALIB_L2_POLE_PAIRS 2 /* 极对数 */
-#define CALIB_L2_RL_FLUX 3    /* R/Ld/Lq/flux辨识 */
+/* ===================== L2 子模式: 电机电气身份 =====================
+ * 原 CALIB_L2_RL_FLUX(3) 拆分为 4 个独立子模式：
+ * R/Ld/Lq/flux 物理上需不同测试方法（DC法/阶跃响应/反电势法），
+ * 拆分后可独立触发与重试。submode 编号 3-6 连续，协议层 payload[0] 透传无需改动。*/
+#define CALIB_L2_PHASE_SEQ    1 /* 相序识别 */
+#define CALIB_L2_POLE_PAIRS   2 /* 极对数 */
+#define CALIB_L2_RESISTANCE   3 /* R 相电阻辨识（DC法）*/
+#define CALIB_L2_INDUCTANCE_D 4 /* Ld d轴电感辨识（阶跃响应）*/
+#define CALIB_L2_INDUCTANCE_Q 5 /* Lq q轴电感辨识（阶跃响应）*/
+#define CALIB_L2_FLUX_LINKAGE 6 /* flux 磁链辨识（反电势法）*/
 
 /* ===================== L3 子模式: 编码器校准 ===================== */
 #define CALIB_L3_ZERO_OFFSET 1    /* 零位 */
