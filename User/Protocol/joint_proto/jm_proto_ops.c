@@ -33,6 +33,7 @@
 #include "version.h"	   /* HW_/APP_ 版本号 */
 #include "motor_loop.h"	   /* motor_loop_get / motor_loop_set_cmd */
 #include "motor_info.h"		   /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
+#include "calib_mgr.h"	   /* 标定管理器 start/poll/abort/get_status */
 
 /* ============================================================================
  *  1) 控制/模式: CMD 0x00~0xB8  ->  set_mode
@@ -146,11 +147,53 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 			mc->torque = jm_rd_f32(&pl[0]);
 			break;
 
-		/* ---- 其余模式(力控/轨迹/特殊/测试/校准/诊断): 暂仅切状态 ----
-		 * 这些模式的载荷由各自 run_*_control 处理逻辑后续接管; 当前先保证
-		 * 模式切换可达。无法识别的码不在 0x00~0xB8 段(dispatch 已过滤)。*/
-		default:
-			break;
+		/* ---- 标定启动 0x90-0x96: payload[0]=子模式 ---- */
+	case JM_CMD_CALIB_LEVEL1:
+	case JM_CMD_CALIB_LEVEL2:
+	case JM_CMD_CALIB_LEVEL3:
+	case JM_CMD_CALIB_LEVEL4:
+	case JM_CMD_CALIB_LEVEL5:
+	case JM_CMD_CALIB_LEVEL6:
+	case JM_CMD_CALIB_LEVEL7:
+	{
+		if (len < 1)
+			return JM_ERR_LENGTH;
+		uint8_t level = cmd - JM_CMD_CALIB_LEVEL1 + 1;
+		uint8_t submode = pl[0];
+		if (!calib_mgr_start(level, submode))
+		{
+			/* 区分失败原因：已在标定中 → BUSY，其余 → OUT_OF_RANGE */
+			calib_status_t st = calib_mgr_get_status();
+			if (st.state == CALIB_STATE_RUNNING)
+				return JM_ERR_CALIB_BUSY;     /* NACK(0x0A) 已在标定中 */
+			return JM_ERR_OUT_OF_RANGE;       /* NACK(0x02) submode 不合法 */
+		}
+		break; /* 继续走 motor_loop_set_cmd 进入 CALIB 态 */
+	}
+
+	/* ---- 标定进度查询 0x97: 不切状态，直接返回 ---- */
+	case JM_CMD_CALIB_QUERY:
+	{
+		calib_status_t st = calib_mgr_get_status();
+		if (st.state == CALIB_STATE_DONE)
+			return JM_ERR_OK;          /* ACK */
+		if (st.state == CALIB_STATE_RUNNING)
+			return JM_ERR_CALIB_BUSY;  /* NACK(0x0A) */
+		return JM_ERR_STATE_DENY;      /* NACK(0x03) 未在标定 */
+	}
+
+	/* ---- 标定中止 0x98: 不切状态，直接返回 ---- */
+	case JM_CMD_CALIB_ABORT:
+	{
+		calib_mgr_abort();
+		return JM_ERR_OK; /* ACK */
+	}
+
+	/* ---- 其余模式(力控/轨迹/特殊/测试/诊断): 暂仅切状态 ----
+	 * 这些模式的载荷由各自 run_*_control 处理逻辑后续接管; 当前先保证
+	 * 模式切换可达。无法识别的码不在 0x00~0xB8 段(dispatch 已过滤)。*/
+	default:
+		break;
 	}
 
 	/* 触发状态机: cmd 数值与 ctrl_mode_e 一致, 由 process_ctrl_cmd 解释 */

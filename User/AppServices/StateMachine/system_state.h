@@ -26,6 +26,7 @@
 #include "state_define.h"
 #include "motor_control.h"
 #include "ctrl_transition.h"
+#include "calib_types.h"
 
 typedef struct
 {
@@ -35,6 +36,7 @@ typedef struct
 	motor_ctrl_t motor;			  /*!< 电机控制核心上下文 */
 	transition_t transition;	  /*!< 状态过渡器 */
 	run_state_e target_run_state; /*!< 目标运行状态 */
+	calib_state_e calib_state;	/*!< 标定子状态（仅 CALIB 态有效）*/
 } system_state_t;
 
 /**

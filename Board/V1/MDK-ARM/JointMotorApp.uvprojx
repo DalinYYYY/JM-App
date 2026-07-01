@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx,JM_BOARD_V1</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorControl/Calibration;../../../User/Protocol;../../../User/Protocol/vesc_proto;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorCalibration;../../../User/Protocol;../../../User/Protocol/vesc_proto;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -582,6 +582,51 @@
               <FileName>dev_motor_virtual.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorControl\CascadeControl\dev_motor_virtual.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>MotorCalibration</GroupName>
+          <Files>
+            <File>
+              <FileName>calib_mgr.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_mgr.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_level1_driver.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_level1_driver.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_level2_motor.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_level2_motor.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_level3_encoder.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_level3_encoder.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_level4_torque.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_level4_torque.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_level5_nonlinear.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_level5_nonlinear.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_level6_system.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_level6_system.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_level7_auto.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_level7_auto.c</FilePath>
             </File>
           </Files>
         </Group>

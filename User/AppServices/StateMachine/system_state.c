@@ -19,6 +19,7 @@
  */
 
 #include "system_state.h"
+#include "calib_mgr.h"
 #include <string.h>
 
 /**
@@ -151,6 +152,7 @@ void system_state_init(system_state_t *sys, motor_param_t *param, float dt)
 	memset(sys, 0, sizeof(system_state_t));
 
 	motor_ctrl_init(&sys->motor, param, dt);
+	calib_mgr_init(param, dt);
 	transition_init(&sys->transition);
 
 	sys->top_state = TOP_FSM_INIT;
@@ -183,6 +185,9 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
 			break;
 
 		case TOP_FSM_CALIB:
+			calib_mgr_abort();
+			sys->calib_state = CALIB_STATE_IDLE;
+			break;
 		case TOP_FSM_CONFIG:
 			break;
 
@@ -210,6 +215,11 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
 			// 故障/急停：立即失能输出
 			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
 			transition_force_complete(&sys->transition);
+			break;
+
+		case TOP_FSM_CALIB:
+			sys->calib_state = CALIB_STATE_IDLE;
+			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
 			break;
 
 		default:
@@ -240,6 +250,14 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 void motor_control_loop(system_state_t *sys)
 {
 	fault_check(sys);
+
+	/* CALIB 态：周期推进标定，不生成运动参考 */
+	if (sys->top_state == TOP_FSM_CALIB)
+	{
+		sys->calib_state = calib_mgr_poll();
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		return;
+	}
 
 	// 非运行态：失能输出，不生成运动参考
 	if (sys->top_state != TOP_FSM_RUN)
@@ -360,27 +378,29 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 				sys->ctrl_mode = cmd;
 			return;
 
-		/* 校准指令：进入 CALIB 状态（标定逻辑后续实现，此处仅路由）*/
-		case CONTROL_MODE_CALIB_MOTOR_PARAM:
-		case CONTROL_MODE_CALIB_ENCODER_OFFSET:
-		case CONTROL_MODE_CALIB_ENCODER_LINEARITY:
-		case CONTROL_MODE_CALIB_TORQUE_CONST:
-		case CONTROL_MODE_CALIB_COGGING_COMP:
-		case CONTROL_MODE_CALIB_FRICTION_COMP:
-		case CONTROL_MODE_CALIB_INERTIA:
-		case CONTROL_MODE_CALIB_ADC_OFFSET:
-		case CONTROL_MODE_CALIB_ADC_GAIN:
-		case CONTROL_MODE_CALIB_CURRENT_SENSOR:
-		case CONTROL_MODE_CALIB_TEMPERATURE:
-		case CONTROL_MODE_CALIB_FULL_AUTO:
-			/* 仅 IDLE 态可进入校准，避免运行中误触发 */
-			if (sys->top_state == TOP_FSM_IDLE)
-			{
-				top_fsm_switch(sys, TOP_FSM_CALIB);
-				if (sys->top_state == TOP_FSM_CALIB)
-					sys->ctrl_mode = cmd;
-			}
-			return;
+		/* 校准指令：进入 CALIB 状态
+	 * 0x90-0x96: 启动标定（子模式已由 app_set_mode 传给 calib_mgr）
+	 * 0x97/0x98: 查询/中止，不切状态（app_set_mode 已处理并 return）*/
+	case CONTROL_MODE_CALIB_LEVEL1:
+	case CONTROL_MODE_CALIB_LEVEL2:
+	case CONTROL_MODE_CALIB_LEVEL3:
+	case CONTROL_MODE_CALIB_LEVEL4:
+	case CONTROL_MODE_CALIB_LEVEL5:
+	case CONTROL_MODE_CALIB_LEVEL6:
+	case CONTROL_MODE_CALIB_LEVEL7:
+		/* 仅 IDLE 态可进入校准，避免运行中误触发 */
+		if (sys->top_state == TOP_FSM_IDLE)
+		{
+			top_fsm_switch(sys, TOP_FSM_CALIB);
+			if (sys->top_state == TOP_FSM_CALIB)
+				sys->ctrl_mode = cmd;
+		}
+		return;
+
+	case CONTROL_MODE_CALIB_QUERY:
+	case CONTROL_MODE_CALIB_ABORT:
+		/* 查询/中止不切状态，app_set_mode 已处理 */
+		return;
 
 		case CONTROL_MODE_SAVE_CONFIG:
 			// extern int motor_param_save(const motor_param_t *cfg);
