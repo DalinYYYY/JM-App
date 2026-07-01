@@ -128,6 +128,7 @@ typedef enum
 typedef enum
 {
 	RUN_STATE_IDLE = 0,			 // 空闲保持
+	RUN_STATE_HOLD,				 // 位置保持（主动锁定当前位置）
 	RUN_STATE_OPEN_LOOP,		 // 开环电压控制
 	RUN_STATE_CURRENT,			 // 电流环控制
 	RUN_STATE_TORQUE,			 // 力矩环控制
@@ -137,6 +138,8 @@ typedef enum
 	RUN_STATE_POSITION_VELOCITY, // 位置+速度前馈
 	RUN_STATE_POSITION_TORQUE,	 // 位置+力矩限幅
 	RUN_STATE_VELOCITY_TORQUE,	 // 速度+力矩限幅
+	RUN_STATE_PROFILE_VELOCITY,	 // 轮廓速度模式（PV）
+	RUN_STATE_PROFILE_TORQUE,	 // 轮廓力矩模式（PT）
 	RUN_STATE_DUTY_CYCLE,		 // 占空比直接控制
 	RUN_STATE_VOLTAGE_VECTOR,	 // 电压矢量控制
 	RUN_STATE_FIELD_WEAKENING,	 // 弱磁控制

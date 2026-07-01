@@ -25,6 +25,8 @@
 #include <stdint.h>
 #include "pid_core.h"
 #include "dev_motor_select.h"
+#include "motor_control.h"   /* for motor_ref_t */
+#include "cascade_control.h" /* for cascade_out_t */
 
 /**
  * @brief 电流环控制器
@@ -57,11 +59,15 @@ void cur_loop_reset(cur_loop_t *cl);
 /**
  * @brief 运行一次电流环（在电流环中断中按基频调用）
  * @param cl 电流环控制器指针
- * @param id_ref d轴电流参考(A)
- * @param iq_ref q轴电流参考(A)
- * @note 内部完成编码器电角度与三相电流刷新
+ * @param ref 电机控制参考（含 ctrl_type / voltage / duty）
+ * @param out 级联外环输出的电流参考（id_ref/iq_ref），仅闭环模式使用
+ * @note 内部按 ref->ctrl_type 分流：
+ *       VOLTAGE — 旁路 PI，直接用 ref->voltage 设 udq
+ *       DUTY    — 旁路整个 FOC，直接驱动 half_bridge
+ *       IDLE    — PWM 置零
+ *       其余    — 正常 PI 电流环（使用 out->id_ref / out->iq_ref）
  */
-void cur_loop_run(cur_loop_t *cl, float id_ref, float iq_ref);
+void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *out);
 
 /**
  * @brief 电流采样零位校准

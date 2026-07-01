@@ -35,8 +35,8 @@ uint32_t g_run_state_trans_count = 1000;
  */
 static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 	[CONTROL_MODE_IDLE] = RUN_STATE_IDLE,
-	[CONTROL_MODE_HOLD] = RUN_STATE_IDLE,
-	[CONTROL_MODE_BRAKE] = RUN_STATE_IDLE,
+	[CONTROL_MODE_HOLD] = RUN_STATE_HOLD,
+	[CONTROL_MODE_BRAKE] = RUN_STATE_HOLD,  /* 刹车=位置保持 */
 
 	[CONTROL_MODE_OPEN_LOOP] = RUN_STATE_OPEN_LOOP,
 	[CONTROL_MODE_CURRENT] = RUN_STATE_CURRENT,
@@ -69,6 +69,13 @@ static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 	[CONTROL_MODE_TRAPEZOIDAL_TRAJ] = RUN_STATE_TRAPEZOIDAL_TRAJ,
 	[CONTROL_MODE_S_CURVE_TRAJ] = RUN_STATE_S_CURVE_TRAJ,
 	[CONTROL_MODE_HOMING] = RUN_STATE_HOMING,
+	[CONTROL_MODE_CANOPEN_SYNC] = RUN_STATE_POSITION,  /* SYNC 同步位置 */
+	[CONTROL_MODE_ETHERCAT_CSP] = RUN_STATE_POSITION, /* CSP = Cyclic Sync Position */
+	[CONTROL_MODE_ETHERCAT_CSV] = RUN_STATE_VELOCITY, /* CSV = Cyclic Sync Velocity */
+	[CONTROL_MODE_ETHERCAT_CST] = RUN_STATE_TORQUE,   /* CST = Cyclic Sync Torque */
+	[CONTROL_MODE_PP] = RUN_STATE_POSITION,              /* Profile Position（前期复用 POSITION）*/
+	[CONTROL_MODE_PV] = RUN_STATE_PROFILE_VELOCITY,     /* Profile Velocity → 独立模式文件 */
+	[CONTROL_MODE_PT] = RUN_STATE_PROFILE_TORQUE,       /* Profile Torque → 独立模式文件 */
 	[CONTROL_MODE_ELECTRONIC_GEAR] = RUN_STATE_ELECTRONIC_GEAR,
 	[CONTROL_MODE_ELECTRONIC_CAM] = RUN_STATE_ELECTRONIC_CAM,
 
@@ -216,13 +223,13 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
  * @brief 切换电机运行状态（具体实现，仅在 RUN 态内有效）
  * @details 启动参考层平滑过渡
  */
-void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans_ms)
+void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans_count)
 {
 	if (new_state >= RUN_STATE_MAX || new_state == sys->motor.run_state)
 		return;
 
 	sys->target_run_state = new_state;
-	transition_start(&sys->transition, trans_ms, &sys->motor.ref);
+	transition_start(&sys->transition, trans_count, &sys->motor.ref);
 }
 
 /**
@@ -353,6 +360,28 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 				sys->ctrl_mode = cmd;
 			return;
 
+		/* 校准指令：进入 CALIB 状态（标定逻辑后续实现，此处仅路由）*/
+		case CONTROL_MODE_CALIB_MOTOR_PARAM:
+		case CONTROL_MODE_CALIB_ENCODER_OFFSET:
+		case CONTROL_MODE_CALIB_ENCODER_LINEARITY:
+		case CONTROL_MODE_CALIB_TORQUE_CONST:
+		case CONTROL_MODE_CALIB_COGGING_COMP:
+		case CONTROL_MODE_CALIB_FRICTION_COMP:
+		case CONTROL_MODE_CALIB_INERTIA:
+		case CONTROL_MODE_CALIB_ADC_OFFSET:
+		case CONTROL_MODE_CALIB_ADC_GAIN:
+		case CONTROL_MODE_CALIB_CURRENT_SENSOR:
+		case CONTROL_MODE_CALIB_TEMPERATURE:
+		case CONTROL_MODE_CALIB_FULL_AUTO:
+			/* 仅 IDLE 态可进入校准，避免运行中误触发 */
+			if (sys->top_state == TOP_FSM_IDLE)
+			{
+				top_fsm_switch(sys, TOP_FSM_CALIB);
+				if (sys->top_state == TOP_FSM_CALIB)
+					sys->ctrl_mode = cmd;
+			}
+			return;
+
 		case CONTROL_MODE_SAVE_CONFIG:
 			// extern int motor_param_save(const motor_param_t *cfg);
 			sys->ctrl_mode = cmd;
@@ -370,11 +399,17 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	/* ---- 运动控制指令：需已使能（READY 或 RUN）---- */
 	if (sys->top_state == TOP_FSM_READY)
 	{
-		// READY → RUN，并设置目标运行子状态
+		/* READY → RUN：首次进入也走平滑过渡，避免位置阶跃 */
 		top_fsm_switch(sys, TOP_FSM_RUN);
 		run_state_e target = s_ctrl_mode_to_run_state[cmd];
-		sys->motor.run_state = target; // 首次进入直接置位，无需过渡
-		sys->target_run_state = target;
+
+		/* 进入 RUN 前把 motor.ref 设为 IDLE（保持当前位置）作为过渡起点 */
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		sys->motor.ref.pos = sys->motor.fb.pos;
+		sys->motor.ref.vel = 0.0f;
+		sys->motor.ref.torque = 0.0f;
+
+		run_state_switch(sys, target, g_run_state_trans_count);
 		sys->ctrl_mode = cmd;
 	}
 	else if (sys->top_state == TOP_FSM_RUN)

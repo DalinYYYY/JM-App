@@ -95,6 +95,10 @@ typedef struct
 	motor_param_t *param;
 	motor_ref_t ref; // 对外参考输出（唯一）
 	float dt;		 // 控制周期(s)
+
+	/* 测试模式运行时状态（避免 static 变量导致的重入性问题）*/
+	float test_phase; /* 扫频测试相位累计 */
+	float test_freq;  /* 扫频测试当前频率 */
 } motor_ctrl_t;
 
 /**
@@ -104,36 +108,6 @@ typedef struct
  * @param dt 控制周期(s)
  */
 void motor_ctrl_init(motor_ctrl_t *ctrl, motor_param_t *param, float dt);
-
-/**
- * @brief 模式预处理（基础模式：设置参考目标）
- * @param ctrl 电机控制指针
- */
-void run_generic_control(motor_ctrl_t *ctrl);
-
-/**
- * @brief 执行力控控制（阻抗/导纳/零力/恒力）
- * @param ctrl 电机控制指针
- */
-void run_force_control(motor_ctrl_t *ctrl);
-
-/**
- * @brief 执行轨迹控制（PVT/梯形/S型/回零）
- * @param ctrl 电机控制指针
- */
-void run_trajectory_control(motor_ctrl_t *ctrl);
-
-/**
- * @brief 执行特殊应用控制（脉冲/模拟量/点动）
- * @param ctrl 电机控制指针
- */
-void run_special_control(motor_ctrl_t *ctrl);
-
-/**
- * @brief 执行测试控制（老化/扫频/齿槽）
- * @param ctrl 电机控制指针
- */
-void run_test_control(motor_ctrl_t *ctrl);
 
 /**
  * @brief 按当前运行状态分发到对应控制处理函数，生成 ctrl->ref

@@ -499,6 +499,66 @@
               <FilePath>..\..\..\User\MotorControl\ControlProcess\motor_control.c</FilePath>
             </File>
             <File>
+              <FileName>motor_mode_idle.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_idle.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_hold.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_hold.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_open_loop.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_open_loop.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_duty.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_duty.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_current.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_current.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_torque.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_torque.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_mit.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_mit.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_velocity.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_velocity.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_position.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_position.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_profile_velocity.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_profile_velocity.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_profile_torque.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_profile_torque.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_test_sweep.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_test_sweep.c</FilePath>
+            </File>
+            <File>
               <FileName>pid_profile.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorControl\ControlProcess\pid_profile.c</FilePath>

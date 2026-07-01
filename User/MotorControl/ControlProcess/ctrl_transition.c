@@ -63,6 +63,10 @@ bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_re
 	out_ref->voltage = blend(trans->old_ref.voltage, new_ref->voltage, trans->ratio);
 	out_ref->duty = blend(trans->old_ref.duty, new_ref->duty, trans->ratio);
 
+	/* PID profile 保留旧值直到过渡完成，避免增益突变+中间参考值导致力矩跳变 */
+	out_ref->pos_profile = trans->old_ref.pos_profile;
+	out_ref->vel_profile = trans->old_ref.vel_profile;
+
 	return false;
 }
 

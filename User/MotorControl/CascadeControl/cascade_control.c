@@ -92,14 +92,15 @@ void cascade_control_run(cascade_ctrl_t *c, const motor_ref_t *ref, const cascad
 	float kt = motor_param_get_kt(p);
 	float peak_i = motor_param_get_peak_current(p);
 
-	// 入环层级或配置文件变化：先做无扰预装载
-	if (ref->ctrl_type != c->last_ctrl_type || ref->pos_profile != c->last_pos_profile || ref->vel_profile != c->last_vel_profile)
+	// 入环层级或配置文件变化：先做无扰预装载（仅闭环模式需要）
+	if ((ref->ctrl_type != c->last_ctrl_type || ref->pos_profile != c->last_pos_profile || ref->vel_profile != c->last_vel_profile)
+		&& ref->ctrl_type >= REF_CTRL_CURRENT)
 	{
 		cascade_bumpless_preload(c, ref, fb);
-		c->last_ctrl_type = ref->ctrl_type;
-		c->last_pos_profile = ref->pos_profile;
-		c->last_vel_profile = ref->vel_profile;
 	}
+	c->last_ctrl_type = ref->ctrl_type;
+	c->last_pos_profile = ref->pos_profile;
+	c->last_vel_profile = ref->vel_profile;
 
 	out->id_ref = 0.0f;
 	out->iq_ref = 0.0f;

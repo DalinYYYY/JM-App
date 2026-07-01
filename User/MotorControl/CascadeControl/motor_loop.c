@@ -17,6 +17,7 @@
 #include "motion_param.h"
 #include "multiturn_counter.h"
 #include "dev_power_monitor.h"
+#include "motor_param.h" /* motor_param_init 加载默认电机参数 */
 
 #define MOTOR_LOOP_DEG_TO_RAD (0.01745329252f) /* π/180 */
 
@@ -56,6 +57,12 @@ void motor_loop_init(float current_freq_hz)
 {
 	motor_loop_t *m = &s_motor_loop;
 	motor_param_t *param = &usr.motor_param[M1];
+
+	/* 加载默认电机参数（R/L/kt/pole_pairs/PID/限幅等）
+	 * usr.motor_param[M1] 为 BSS 段全局变量，启动时全零，
+	 * 若不加载默认值会导致除零、控制环无响应等问题。
+	 * TODO: Flash 参数加载实现后，改为先尝试 Flash 加载，失败再 fallback 到默认。*/
+	motor_param_init(param);
 
 	// 各环控制周期：电流环由中断频率决定，外环按分频系数派生
 	float dt_current = 1.0f / current_freq_hz;
@@ -240,7 +247,13 @@ void motor_loop_isr(void)
 	if (pos_tick)
 		m->pos_cnt = 0;
 
-	// step1: 解算运动反馈（复用上一拍电流环刷新的角度/电流）
+	// step0: 刷新编码器与电角度（所有模式统一执行，确保上位机随时可读角度）
+	m->motor.encoder.update(&m->motor.encoder);
+	m->motor.motor_param.update(&m->motor.motor_param,
+								MOTION_TYPE_ELE_RADIAN,
+								m->motor.encoder.mechanical_angle);
+
+	// step1: 解算运动反馈（使用本拍刷新的角度）
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);
 
 	// 遥测同步错开位置环：上一拍位置拍挂起的同步在本拍执行，避开位置环重负载拍
@@ -257,27 +270,29 @@ void motor_loop_isr(void)
 	motor_control_loop(&m->sys);
 	motor_loop_sync_state(m);
 
-	// 非运行态：电流环输出零电流，外环复位
+	// 非运行态：外环复位，电流环以 IDLE 直通模式输出零 PWM
 	if (m->sys.top_state != TOP_FSM_RUN)
 	{
 		cascade_control_reset(&m->cascade);
 		cur_loop_reset(&m->current);
+		/* 清零 out，避免进入 RUN 态第一拍 vel_tick=false 时电流环用旧值 */
 		m->out.id_ref = 0.0f;
 		m->out.iq_ref = 0.0f;
-		cur_loop_run(&m->current, 0.0f, 0.0f);
+		/* IDLE 直通：cur_loop_run 内部检测 ctrl_type==IDLE 后 PWM 置零 */
+		cur_loop_run(&m->current, &m->sys.motor.ref, &m->out);
 		return;
 	}
 
-	// step3: 位置环（分频）——输出速度设定
-	if (pos_tick)
+	// step3: 位置环（分频）——仅 POSITION 模式需要
+	if (pos_tick && m->sys.motor.ref.ctrl_type == REF_CTRL_POSITION)
 		cascade_control_run_position(&m->cascade, &m->sys.motor.ref, &fb);
 
-	// step4: 速度环 + 入环分发（分频）——输出 dq 电流参考
-	if (vel_tick)
+	// step4: 速度环 + 入环分发（分频）——跳过 VOLTAGE/DUTY/IDLE 直通模式
+	if (vel_tick && m->sys.motor.ref.ctrl_type >= REF_CTRL_CURRENT)
 		cascade_control_run(&m->cascade, &m->sys.motor.ref, &fb, &m->out);
 
-	// step5: 电流环（基频）——FOC + PI + SVPWM + PWM 输出
-	cur_loop_run(&m->current, m->out.id_ref, m->out.iq_ref);
+	// step5: 电流环（基频）——传入完整 ref，内部按 ctrl_type 分流
+	cur_loop_run(&m->current, &m->sys.motor.ref, &m->out);
 }
 
 void motor_loop_set_cmd(ctrl_mode_e cmd)

@@ -69,13 +69,13 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state);
  * @brief 切换电机运行状态（带平滑过渡）
  * @param[in,out] sys 系统状态机实例指针（非NULL）
  * @param[in] new_state 目标运行状态（如RUN_STATE_POSITION/RUN_STATE_TORQUE等）
- * @param[in] trans_ms 过渡时长（以 motor_control_loop 的调用次数计，非毫秒）
+ * @param[in] trans_count 过渡时长（以 motor_control_loop 的调用次数计，非毫秒）
  * @retval 无
  * @note 1. 若目标状态超出范围或与当前状态一致，不执行任何操作；
  *       2. 会启动参考层过渡器；同量纲模式做参考线性混合，异量纲模式
  *          直接切换并依赖下游三环预装载积分实现无扰切换
  */
-void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans_ms);
+void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans_count);
 
 /**
  * @brief 电机控制主循环（中断级执行）
