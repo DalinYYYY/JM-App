@@ -5,10 +5,11 @@
 
 /**
  * @brief 初始化标定管理器
+ * @param motor 底层电机设备指针（FOC/编码器/半桥，供标定模块直接操作硬件）
  * @param param 电机参数指针（标定结果写入此结构）
- * @param dt 控制周期(s)
+ * @param dt    控制周期(s)
  */
-void calib_mgr_init(motor_param_t *param, float dt);
+void calib_mgr_init(struct dev_motor *motor, motor_param_t *param, float dt);
 
 /**
  * @brief 启动一次标定
@@ -33,5 +34,11 @@ calib_status_t calib_mgr_get_status(void);
  * @brief 强制中止当前标定
  */
 void calib_mgr_abort(void);
+
+/**
+ * @brief 获取标定硬件访问接口（供各 level 模块访问 dev_motor_t/param/dt）
+ * @note  在 level 模块的 start/poll/abort 中调用，获取注入的硬件资源
+ */
+const calib_io_t *calib_mgr_get_io(void);
 
 #endif /* __CALIB_MGR_H__ */

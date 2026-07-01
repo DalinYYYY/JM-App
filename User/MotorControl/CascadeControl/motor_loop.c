@@ -95,7 +95,7 @@ void motor_loop_init(float current_freq_hz)
 #endif
 
 	// 上层状态机（模式管理 + 参考生成）
-	system_state_init(&m->sys, param, dt_current);
+	system_state_init(&m->sys, &m->motor, param, dt_current);
 	motor_loop_sync_state(m);
 
 	// 级联外环（位置/速度）与电流环
@@ -269,6 +269,13 @@ void motor_loop_isr(void)
 	// step2: 状态机生成参考输出 motor.ref（含模式管理与平滑过渡）
 	motor_control_loop(&m->sys);
 	motor_loop_sync_state(m);
+
+	// CALIB 态：标定模块在 calib_mgr_poll() 中直接操作 FOC 链路施加电压，
+	// 不走 cur_loop_run（避免被 IDLE 直通覆盖为零 PWM）
+	if (m->sys.top_state == TOP_FSM_CALIB)
+	{
+		return;
+	}
 
 	// 非运行态：外环复位，电流环以 IDLE 直通模式输出零 PWM
 	if (m->sys.top_state != TOP_FSM_RUN)

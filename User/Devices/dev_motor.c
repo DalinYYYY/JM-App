@@ -27,6 +27,7 @@
 
 #include "dev_motor.h"
 #include "assert_report.h"
+#include "runtime_param.h" /* usr.motor_param：读取已标定的 enc_direction/enc_offset */
 
 static dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
 	{"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
@@ -119,11 +120,16 @@ void dev_motor_init(dev_motor_t *pobj,
 	// 初始化编码器（型号由 DEV_MOTOR_ENCODER_TYPE 选择，控制层不感知）
 #if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
 	dev_mt6701_init(&pobj->mt6701, (mt6701_id_e)id);
-	pobj->mt6701.set_zero_angle(&pobj->mt6701, 0.0f);
-	//	if (usr.motor[id].encoder_param.change_dir)
-	//		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CCW);
-	//	else
-	//		pobj->mt6701.set_dir(&pobj->mt6701, MT6701_DIR_CW);
+	/* 从已标定参数加载编码器零位和方向（启动时 Flash 参数已加载到 usr.motor_param）*/
+	{
+		const encoder_param_t *enc_cfg = &usr.motor_param[(motor_num_e)id].encoder_param;
+		/* enc_offset 为编码器计数值，转换为角度(°)写入 dev_mt6701 */
+		float offset_deg = (float)enc_cfg->enc_offset
+						 / MT6701_ANGLE_RESOLUTION * 360.0F;
+		pobj->mt6701.offset = offset_deg;
+		pobj->mt6701.dir = (enc_cfg->enc_direction < 0)
+						 ? MT6701_DIR_CCW : MT6701_DIR_CW;
+	}
 
 	/* 装配抽象编码器接口 → MT6701 */
 	pobj->encoder.ctx = &pobj->mt6701;

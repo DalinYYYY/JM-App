@@ -18,19 +18,19 @@ static const struct
 	uint8_t level;
 	uint8_t submode;
 } s_sequence[] = {
-	{ CALIB_LEVEL1_DRIVER,    CALIB_L1_ADC_OFFSET     },
-	{ CALIB_LEVEL1_DRIVER,    CALIB_L1_ADC_GAIN       },
-	{ CALIB_LEVEL1_DRIVER,    CALIB_L1_CURRENT_SENSOR },
-	{ CALIB_LEVEL2_MOTOR,     CALIB_L2_PHASE_SEQ      },
-	{ CALIB_LEVEL2_MOTOR,     CALIB_L2_POLE_PAIRS     },
-	{ CALIB_LEVEL2_MOTOR,     CALIB_L2_RL_FLUX        },
-	{ CALIB_LEVEL3_ENCODER,   CALIB_L3_ZERO_OFFSET    },
-	{ CALIB_LEVEL3_ENCODER,   CALIB_L3_DIRECTION      },
-	{ CALIB_LEVEL4_TORQUE,    CALIB_L4_KT             },
-	{ CALIB_LEVEL5_NONLINEAR, CALIB_L5_COGGING        },
-	{ CALIB_LEVEL5_NONLINEAR, CALIB_L5_FRICTION       },
-	{ CALIB_LEVEL6_SYSTEM,    CALIB_L6_INERTIA        },
-	{ CALIB_LEVEL6_SYSTEM,    CALIB_L6_PID_AUTOTUNE   },
+	{CALIB_LEVEL1_DRIVER,    CALIB_L1_ADC_OFFSET    },
+	{CALIB_LEVEL1_DRIVER,    CALIB_L1_ADC_GAIN      },
+	{CALIB_LEVEL1_DRIVER,    CALIB_L1_CURRENT_SENSOR},
+	{CALIB_LEVEL2_MOTOR,     CALIB_L2_PHASE_SEQ     },
+	{CALIB_LEVEL2_MOTOR,     CALIB_L2_POLE_PAIRS    },
+	{CALIB_LEVEL2_MOTOR,     CALIB_L2_RL_FLUX       },
+	{CALIB_LEVEL3_ENCODER,   CALIB_L3_ZERO_OFFSET   },
+	{CALIB_LEVEL3_ENCODER,   CALIB_L3_DIRECTION     },
+	{CALIB_LEVEL4_TORQUE,    CALIB_L4_KT            },
+	{CALIB_LEVEL5_NONLINEAR, CALIB_L5_COGGING       },
+	{CALIB_LEVEL5_NONLINEAR, CALIB_L5_FRICTION      },
+	{CALIB_LEVEL6_SYSTEM,    CALIB_L6_INERTIA       },
+	{CALIB_LEVEL6_SYSTEM,    CALIB_L6_PID_AUTOTUNE  },
 };
 #define L7_SEQ_LEN (sizeof(s_sequence) / sizeof(s_sequence[0]))
 
@@ -57,7 +57,10 @@ static calib_state_e calib_level7_poll(void)
 	 *   1. 调用当前 step 对应 level 的 start/poll
 	 *   2. 子标定 DONE 后 s_step++，启动下一个
 	 *   3. s_step >= L7_SEQ_LEN 时返回 DONE */
-	(void)s_param; (void)s_dt; (void)s_step; (void)L7_SEQ_LEN;
+	(void)s_param;
+	(void)s_dt;
+	(void)s_step;
+	(void)L7_SEQ_LEN;
 	return CALIB_STATE_DONE;
 }
 
@@ -68,6 +71,6 @@ static void calib_level7_abort(void)
 
 const calib_level_ops_t calib_level7_ops = {
 	.start = calib_level7_start,
-	.poll  = calib_level7_poll,
+	.poll = calib_level7_poll,
 	.abort = calib_level7_abort,
 };

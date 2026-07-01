@@ -54,7 +54,7 @@ static const motor_param_t g_default_config =
 			{
 							 .enc_lines = 4000,
 							 .enc_direction = 1,
-							 .enc_offset = 0,
+							 .enc_offset = 43.77f,
 							 .elec_angle_bias = 0.0f,
 							 .pos_filter_alpha = 0.1f,
 							 .enc_type = 0,

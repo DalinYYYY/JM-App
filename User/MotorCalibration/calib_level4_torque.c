@@ -7,7 +7,10 @@
 static motor_param_t *s_param;
 static float s_dt;
 
-static calib_state_e poll_kt(void) { return CALIB_STATE_DONE; }
+static calib_state_e poll_kt(void)
+{
+	return CALIB_STATE_DONE;
+}
 
 static bool calib_level4_start(uint8_t submode, motor_param_t *param, float dt)
 {
@@ -29,10 +32,12 @@ static calib_state_e calib_level4_poll(void)
 	return poll_kt();
 }
 
-static void calib_level4_abort(void) {}
+static void calib_level4_abort(void)
+{
+}
 
 const calib_level_ops_t calib_level4_ops = {
 	.start = calib_level4_start,
-	.poll  = calib_level4_poll,
+	.poll = calib_level4_poll,
 	.abort = calib_level4_abort,
 };

@@ -28,6 +28,9 @@
 #include "ctrl_transition.h"
 #include "calib_types.h"
 
+/* 前向声明，避免 system_state.h 直接依赖 dev_motor.h */
+struct dev_motor;
+
 typedef struct
 {
 	top_fsm_e top_state;		  /*!< 顶层有限状态机状态 */
@@ -49,12 +52,13 @@ extern uint32_t g_run_state_trans_count;
 /**
  * @brief 初始化系统状态机
  * @param[in,out] sys 系统状态机实例指针（非NULL）
+ * @param[in] motor 底层电机设备指针（供标定模块操作 FOC/编码器/半桥）
  * @param[in] param 电机参数配置指针（非NULL，含电机额定参数、PID参数等）
  * @param[in] dt 控制周期（单位：秒，如1e-4表示100us）
  * @retval 无
  * @note 会初始化电机控制上下文、状态过渡器，并将顶层状态初始化为IDLE
  */
-void system_state_init(system_state_t *sys, motor_param_t *param, float dt);
+void system_state_init(system_state_t *sys, struct dev_motor *motor, motor_param_t *param, float dt);
 
 /**
  * @brief 切换顶层有限状态机状态

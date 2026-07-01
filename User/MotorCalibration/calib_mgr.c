@@ -17,30 +17,35 @@ extern const calib_level_ops_t calib_level7_ops;
 /* ---- level → ops 调度表（索引 1-7，0 保留） ---- */
 static const calib_level_ops_t *s_level_table[CALIB_LEVEL_MAX] = {
 	[0] = NULL,
-	[CALIB_LEVEL1_DRIVER]    = &calib_level1_ops,
-	[CALIB_LEVEL2_MOTOR]     = &calib_level2_ops,
-	[CALIB_LEVEL3_ENCODER]   = &calib_level3_ops,
-	[CALIB_LEVEL4_TORQUE]    = &calib_level4_ops,
+	[CALIB_LEVEL1_DRIVER] = &calib_level1_ops,
+	[CALIB_LEVEL2_MOTOR] = &calib_level2_ops,
+	[CALIB_LEVEL3_ENCODER] = &calib_level3_ops,
+	[CALIB_LEVEL4_TORQUE] = &calib_level4_ops,
 	[CALIB_LEVEL5_NONLINEAR] = &calib_level5_ops,
-	[CALIB_LEVEL6_SYSTEM]    = &calib_level6_ops,
-	[CALIB_LEVEL7_AUTO]      = &calib_level7_ops,
+	[CALIB_LEVEL6_SYSTEM] = &calib_level6_ops,
+	[CALIB_LEVEL7_AUTO] = &calib_level7_ops,
 };
 
 /* ---- 管理器私有状态 ---- */
 static struct
 {
-	motor_param_t *param;
-	float dt;
+	calib_io_t io; /* 硬件访问接口（motor + param + dt） */
 	calib_status_t status;
 	const calib_level_ops_t *active_ops;
 } s_mgr;
 
-void calib_mgr_init(motor_param_t *param, float dt)
+void calib_mgr_init(struct dev_motor *motor, motor_param_t *param, float dt)
 {
 	memset(&s_mgr, 0, sizeof(s_mgr));
-	s_mgr.param = param;
-	s_mgr.dt = dt;
+	s_mgr.io.motor = motor;
+	s_mgr.io.param = param;
+	s_mgr.io.dt = dt;
 	s_mgr.status.state = CALIB_STATE_IDLE;
+}
+
+const calib_io_t *calib_mgr_get_io(void)
+{
+	return &s_mgr.io;
 }
 
 bool calib_mgr_start(uint8_t level, uint8_t submode)
@@ -55,7 +60,7 @@ bool calib_mgr_start(uint8_t level, uint8_t submode)
 		return false;
 
 	/* start 返回 false 表示 submode 不支持 */
-	if (!ops->start(submode, s_mgr.param, s_mgr.dt))
+	if (!ops->start(submode, s_mgr.io.param, s_mgr.io.dt))
 		return false;
 
 	s_mgr.active_ops = ops;

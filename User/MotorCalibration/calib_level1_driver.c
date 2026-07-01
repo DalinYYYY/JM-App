@@ -11,12 +11,30 @@ static motor_param_t *s_param;
 static float s_dt;
 
 /* ---- 各子模式的独立实现函数（桩） ---- */
-static calib_state_e poll_adc_offset(void)      { return CALIB_STATE_DONE; }
-static calib_state_e poll_adc_gain(void)        { return CALIB_STATE_DONE; }
-static calib_state_e poll_current_sensor(void)  { return CALIB_STATE_DONE; }
-static calib_state_e poll_temp_sensor(void)     { return CALIB_STATE_DONE; }
-static calib_state_e poll_vbus(void)            { return CALIB_STATE_DONE; }
-static calib_state_e poll_deadtime(void)        { return CALIB_STATE_DONE; }
+static calib_state_e poll_adc_offset(void)
+{
+	return CALIB_STATE_DONE;
+}
+static calib_state_e poll_adc_gain(void)
+{
+	return CALIB_STATE_DONE;
+}
+static calib_state_e poll_current_sensor(void)
+{
+	return CALIB_STATE_DONE;
+}
+static calib_state_e poll_temp_sensor(void)
+{
+	return CALIB_STATE_DONE;
+}
+static calib_state_e poll_vbus(void)
+{
+	return CALIB_STATE_DONE;
+}
+static calib_state_e poll_deadtime(void)
+{
+	return CALIB_STATE_DONE;
+}
 
 static bool calib_level1_start(uint8_t submode, motor_param_t *param, float dt)
 {
@@ -43,13 +61,13 @@ static calib_state_e calib_level1_poll(void)
 {
 	switch (s_submode)
 	{
-		case CALIB_L1_ADC_OFFSET:     return poll_adc_offset();
-		case CALIB_L1_ADC_GAIN:       return poll_adc_gain();
+		case CALIB_L1_ADC_OFFSET: return poll_adc_offset();
+		case CALIB_L1_ADC_GAIN: return poll_adc_gain();
 		case CALIB_L1_CURRENT_SENSOR: return poll_current_sensor();
-		case CALIB_L1_TEMP_SENSOR:    return poll_temp_sensor();
-		case CALIB_L1_VBUS:           return poll_vbus();
-		case CALIB_L1_DEADTIME:       return poll_deadtime();
-		default:                      return CALIB_STATE_FAILED;
+		case CALIB_L1_TEMP_SENSOR: return poll_temp_sensor();
+		case CALIB_L1_VBUS: return poll_vbus();
+		case CALIB_L1_DEADTIME: return poll_deadtime();
+		default: return CALIB_STATE_FAILED;
 	}
 }
 
@@ -60,6 +78,6 @@ static void calib_level1_abort(void)
 
 const calib_level_ops_t calib_level1_ops = {
 	.start = calib_level1_start,
-	.poll  = calib_level1_poll,
+	.poll = calib_level1_poll,
 	.abort = calib_level1_abort,
 };

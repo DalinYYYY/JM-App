@@ -116,7 +116,7 @@ static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 static const bool s_top_fsm_allowed[TOP_FSM_MAX][TOP_FSM_MAX] = {
 	[TOP_FSM_INIT] = {[TOP_FSM_IDLE] = true},
 	[TOP_FSM_IDLE] = {[TOP_FSM_READY] = true, [TOP_FSM_CALIB] = true, [TOP_FSM_CONFIG] = true, [TOP_FSM_BOOTLOADER] = true},
-	[TOP_FSM_READY] = {[TOP_FSM_RUN] = true, [TOP_FSM_IDLE] = true},
+	[TOP_FSM_READY] = {[TOP_FSM_RUN] = true, [TOP_FSM_IDLE] = true, [TOP_FSM_CALIB] = true},
 	[TOP_FSM_RUN] = {[TOP_FSM_READY] = true},
 	[TOP_FSM_FAULT] = {[TOP_FSM_IDLE] = true},
 	[TOP_FSM_SAFETY] = {[TOP_FSM_IDLE] = true},
@@ -147,12 +147,12 @@ static bool top_fsm_transition_allowed(top_fsm_e from, top_fsm_e to)
 /**
  * @brief 初始化系统状态机（具体实现）
  */
-void system_state_init(system_state_t *sys, motor_param_t *param, float dt)
+void system_state_init(system_state_t *sys, struct dev_motor *motor, motor_param_t *param, float dt)
 {
 	memset(sys, 0, sizeof(system_state_t));
 
 	motor_ctrl_init(&sys->motor, param, dt);
-	calib_mgr_init(param, dt);
+	calib_mgr_init(motor, param, dt);
 	transition_init(&sys->transition);
 
 	sys->top_state = TOP_FSM_INIT;
@@ -388,12 +388,19 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	case CONTROL_MODE_CALIB_LEVEL5:
 	case CONTROL_MODE_CALIB_LEVEL6:
 	case CONTROL_MODE_CALIB_LEVEL7:
-		/* 仅 IDLE 态可进入校准，避免运行中误触发 */
-		if (sys->top_state == TOP_FSM_IDLE)
+		/* IDLE 或 READY 态可进入校准；RUN 态需先停止再标定 */
+		if (sys->top_state == TOP_FSM_IDLE || sys->top_state == TOP_FSM_READY)
 		{
 			top_fsm_switch(sys, TOP_FSM_CALIB);
 			if (sys->top_state == TOP_FSM_CALIB)
 				sys->ctrl_mode = cmd;
+			else
+				calib_mgr_abort(); /* 状态切换失败，回滚标定避免卡死 */
+		}
+		else
+		{
+			/* 非法状态（RUN/FAULT/SAFETY等），回滚 calib_mgr_start */
+			calib_mgr_abort();
 		}
 		return;
 
