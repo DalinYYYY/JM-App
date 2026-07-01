@@ -628,6 +628,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorCalibration\calib_level7_auto.c</FilePath>
             </File>
+            <File>
+              <FileName>calib_hw.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_hw.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
