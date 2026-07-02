@@ -30,7 +30,7 @@
 
 // <c1>
 // ENABLE DRIVER ---> FLASH_G4
-//#define USE_FLASH_G4_DRIVER
+#define USE_FLASH_G4_DRIVER
 // </c>
 
 // <c1>

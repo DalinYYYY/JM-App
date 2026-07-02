@@ -20,6 +20,7 @@
 #include "user_interface.h"
 #include "thread_management.h"
 #include "dev_dwt_counter.h"
+#include "motor_info_storage.h"
 #include "motor_loop.h"
 #include "motor_loop_config.h"
 #include "runtime_param.h"
@@ -29,6 +30,9 @@ static void hardware_init(void)
 {
 	/* 初始化DWT定时器 */
 	dev_dwt_counter_init();
+
+	/* 初始化 motor_info Flash 存储服务（须在 motor_loop_init 之前） */
+	motor_info_storage_init();
 
 	/* 初始化电机三环控制（dev_motor + 状态机 + 级联控制）
      * 电流环频率由 ADC 注入转换中断决定，此处传入实际中断频率 */

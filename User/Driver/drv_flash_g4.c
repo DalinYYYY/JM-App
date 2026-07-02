@@ -26,6 +26,12 @@
  * 按G4最大页(单Bank模式4KB=512个u64)分配，双Bank模式(2KB)仅用前一半 */
 static u64 page_buf[0x1000U / 8U];
 
+/* STM32G4 双Bank模式下 Bank2 基地址固定为 0x08040000（硬件地址译码固定，
+ * 与芯片容量无关）。Bank1 起始于 FLASH_BASE(0x08000000)，两Bank之间
+ * 是地址空洞（小容量芯片尤为明显，如128KB芯片: Bank1=64KB@0x08000000，
+ * Bank2=64KB@0x08040000，中间0x08010000-0x0803FFFF无物理Flash）。 */
+#define STM32G4_FLASH_BANK2_BASE 0x08040000U
+
 /**
  * @brief 判断当前FLASH是否为双Bank模式(运行期读DBANK选项位)
  */
@@ -61,21 +67,28 @@ static u32 flash_bank_size(void)
 
 /**
  * @brief 根据地址获取Bank编号(1/2，越界0xFF；单Bank有效地址恒为1)
+ * @note  双Bank模式下两Bank地址不连续：Bank1=[FLASH_BASE, FLASH_BASE+bank_sz)，
+ *        Bank2=[0x08040000, 0x08040000+bank_sz)，中间为地址空洞。
  */
 u8 drv_g4_flash_get_bank(u32 addr)
 {
 	u32 total = (u32)FLASH_SIZE;
-	u32 bank_sz = flash_bank_size();
 
-	if (addr < FLASH_BASE || addr >= FLASH_BASE + total)
-	{
-		return 0xFFU;
-	}
 	if (!drv_g4_flash_is_dualbank())
 	{
-		return 1U; /* 单Bank：全片视为Bank1 */
+		/* 单Bank：连续地址 [FLASH_BASE, FLASH_BASE + total) */
+		if (addr < FLASH_BASE || addr >= FLASH_BASE + total)
+			return 0xFFU;
+		return 1U;
 	}
-	return (addr < FLASH_BASE + bank_sz) ? 1U : 2U;
+
+	/* 双Bank：Bank1、Bank2 地址不连续，分别校验 */
+	u32 bank_sz = total >> 1;  /* 每 Bank 大小 */
+	if (addr >= FLASH_BASE && addr < FLASH_BASE + bank_sz)
+		return 1U;
+	if (addr >= STM32G4_FLASH_BANK2_BASE && addr < STM32G4_FLASH_BANK2_BASE + bank_sz)
+		return 2U;
+	return 0xFFU;
 }
 
 /**
@@ -83,7 +96,7 @@ u8 drv_g4_flash_get_bank(u32 addr)
  */
 static u32 flash_bank_start(u8 bank)
 {
-	return (bank == 2U) ? (FLASH_BASE + flash_bank_size()) : FLASH_BASE;
+	return (bank == 2U) ? STM32G4_FLASH_BANK2_BASE : FLASH_BASE;
 }
 
 /**
@@ -181,9 +194,9 @@ u8 drv_g4_flash_read(const u32 addr, u64 *pdata64, u32 len_64)
 	{
 		return FLASH_ERR_ADDR_OUT_RANGE;
 	}
-	// 校验读取范围不越界(以全片容量为界)
+	// 校验读取范围不越界(末字节须仍属同一Bank，双Bank下地址不连续)
 	u32 end_addr = addr + len_64 * 8U;
-	if (end_addr > FLASH_BASE + (u32)FLASH_SIZE)
+	if (drv_g4_flash_get_bank(end_addr - 1U) != addr_bank)
 	{
 		return FLASH_ERR_ADDR_OUT_RANGE;
 	}
@@ -216,11 +229,7 @@ u8 drv_g4_flash_write(const u32 addr, u64 *pdata64, u32 len_64, u8 bank)
 		return FLASH_ERR_ADDR_OUT_RANGE;
 	}
 	u32 end_addr = addr + len_64 * 8U;
-	if (end_addr > FLASH_BASE + (u32)FLASH_SIZE)
-	{
-		return FLASH_ERR_ADDR_OUT_RANGE;
-	}
-	/* 不允许跨Bank写入(末字节须仍属同一Bank)，否则按页循环的Bank基址会错 */
+	/* 不允许跨Bank写入(末字节须仍属同一Bank)，双Bank下地址不连续 */
 	if (drv_g4_flash_get_bank(end_addr - 1U) != bank)
 	{
 		return FLASH_ERR_ADDR_OUT_RANGE;

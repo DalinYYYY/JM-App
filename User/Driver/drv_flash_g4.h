@@ -25,7 +25,12 @@
 #ifdef USE_FLASH_G4_DRIVER
 
 #include "main.h"
-#include "types.h"
+
+/* 简写整型别名（本工程无独立 types.h，内联定义供 drv_flash_g4/dev_flash 共用） */
+typedef uint8_t  u8;
+typedef uint16_t u16;
+typedef uint32_t u32;
+typedef uint64_t u64;
 
 /*
  * FLASH几何参数全部来自HAL运行期值，不按型号宏硬编码：
