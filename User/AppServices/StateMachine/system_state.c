@@ -397,6 +397,12 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 			else
 				calib_mgr_abort(); /* 状态切换失败，回滚标定避免卡死 */
 		}
+		else if (sys->top_state == TOP_FSM_CALIB)
+		{
+			/* 已在 CALIB 态：上一个标定已 DONE/FAILED，calib_mgr_start 已成功启动新标定，
+			 * 直接接受即可，不得 abort（否则会终止刚启动的新标定）*/
+			sys->ctrl_mode = cmd;
+		}
 		else
 		{
 			/* 非法状态（RUN/FAULT/SAFETY等），回滚 calib_mgr_start */

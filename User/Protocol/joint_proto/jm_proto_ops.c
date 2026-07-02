@@ -30,6 +30,7 @@
 #include "jm_proto_ops.h"
 #include "runtime_param.h" /* usr, motor_state_t, motor_param_t, M1 */
 #include "motor_param.h"   /* motor_param_init / 字段类型 */
+#include "motor_profile.h" /* motor_profile_apply_param/info 覆盖电机电气身份 */
 #include "version.h"	   /* HW_/APP_ 版本号 */
 #include "motor_loop.h"	   /* motor_loop_get / motor_loop_set_cmd */
 #include "motor_info.h"		   /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
@@ -162,10 +163,13 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		uint8_t submode = pl[0];
 		if (!calib_mgr_start(level, submode))
 		{
-			/* 区分失败原因：已在标定中 → BUSY，其余 → OUT_OF_RANGE */
+			/* 区分失败原因：已在标定中 → BUSY，前置依赖未完成 → STATE_DENY，
+			 * 其余（submode 越界/不支持）→ OUT_OF_RANGE */
 			calib_status_t st = calib_mgr_get_status();
 			if (st.state == CALIB_STATE_RUNNING)
 				return JM_ERR_CALIB_BUSY;     /* NACK(0x0A) 已在标定中 */
+			if (st.fail_reason == CALIB_FAIL_DEP_NOT_MET)
+				return JM_ERR_STATE_DENY;     /* NACK(0x03) 前置标定未完成 */
 			return JM_ERR_OUT_OF_RANGE;       /* NACK(0x02) submode 不合法 */
 		}
 		break; /* 继续走 motor_loop_set_cmd 进入 CALIB 态 */
@@ -439,7 +443,9 @@ static jm_err_e app_param_reset(uint16_t param_id)
 	/* 0xFFFF: 全部恢复默认 */
 	if (param_id == 0xFFFFu)
 	{
-		return (motor_param_init(&usr.motor_param[M1]) == 0) ? JM_ERR_OK : JM_ERR_FLASH;
+		motor_param_init(&usr.motor_param[M1]);
+		motor_profile_apply_param(&usr.motor_param[M1]);
+		return JM_ERR_OK;
 	}
 	if (param_id >= MOTOR_PARAM_PARAM_COUNT)
 	{
@@ -450,6 +456,7 @@ static jm_err_e app_param_reset(uint16_t param_id)
 	{
 		return JM_ERR_FLASH;
 	}
+	motor_profile_apply_param(&def);
 	{
 		const param_desc_t *d = &s_param_tbl[param_id];
 		uint8_t *dst = (uint8_t *)&usr.motor_param[M1] + d->offset;
@@ -656,6 +663,7 @@ static motor_info_t *app_motor_info(void)
 	if (g_motor_info_inited == 0u)
 	{
 		(void)motor_info_init(&g_motor_info);
+		motor_profile_apply_info(&g_motor_info);
 		g_motor_info_inited = 1u;
 	}
 	return &g_motor_info;
@@ -790,7 +798,9 @@ static jm_err_e app_motor_info_reset(uint16_t param_id)
 
 	if (param_id == 0xFFFFu)
 	{
-		return (motor_info_init(cfg) == 0) ? JM_ERR_OK : JM_ERR_FLASH;
+		motor_info_init(cfg);
+		motor_profile_apply_info(cfg);
+		return JM_ERR_OK;
 	}
 	/* 单参恢复: 从默认实例读出该参数值, 再写入当前实例 */
 	{
@@ -801,6 +811,7 @@ static jm_err_e app_motor_info_reset(uint16_t param_id)
 		{
 			return JM_ERR_FLASH;
 		}
+		motor_profile_apply_info(&def);
 		rc = motor_info_dispatch_read(param_id, &def, v4, &tcode, &vlen);
 		if (rc != MOTOR_INFO_DISPATCH_OK)
 		{

@@ -823,6 +823,16 @@
               <FileType>5</FileType>
               <FilePath>..\..\..\User\Config\system_config.h</FilePath>
             </File>
+            <File>
+              <FileName>motor_profile.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\User\Config\motor_profile.h</FilePath>
+            </File>
+            <File>
+              <FileName>motor_profile.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Config\motor_profile.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
