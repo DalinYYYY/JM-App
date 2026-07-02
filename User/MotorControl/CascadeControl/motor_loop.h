@@ -74,4 +74,12 @@ void motor_loop_set_cmd(ctrl_mode_e cmd);
  */
 motor_loop_t *motor_loop_get(void);
 
+/**
+ * @brief 运行时翻转编码器方向(换电机/换安装后调试用)
+ * @param dir 方向: 1=CW(正向), -1=CCW(反向)
+ * @note  应在 IDLE 状态下调用; 立即生效, 无需重新初始化。
+ *        切换后原 enc_offset 失效, 需重新做编码器零位标定。
+ */
+void motor_loop_set_encoder_dir(int8_t dir);
+
 #endif /* __MOTOR_LOOP_H__ */

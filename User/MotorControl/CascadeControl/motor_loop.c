@@ -17,7 +17,7 @@
 #include "motion_param.h"
 #include "multiturn_counter.h"
 #include "dev_power_monitor.h"
-#include "motor_param.h" /* motor_param_init 加载默认电机参数 */
+#include "motor_param.h"                       /* motor_param_init 加载默认电机参数 */
 
 #define MOTOR_LOOP_DEG_TO_RAD (0.01745329252f) /* π/180 */
 
@@ -102,13 +102,38 @@ void motor_loop_init(float current_freq_hz)
 	cascade_control_init(&m->cascade, param, dt_position, dt_velocity);
 	cur_loop_init(&m->current, &m->motor, dt_current);
 
-	// 电流采样零位校准
-	cur_loop_calibrate_offset(&m->current);
-
+	// 注入组先使能(ADC 注入组 + JEOC 中断), 但转换由 TIM1_CC4 硬件触发,
+	// 必须等 half_bridge.start 启动 TIM1 后才会有转换, JDR 才有有效值。
 	m->motor.phase_current.start(&m->motor.phase_current);
+
+	// 启动半桥: TIM1 计数器开始运行, CC4 触发 ADC 注入组转换。
+	// 此时三相 PWM 默认 CCR=0(0%占空比, 下桥全导通, 三相绕组接GND, 无电位差, 电流=0),
+	// 正是标定 INA199B1 零位(输出=REF)所需工况; 控制环 ISR 已开始跑(IDLE态安全)。
 	m->motor.half_bridge.start(&m->motor.half_bridge);
 
+	// 等待若干 PWM 周期, 确保 ADC 完成首次注入转换, JDR 寄存器已更新为真实采样值
+	HAL_Delay(2);
+
+	// 电流采样零位校准(此时 INA199B1 输出=REF, 标定的是真正的零位)
+	cur_loop_calibrate_offset(&m->current);
+
 	drv_tim_start_it(m->motor.fsm_tim); // 启动控制定时器
+}
+
+/**
+ * @brief 运行时翻转编码器方向(换电机/换安装后调试用)
+ * @note  直接调用设备层接口, 同步更新 mt6701.dir 和 motor_param 持久化字段。
+ *        应在 IDLE 状态调用, 切换后须重新做编码器零位标定(enc_offset)。
+ *        虚拟电机模式下为空实现(无真实编码器)。
+ */
+void motor_loop_set_encoder_dir(int8_t dir)
+{
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER)
+	motor_loop_t *m = &s_motor_loop;
+	dev_motor_set_encoder_dir(&m->motor, dir);
+#else
+	(void)dir; /* 虚拟电机模式: 无真实编码器, 空实现 */
+#endif
 }
 
 /**
@@ -190,7 +215,7 @@ static void publish_motion(motor_motion_t *mo, const motion_param_t *mp, multitu
  * @note  母线/温度来自全局 power_monitor; 力矩估算 = iq*kt*gear。
  */
 static void publish_power_thermal(motor_state_t *st, const foc_t *foc,
-								  const motion_param_t *mp, const motor_param_t *param)
+                                  const motion_param_t *mp, const motor_param_t *param)
 {
 	st->power.v_bus = dev_power_monitor.vbus;
 	st->power.i_bus = dev_power_monitor.ibus;
@@ -250,8 +275,8 @@ void motor_loop_isr(void)
 	// step0: 刷新编码器与电角度（所有模式统一执行，确保上位机随时可读角度）
 	m->motor.encoder.update(&m->motor.encoder);
 	m->motor.motor_param.update(&m->motor.motor_param,
-								MOTION_TYPE_ELE_RADIAN,
-								m->motor.encoder.mechanical_angle);
+	                            MOTION_TYPE_ELE_RADIAN,
+	                            m->motor.encoder.mechanical_angle);
 
 	// step1: 解算运动反馈（使用本拍刷新的角度）
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);

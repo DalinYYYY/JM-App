@@ -28,13 +28,13 @@
  * @brief 依据配置表为每相推导(ADC,rank)并启动注入组
  * @note  同一ADC内按通道在 phase_current_list 中的出现次序递增rank,
  *        需与CubeMX注入序列顺序一致; 每个用到的ADC只启动一次。
- */ 
+ */
 static int dev_phase_current_start(struct dev_adc_injected *pobj)
 {
 	assert_report(pobj != NULL);
 
 	uint8_t rank_cnt[DRV_ADC_MAX] = {0}; /* 各ADC已分配的rank数 */
-	bool adc_used[DRV_ADC_MAX] = {0};	 /* 各ADC是否被相电流占用 */
+	bool adc_used[DRV_ADC_MAX] = {0};    /* 各ADC是否被相电流占用 */
 	int status = DEV_EOK;
 
 	/* step 1: 遍历配置表, 同一ADC内按出现次序分配rank1~rankN */

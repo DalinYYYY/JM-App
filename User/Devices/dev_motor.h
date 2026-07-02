@@ -105,4 +105,14 @@ void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
                     focCurrent_t (*current_callback)(void),
                     float (*ele_radian_callback)(void));
 
+/**
+ * @brief 运行时翻转编码器方向(换电机/换安装后快速调试用)
+ * @param pobj  电机设备对象
+ * @param dir   方向: 1=CW(正向), -1=CCW(反向)
+ * @note  同步更新 mt6701.dir 与 usr.motor_param.encoder_param.enc_direction,
+ *        无需重新初始化即可生效; 已刷新的 mechanical_angle 会在下次 update 时按新方向计算。
+ *        切换方向后建议同时重新校准 enc_offset(零位), 因方向反转后原零位不再有效。
+ */
+void dev_motor_set_encoder_dir(dev_motor_t *pobj, int8_t dir);
+
 #endif /* __DEV_MOTOR_H__ */

@@ -43,7 +43,9 @@
 #define PHASE_CURRENT_VREF (3.3f)
 #define PHASE_CURRENT_RESOLUTION (4096.0f)
 #define PHASE_CURRENT_LPF_ALPHA (0.9f)
-#define PHASE_CURRENT_ZERO_ADC (2024u)
+/* INA199B1 REF 标称 1.65V (VREF/2), 对应 ADC = 1.65/3.3 * 4096 = 2048
+ * 仅作为校准前的兜底默认值; 启动时 cur_loop_calibrate_offset 会用实测均值覆盖 */
+#define PHASE_CURRENT_ZERO_ADC (2048u)
 #endif
 
 #if defined(USE_DEV_COMMUN_VESC)

@@ -100,9 +100,9 @@ static float encoder_mt6835_get_mechanical_angle(struct dev_encoder *enc)
 #endif
 
 void dev_motor_init(dev_motor_t *pobj,
-					motor_id_e id,
-					focCurrent_t (*current_callback)(void),
-					float (*ele_radian_callback)(void))
+                    motor_id_e id,
+                    focCurrent_t (*current_callback)(void),
+                    float (*ele_radian_callback)(void))
 {
 	assert_report(pobj != NULL);
 	assert_report(current_callback != NULL);
@@ -117,18 +117,17 @@ void dev_motor_init(dev_motor_t *pobj,
 
 	pobj->fsm_tim = DRV_TIM2; // 定时器2 // TODO: 后续支持配置表
 
-	// 初始化编码器（型号由 DEV_MOTOR_ENCODER_TYPE 选择，控制层不感知）
+							  // 初始化编码器（型号由 DEV_MOTOR_ENCODER_TYPE 选择，控制层不感知）
 #if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
 	dev_mt6701_init(&pobj->mt6701, (mt6701_id_e)id);
 	/* 从已标定参数加载编码器零位和方向（启动时 Flash 参数已加载到 usr.motor_param）*/
 	{
 		const encoder_param_t *enc_cfg = &usr.motor_param[(motor_num_e)id].encoder_param;
+
 		/* enc_offset 为编码器计数值，转换为角度(°)写入 dev_mt6701 */
-		float offset_deg = (float)enc_cfg->enc_offset
-						 / MT6701_ANGLE_RESOLUTION * 360.0F;
+		float offset_deg = (float)enc_cfg->enc_offset / MT6701_ANGLE_RESOLUTION * 360.0F;
 		pobj->mt6701.offset = offset_deg;
-		pobj->mt6701.dir = (enc_cfg->enc_direction < 0)
-						 ? MT6701_DIR_CCW : MT6701_DIR_CW;
+		pobj->mt6701.dir = (enc_cfg->enc_direction < 0) ? MT6701_DIR_CCW : MT6701_DIR_CW;
 	}
 
 	/* 装配抽象编码器接口 → MT6701 */
@@ -139,7 +138,7 @@ void dev_motor_init(dev_motor_t *pobj,
 #elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
 	dev_mt6835_init(&pobj->mt6835, (mt6835_id_e)id);
 	pobj->mt6835.set_zero_angle(&pobj->mt6835, 0.0f); // TODO: 后续支持配置表
-	pobj->mt6835.set_dir(&pobj->mt6835, 0);			  // TODO: 后续支持配置表
+	pobj->mt6835.set_dir(&pobj->mt6835, 0);           // TODO: 后续支持配置表
 
 	/* 装配抽象编码器接口 → MT6835 */
 	pobj->encoder.ctx = &pobj->mt6835;
@@ -166,9 +165,9 @@ void dev_motor_init(dev_motor_t *pobj,
 	// 初始化三相adc电流采样
 	dev_phase_current_init(&pobj->phase_current, PHASE_CURRENT_GAIN, PHASE_CURRENT_SHUNT);
 	pobj->phase_current.set_offset(&pobj->phase_current,
-								   (dev_current_i3axis_t){PHASE_CURRENT_ZERO_ADC,
-														  PHASE_CURRENT_ZERO_ADC,
-														  PHASE_CURRENT_ZERO_ADC}); // TODO: 后续支持自动校准
+	                               (dev_current_i3axis_t){PHASE_CURRENT_ZERO_ADC,
+	                                                      PHASE_CURRENT_ZERO_ADC,
+	                                                      PHASE_CURRENT_ZERO_ADC}); // TODO: 后续支持自动校准
 
 	// 初始化FOC
 	pobj->current_callback = current_callback;
@@ -176,6 +175,25 @@ void dev_motor_init(dev_motor_t *pobj,
 	foc_init(&pobj->foc, pobj->current_callback, pobj->ele_radian_callback);
 
 	dev_motor_enable();
+}
+
+void dev_motor_set_encoder_dir(dev_motor_t *pobj, int8_t dir)
+{
+	assert_report(pobj != NULL);
+	if (dir != 1 && dir != -1)
+	{
+		return; /* 仅接受 1(CW) / -1(CCW) */
+	}
+
+#if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
+	mt6701_dir_e hw_dir = (dir < 0) ? MT6701_DIR_CCW : MT6701_DIR_CW;
+	pobj->mt6701.set_dir(&pobj->mt6701, hw_dir);
+#elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
+	pobj->mt6835.set_dir(&pobj->mt6835, (dir < 0) ? 1 : 0);
+#endif
+
+	/* 同步到参数层(便于后续持久化到 Flash / 上位机读取一致) */
+	motor_param_set_enc_direction(&usr.motor_param[(motor_num_e)pobj->id], dir);
 }
 
 #endif /* MOTOR_LOOP_ENABLE_DEV_DRIVER */

@@ -35,7 +35,10 @@ void cur_loop_reset(cur_loop_t *cl)
 
 void cur_loop_calibrate_offset(cur_loop_t *cl)
 {
-	cl->motor->phase_current.update(&cl->motor->phase_current);
+	/* 电机不通电、PWM 未启动时调用: 多次采样取均值标定 INA199B1 REF
+	 * (约1.65V) 对应的 ADC 零位, 消除分压网络/运放 REF 容差导致的零点漂移。
+	 * 须在 phase_current.start 之后调用(注入组已运行才有有效ADC值)。 */
+	cl->motor->phase_current.calibrate_offset(&cl->motor->phase_current, 256);
 }
 
 void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *out)
