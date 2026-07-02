@@ -41,4 +41,13 @@ void calib_mgr_abort(void);
  */
 const calib_io_t *calib_mgr_get_io(void);
 
+/* 标记某子模式已完成（标定 DONE 时由 level 模块或 calib_mgr_poll 调用）*/
+void calib_mgr_mark_done(uint8_t level, uint8_t submode);
+
+/* 查询某子模式是否已完成（前置依赖检查用）*/
+bool calib_mgr_is_done(uint8_t level, uint8_t submode);
+
+/* 清除所有标定完成标志（重新标定前调用）*/
+void calib_mgr_clear_done(void);
+
 #endif /* __CALIB_MGR_H__ */

@@ -6,11 +6,25 @@
  *       （否则会与 calib_mgr 的单例 active_ops 冲突）。
  *       step 字段标识当前执行到第几步，通过 calib_status_t.step 上报。
  */
+#include <stddef.h>
 #include "calib_types.h"
+#include "calib_mgr.h"
+
+/* ===================== L7 错误处理策略 ===================== */
+typedef enum {
+	CALIB_L7_STRATEGY_STOP = 0,      /* 失败即停止（默认，最安全）*/
+	CALIB_L7_STRATEGY_SKIP,           /* 跳过失败步，继续下一步 */
+	CALIB_L7_STRATEGY_RETRY_ONCE,     /* 重试一次再跳过 */
+} calib_l7_strategy_e;
+
+/* 当前策略（可改为运行时配置）*/
+#define CALIB_L7_STRATEGY  CALIB_L7_STRATEGY_STOP
 
 static motor_param_t *s_param;
 static float s_dt;
-static uint8_t s_step; /* 当前执行步骤（0=未开始） */
+static uint8_t s_step;        /* 当前执行步骤索引（0..L7_SEQ_LEN）*/
+static uint8_t s_failed_step; /* 失败的步号（0xFF=无失败）*/
+static uint8_t s_retry_count; /* 当前步重试计数 */
 
 /* L7 内部子标定序列定义（真实实现时填充） */
 static const struct
@@ -37,17 +51,70 @@ static const struct
 };
 #define L7_SEQ_LEN (sizeof(s_sequence) / sizeof(s_sequence[0]))
 
+/* ---- 各子级 ops（直接调用，避免与 calib_mgr 单例 active_ops 冲突）---- */
+extern const calib_level_ops_t calib_level1_ops;
+extern const calib_level_ops_t calib_level2_ops;
+extern const calib_level_ops_t calib_level3_ops;
+extern const calib_level_ops_t calib_level4_ops;
+extern const calib_level_ops_t calib_level5_ops;
+extern const calib_level_ops_t calib_level6_ops;
+
+static const calib_level_ops_t *s_l7_level_table[CALIB_LEVEL_MAX] = {
+	[0] = NULL,
+	[CALIB_LEVEL1_DRIVER]    = &calib_level1_ops,
+	[CALIB_LEVEL2_MOTOR]     = &calib_level2_ops,
+	[CALIB_LEVEL3_ENCODER]   = &calib_level3_ops,
+	[CALIB_LEVEL4_TORQUE]    = &calib_level4_ops,
+	[CALIB_LEVEL5_NONLINEAR] = &calib_level5_ops,
+	[CALIB_LEVEL6_SYSTEM]    = &calib_level6_ops,
+};
+
+/* 启动当前步对应的子标定 */
+static bool l7_start_current_step(void)
+{
+	const calib_level_ops_t *ops = s_l7_level_table[s_sequence[s_step].level];
+	if (ops == NULL || ops->start == NULL)
+		return false;
+	return ops->start(s_sequence[s_step].submode, s_param, s_dt);
+}
+
+/* 轮询当前步对应的子标定 */
+static calib_state_e l7_poll_current_step(void)
+{
+	const calib_level_ops_t *ops = s_l7_level_table[s_sequence[s_step].level];
+	if (ops == NULL || ops->poll == NULL)
+		return CALIB_STATE_FAILED;
+	return ops->poll();
+}
+
+/* 中止当前步对应的子标定（清理硬件）*/
+static void l7_abort_current_step(void)
+{
+	if (s_step < L7_SEQ_LEN)
+	{
+		const calib_level_ops_t *ops = s_l7_level_table[s_sequence[s_step].level];
+		if (ops != NULL && ops->abort != NULL)
+			ops->abort();
+	}
+}
+
 static bool calib_level7_start(uint8_t submode, motor_param_t *param, float dt)
 {
 	s_param = param;
 	s_dt = dt;
 	s_step = 0;
+	s_failed_step = 0xFF;
+	s_retry_count = 0;
+
+	/* step_total 上报：L7 无法直接写 calib_mgr 的 status（其私有于 calib_mgr.c），
+	 * 且 calib_mgr 不感知 L7 序列长度。后续若需 step_total，需在 calib_mgr 侧
+	 * 对 level==7 特判或增加回调，当前留作后续增强。*/
 
 	switch (submode)
 	{
 		case CALIB_L7_FULL_AUTO:
-			/* TODO: 启动序列中第一个子标定 */
-			return true;
+			/* 启动序列中第一个子标定 */
+			return l7_start_current_step();
 		default:
 			return false;
 	}
@@ -55,21 +122,73 @@ static bool calib_level7_start(uint8_t submode, motor_param_t *param, float dt)
 
 static calib_state_e calib_level7_poll(void)
 {
-	/* 桩：直接返回完成。
-	 * 真实实现：
-	 *   1. 调用当前 step 对应 level 的 start/poll
-	 *   2. 子标定 DONE 后 s_step++，启动下一个
-	 *   3. s_step >= L7_SEQ_LEN 时返回 DONE */
-	(void)s_param;
-	(void)s_dt;
-	(void)s_step;
-	(void)L7_SEQ_LEN;
-	return CALIB_STATE_DONE;
+	/* 全部步骤已完成 */
+	if (s_step >= L7_SEQ_LEN)
+		return CALIB_STATE_DONE;
+
+	calib_state_e st = l7_poll_current_step();
+
+	if (st == CALIB_STATE_DONE)
+	{
+		/* 当前步完成，标记 done 并前进到下一步 */
+		calib_mgr_mark_done(s_sequence[s_step].level, s_sequence[s_step].submode);
+		s_step++;
+		s_retry_count = 0;
+		if (s_step >= L7_SEQ_LEN)
+			return CALIB_STATE_DONE;
+		/* 启动下一步 */
+		if (!l7_start_current_step())
+			return CALIB_STATE_FAILED;
+		return CALIB_STATE_RUNNING;
+	}
+	else if (st == CALIB_STATE_FAILED)
+	{
+		s_failed_step = s_step;
+		switch (CALIB_L7_STRATEGY)
+		{
+			case CALIB_L7_STRATEGY_STOP:
+				/* 失败即停止，L7 整体 FAILED */
+				return CALIB_STATE_FAILED;
+
+			case CALIB_L7_STRATEGY_SKIP:
+				/* 跳过失败步，继续下一步 */
+				s_step++;
+				s_retry_count = 0;
+				if (s_step >= L7_SEQ_LEN)
+					return CALIB_STATE_DONE;
+				if (!l7_start_current_step())
+					return CALIB_STATE_FAILED;
+				return CALIB_STATE_RUNNING;
+
+			case CALIB_L7_STRATEGY_RETRY_ONCE:
+				if (s_retry_count < 1)
+				{
+					/* 重试当前步：重新 start */
+					s_retry_count++;
+					if (!l7_start_current_step())
+						return CALIB_STATE_FAILED;
+					return CALIB_STATE_RUNNING;
+				}
+				/* 重试过一次仍失败，跳过 */
+				s_step++;
+				s_retry_count = 0;
+				if (s_step >= L7_SEQ_LEN)
+					return CALIB_STATE_DONE;
+				if (!l7_start_current_step())
+					return CALIB_STATE_FAILED;
+				return CALIB_STATE_RUNNING;
+		}
+	}
+	return CALIB_STATE_RUNNING;
 }
 
 static void calib_level7_abort(void)
 {
+	/* 中止当前子标定（清理硬件），再重置 L7 状态 */
+	l7_abort_current_step();
 	s_step = 0;
+	s_failed_step = 0xFF;
+	s_retry_count = 0;
 }
 
 const calib_level_ops_t calib_level7_ops = {

@@ -22,6 +22,14 @@ AlignConsecutiveAssignments: false
 # # 连续声明时，对齐所有声明的变量名
 AlignConsecutiveDeclarations: false
 
+# # 连续宏定义时，对齐所有宏的值（#define NAME value 的 value 列）
+# -- None - 不对齐
+# -- Consecutive - 对齐连续的宏
+# -- AcrossEmptyLines - 跨空行对齐
+# -- AcrossComments - 跨注释对齐
+# -- AcrossEmptyLinesAndComments - 跨空行和注释对齐
+AlignConsecutiveMacros: Consecutive
+
 # 反斜杆换行的对齐方式
 # -- DontAlign - 不进行对齐
 # -- Left - 反斜杠靠左对齐

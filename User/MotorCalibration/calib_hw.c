@@ -4,8 +4,10 @@
  * @note 从 calib_level3_encoder.c 提取，供 L1/L2/L3 共享。
  *       单电机系统约束：s_active 同一时刻只指向一个会话。
  */
+#include <math.h>
 #include "calib_hw.h"
-#include "calib_mgr.h"   /* calib_mgr_get_io() —— abort 时取 motor 用 */
+#include "calib_config.h"
+#include "calib_mgr.h" /* calib_mgr_get_io() —— abort 时取 motor 用 */
 #include "dev_motor.h"
 #include "dev_mt6701.h"
 
@@ -45,6 +47,16 @@ void calib_hw_exit(calib_hw_session_t *s)
 void calib_hw_apply_voltage(calib_hw_session_t *s, float ud, float uq, float theta)
 {
 	struct dev_motor *m = s->motor;
+
+	/* 安全互锁：电压幅值上限保护，防止 level 模块 bug 烧管子 */
+	float mag = sqrtf(ud * ud + uq * uq);
+	if (mag > CALIB_CFG_MAX_VOLTAGE_MAG_V)
+	{
+		float scale = CALIB_CFG_MAX_VOLTAGE_MAG_V / mag;
+		ud *= scale;
+		uq *= scale;
+	}
+
 	s->forced_ele_angle = theta;
 	m->foc.set_udq(&m->foc, ud, uq);
 	m->foc.inverse_park(&m->foc);

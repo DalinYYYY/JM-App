@@ -20,17 +20,16 @@
 #include "dev_motor.h"
 #include "dev_mt6701.h"
 #include "motor_param.h"
+#include "calib_step.h"
+#include "calib_validate.h"
 
 /* ===================== 模块私有状态（合并为单一结构体）===================== */
 static struct
 {
-	uint8_t              submode;
-	uint8_t              step;          /* 标定步骤状态机 */
-	uint32_t             tick;          /* 周期计数器 */
-	uint32_t             sample_cnt;    /* 采样计数器 */
-	float                angle_sum;     /* 角度采样累加和 */
-	float                dir_start_angle; /* 方向测试起始角度 */
-	calib_hw_session_t   session;       /* 标定电压会话（替换电角度回调 + 施加电压）*/
+	uint8_t submode;
+	calib_step_t step;          /* 统一状态机骨架（cur/tick/sample_cnt/sample_sum）*/
+	float dir_start_angle;      /* 方向测试起始角度 */
+	calib_hw_session_t session; /* 标定电压会话（替换电角度回调 + 施加电压）*/
 } s_l3;
 
 /* ===================== 零位标定状态机 =====================
@@ -44,45 +43,48 @@ static calib_state_e poll_zero_offset(void)
 	const calib_io_t *io = calib_mgr_get_io();
 	dev_motor_t *m = io->motor;
 
-	switch (s_l3.step)
+	switch (s_l3.step.cur)
 	{
 		case 0: /* 施加 d 轴对齐电压 */
 			calib_hw_enter(&s_l3.session, m);
 			calib_hw_apply_voltage(&s_l3.session, CALIB_CFG_L3_ALIGN_VOLTAGE_V, 0.0f, 0.0f);
-			s_l3.tick = 0;
-			s_l3.step = 1;
+			calib_step_next(&s_l3.step, 1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 等待转子稳定对齐 */
 			calib_hw_apply_voltage(&s_l3.session, CALIB_CFG_L3_ALIGN_VOLTAGE_V, 0.0f, 0.0f);
-			if (++s_l3.tick < CALIB_CFG_L3_ALIGN_TICKS)
+			if (calib_step_wait(&s_l3.step, CALIB_CFG_L3_ALIGN_TICKS))
 				return CALIB_STATE_RUNNING;
-			s_l3.tick = 0;
-			s_l3.sample_cnt = 0;
-			s_l3.angle_sum = 0.0f;
-			s_l3.step = 2;
+			calib_step_next(&s_l3.step, 2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 多次采样编码器原始角度 */
 			calib_hw_apply_voltage(&s_l3.session, CALIB_CFG_L3_ALIGN_VOLTAGE_V, 0.0f, 0.0f);
-			s_l3.angle_sum += calib_hw_get_encoder_raw_deg(m);
-			if (++s_l3.sample_cnt < CALIB_CFG_L3_SAMPLE_COUNT)
+			calib_step_accumulate(&s_l3.step, calib_hw_get_encoder_raw_deg(m));
+			if (s_l3.step.sample_cnt < CALIB_CFG_L3_SAMPLE_COUNT)
 				return CALIB_STATE_RUNNING;
-			s_l3.step = 3;
+			calib_step_next(&s_l3.step, 3);
 			return CALIB_STATE_RUNNING;
 
 		case 3: /* 写入标定结果，完成 */
 		{
-			float avg_deg = s_l3.angle_sum / (float)CALIB_CFG_L3_SAMPLE_COUNT;
+			float avg_deg = calib_step_average(&s_l3.step);
 			/* 写入 dev_mt6701 运行时（offset = 对齐位置的原始角度，使 mech_angle=0）*/
 			m->mt6701.offset = avg_deg;
 			m->mt6701.dir = MT6701_DIR_CW; /* 零位标定先置 CW，方向由后续方向标定确定 */
 			/* 写入 motor_param_t（持久化），enc_offset 用计数值 */
 			int32_t raw_counts = (int32_t)(avg_deg / 360.0F * MT6701_ANGLE_RESOLUTION);
+			if (!calib_validate_enc_offset(raw_counts))
+			{
+				calib_hw_exit(&s_l3.session);
+				return CALIB_STATE_FAILED;
+			}
 			motor_param_set_enc_offset(io->param, raw_counts);
 			motor_param_set_enc_direction(io->param, 1); /* 1=CW */
 			motor_param_set_elec_angle_bias(io->param, 0.0f);
 			calib_hw_exit(&s_l3.session);
+			calib_mgr_mark_done(CALIB_LEVEL3_ENCODER, CALIB_L3_ZERO_OFFSET);
+			calib_step_reset(&s_l3.step);
 			return CALIB_STATE_DONE;
 		}
 
@@ -106,22 +108,21 @@ static calib_state_e poll_direction(void)
 	const calib_io_t *io = calib_mgr_get_io();
 	dev_motor_t *m = io->motor;
 
-	switch (s_l3.step)
+	switch (s_l3.step.cur)
 	{
 		case 0: /* 施加正向 uq 电压，记录起始角度 */
 			calib_hw_enter(&s_l3.session, m);
 			/* 电角度=0 时 uq>0 产生正向力矩（q轴超前d轴90°，即α轴方向）*/
 			s_l3.dir_start_angle = calib_hw_get_encoder_mech_angle(m);
 			calib_hw_apply_voltage(&s_l3.session, 0.0f, CALIB_CFG_L3_DIR_VOLTAGE_V, 0.0f);
-			s_l3.tick = 0;
-			s_l3.step = 1;
+			calib_step_next(&s_l3.step, 1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 持续施加 uq，等待电机转动 */
 			calib_hw_apply_voltage(&s_l3.session, 0.0f, CALIB_CFG_L3_DIR_VOLTAGE_V, 0.0f);
-			if (++s_l3.tick < CALIB_CFG_L3_DIR_TICKS)
+			if (calib_step_wait(&s_l3.step, CALIB_CFG_L3_DIR_TICKS))
 				return CALIB_STATE_RUNNING;
-			s_l3.step = 2;
+			calib_step_next(&s_l3.step, 2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 采样当前角度，判定方向 */
@@ -152,16 +153,23 @@ static calib_state_e poll_direction(void)
 				return CALIB_STATE_FAILED;
 			}
 
+			if (!calib_validate_enc_direction(enc_dir))
+			{
+				calib_hw_exit(&s_l3.session);
+				return CALIB_STATE_FAILED;
+			}
 			/* 写入 dev_mt6701 运行时 */
 			m->mt6701.dir = dir;
 			/* 写入 motor_param_t（持久化） */
 			motor_param_set_enc_direction(io->param, enc_dir);
-			s_l3.step = 3;
+			calib_step_next(&s_l3.step, 3);
 			return CALIB_STATE_RUNNING;
 		}
 
 		case 3: /* 撤销电压，完成 */
 			calib_hw_exit(&s_l3.session);
+			calib_mgr_mark_done(CALIB_LEVEL3_ENCODER, CALIB_L3_DIRECTION);
+			calib_step_reset(&s_l3.step);
 			return CALIB_STATE_DONE;
 
 		default:
@@ -191,10 +199,7 @@ static bool calib_level3_start(uint8_t submode, motor_param_t *param, float dt)
 	(void)dt;
 
 	s_l3.submode = submode;
-	s_l3.step = 0;
-	s_l3.tick = 0;
-	s_l3.sample_cnt = 0;
-	s_l3.angle_sum = 0.0f;
+	calib_step_reset(&s_l3.step);
 	s_l3.session.motor = NULL;
 	s_l3.session.orig_ele_cb = NULL;
 	s_l3.session.forced_ele_angle = 0.0f;
@@ -230,7 +235,7 @@ static void calib_level3_abort(void)
 	const calib_io_t *io = calib_mgr_get_io();
 	if (io != NULL && io->motor != NULL)
 		calib_hw_exit(&s_l3.session);
-	s_l3.step = 0;
+	calib_step_reset(&s_l3.step);
 }
 
 const calib_level_ops_t calib_level3_ops = {

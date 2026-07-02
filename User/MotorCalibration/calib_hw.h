@@ -10,9 +10,9 @@
  * 系统单电机 + calib_mgr 保证同时只有一个标定活动，s_active 单例约束可接受。*/
 typedef struct
 {
-	struct dev_motor *motor;          /* 目标电机设备 */
-	float (*orig_ele_cb)(void);       /* 保存的原始电角度回调，exit 时恢复 */
-	float forced_ele_angle;           /* 标定期间强制使用的电角度(rad) */
+	struct dev_motor *motor;    /* 目标电机设备 */
+	float (*orig_ele_cb)(void); /* 保存的原始电角度回调，exit 时恢复 */
+	float forced_ele_angle;     /* 标定期间强制使用的电角度(rad) */
 } calib_hw_session_t;
 
 /* 进入标定电压会话：保存并替换电角度回调，强制电角度=0 */
