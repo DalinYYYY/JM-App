@@ -48,12 +48,16 @@ static uint32_t motorinfo_crc32_compute(const motor_info_t *cfg)
 }
 
 /**
- * @brief  三重校验：magic → CRC32 → 字段范围
+ * @brief  四重校验：magic → config_version → CRC32 → 字段范围
  * @return MOTOR_INFO_STORAGE_OK / NO_DATA / CRC_FAIL / RANGE_FAIL
  */
 static motor_info_storage_status_t motorinfo_verify(const motor_info_t *cfg)
 {
 	if (cfg->blocks.header.magic != PARAM_MAGIC)
+		return MOTOR_INFO_STORAGE_NO_DATA;
+
+	/* config_version 校验：profile 版本不匹配视为无有效数据（触发重新初始化） */
+	if (cfg->blocks.system.config_version != MOTOR_PROFILE_CONFIG_VERSION)
 		return MOTOR_INFO_STORAGE_NO_DATA;
 
 	if (cfg->blocks.header.crc32 != motorinfo_crc32_compute(cfg))
@@ -154,29 +158,54 @@ motor_info_storage_status_t motor_info_storage_init(void)
 	/* 1. 装配 ops 方法表指针（一行装配所有方法） */
 	pobj->ops = &s_motorinfo_ops;
 
-	/* 2. 初始化 dev_flash 子设备（扫描扇区定位最新有效数据） */
+	/* 2. 初始化 dev_flash 子设备（单扇区配置：total_size=page_size=2048）
+	 *    sector_count=1，写入时 next=(0+1)%1=0 始终写扇区0，固定地址
+	 *    dev_flash_init 扫描扇区 flag，last_sequence>0 表示有写入过的数据 */
 	dev_flash_init(&pobj->flash_dev,
 	               MOTORINFO_FLASH_START_ADDR,
-	               MOTORINFO_FLASH_TOTAL_SIZE,
+	               MOTORINFO_FLASH_PAGE_SIZE,    /* total_size = page_size，单扇区 */
 	               MOTORINFO_FLASH_PAGE_SIZE);
 	pobj->inited = pobj->flash_dev.inited ? true : false;
 
 	/* 3. 加载全局 motor_info（上电自动加载，仅一次） */
 	if (!pobj->motor_info_loaded)
 	{
-		/* 3.1 填默认值（含 header.magic/version/block 索引表） */
-		(void)motor_info_init(&pobj->motor_info);
+		bool need_init_default = true;  /* 是否走首次上电默认路径 */
 
-		/* 3.2 尝试从 Flash 加载覆盖默认值
-         *     返回 OK=加载成功；NO_DATA=Flash 无数据(首次上电)；CRC_FAIL/RANGE_FAIL=数据损坏
-         *     任何非 OK 都保留默认值，系统仍可正常启动 */
-		if (pobj->inited)
+		/* 路径A：非首次上电——dev_flash 扫描到有效 flag（last_sequence > 0） */
+		if (pobj->inited && pobj->flash_dev.last_sequence > 0U)
 		{
-			(void)motorinfo_ops_load(pobj, &pobj->motor_info);
+			motor_info_storage_status_t lr = motorinfo_ops_load(pobj, &pobj->motor_info);
+			if (lr == MOTOR_INFO_STORAGE_OK)
+			{
+				/* Flash 数据有效（magic + config_version + CRC + range 全通过）
+				 * 直接用 Flash 数据，不调用 motor_info_init
+				 * apply_info(零值fallback)：未标定字段（零值）用 profile 补缺，
+				 * 已标定字段（非零）保留 Flash 中的标定值 */
+				motor_profile_apply_info(&pobj->motor_info);
+				need_init_default = false;
+			}
+			/* lr != OK：Flash 数据损坏 → 走路径B */
 		}
+		/* last_sequence == 0：首次上电（Flash 无有效 flag）→ 走路径B */
 
-		/* 3.3 施加编译期 motor_profile 覆盖（硬件级电气身份参数，最终决定权） */
-		motor_profile_apply_info(&pobj->motor_info);
+		/* 路径B：首次上电——init + apply_default + save */
+		if (need_init_default)
+		{
+			/* B1. 填默认值（header 元数据 magic/version/blocks 索引 + 通用默认值） */
+			(void)motor_info_init(&pobj->motor_info);
+
+			/* B2. profile 无条件覆盖（含 config_version 设置）
+			 *     无视 init 的非零默认值，强制用 profile 覆盖 7 个字段 */
+			motor_profile_apply_info_default(&pobj->motor_info);
+
+			/* B3. 回写 Flash（下次上电走路径A，直接 load）
+			 *     保存失败不阻断启动（内存数据已正确） */
+			if (pobj->inited)
+			{
+				(void)motorinfo_ops_save(pobj, &pobj->motor_info);
+			}
+		}
 
 		pobj->motor_info_loaded = true;
 	}

@@ -41,10 +41,10 @@ static inline bool calib_validate_pole_pairs(uint8_t pp)
 	return pp >= CALIB_CFG_POLE_PAIRS_MIN && pp <= CALIB_CFG_POLE_PAIRS_MAX;
 }
 
-/* 编码器 offset（原始计数值，非负）*/
-static inline bool calib_validate_enc_offset(int32_t offset)
+/* 编码器 offset（deg 单位，范围 -360.0 ~ 360.0）*/
+static inline bool calib_validate_enc_offset(float offset)
 {
-	return offset >= 0;
+	return (offset >= -360.0f) && (offset <= 360.0f);
 }
 
 /* 编码器方向（+1=CW / -1=CCW）*/

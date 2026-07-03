@@ -67,13 +67,22 @@
 #endif
 
 /* ===================== apply 接口（在 motor_profile.c 实现）======================
- * 在 motor_param_init() / motor_info_init() 调用之后紧接着调用，
- * 用 motor_profile.h 的 MOTOR_* 宏覆盖电机电气身份字段。
+ * 在 motor_param_init() / motor_info_init() 调用之后紧接着调用。
+ * **逐字段零值 fallback 语义**：对每个电机电气身份字段独立判断，
+ * 若该字段为零值（未设置/未标定），则用 motor_profile.h 的 MOTOR_* 宏覆盖；
+ * 非零（已标定）则保留 motor_info 中的实际标定值，不被默认值覆盖。
  *   motor_profile_apply_param(cfg)  —— cfg 实际类型为 motor_param_t*
  *   motor_profile_apply_info(cfg)   —— cfg 实际类型为 motor_info_t*
  * 用 void* 是为了避免 motor_profile.h 循环 include motor_param.h/motor_info.h，
  * 实际类型检查在 motor_profile.c 内部完成。*/
 void motor_profile_apply_param(void *cfg);
 void motor_profile_apply_info(void *cfg);
+
+/* profile 配置版本号：修改 MOTOR_PROFILE 宏切换电机型号时递增此版本号，
+ * 用于上电时检测 Flash 中存储的参数是否对应当前固件的 profile。
+ * 版本不匹配时触发重新初始化（init + apply_default + save）。*/
+#define MOTOR_PROFILE_CONFIG_VERSION 1U
+
+void motor_profile_apply_info_default(void *cfg);  /* 无条件覆盖：首次上电用 */
 
 #endif /* __MOTOR_PROFILE_H__ */

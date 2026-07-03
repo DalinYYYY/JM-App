@@ -22,6 +22,7 @@
 #include "motor_param.h"
 #include "calib_step.h"
 #include "calib_validate.h"
+#include "motor_info_calib.h"
 
 /* ===================== 模块私有状态（合并为单一结构体）===================== */
 static struct
@@ -91,6 +92,7 @@ static calib_state_e poll_resistance(void)
 				return CALIB_STATE_FAILED;
 			}
 			motor_param_set_r(io->param, R);
+			(void)motor_info_calib_submit_r(R);
 			calib_hw_exit(&s_l2.session);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_RESISTANCE);
 			calib_step_reset(&s_l2.step);
@@ -165,6 +167,7 @@ static calib_state_e poll_inductance_d(void)
 				return CALIB_STATE_FAILED;
 			}
 			motor_param_set_ld(io->param, Ld);
+			(void)motor_info_calib_submit_ld(Ld);
 			calib_hw_exit(&s_l2.session);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_INDUCTANCE_D);
 			calib_step_reset(&s_l2.step);
@@ -238,6 +241,7 @@ static calib_state_e poll_inductance_q(void)
 				return CALIB_STATE_FAILED;
 			}
 			motor_param_set_lq(io->param, Lq);
+			(void)motor_info_calib_submit_lq(Lq);
 			calib_hw_exit(&s_l2.session);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_INDUCTANCE_Q);
 			calib_step_reset(&s_l2.step);
@@ -321,6 +325,7 @@ static calib_state_e poll_flux_linkage(void)
 			if (!calib_validate_flux(flux))
 				return CALIB_STATE_FAILED;
 			motor_param_set_flux(io->param, flux);
+			(void)motor_info_calib_submit_flux(flux);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_FLUX_LINKAGE);
 			calib_step_reset(&s_l2.step);
 			return CALIB_STATE_DONE;
@@ -463,6 +468,7 @@ static calib_state_e poll_pole_pairs(void)
 			if (!calib_validate_pole_pairs(pp))
 				return CALIB_STATE_FAILED;
 			motor_param_set_pole_pairs(io->param, pp);
+			(void)motor_info_calib_submit_pole_pairs(pp);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_POLE_PAIRS);
 			calib_step_reset(&s_l2.step);
 			return CALIB_STATE_DONE;

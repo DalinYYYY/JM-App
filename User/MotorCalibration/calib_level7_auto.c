@@ -9,6 +9,7 @@
 #include <stddef.h>
 #include "calib_types.h"
 #include "calib_mgr.h"
+#include "motor_info_calib.h"
 
 /* ===================== L7 错误处理策略 ===================== */
 typedef enum {
@@ -135,7 +136,11 @@ static calib_state_e calib_level7_poll(void)
 		s_step++;
 		s_retry_count = 0;
 		if (s_step >= L7_SEQ_LEN)
+		{
+			/* L7 全流程完成，置位 is_calibrated，下次上电使用标定值 */
+			(void)motor_info_calib_mark_calibrated();
 			return CALIB_STATE_DONE;
+		}
 		/* 启动下一步 */
 		if (!l7_start_current_step())
 			return CALIB_STATE_FAILED;

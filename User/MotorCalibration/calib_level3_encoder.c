@@ -22,6 +22,7 @@
 #include "motor_param.h"
 #include "calib_step.h"
 #include "calib_validate.h"
+#include "motor_info_calib.h"
 
 /* ===================== 模块私有状态（合并为单一结构体）===================== */
 static struct
@@ -72,16 +73,17 @@ static calib_state_e poll_zero_offset(void)
 			/* 写入 dev_mt6701 运行时（offset = 对齐位置的原始角度，使 mech_angle=0）*/
 			m->mt6701.offset = avg_deg;
 			m->mt6701.dir = MT6701_DIR_CW; /* 零位标定先置 CW，方向由后续方向标定确定 */
-			/* 写入 motor_param_t（持久化），enc_offset 用计数值 */
-			int32_t raw_counts = (int32_t)(avg_deg / 360.0F * MT6701_ANGLE_RESOLUTION);
-			if (!calib_validate_enc_offset(raw_counts))
+			/* 写入 motor_param_t（持久化），enc_offset 用 deg 角度值 */
+			if (!calib_validate_enc_offset(avg_deg))
 			{
 				calib_hw_exit(&s_l3.session);
 				return CALIB_STATE_FAILED;
 			}
-			motor_param_set_enc_offset(io->param, raw_counts);
+			motor_param_set_enc_offset(io->param, avg_deg);
 			motor_param_set_enc_direction(io->param, 1); /* 1=CW */
 			motor_param_set_elec_angle_bias(io->param, 0.0f);
+			/* 提交零位标定结果到 motor_info */
+			(void)motor_info_calib_submit_enc_zero(0.0f, avg_deg, 1);
 			calib_hw_exit(&s_l3.session);
 			calib_mgr_mark_done(CALIB_LEVEL3_ENCODER, CALIB_L3_ZERO_OFFSET);
 			calib_step_reset(&s_l3.step);
@@ -162,6 +164,7 @@ static calib_state_e poll_direction(void)
 			m->mt6701.dir = dir;
 			/* 写入 motor_param_t（持久化） */
 			motor_param_set_enc_direction(io->param, enc_dir);
+			(void)motor_info_calib_submit_enc_direction(enc_dir);
 			calib_step_next(&s_l3.step, 3);
 			return CALIB_STATE_RUNNING;
 		}
