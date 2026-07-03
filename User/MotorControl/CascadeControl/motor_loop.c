@@ -18,7 +18,8 @@
 #include "multiturn_counter.h"
 #include "dev_power_monitor.h"
 #include "motor_param.h"                       /* motor_param_init 加载默认电机参数 */
-#include "motor_profile.h"                     /* motor_profile_apply_param 覆盖电机电气身份 */
+#include "motor_profile.h"                     /* motor_profile_apply_param / sync_to_param */
+#include "motor_info_storage.h"                /* motor_info_storage_get：Flash 加载的标定参数 */
 
 #define MOTOR_LOOP_DEG_TO_RAD (0.01745329252f) /* π/180 */
 
@@ -61,10 +62,12 @@ void motor_loop_init(float current_freq_hz)
 
 	/* 加载默认电机参数（R/L/kt/pole_pairs/PID/限幅等）
 	 * usr.motor_param[M1] 为 BSS 段全局变量，启动时全零，
-	 * 若不加载默认值会导致除零、控制环无响应等问题。
-	 * TODO: Flash 参数加载实现后，改为先尝试 Flash 加载，失败再 fallback 到默认。*/
+	 * 若不加载默认值会导致除零、控制环无响应等问题。*/
 	motor_param_init(param);
 	motor_profile_apply_param(param); /* 用 motor_profile.h 的 MOTOR_* 覆盖电气身份字段 */
+
+	/* Flash 标定参数同步到运行期 motor_param_t*/
+	motor_profile_sync_to_param(param, motor_info_storage_get());
 
 	// 各环控制周期：电流环由中断频率决定，外环按分频系数派生
 	float dt_current = 1.0f / current_freq_hz;

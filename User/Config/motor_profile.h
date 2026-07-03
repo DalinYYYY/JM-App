@@ -1,6 +1,9 @@
 #ifndef __MOTOR_PROFILE_H__
 #define __MOTOR_PROFILE_H__
 
+#include "motor_param.h" /* motor_param_t：sync_to_param 参数类型 */
+#include "motor_info.h"  /* motor_info_t：sync_to_param 参数类型 */
+
 /* ===================== 电机参数配置文件（唯一真相源）=====================
  * 所有电机电气身份参数集中于此。三个消费方通过 #include 引用：
  *   - User/DataHub/motor_param.c         （控制环运行时默认值）
@@ -27,21 +30,21 @@
  * 结构 12N14P / WYE / SPMSM（表贴式，Ld≈Lq）
  * 时间常数 τ = L/R = 4.8mH/3.6Ω = 1.33ms */
 #define MOTOR_NAME            "GM4820H"
-#define MOTOR_R               3.6f      /* 相电阻(Ω) PDF: Ri */
-#define MOTOR_LD              4.8e-3f   /* d轴电感(H) PDF: 4.8mH */
-#define MOTOR_LQ              4.8e-3f   /* q轴电感(H) SPMSM: Ld≈Lq */
-#define MOTOR_FLUX            0.02f     /* 磁链(Wb) KV=66反算: 60/(2π·66·7) */
-#define MOTOR_KT              0.21f     /* 转矩常数(Nm/A) = 1.5·pp·flux */
-#define MOTOR_KE              0.14f     /* 反电动势常数(V/(rad/s)) = flux·pp */
-#define MOTOR_POLE_PAIRS      7         /* 极对数 PDF: 12N14P */
-#define MOTOR_RATED_CURRENT   0.6f      /* 额定电流(A) 保守 */
-#define MOTOR_PEAK_CURRENT    3.7f      /* 峰值电流(A) PDF: 堵转 */
-#define MOTOR_MAX_SPEED       200.0f    /* 最大转速(rad/s) ~1900RPM */
-#define MOTOR_RATED_VOLTAGE   24.0f     /* 额定电压(V) PDF: 推荐 */
-#define MOTOR_RATED_SPEED_RPM 1550.0f   /* 额定转速(rpm) PDF: 24V */
-#define MOTOR_RATED_TORQUE    0.2f      /* 额定转矩(Nm) PDF */
-#define MOTOR_PEAK_TORQUE     0.5f      /* 峰值转矩(Nm) */
-#define MOTOR_INERTIA         1e-5f     /* 转子惯量(kg·m²) 估算 */
+#define MOTOR_R               3.6f    /* 相电阻(Ω) PDF: Ri */
+#define MOTOR_LD              4.8e-3f /* d轴电感(H) PDF: 4.8mH */
+#define MOTOR_LQ              4.8e-3f /* q轴电感(H) SPMSM: Ld≈Lq */
+#define MOTOR_FLUX            0.02f   /* 磁链(Wb) KV=66反算: 60/(2π·66·7) */
+#define MOTOR_KT              0.21f   /* 转矩常数(Nm/A) = 1.5·pp·flux */
+#define MOTOR_KE              0.14f   /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      7       /* 极对数 PDF: 12N14P */
+#define MOTOR_RATED_CURRENT   0.6f    /* 额定电流(A) 保守 */
+#define MOTOR_PEAK_CURRENT    3.7f    /* 峰值电流(A) PDF: 堵转 */
+#define MOTOR_MAX_SPEED       200.0f  /* 最大转速(rad/s) ~1900RPM */
+#define MOTOR_RATED_VOLTAGE   24.0f   /* 额定电压(V) PDF: 推荐 */
+#define MOTOR_RATED_SPEED_RPM 1550.0f /* 额定转速(rpm) PDF: 24V */
+#define MOTOR_RATED_TORQUE    0.2f    /* 额定转矩(Nm) PDF */
+#define MOTOR_PEAK_TORQUE     0.5f    /* 峰值转矩(Nm) */
+#define MOTOR_INERTIA         1e-5f   /* 转子惯量(kg·m²) 估算 */
 
 #elif MOTOR_PROFILE == MOTOR_PROFILE_DEMO
 /* 示例：演示如何添加第二个电机型号（占位，非真实参数）*/
@@ -83,6 +86,26 @@ void motor_profile_apply_info(void *cfg);
  * 版本不匹配时触发重新初始化（init + apply_default + save）。*/
 #define MOTOR_PROFILE_CONFIG_VERSION 1U
 
-void motor_profile_apply_info_default(void *cfg);  /* 无条件覆盖：首次上电用 */
+void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上电用 */
+
+/* ===================== Flash → 运行期参数同步 =====================
+ * 把 motor_info_storage_get() 返回的 Flash 加载数据同步到控制环实际使用的
+ * motor_param_t。补上 motor_info_storage_init 之后断裂的桥接链路。
+ *
+ * 同步策略：
+ *   - is_calibrated == 1：电气参数(R/Ld/Lq/flux/kt/inertia/pole_pairs)用Flash标定值
+ *                        覆盖 motor_profile_apply_param 已写入的 profile 默认值
+ *   - is_calibrated == 0：电气参数保留 profile 默认值（apply_param 已写入）
+ *   - 编码器参数(enc_direction/enc_offset/elec_angle_bias)：始终同步
+ *     （apply_info 已对 enc_direction 做零值 fallback=1；
+ *      enc_offset/elec_angle_bias 保留 0 表示需标定）
+ *
+ * 调用时机：motor_loop_init 中 motor_profile_apply_param(param) 之后立即调用，
+ *           须保证 motor_info_storage_init() 已先执行（在 user_interface.c 中）。
+ *
+ * @param param  运行期参数（&usr.motor_param[M1]）
+ * @param info   Flash 加载的 motor_info 句柄（motor_info_storage_get() 返回值）
+ */
+void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info);
 
 #endif /* __MOTOR_PROFILE_H__ */

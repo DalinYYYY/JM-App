@@ -23,21 +23,21 @@ void motor_profile_apply_param(void *cfg)
 		return;
 
 	/* 电机本体电气身份参数（motor_base 段）*/
-	p->motor_base.r               = MOTOR_R;
-	p->motor_base.ld              = MOTOR_LD;
-	p->motor_base.lq              = MOTOR_LQ;
-	p->motor_base.flux            = MOTOR_FLUX;
-	p->motor_base.kt              = MOTOR_KT;
-	p->motor_base.ke              = MOTOR_KE;
-	p->motor_base.pole_pairs      = MOTOR_POLE_PAIRS;
-	p->motor_base.rated_current   = MOTOR_RATED_CURRENT;
-	p->motor_base.peak_current    = MOTOR_PEAK_CURRENT;
-	p->motor_base.max_speed       = MOTOR_MAX_SPEED;
-	p->motor_base.rated_voltage   = MOTOR_RATED_VOLTAGE;
+	p->motor_base.r = MOTOR_R;
+	p->motor_base.ld = MOTOR_LD;
+	p->motor_base.lq = MOTOR_LQ;
+	p->motor_base.flux = MOTOR_FLUX;
+	p->motor_base.kt = MOTOR_KT;
+	p->motor_base.ke = MOTOR_KE;
+	p->motor_base.pole_pairs = MOTOR_POLE_PAIRS;
+	p->motor_base.rated_current = MOTOR_RATED_CURRENT;
+	p->motor_base.peak_current = MOTOR_PEAK_CURRENT;
+	p->motor_base.max_speed = MOTOR_MAX_SPEED;
+	p->motor_base.rated_voltage = MOTOR_RATED_VOLTAGE;
 	p->motor_base.rated_speed_rpm = MOTOR_RATED_SPEED_RPM;
-	p->motor_base.rated_torque    = MOTOR_RATED_TORQUE;
-	p->motor_base.peak_torque     = MOTOR_PEAK_TORQUE;
-	p->motor_base.inertia         = MOTOR_INERTIA;
+	p->motor_base.rated_torque = MOTOR_RATED_TORQUE;
+	p->motor_base.peak_torque = MOTOR_PEAK_TORQUE;
+	p->motor_base.inertia = MOTOR_INERTIA;
 
 	/* 板级参数（pwm_freq/foc_freq/dead_time）与减速器、编码器、PID 等
 	 * 不在此覆盖，保留 motor_param_init() 的默认值。*/
@@ -73,6 +73,10 @@ void motor_profile_apply_info(void *cfg)
 	/* enc_direction: 0 视为未标定，默认 CW(1) */
 	if (p->blocks.motor_calib.enc_direction == 0)
 		p->blocks.motor_calib.enc_direction = 1;
+	/* enc_offset / elec_angle_bias 不做零值 fallback：
+	 *   - profile 没有合理的默认零点（每台电机安装位置不同）
+	 *   - 零值表示"未标定，需重新做编码器零位标定"
+	 *   - sync_to_param 会把零值同步到运行期，控制环读到 0 即知未标定 */
 
 	/* is_calibrated / motor_type / direction / 减速器 / 编码器 / 功率级 /
 	 * 电流采样 / PID 等不在此覆盖，保留 motor_info_init() 的默认值。*/
@@ -87,15 +91,42 @@ void motor_profile_apply_info_default(void *cfg)
 	/* 无条件覆盖：无视 motor_info_init 的非零通用默认值，
 	 * 强制用 profile 的电机型号特定默认值覆盖。
 	 * 仅在首次上电（Flash 无数据 或 profile 版本不匹配）时调用。*/
-	p->blocks.motor_calib.pole_pairs         = (uint32_t)MOTOR_POLE_PAIRS;
-	p->blocks.motor_calib.phase_resistance   = MOTOR_R;
+	p->blocks.motor_calib.pole_pairs = (uint32_t)MOTOR_POLE_PAIRS;
+	p->blocks.motor_calib.phase_resistance = MOTOR_R;
 	p->blocks.motor_calib.phase_inductance_d = MOTOR_LD;
 	p->blocks.motor_calib.phase_inductance_q = MOTOR_LQ;
-	p->blocks.motor_calib.flux_linkage       = MOTOR_FLUX;
-	p->blocks.motor_calib.torque_constant    = MOTOR_KT;
-	p->blocks.motor_calib.rotor_inertia      = MOTOR_INERTIA;
-	p->blocks.motor_calib.enc_direction     = 1; /* 默认 CW(正向) */
+	p->blocks.motor_calib.flux_linkage = MOTOR_FLUX;
+	p->blocks.motor_calib.torque_constant = MOTOR_KT;
+	p->blocks.motor_calib.rotor_inertia = MOTOR_INERTIA;
+	p->blocks.motor_calib.enc_direction = 1; /* 默认 CW(正向) */
 
 	/* 同时设置 config_version，标记当前 profile 版本 */
 	p->blocks.system.config_version = MOTOR_PROFILE_CONFIG_VERSION;
+}
+
+void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
+{
+	if (param == NULL || info == NULL)
+		return;
+
+	const MotorCalibParam_t *c = &info->blocks.motor_calib;
+
+	/* 电气参数：仅当 is_calibrated==1 时用 Flash 标定值覆盖 profile 默认值
+	 * （apply_param 已写入 profile 默认值，此处按标定状态决定是否覆盖）*/
+	if (c->is_calibrated == 1U)
+	{
+		param->motor_base.pole_pairs = (uint8_t)c->pole_pairs;
+		param->motor_base.r = c->phase_resistance;
+		param->motor_base.ld = c->phase_inductance_d;
+		param->motor_base.lq = c->phase_inductance_q;
+		param->motor_base.flux = c->flux_linkage;
+		param->motor_base.kt = c->torque_constant;
+		param->motor_base.inertia = c->rotor_inertia;
+	}
+
+	/* 编码器参数：始终同步（apply_info 已对 enc_direction 做零值 fallback=1；
+	 * enc_offset/elec_angle_bias 保留 0 表示需标定，控制环据此判断未标定状态）*/
+	param->encoder_param.enc_direction = (int8_t)c->enc_direction;
+	param->encoder_param.enc_offset = c->enc_offset;
+	param->encoder_param.elec_angle_bias = c->elec_angle_bias;
 }
