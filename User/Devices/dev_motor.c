@@ -84,6 +84,39 @@ static float encoder_mt6701_get_mechanical_angle(struct dev_encoder *enc)
 	return enc->mechanical_angle;
 }
 
+/* MT6701 标定扩展接口适配（统一 -1/1 方向约定，deg 单位）*/
+static void encoder_mt6701_set_offset(struct dev_encoder *enc, float offset_deg)
+{
+	dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+	chip->offset = offset_deg;
+}
+
+static float encoder_mt6701_get_offset(struct dev_encoder *enc)
+{
+	dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+	return chip->offset;
+}
+
+static void encoder_mt6701_set_dir(struct dev_encoder *enc, int8_t dir)
+{
+	dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+	/* MT6701 枚举已统一为 -1/1，与抽象层约定一致，直接赋值 */
+	chip->set_dir(chip, (mt6701_dir_e)dir);
+}
+
+static int8_t encoder_mt6701_get_dir(struct dev_encoder *enc)
+{
+	dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+	return (int8_t)chip->get_dir(chip);
+}
+
+static float encoder_mt6701_get_raw_deg(struct dev_encoder *enc)
+{
+	dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+	chip->update(chip); /* 确保 raw 字段已刷新 */
+	return (float)chip->raw / MT6701_ANGLE_RESOLUTION * 360.0F;
+}
+
 #elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
 /** @brief MT6835 → 抽象编码器：刷新并经 get_mechanical_angle 取角 */
 static void encoder_mt6835_update(struct dev_encoder *enc)
@@ -96,6 +129,39 @@ static void encoder_mt6835_update(struct dev_encoder *enc)
 static float encoder_mt6835_get_mechanical_angle(struct dev_encoder *enc)
 {
 	return enc->mechanical_angle;
+}
+
+/* MT6835 标定扩展接口适配（统一 -1/1 方向约定，deg 单位）*/
+static void encoder_mt6835_set_offset(struct dev_encoder *enc, float offset_deg)
+{
+	dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+	chip->set_offset(chip, offset_deg);
+}
+
+static float encoder_mt6835_get_offset(struct dev_encoder *enc)
+{
+	dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+	return chip->offset;
+}
+
+static void encoder_mt6835_set_dir(struct dev_encoder *enc, int8_t dir)
+{
+	dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+	/* MT6835 约定：running_dir > 1 表示反向，适配到 -1/1 */
+	chip->set_dir(chip, (dir < 0) ? 2 : 1);
+}
+
+static int8_t encoder_mt6835_get_dir(struct dev_encoder *enc)
+{
+	dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+	return (chip->running_dir > 1) ? -1 : 1;
+}
+
+static float encoder_mt6835_get_raw_deg(struct dev_encoder *enc)
+{
+	dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+	/* MT6835 21bit 原始角度转 deg */
+	return (float)chip->get_mechanical_angle_raw(chip) / (1 << 21) * 360.0F;
 }
 #endif
 
@@ -120,33 +186,41 @@ void dev_motor_init(dev_motor_t *pobj,
 							  // 初始化编码器（型号由 DEV_MOTOR_ENCODER_TYPE 选择，控制层不感知）
 #if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
 	dev_mt6701_init(&pobj->mt6701, (mt6701_id_e)id);
-	/* 从已标定参数加载编码器零位和方向（启动时 Flash 参数已加载到 usr.motor_param）*/
-	{
-		const encoder_param_t *enc_cfg = &usr.motor_param[(motor_num_e)id].encoder_param;
 
-		/* enc_offset 已为角度值(deg)，直接写入 dev_mt6701 */
-		pobj->mt6701.offset = enc_cfg->enc_offset;
-		pobj->mt6701.dir = (enc_cfg->enc_direction < 0) ? MT6701_DIR_CCW : MT6701_DIR_CW;
-	}
-
-	/* 装配抽象编码器接口 → MT6701 */
+	/* 装配抽象编码器接口 → MT6701（含标定扩展接口）*/
 	pobj->encoder.ctx = &pobj->mt6701;
 	pobj->encoder.update = encoder_mt6701_update;
 	pobj->encoder.get_mechanical_angle = encoder_mt6701_get_mechanical_angle;
+	pobj->encoder.set_offset = encoder_mt6701_set_offset;
+	pobj->encoder.get_offset = encoder_mt6701_get_offset;
+	pobj->encoder.set_dir = encoder_mt6701_set_dir;
+	pobj->encoder.get_dir = encoder_mt6701_get_dir;
+	pobj->encoder.get_raw_deg = encoder_mt6701_get_raw_deg;
 
 #elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
 	dev_mt6835_init(&pobj->mt6835, (mt6835_id_e)id);
-	pobj->mt6835.set_zero_angle(&pobj->mt6835, 0.0f); // TODO: 后续支持配置表
-	pobj->mt6835.set_dir(&pobj->mt6835, 0);           // TODO: 后续支持配置表
 
-	/* 装配抽象编码器接口 → MT6835 */
+	/* 装配抽象编码器接口 → MT6835（含标定扩展接口）*/
 	pobj->encoder.ctx = &pobj->mt6835;
 	pobj->encoder.update = encoder_mt6835_update;
 	pobj->encoder.get_mechanical_angle = encoder_mt6835_get_mechanical_angle;
+	pobj->encoder.set_offset = encoder_mt6835_set_offset;
+	pobj->encoder.get_offset = encoder_mt6835_get_offset;
+	pobj->encoder.set_dir = encoder_mt6835_set_dir;
+	pobj->encoder.get_dir = encoder_mt6835_get_dir;
+	pobj->encoder.get_raw_deg = encoder_mt6835_get_raw_deg;
 
 #else
 #error "未知的 DEV_MOTOR_ENCODER_TYPE，请在 dev_motor.h 选择支持的编码器型号"
 #endif
+
+	/* 通过抽象层从已标定参数加载编码器零位和方向
+	 * （启动时 Flash 参数已加载到 usr.motor_param，统一 -1/1 方向约定）*/
+	{
+		const encoder_param_t *enc_cfg = &usr.motor_param[(motor_num_e)id].encoder_param;
+		pobj->encoder.set_offset(&pobj->encoder, enc_cfg->enc_offset);
+		pobj->encoder.set_dir(&pobj->encoder, enc_cfg->enc_direction);
+	}
 
 	// 初始化角度转化器（仅角度/速度，不含多圈）
 	motion_param_init(&pobj->motor_param, pobj->poles, 10, NULL); // TODO: 后续支持配置表
@@ -184,12 +258,8 @@ void dev_motor_set_encoder_dir(dev_motor_t *pobj, int8_t dir)
 		return; /* 仅接受 1(CW) / -1(CCW) */
 	}
 
-#if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
-	mt6701_dir_e hw_dir = (dir < 0) ? MT6701_DIR_CCW : MT6701_DIR_CW;
-	pobj->mt6701.set_dir(&pobj->mt6701, hw_dir);
-#elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
-	pobj->mt6835.set_dir(&pobj->mt6835, (dir < 0) ? 1 : 0);
-#endif
+	/* 通过抽象编码器层设置方向（统一 -1/1 约定，适配层内部处理具体芯片差异）*/
+	pobj->encoder.set_dir(&pobj->encoder, dir);
 
 	/* 同步到参数层(便于后续持久化到 Flash / 上位机读取一致) */
 	motor_param_set_enc_direction(&usr.motor_param[(motor_num_e)pobj->id], dir);

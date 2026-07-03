@@ -70,6 +70,9 @@ void motor_profile_apply_info(void *cfg)
 		p->blocks.motor_calib.torque_constant = MOTOR_KT;
 	if (p->blocks.motor_calib.rotor_inertia == 0.0f)
 		p->blocks.motor_calib.rotor_inertia = MOTOR_INERTIA;
+	/* enc_direction: 0 视为未标定，默认 CW(1) */
+	if (p->blocks.motor_calib.enc_direction == 0)
+		p->blocks.motor_calib.enc_direction = 1;
 
 	/* is_calibrated / motor_type / direction / 减速器 / 编码器 / 功率级 /
 	 * 电流采样 / PID 等不在此覆盖，保留 motor_info_init() 的默认值。*/
@@ -91,6 +94,7 @@ void motor_profile_apply_info_default(void *cfg)
 	p->blocks.motor_calib.flux_linkage       = MOTOR_FLUX;
 	p->blocks.motor_calib.torque_constant    = MOTOR_KT;
 	p->blocks.motor_calib.rotor_inertia      = MOTOR_INERTIA;
+	p->blocks.motor_calib.enc_direction     = 1; /* 默认 CW(正向) */
 
 	/* 同时设置 config_version，标记当前 profile 版本 */
 	p->blocks.system.config_version = MOTOR_PROFILE_CONFIG_VERSION;

@@ -28,7 +28,7 @@ void calib_hw_apply_voltage(calib_hw_session_t *s, float ud, float uq, float the
 /* 撤销电压输出（PWM 三相置零）*/
 void calib_hw_apply_zero(struct dev_motor *m);
 
-/* 获取 MT6701 原始角度(°) [0,360)，不含 offset/dir 补偿 */
+/* 获取编码器原始角度(°) [0,360)，不含 offset/dir 补偿（通过抽象层访问）*/
 float calib_hw_get_encoder_raw_deg(struct dev_motor *m);
 
 /* 获取编码器当前机械角度(°) [0,360)，含 offset/dir 补偿 */

@@ -17,8 +17,7 @@
 #include "calib_config.h"
 #include "calib_mgr.h"
 #include "calib_hw.h"
-#include "dev_motor.h"
-#include "dev_mt6701.h"
+#include "dev_motor.h"     /* 通过 dev_motor_t.encoder 抽象层访问编码器，不直接依赖具体芯片 */
 #include "motor_param.h"
 #include "calib_step.h"
 #include "calib_validate.h"
@@ -37,7 +36,7 @@ static struct
  * STEP 0: 初始化，施加 ud 电压（电角度强制为0），转子开始对齐
  * STEP 1: 等待转子稳定对齐（CALIB_CFG_L3_ALIGN_TICKS 个周期）
  * STEP 2: 多次采样编码器原始角度取平均
- * STEP 3: 写入 offset 到 encoder_param 和 dev_mt6701，撤销电压，完成
+ * STEP 3: 写入 offset 到抽象编码器层和 encoder_param，撤销电压，完成
  * ========================================================== */
 static calib_state_e poll_zero_offset(void)
 {
@@ -70,9 +69,9 @@ static calib_state_e poll_zero_offset(void)
 		case 3: /* 写入标定结果，完成 */
 		{
 			float avg_deg = calib_step_average(&s_l3.step);
-			/* 写入 dev_mt6701 运行时（offset = 对齐位置的原始角度，使 mech_angle=0）*/
-			m->mt6701.offset = avg_deg;
-			m->mt6701.dir = MT6701_DIR_CW; /* 零位标定先置 CW，方向由后续方向标定确定 */
+			/* 通过抽象编码器层写入运行时（offset = 对齐位置的原始角度，使 mech_angle=0）*/
+			m->encoder.set_offset(&m->encoder, avg_deg);
+			m->encoder.set_dir(&m->encoder, 1); /* 零位标定先置 CW，方向由后续方向标定确定 */
 			/* 写入 motor_param_t（持久化），enc_offset 用 deg 角度值 */
 			if (!calib_validate_enc_offset(avg_deg))
 			{
@@ -137,18 +136,11 @@ static calib_state_e poll_direction(void)
 			else if (delta < -180.0f)
 				delta += 360.0f;
 
-			mt6701_dir_e dir;
 			int8_t enc_dir;
 			if (delta > 1.0f) /* 角度增大 → 正向 CW */
-			{
-				dir = MT6701_DIR_CW;
 				enc_dir = 1;
-			}
 			else if (delta < -1.0f) /* 角度减小 → 反向 CCW */
-			{
-				dir = MT6701_DIR_CCW;
 				enc_dir = -1;
-			}
 			else /* 角度几乎无变化，可能电机未转动 */
 			{
 				calib_hw_exit(&s_l3.session);
@@ -160,8 +152,8 @@ static calib_state_e poll_direction(void)
 				calib_hw_exit(&s_l3.session);
 				return CALIB_STATE_FAILED;
 			}
-			/* 写入 dev_mt6701 运行时 */
-			m->mt6701.dir = dir;
+			/* 通过抽象编码器层写入运行时方向（统一 -1/1 约定）*/
+			m->encoder.set_dir(&m->encoder, enc_dir);
 			/* 写入 motor_param_t（持久化） */
 			motor_param_set_enc_direction(io->param, enc_dir);
 			(void)motor_info_calib_submit_enc_direction(enc_dir);

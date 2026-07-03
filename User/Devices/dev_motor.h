@@ -68,7 +68,14 @@ typedef struct
  *          ctx，并将其 update / get_mechanical_angle 适配到本接口。
  *          调用约定：先 update(self) 刷新，再读 self->mechanical_angle，
  *          或调 get_mechanical_angle(self)。
- *          注：本结构与 dev_motor_virtual.h 中的同名定义保持布局一致（二选一编译）。
+ *
+ * @par 标定扩展接口（set_offset / set_dir / get_raw_deg）
+ *          供 calib_hw / calib_level3 等标定模块使用，统一通过抽象层访问编码器，
+ *          不直接依赖具体芯片。方向统一为 -1/1 约定（1=CW 正向, -1=CCW 反向），
+ *          角度统一为 deg 单位。
+ *          虚拟模式下这些方法可为 NULL（标定不在虚拟模式运行）。
+ *
+ * @note 本结构与 dev_motor_virtual.h 中的同名定义保持布局一致（二选一编译）。
  */
 typedef struct dev_encoder
 {
@@ -76,6 +83,12 @@ typedef struct dev_encoder
 	float mechanical_angle; // 最新机械角度(deg)，update 后刷新
 	void (*update)(struct dev_encoder *pobj);
 	float (*get_mechanical_angle)(struct dev_encoder *pobj);
+	/* 标定扩展接口：统一 -1/1 方向约定，统一 deg 单位 */
+	void (*set_offset)(struct dev_encoder *pobj, float offset_deg); /* 设置零点偏移(deg) */
+	float (*get_offset)(struct dev_encoder *pobj);                   /* 读取零点偏移(deg) */
+	void (*set_dir)(struct dev_encoder *pobj, int8_t dir);           /* 设置方向: 1=CW, -1=CCW */
+	int8_t (*get_dir)(struct dev_encoder *pobj);                     /* 读取方向: 1/-1 */
+	float (*get_raw_deg)(struct dev_encoder *pobj);                 /* 原始角度(deg)，未补偿 */
 } dev_encoder_t;
 
 typedef struct dev_motor

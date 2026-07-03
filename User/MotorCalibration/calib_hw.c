@@ -9,7 +9,6 @@
 #include "calib_config.h"
 #include "calib_mgr.h" /* calib_mgr_get_io() —— abort 时取 motor 用 */
 #include "dev_motor.h"
-#include "dev_mt6701.h"
 
 /* ===================== 模块私有：当前活动会话（单例）===================== */
 static calib_hw_session_t *s_active = NULL;
@@ -74,9 +73,8 @@ void calib_hw_apply_zero(struct dev_motor *m)
 
 float calib_hw_get_encoder_raw_deg(struct dev_motor *m)
 {
-	dev_mt6701_t *enc = &m->mt6701;
-	enc->update(enc);
-	return (float)enc->raw / MT6701_ANGLE_RESOLUTION * 360.0F;
+	/* 通过抽象编码器层访问，不直接依赖 MT6701/MT6835 具体芯片 */
+	return m->encoder.get_raw_deg(&m->encoder);
 }
 
 float calib_hw_get_encoder_mech_angle(struct dev_motor *m)
