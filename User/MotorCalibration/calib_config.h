@@ -68,10 +68,21 @@
 #define CALIB_CFG_L2_PHASE_SEQ_STEP_S      0.5f /* 步进后等待(s) */
 #define CALIB_CFG_L2_PHASE_SEQ_STEP_TICKS  (uint32_t)(CALIB_CFG_L2_PHASE_SEQ_STEP_S * CALIB_TICKS_PER_SEC)
 
-/* 极对数辨识：驱动电压 = 测试电流 × R */
-#define CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V  (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
-#define CALIB_CFG_L2_POLE_PAIRS_SPIN_S     1.0f /* 转动时间(s) */
-#define CALIB_CFG_L2_POLE_PAIRS_SPIN_TICKS (uint32_t)(CALIB_CFG_L2_POLE_PAIRS_SPIN_S * CALIB_TICKS_PER_SEC)
+/* 极对数辨识：开环强制电角度扫描法
+ * 施加 ud 锁定转子跟随"强制电角度"，匀速扫过 N 个完整电周期，
+ *   pole_pairs = 命令电角度变化(N·2π，精确已知) / 实测机械角变化
+ * 分子是我方开环命令值（独立、精确），分母是编码器实测机械角，两者独立可测。
+ * 【禁止】用 motor_param.ele_radian 反推——该量 = 机械角×已配置极对数，
+ *   是循环自证的派生量，最好情况只把配置值还回来，测不出真实极对数。*/
+#define CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
+#define CALIB_CFG_L2_POLE_PAIRS_ALIGN_S     1.0f /* 对齐 d 轴等待(s)，让转子锁到 theta=0 */
+#define CALIB_CFG_L2_POLE_PAIRS_ALIGN_TICKS (uint32_t)(CALIB_CFG_L2_POLE_PAIRS_ALIGN_S * CALIB_TICKS_PER_SEC)
+#define CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES  8u   /* 扫描的完整电周期数（越多量化误差越小）*/
+#define CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ 2.0f /* 电角度扫描频率(电周期/秒)，慢速确保转子跟随 */
+/* 每 tick 电角度增量(rad) = 2π·f / ticks_per_sec */
+#define CALIB_CFG_L2_POLE_PAIRS_DTHETA_RAD  (2.0f * 3.14159265F * CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ / CALIB_TICKS_PER_SEC)
+/* 扫描目标：命令电角度累加到 N·2π 即结束 */
+#define CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD  (2.0f * 3.14159265F * (float)CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES)
 
 /* ===================== L3 编码器校准参数（从 MOTOR_* 派生）===================== */
 /* 零位标定：对齐电压 = 测试电流 × R（d 轴锁定）*/

@@ -31,8 +31,10 @@ static struct
 	calib_step_t step;          /* 统一状态机骨架（cur/tick/sample_cnt/sample_sum）*/
 	calib_hw_session_t session; /* 标定电压会话（替换电角度回调 + 施加电压）*/
 	float prev_i;               /* 前一次采样电流（Ld/Lq 阶跃求 did/dt 用）*/
-	float start_mech_deg;       /* 起始机械角度（相序/极对数用）*/
-	float start_ele_rad;        /* 起始电角度（极对数用）*/
+	float start_mech_deg;       /* 起始机械角度（相序用）*/
+	float scan_ele_rad;         /* 极对数扫描：当前命令电角度累加值(rad，不折返)*/
+	float accum_mech_deg;       /* 极对数扫描：连续累加的机械角(deg，跨 360° 不 wrap)*/
+	float prev_mech_deg;        /* 极对数扫描：上一 tick 机械角原始读数(deg，用于差分)*/
 	float test_voltage;         /* 本次施加的测试电压（R/Ld/Lq/flux 算结果时用）*/
 } s_l2;
 
@@ -406,15 +408,23 @@ static calib_state_e poll_phase_seq(void)
 	}
 }
 
-/* ===================== 极对数辨识 =====================
- * STEP 0: 记录起始电角度，施加 uq 让电机转动
- * STEP 1: 持续驱动转动 CALIB_CFG_L2_POLE_PAIRS_SPIN_TICKS
- * STEP 2: 计算极对数 = 电角度变化 / 机械角度变化，取整校验写入
+/* ===================== 极对数辨识（开环强制电角度扫描法）=====================
+ * STEP 0: 进入会话接管电角度，施加 ud 锁定转子到强制电角度 0（对齐 d 轴）
+ * STEP 1: 等待对齐稳定
+ * STEP 2: 记录起始机械角，初始化连续累加器
+ * STEP 3: 每 tick 递增强制电角度（开环扫描），同时对机械角做连续累加（unwrap），
+ *         命令电角度累加到 N·2π 即结束
+ * STEP 4: pole_pairs = 命令电角度总量(N·2π) / |累计机械弧度|，四舍五入校验写入
  *
- * 原理：电机转 1 圈机械角度（360°），电角度变化 = 360° * pole_pairs
- *   pole_pairs = 电角度变化 / 机械角度变化
- *   电角度从 motor_param.ele_radian 读（rad），机械角度从编码器读（deg→rad）
- * ===================================================== */
+ * 原理：转子的 d 轴始终锁在我方"强制施加"的电角度上。强制电角度扫过 N 个
+ *   完整电周期（= N·2π，精确已知），转子机械角实际转过 N/pole_pairs 圈。
+ *     pole_pairs = 命令电角度总量 / 实测机械角总量
+ *   分子由我方开环命令决定（独立精确），分母由编码器实测——两者独立，可真辨识。
+ *
+ * 【与旧实现的本质区别】旧版读 motor_param.ele_radian 反推，而该量本身 =
+ *   机械角 × 已配置极对数，是循环自证的派生量（且被 normalize_angle 折返破坏），
+ *   最好情况只把配置值 7 还回来，实测因双重折返坍缩到 2。故彻底改为开环扫描。
+ * =========================================================================== */
 static calib_state_e poll_pole_pairs(void)
 {
 	const calib_io_t *io = calib_mgr_get_io();
@@ -422,47 +432,59 @@ static calib_state_e poll_pole_pairs(void)
 
 	switch (s_l2.step.cur)
 	{
-		case 0:                              /* 记录起始角度，驱动转动 */
-			s_l2.session.motor = m;
-			s_l2.session.orig_ele_cb = NULL; /* 不替换回调，需实时电角度 */
-			s_l2.session.forced_ele_angle = 0.0f;
-			s_l2.start_ele_rad = m->motor_param.ele_radian;
-			s_l2.start_mech_deg = calib_hw_get_encoder_mech_angle(m);
-			calib_hw_apply_voltage(&s_l2.session, 0.0f, CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V, m->motor_param.ele_radian);
+		case 0: /* 接管电角度，锁定转子到强制电角度 0 */
+			calib_hw_enter(&s_l2.session, m);
+			s_l2.scan_ele_rad = 0.0f;
+			calib_hw_apply_voltage(&s_l2.session, CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V, 0.0f, s_l2.scan_ele_rad);
 			calib_step_next(&s_l2.step, 1);
 			return CALIB_STATE_RUNNING;
 
-		case 1: /* 持续转动 */
-			calib_hw_apply_voltage(&s_l2.session, 0.0f, CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V, m->motor_param.ele_radian);
-			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_POLE_PAIRS_SPIN_TICKS))
+		case 1: /* 等待转子对齐到 d 轴 */
+			calib_hw_apply_voltage(&s_l2.session, CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V, 0.0f, s_l2.scan_ele_rad);
+			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_POLE_PAIRS_ALIGN_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 2);
 			return CALIB_STATE_RUNNING;
 
-		case 2: /* 计算极对数 */
+		case 2: /* 记录起始机械角，初始化连续累加器 */
+			s_l2.start_mech_deg = calib_hw_get_encoder_mech_angle(m);
+			s_l2.prev_mech_deg = s_l2.start_mech_deg;
+			s_l2.accum_mech_deg = 0.0f;
+			calib_step_next(&s_l2.step, 3);
+			return CALIB_STATE_RUNNING;
+
+		case 3: /* 开环扫描：递增强制电角度 + 机械角连续累加（unwrap）*/
 		{
-			float end_ele_rad = m->motor_param.ele_radian;
-			float end_mech_deg = calib_hw_get_encoder_mech_angle(m);
+			/* 递增命令电角度（不折返，作为精确分子）*/
+			s_l2.scan_ele_rad += CALIB_CFG_L2_POLE_PAIRS_DTHETA_RAD;
+			calib_hw_apply_voltage(&s_l2.session, CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V, 0.0f, s_l2.scan_ele_rad);
 
-			/* 机械角度变化（deg → rad）*/
-			float dmech_deg = end_mech_deg - s_l2.start_mech_deg;
-			if (dmech_deg > 180.0f)
-				dmech_deg -= 360.0f;
-			else if (dmech_deg < -180.0f)
-				dmech_deg += 360.0f;
-			float dmech_rad = dmech_deg * (3.14159265F / 180.0F);
+			/* 机械角差分并去 ±360° 跳变，累加成连续量 */
+			float mech_deg = calib_hw_get_encoder_mech_angle(m);
+			float dmech = mech_deg - s_l2.prev_mech_deg;
+			if (dmech > 180.0f)
+				dmech -= 360.0f;
+			else if (dmech < -180.0f)
+				dmech += 360.0f;
+			s_l2.accum_mech_deg += dmech;
+			s_l2.prev_mech_deg = mech_deg;
 
-			/* 电角度变化（rad），取绝对值（单圈值差分近似）*/
-			float dele_rad = end_ele_rad - s_l2.start_ele_rad;
-			if (dele_rad < 0)
-				dele_rad = -dele_rad;
+			if (s_l2.scan_ele_rad < CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD)
+				return CALIB_STATE_RUNNING;
+			calib_step_next(&s_l2.step, 4);
+			return CALIB_STATE_RUNNING;
+		}
 
-			calib_hw_apply_zero(m);
+		case 4: /* 计算极对数 */
+		{
+			calib_hw_exit(&s_l2.session); /* 撤销电压并恢复电角度回调 */
 
-			if (fabsf(dmech_rad) < 0.1f)
-				return CALIB_STATE_FAILED; /* 电机未转动 */
+			float dmech_rad = fabsf(s_l2.accum_mech_deg) * (3.14159265F / 180.0F);
+			if (dmech_rad < 0.1f)
+				return CALIB_STATE_FAILED; /* 转子未跟随转动 */
 
-			float pp_f = dele_rad / dmech_rad;
+			/* pole_pairs = 命令电角度总量 / 实测机械角总量 */
+			float pp_f = CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD / dmech_rad;
 			uint8_t pp = (uint8_t)(pp_f + 0.5f); /* 四舍五入 */
 
 			if (!calib_validate_pole_pairs(pp))
@@ -475,7 +497,7 @@ static calib_state_e poll_pole_pairs(void)
 		}
 
 		default:
-			calib_hw_apply_zero(m);
+			calib_hw_exit(&s_l2.session);
 			return CALIB_STATE_FAILED;
 	}
 }
