@@ -1,4 +1,4 @@
-﻿id,param_name,description,group,access,data_type,array_size,default_value,unit,min_value,max_value,notes
+id,param_name,description,group,access,data_type,array_size,default_value,unit,min_value,max_value,notes
 1,motor_id,电机实例ID,MotorInstance,RW,uint8_t,1,0,,0,31,多电机系统的唯一标识
 2,motor_name,电机名称字符串,MotorInstance,RW,char,16,0,,0,0,16字节电机名称字符串
 3,r,定子相电阻,MotorConfig,RW,float,1,0.1,ohm,0.001,10,FOC算法核心参数
@@ -25,7 +25,7 @@
 24,gear_backlash,减速器回程间隙,GearboxConfig,RW,float,1,0.01,rad,0,0.5,机械回程间隙
 25,enc_lines,编码器分辨率,EncoderConfig,RW,uint32_t,1,4000,CPR,100,1e+06,每转计数
 26,enc_direction,编码器计数方向,EncoderConfig,RW,int8_t,1,1,,-1,1,"1=正向, -1=反向"
-27,enc_offset,编码器初始位置偏移,EncoderConfig,RW,int32_t,1,0,counts,-2147483648,2147483647,
+27,enc_offset,编码器初始位置偏移,EncoderConfig,RW,float,1,0,deg,-360.0,360.0,
 28,elec_angle_bias,电角度偏移,EncoderConfig,RW,float,1,0,rad,-3.1416,3.1416,校准后自动保存
 29,pos_filter_alpha,位置滤波系数,EncoderConfig,RW,float,1,0.1,,0,1,一阶低通滤波系数
 30,enc_type,编码器类型,EncoderConfig,RW,uint8_t,1,0,,0,10,"0=ABZ增量式,1=SPI绝对值,2=BiSS-C,3=霍尔"

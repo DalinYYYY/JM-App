@@ -109,7 +109,7 @@ extern "C"
 		uint32_t enc_type;                  /* 编码器类型  [1:MT6701 2:MT6835 0:ABZ增量 3:霍尔 同板可换] */
 		uint32_t enc_lines;                 /* 编码器分辨率 (CPR)  [SPI绝对值为分辨率 增量式为CPR] */
 		int32_t enc_direction;              /* 编码器计数方向  [1:正向 -1:反向] */
-		int32_t enc_offset;                 /* 编码器初始位置偏移 (counts)  [校准后保存] */
+		float enc_offset;                   /* 编码器初始位置偏移 (deg)    [校准后保存] */
 		float elec_angle_bias;              /* 电角度偏移 (rad)  [FOC换相必需 校准后保存 最关键] */
 		uint32_t pwm_freq_hz;               /* PWM载波频率 (Hz)  [不同功率器件可能不同] */
 		float dead_time_ns;                 /* PWM死区时间 (ns)  [不同功率器件可能不同] */
@@ -621,14 +621,14 @@ extern "C"
  * @param   cfg 参数区指针
  * @return  编码器初始位置偏移
  */
-	int32_t motor_info_get_enc_offset(const motor_info_t *cfg);
+	float motor_info_get_enc_offset(const motor_info_t *cfg);
 	/**
  * @brief   设置 编码器初始位置偏移 (counts)
  * @param   cfg 参数区指针
  * @param   value 要设置的值
  * @return  0=成功, -EINVAL=空指针或越界
  */
-	int motor_info_set_enc_offset(motor_info_t *cfg, int32_t value);
+	int motor_info_set_enc_offset(motor_info_t *cfg, float value);
 
 	/**
  * @brief   读取 电角度偏移 (rad)

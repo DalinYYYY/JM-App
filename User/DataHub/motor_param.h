@@ -79,7 +79,7 @@ extern "C"
 	{
 		uint32_t enc_lines;		/* 编码器分辨率 (CPR) */
 		int8_t enc_direction;	/* 编码器计数方向 */
-		int32_t enc_offset;		/* 编码器初始位置偏移 (counts) */
+		float enc_offset;		/* 编码器初始位置偏移 (deg) */
 		float elec_angle_bias;	/* 电角度偏移 (rad) */
 		float pos_filter_alpha; /* 位置滤波系数 */
 		uint8_t enc_type;		/* 编码器类型 */
@@ -640,7 +640,7 @@ extern "C"
  * @param   cfg 电机配置指针
  * @return  编码器初始位置偏移
  */
-	int32_t motor_param_get_enc_offset(const motor_param_t *cfg);
+	float motor_param_get_enc_offset(const motor_param_t *cfg);
 
 	/**
  * @brief   设置编码器初始位置偏移
@@ -648,7 +648,7 @@ extern "C"
  * @param   value 要设置的值
  * @return  0=成功, -EINVAL=参数错误
  */
-	int motor_param_set_enc_offset(motor_param_t *cfg, int32_t value);
+	int motor_param_set_enc_offset(motor_param_t *cfg, float value);
 
 	/**
  * @brief   获取电角度偏移

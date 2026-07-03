@@ -54,7 +54,7 @@ static const motor_param_t g_default_config =
 			{
 							 .enc_lines = 4000,
 							 .enc_direction = 1,
-							 .enc_offset = 43.77f,
+							 .enc_offset = 43.77f,  /* deg */
 							 .elec_angle_bias = 0.0f,
 							 .pos_filter_alpha = 0.1f,
 							 .enc_type = 0,
@@ -198,7 +198,7 @@ int motor_param_validate(const motor_param_t *cfg)
 		return 25;
 	if (cfg->encoder_param.enc_direction < (int8_t)-1 || cfg->encoder_param.enc_direction > (int8_t)1)
 		return 26;
-	if (cfg->encoder_param.enc_offset < (int32_t)-2147483648 || cfg->encoder_param.enc_offset > (int32_t)2147483647)
+	if (cfg->encoder_param.enc_offset < -360.0f || cfg->encoder_param.enc_offset > 360.0f)
 		return 27;
 	if (cfg->encoder_param.elec_angle_bias < -3.1416f || cfg->encoder_param.elec_angle_bias > 3.1416f)
 		return 28;
@@ -355,7 +355,7 @@ void motor_param_print(const motor_param_t *cfg)
 	printf("\n--- Encoder Parameters ---\n");
 	printf("enc_lines: %u CPR\n", (unsigned)cfg->encoder_param.enc_lines);
 	printf("enc_direction: %d\n", (int)cfg->encoder_param.enc_direction);
-	printf("enc_offset: %d counts\n", (int)cfg->encoder_param.enc_offset);
+	printf("enc_offset: %.4f deg\n", cfg->encoder_param.enc_offset);
 	printf("elec_angle_bias: %f rad\n", cfg->encoder_param.elec_angle_bias);
 	printf("pos_filter_alpha: %f\n", cfg->encoder_param.pos_filter_alpha);
 	printf("enc_type: %u\n", (unsigned)cfg->encoder_param.enc_type);
@@ -869,17 +869,17 @@ int motor_param_set_enc_direction(motor_param_t *cfg, int8_t value)
 	return 0;
 }
 
-int32_t motor_param_get_enc_offset(const motor_param_t *cfg)
+float motor_param_get_enc_offset(const motor_param_t *cfg)
 {
 	return cfg->encoder_param.enc_offset;
 }
 
-int motor_param_set_enc_offset(motor_param_t *cfg, int32_t value)
+int motor_param_set_enc_offset(motor_param_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < (int32_t)-2147483648 || value > (int32_t)2147483647)
+	if (value < -360.0f || value > 360.0f)
 		return -EINVAL;
 
 	cfg->encoder_param.enc_offset = value;

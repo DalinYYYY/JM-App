@@ -124,9 +124,8 @@ void dev_motor_init(dev_motor_t *pobj,
 	{
 		const encoder_param_t *enc_cfg = &usr.motor_param[(motor_num_e)id].encoder_param;
 
-		/* enc_offset 为编码器计数值，转换为角度(°)写入 dev_mt6701 */
-		float offset_deg = (float)enc_cfg->enc_offset / MT6701_ANGLE_RESOLUTION * 360.0F;
-		pobj->mt6701.offset = offset_deg;
+		/* enc_offset 已为角度值(deg)，直接写入 dev_mt6701 */
+		pobj->mt6701.offset = enc_cfg->enc_offset;
 		pobj->mt6701.dir = (enc_cfg->enc_direction < 0) ? MT6701_DIR_CCW : MT6701_DIR_CW;
 	}
 

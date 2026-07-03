@@ -304,7 +304,7 @@ static const param_desc_t s_param_tbl[MOTOR_PARAM_PARAM_COUNT] = {
 	/* 24~31 编码器 */
 	PARAM_ENT(encoder_param, encoder_param_t, enc_lines, JM_PT_U32),
 	PARAM_ENT(encoder_param, encoder_param_t, enc_direction, JM_PT_I8),
-	PARAM_ENT(encoder_param, encoder_param_t, enc_offset, JM_PT_I32),
+	PARAM_ENT(encoder_param, encoder_param_t, enc_offset, JM_PT_F32),
 	PARAM_ENT(encoder_param, encoder_param_t, elec_angle_bias, JM_PT_F32),
 	PARAM_ENT(encoder_param, encoder_param_t, pos_filter_alpha, JM_PT_F32),
 	PARAM_ENT(encoder_param, encoder_param_t, enc_type, JM_PT_U8),

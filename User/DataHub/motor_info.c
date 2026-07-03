@@ -68,7 +68,7 @@ int motor_info_init(motor_info_t *cfg)
 	cfg->blocks.motor_calib.enc_type = 1U;
 	cfg->blocks.motor_calib.enc_lines = 16384U;
 	cfg->blocks.motor_calib.enc_direction = 1;
-	cfg->blocks.motor_calib.enc_offset = 0;
+	cfg->blocks.motor_calib.enc_offset = 0.0f;
 	cfg->blocks.motor_calib.elec_angle_bias = 0.0f;
 	cfg->blocks.motor_calib.pwm_freq_hz = 20000U;
 	cfg->blocks.motor_calib.dead_time_ns = 500.0f;
@@ -202,7 +202,7 @@ int motor_info_validate(const motor_info_t *cfg)
 		return 35; /* enc_lines */
 	if (cfg->blocks.motor_calib.enc_direction < (int32_t)-1 || cfg->blocks.motor_calib.enc_direction > (int32_t)1)
 		return 36; /* enc_direction */
-	if (cfg->blocks.motor_calib.enc_offset < (int32_t)-2147483648 || cfg->blocks.motor_calib.enc_offset > (int32_t)2147483647)
+	if (cfg->blocks.motor_calib.enc_offset < -360.0f || cfg->blocks.motor_calib.enc_offset > 360.0f)
 		return 37; /* enc_offset */
 	if (cfg->blocks.motor_calib.elec_angle_bias < -3.1416f || cfg->blocks.motor_calib.elec_angle_bias > 3.1416f)
 		return 38; /* elec_angle_bias */
@@ -370,7 +370,7 @@ void motor_info_print(const motor_info_t *cfg)
 	printf("enc_type: %u\n", (unsigned)cfg->blocks.motor_calib.enc_type);
 	printf("enc_lines: %u CPR\n", (unsigned)cfg->blocks.motor_calib.enc_lines);
 	printf("enc_direction: %d\n", (int)cfg->blocks.motor_calib.enc_direction);
-	printf("enc_offset: %d counts\n", (int)cfg->blocks.motor_calib.enc_offset);
+	printf("enc_offset: %.4f deg\n", cfg->blocks.motor_calib.enc_offset);
 	printf("elec_angle_bias: %f rad\n", cfg->blocks.motor_calib.elec_angle_bias);
 	printf("pwm_freq_hz: %u Hz\n", (unsigned)cfg->blocks.motor_calib.pwm_freq_hz);
 	printf("dead_time_ns: %f ns\n", cfg->blocks.motor_calib.dead_time_ns);
@@ -836,16 +836,16 @@ int motor_info_set_enc_direction(motor_info_t *cfg, int32_t value)
 	return 0;
 }
 
-int32_t motor_info_get_enc_offset(const motor_info_t *cfg)
+float motor_info_get_enc_offset(const motor_info_t *cfg)
 {
 	return cfg->blocks.motor_calib.enc_offset;
 }
 
-int motor_info_set_enc_offset(motor_info_t *cfg, int32_t value)
+int motor_info_set_enc_offset(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (int32_t)-2147483648 || value > (int32_t)2147483647)
+	if (value < -360.0f || value > 360.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.enc_offset = value;
 	return 0;
@@ -1939,10 +1939,10 @@ int motor_info_dispatch_read(uint16_t pid, const motor_info_t *cfg, uint8_t out4
 			return 0;
 		}
 		case 37:
-		{ /* enc_offset (int32_t) */
-			int32_t v = motor_info_get_enc_offset(cfg);
+		{ /* enc_offset (float, deg) */
+			float v = motor_info_get_enc_offset(cfg);
 			memcpy(out4, &v, 4);
-			*out_type = 5;
+			*out_type = 6;
 			*out_len = 4;
 			return 0;
 		}
@@ -2597,8 +2597,8 @@ int motor_info_dispatch_write(uint16_t pid, motor_info_t *cfg, const uint8_t in4
 			return (rc == 0) ? 0 : -2;
 		}
 		case 37:
-		{ /* enc_offset (int32_t) */
-			int32_t v;
+		{ /* enc_offset (float, deg) */
+			float v;
 			memcpy(&v, in4, 4);
 			int rc = motor_info_set_enc_offset(cfg, v);
 			return (rc == 0) ? 0 : -2;
