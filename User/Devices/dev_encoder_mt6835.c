@@ -1,0 +1,80 @@
+/**
+ * @file        dev_encoder_mt6835.c
+ * @brief       MT6835 编码器适配层实现
+ */
+#include "dev_encoder_mt6835.h"
+
+#if defined(USE_DEV_MT6835)
+
+#include <string.h>
+#include "assert_report.h"
+
+static dev_mt6835_t s_mt6835[MT6835_ID_MAX];
+
+/* ---- MT6835 → 抽象编码器 适配函数 ---- */
+
+static void encoder_mt6835_update(struct dev_encoder *enc)
+{
+    dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+    chip->update(chip);
+    enc->mechanical_angle = chip->get_mechanical_angle(chip);
+}
+
+static float encoder_mt6835_get_mechanical_angle(struct dev_encoder *enc)
+{
+    return enc->mechanical_angle;
+}
+
+static void encoder_mt6835_set_offset(struct dev_encoder *enc, float offset_deg)
+{
+    dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+    chip->set_offset(chip, offset_deg);
+}
+
+static float encoder_mt6835_get_offset(struct dev_encoder *enc)
+{
+    dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+    return chip->offset;
+}
+
+static void encoder_mt6835_set_dir(struct dev_encoder *enc, int8_t dir)
+{
+    dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+    /* MT6835 约定：running_dir > 1 表示反向，适配到 -1/1 */
+    chip->set_dir(chip, (dir < 0) ? 2 : 1);
+}
+
+static int8_t encoder_mt6835_get_dir(struct dev_encoder *enc)
+{
+    dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+    return (chip->running_dir > 1) ? -1 : 1;
+}
+
+static float encoder_mt6835_get_raw_deg(struct dev_encoder *enc)
+{
+    dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
+    /* MT6835 21bit 原始角度转 deg */
+    return (float)chip->get_mechanical_angle_raw(chip) / MT6835_ANGLE_RESOLUTION * 360.0F;
+}
+
+/* ---- 工厂函数 ---- */
+
+void dev_encoder_mt6835_create(dev_encoder_t *enc, mt6835_id_e id)
+{
+    assert_report(enc != NULL);
+    assert_report(id < MT6835_ID_MAX);
+
+    dev_mt6835_init(&s_mt6835[id], id);
+
+    enc->ctx = &s_mt6835[id];
+    enc->mechanical_angle = 0.0F;
+    enc->update = encoder_mt6835_update;
+    enc->get_mechanical_angle = encoder_mt6835_get_mechanical_angle;
+    enc->set_offset = encoder_mt6835_set_offset;
+    enc->get_offset = encoder_mt6835_get_offset;
+    enc->set_dir = encoder_mt6835_set_dir;
+    enc->get_dir = encoder_mt6835_get_dir;
+    enc->get_raw_deg = encoder_mt6835_get_raw_deg;
+}
+
+#endif /* USE_DEV_MT6835 */

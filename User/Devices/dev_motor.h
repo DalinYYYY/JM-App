@@ -20,11 +20,10 @@
 #define __DEV_MOTOR_H__
 
 #include <stdint.h>
-#include "dev_mt6701.h"
+#include "dev_encoder.h"        /* dev_encoder_t 抽象接口（替代内联定义）*/
 #include "foc_core.h"
 #include "dev_power_monitor.h"
 #include "dev_half_bridge.h"
-#include "dev_mt6835.h"
 #include "motion_param.h"
 #include "multiturn_counter.h"
 #include "dev_motor_phase_current.h"
@@ -61,35 +60,7 @@ typedef struct
 	float current_target;  // 电流环目标
 } motor_ctrl_target_t;
 
-/**
- * @brief 抽象编码器接口（与具体芯片型号无关）
- * @details 控制层只面向本接口，不感知背后是 MT6701 / MT6835 / AS5047 等。
- *          dev_motor_init 把选定的具体编码器对象（&mt6701 / &mt6835 ...）绑定到
- *          ctx，并将其 update / get_mechanical_angle 适配到本接口。
- *          调用约定：先 update(self) 刷新，再读 self->mechanical_angle，
- *          或调 get_mechanical_angle(self)。
- *
- * @par 标定扩展接口（set_offset / set_dir / get_raw_deg）
- *          供 calib_hw / calib_level3 等标定模块使用，统一通过抽象层访问编码器，
- *          不直接依赖具体芯片。方向统一为 -1/1 约定（1=CW 正向, -1=CCW 反向），
- *          角度统一为 deg 单位。
- *          虚拟模式下这些方法可为 NULL（标定不在虚拟模式运行）。
- *
- * @note 本结构与 dev_motor_virtual.h 中的同名定义保持布局一致（二选一编译）。
- */
-typedef struct dev_encoder
-{
-	void *ctx;              // 指向具体编码器对象
-	float mechanical_angle; // 最新机械角度(deg)，update 后刷新
-	void (*update)(struct dev_encoder *pobj);
-	float (*get_mechanical_angle)(struct dev_encoder *pobj);
-	/* 标定扩展接口：统一 -1/1 方向约定，统一 deg 单位 */
-	void (*set_offset)(struct dev_encoder *pobj, float offset_deg); /* 设置零点偏移(deg) */
-	float (*get_offset)(struct dev_encoder *pobj);                   /* 读取零点偏移(deg) */
-	void (*set_dir)(struct dev_encoder *pobj, int8_t dir);           /* 设置方向: 1=CW, -1=CCW */
-	int8_t (*get_dir)(struct dev_encoder *pobj);                     /* 读取方向: 1/-1 */
-	float (*get_raw_deg)(struct dev_encoder *pobj);                 /* 原始角度(deg)，未补偿 */
-} dev_encoder_t;
+/* dev_encoder_t 已移至 dev_encoder.h，此处不再重复定义 */
 
 typedef struct dev_motor
 {
@@ -104,9 +75,7 @@ typedef struct dev_motor
 	timNumber_e fsm_tim;        // 状态机定时器
 
 	/* public */
-	dev_encoder_t encoder;             // 抽象编码器（型号无关，控制层入口）
-	dev_mt6701_t mt6701;               // mt6701（具体芯片实体，由 encoder.ctx 绑定）
-	dev_mt6835_t mt6835;               // mt6835（具体芯片实体，由 encoder.ctx 绑定）
+	dev_encoder_t encoder;             // 抽象编码器（ctx 指向适配层静态实体）
 	motion_param_t motor_param;        // 角度/速度转化
 	multiturn_t multiturn;             // 绝对多圈计数
 	foc_t foc;                         // foc
@@ -122,7 +91,7 @@ void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
  * @brief 运行时翻转编码器方向(换电机/换安装后快速调试用)
  * @param pobj  电机设备对象
  * @param dir   方向: 1=CW(正向), -1=CCW(反向)
- * @note  同步更新 mt6701.dir 与 usr.motor_param.encoder_param.enc_direction,
+ * @note  通过抽象编码器层 set_dir 设置方向，同步更新 usr.motor_param.encoder_param.enc_direction,
  *        无需重新初始化即可生效; 已刷新的 mechanical_angle 会在下次 update 时按新方向计算。
  *        切换方向后建议同时重新校准 enc_offset(零位), 因方向反转后原零位不再有效。
  */

@@ -38,6 +38,7 @@
 #define __DEV_MOTOR_VIRTUAL_H__
 
 #include <stdint.h>
+#include "dev_encoder.h"        /* dev_encoder_t 抽象接口（与 dev_motor.h 共享同一定义）*/
 #include "foc_core.h"		  // 真实 foc_t / focCurrent_t（虚拟实现复用其类型）
 #include "motion_param.h" // 真实 motion_param_t（虚拟实现复用其类型）
 #include "multiturn_counter.h"	  // 真实 multiturn_t（虚拟实现复用其类型）
@@ -60,34 +61,7 @@ typedef struct
  * 仅保留三环控制层会访问到的成员。
  *------------------------------------------------------------------------*/
 
-/**
- * @brief 抽象编码器接口（与具体芯片型号无关）
- * @details 控制层只面向本接口，不感知背后是 MT6701 / MT6835 / AS5047 等。
- *          真实模式下由 dev_motor_init 把具体编码器对象绑定到 ctx，并将其
- *          update / get_mechanical_angle 适配到本接口；虚拟模式下由物理模型实现。
- *          调用约定：先 update(self) 刷新，再读 self->mechanical_angle，
- *          或调 get_mechanical_angle(self)。
- *
- * @par 标定扩展接口（set_offset / set_dir / get_raw_deg）
- *          供 calib_hw / calib_level3 等标定模块使用，统一通过抽象层访问编码器。
- *          方向统一为 -1/1 约定（1=CW 正向, -1=CCW 反向），角度统一为 deg 单位。
- *          虚拟模式下这些方法可为 NULL（标定不在虚拟模式运行）。
- *
- * @note 本结构与 dev_motor.h 中的同名定义保持布局一致（二选一编译）。
- */
-typedef struct dev_encoder
-{
-	void *ctx;				// 指向具体编码器对象（dev_mt6701_t* / dev_mt6835_t* ...），虚拟模式可为 NULL
-	float mechanical_angle; // 最新机械角度(deg)，update 后刷新
-	void (*update)(struct dev_encoder *pobj);
-	float (*get_mechanical_angle)(struct dev_encoder *pobj);
-	/* 标定扩展接口：统一 -1/1 方向约定，统一 deg 单位（虚拟模式可为 NULL）*/
-	void (*set_offset)(struct dev_encoder *pobj, float offset_deg);
-	float (*get_offset)(struct dev_encoder *pobj);
-	void (*set_dir)(struct dev_encoder *pobj, int8_t dir);
-	int8_t (*get_dir)(struct dev_encoder *pobj);
-	float (*get_raw_deg)(struct dev_encoder *pobj);
-} dev_encoder_t;
+/* dev_encoder_t 已移至 dev_encoder.h，此处不再重复定义 */
 
 /** @brief 三相电流值（对应 dev_current_f3axis_t） */
 typedef struct
