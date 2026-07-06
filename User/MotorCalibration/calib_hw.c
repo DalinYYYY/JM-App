@@ -9,6 +9,10 @@
 #include "calib_config.h"
 #include "calib_mgr.h" /* calib_mgr_get_io() —— abort 时取 motor 用 */
 #include "dev_motor.h"
+#include "motor_loop_config.h"
+#if MOTOR_LOOP_ENABLE_DEV_DRIVER
+#include "dev_power_monitor.h" /* 真实电机：SVPWM 归一化用 Vbus */
+#endif
 
 /* ===================== 模块私有：当前活动会话（单例）===================== */
 static calib_hw_session_t *s_active = NULL;
@@ -55,6 +59,21 @@ void calib_hw_apply_voltage(calib_hw_session_t *s, float ud, float uq, float the
 		ud *= scale;
 		uq *= scale;
 	}
+
+#if MOTOR_LOOP_ENABLE_DEV_DRIVER
+	/* 真实电机 SVPWM 归一化：foc_core.c 的 SVPWM Ts=1.0（归一化周期），
+	 * 输入 u_alpha/u_beta 须为占空比（0~1）而非电压值（伏特）。
+	 * ud/uq 是真实电压，须除以 Vbus 转换为占空比，否则电压值（如 1.865V）
+	 * 会被当作占空比（>>1.0）触发过调制限幅，实际电压幅值失真且随角度
+	 * 非线性波动，导致开环标定（极对数/R/Ld/Lq/flux）结果错误。
+	 * 虚拟电机直接用 ud/uq 推进物理模型（不走 SVPWM），不归一化。*/
+	// float vbus = dev_power_monitor.vbus;
+	float vbus = 12.0f;
+	if (vbus < 1.0f)
+		vbus = 1.0f; /* 保护：Vbus 未就绪时避免除零，标称 Vbus >= 12V */
+	ud /= vbus;
+	uq /= vbus;
+#endif
 
 	s->forced_ele_angle = theta;
 	m->foc.set_udq(&m->foc, ud, uq);

@@ -107,6 +107,11 @@ void motor_loop_init(float current_freq_hz)
 	cascade_control_init(&m->cascade, param, dt_position, dt_velocity);
 	cur_loop_init(&m->current, &m->motor, dt_current);
 
+	// 电源监控(规则组ADC + DMA): 初始化并启动, 供 vbus/ibus 遥测与 SVPWM 归一化使用
+	// 须在 half_bridge.start 之前启动规则组 DMA(独立于注入组, 不依赖 TIM1 触发)
+	dev_power_monitor_init(&dev_power_monitor);
+	(void)dev_power_monitor.start(&dev_power_monitor);
+
 	// 注入组先使能(ADC 注入组 + JEOC 中断), 但转换由 TIM1_CC4 硬件触发,
 	// 必须等 half_bridge.start 启动 TIM1 后才会有转换, JDR 才有有效值。
 	m->motor.phase_current.start(&m->motor.phase_current);
@@ -282,6 +287,15 @@ void motor_loop_isr(void)
 	m->motor.motor_param.update(&m->motor.motor_param,
 	                            MOTION_TYPE_ELE_RADIAN,
 	                            m->motor.encoder.mechanical_angle);
+
+	// 电源监控刷新（速度环节拍 2kHz 足够，母线电压变化缓慢）
+	// vbus 字段供 SVPWM 归一化(calib_hw)与遥测(publish_power_thermal)使用
+	if (vel_tick)
+	{
+		dev_power_monitor.update(&dev_power_monitor);
+		(void)dev_power_monitor.get_vbus(&dev_power_monitor);
+		(void)dev_power_monitor.get_ibus(&dev_power_monitor);
+	}
 
 	// step1: 解算运动反馈（使用本拍刷新的角度）
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);

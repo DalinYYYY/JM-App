@@ -156,4 +156,3 @@ void dev_power_monitor_init(struct dev_power_monitor *pobj)
 }
 
 #endif /* USE_DEV_POWER_MONITOR */
-
