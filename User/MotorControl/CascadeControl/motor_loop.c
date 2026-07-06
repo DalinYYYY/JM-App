@@ -16,7 +16,6 @@
 #include "runtime_param.h"
 #include "motion_param.h"
 #include "multiturn_counter.h"
-#include "dev_power_monitor.h"
 #include "motor_param.h"                       /* motor_param_init 加载默认电机参数 */
 #include "motor_profile.h"                     /* motor_profile_apply_param / sync_to_param */
 #include "motor_info_storage.h"                /* motor_info_storage_get：Flash 加载的标定参数 */
@@ -106,11 +105,6 @@ void motor_loop_init(float current_freq_hz)
 	// 级联外环（位置/速度）与电流环
 	cascade_control_init(&m->cascade, param, dt_position, dt_velocity);
 	cur_loop_init(&m->current, &m->motor, dt_current);
-
-	// 电源监控(规则组ADC + DMA): 初始化并启动, 供 vbus/ibus 遥测与 SVPWM 归一化使用
-	// 须在 half_bridge.start 之前启动规则组 DMA(独立于注入组, 不依赖 TIM1 触发)
-	dev_power_monitor_init(&dev_power_monitor);
-	(void)dev_power_monitor.start(&dev_power_monitor);
 
 	// 注入组先使能(ADC 注入组 + JEOC 中断), 但转换由 TIM1_CC4 硬件触发,
 	// 必须等 half_bridge.start 启动 TIM1 后才会有转换, JDR 才有有效值。
@@ -222,19 +216,15 @@ static void publish_motion(motor_motion_t *mo, const motion_param_t *mp, multitu
 
 /**
  * @brief 发布母线/功率/力矩 0xC4 与温度 0xC5
- * @note  母线/温度来自全局 power_monitor; 力矩估算 = iq*kt*gear。
+ * @note  母线/温度由 period_thread(100ms) 从 dev_power_monitor 同步到 usr,
+ *        中断层不重复读 dev_power_monitor(避免与任务层竞争 + 减少 ISR 耦合)。
+ *        力矩/机械功率依赖本拍 foc/motion_param, 须在 ISR 计算。
  */
 static void publish_power_thermal(motor_state_t *st, const foc_t *foc,
                                   const motion_param_t *mp, const motor_param_t *param)
 {
-	st->power.v_bus = dev_power_monitor.vbus;
-	st->power.i_bus = dev_power_monitor.ibus;
-	st->power.power_elec_w = dev_power_monitor.vbus * dev_power_monitor.ibus;
 	st->power.torque_est = foc->i_dq.q * param->motor_base.kt * param->gearbox_param.gear_ratio;
 	st->power.power_mech_w = st->power.torque_est * mp->slide_rad_s;
-
-	st->thermal.temp_fet = dev_power_monitor.temp_driver;
-	st->thermal.temp_motor = dev_power_monitor.temp_motor;
 }
 
 static void motor_loop_sync_state(motor_loop_t *m)
@@ -287,15 +277,6 @@ void motor_loop_isr(void)
 	m->motor.motor_param.update(&m->motor.motor_param,
 	                            MOTION_TYPE_ELE_RADIAN,
 	                            m->motor.encoder.mechanical_angle);
-
-	// 电源监控刷新（速度环节拍 2kHz 足够，母线电压变化缓慢）
-	// vbus 字段供 SVPWM 归一化(calib_hw)与遥测(publish_power_thermal)使用
-	if (vel_tick)
-	{
-		dev_power_monitor.update(&dev_power_monitor);
-		(void)dev_power_monitor.get_vbus(&dev_power_monitor);
-		(void)dev_power_monitor.get_ibus(&dev_power_monitor);
-	}
 
 	// step1: 解算运动反馈（使用本拍刷新的角度）
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);

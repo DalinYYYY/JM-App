@@ -14,9 +14,9 @@
 
 #include "board_select.h"
 
-#define DEV_EOK 0
-#define DEV_ERROR 1
-#define DEV_ENABLE 1
+#define DEV_EOK     0
+#define DEV_ERROR   1
+#define DEV_ENABLE  1
 #define DEV_DISABLE 0
 
 /* ===================================================================== */
@@ -26,8 +26,9 @@
 #if defined(USE_DEV_POWER_MONITOR)
 #define PM_VREF (3.3f)
 #define PM_RESOLUTION (4096.0f)
-#define PM_VBUS_RATIO (24.0f)
-#define PM_IBUS_RATIO (10.0f)
+#define PM_VBUS_RATIO (11.0f)   /* 板级分压网络 11:1 */
+#define PM_IBUS_RATIO (2.0f)    /* 1/(gain*shunt) = 1/(50*0.01) */
+#define PM_IBUS_OFFSET_V (1.65f) /* INA199B1 REF=VREF/2, 零电流偏置电压 */
 #define PM_TEMP_RATIO (10.0f)
 #endif
 
@@ -38,11 +39,11 @@
 #endif
 
 #if defined(USE_DEV_PHASE_CURRENT)
-#define PHASE_CURRENT_GAIN (50.0f)
-#define PHASE_CURRENT_SHUNT (0.01f)
-#define PHASE_CURRENT_VREF (3.3f)
+#define PHASE_CURRENT_GAIN       (50.0f)
+#define PHASE_CURRENT_SHUNT      (0.01f)
+#define PHASE_CURRENT_VREF       (3.3f)
 #define PHASE_CURRENT_RESOLUTION (4096.0f)
-#define PHASE_CURRENT_LPF_ALPHA (0.9f)
+#define PHASE_CURRENT_LPF_ALPHA  (0.9f)
 /* INA199B1 REF 标称 1.65V (VREF/2), 对应 ADC = 1.65/3.3 * 4096 = 2048
  * 仅作为校准前的兜底默认值; 启动时 cur_loop_calibrate_offset 会用实测均值覆盖 */
 #define PHASE_CURRENT_ZERO_ADC (2048u)

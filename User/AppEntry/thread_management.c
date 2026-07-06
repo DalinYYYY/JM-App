@@ -29,10 +29,10 @@
 #include "thread_idle.h"
 
 #define THREAD_IDLE_SIZE 128 * 2
-#define THREAD_PERIOD_SIZE 128 * 1
+#define THREAD_PERIOD_SIZE 128 * 8
 #define THREAD_DISPLAY_SIZE 128 * 8
 #define THREAD_COMMUN_SIZE 128 * 24 /* 3072B：容纳 motor_info_storage_save(1024B tmp) + crc32_compute 嵌套(1024B) + 调用链余量 */
-#define THREAD_CONTROL_SIZE 128 * 4
+#define THREAD_CONTROL_SIZE 128 * 16
 
 /* 任务列表ID */
 enum

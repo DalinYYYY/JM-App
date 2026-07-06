@@ -119,7 +119,8 @@ static float dev_power_monitor_get_vbus(struct dev_power_monitor *pobj)
 static float dev_power_monitor_get_ibus(struct dev_power_monitor *pobj)
 {
 	assert_report(pobj != NULL);
-	pobj->ibus = pobj->voltage[DRV_ADC_1][PM_IBUS] * PM_IBUS_RATIO;
+	/* INA199B1 双向检测: 零电流时输出 VREF/2, 需减去偏置再乘比例 */
+	pobj->ibus = -((pobj->voltage[DRV_ADC_1][PM_IBUS] - pobj->ibus_offset) * PM_IBUS_RATIO);
 	return pobj->ibus;
 }
 
@@ -146,6 +147,7 @@ void dev_power_monitor_init(struct dev_power_monitor *pobj)
 {
 	assert_report(pobj != NULL);
 
+	pobj->ibus_offset = PM_IBUS_OFFSET_V;
 	pobj->start = dev_power_monitor_start;
 	pobj->update = dev_power_monitor_update;
 	pobj->get_vbus = dev_power_monitor_get_vbus;

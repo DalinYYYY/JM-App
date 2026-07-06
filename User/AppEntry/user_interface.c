@@ -20,6 +20,7 @@
 #include "user_interface.h"
 #include "thread_management.h"
 #include "dev_dwt_counter.h"
+#include "dev_power_monitor.h"
 #include "motor_info_storage.h"
 #include "motor_loop.h"
 #include "motor_loop_config.h"
@@ -33,6 +34,11 @@ static void hardware_init(void)
 
 	/* 初始化 motor_info Flash 存储服务（须在 motor_loop_init 之前） */
 	motor_info_storage_init();
+
+	/* 电源监控(规则组ADC+DMA): 初始化并启动, 供 vbus/ibus 遥测与 SVPWM 归一化使用
+	 * 须在 motor_loop_init 之前启动规则组 DMA(独立于注入组, 不依赖 TIM1 触发) */
+	dev_power_monitor_init(&dev_power_monitor);
+	(void)dev_power_monitor.start(&dev_power_monitor);
 
 	/* 初始化电机三环控制（dev_motor + 状态机 + 级联控制）
      * 电流环频率由 ADC 注入转换中断决定，此处传入实际中断频率 */

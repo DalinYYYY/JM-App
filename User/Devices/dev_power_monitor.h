@@ -91,6 +91,7 @@ extern "C"
 		float voltage[DRV_ADC_MAX][PM_CH_NBRS];
 		int32_t offset[PM_SAMPLE_NBRS];
 
+		float ibus_offset; /* IBUS 零电流偏置电压(V), 默认PM_IBUS_OFFSET_V */
 		float vbus;
 		float ibus;
 		float temp_driver;
