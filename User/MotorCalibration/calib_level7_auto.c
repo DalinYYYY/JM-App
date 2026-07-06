@@ -21,34 +21,94 @@ typedef enum {
 /* 当前策略（可改为运行时配置）*/
 #define CALIB_L7_STRATEGY  CALIB_L7_STRATEGY_STOP
 
+/* ===================== L7 一键标定内容配置 =====================
+ * 通过下面 0/1 开关宏控制 L7 一键标定执行哪些子项。
+ * 改 0 即跳过该子项, 无需动算法代码。
+ *
+ * 注意:
+ *   1. 子项之间的依赖仍需保证顺序 (如 L2.4 Ld 依赖 L2.3 R, 需 R 在前)
+ *   2. L7 全流程成功后会调用 motor_info_calib_mark_calibrated() 置位
+ *      is_calibrated 标记, 下次上电即使用标定值
+ *   3. 默认配置: 电机基础身份(L2) + 编码器标定(L3);
+ *      L1 硬件底层与 L4/L5/L6 高级标定按需开启
+ */
+#define CALIB_L7_ENABLE_L1_ADC_OFFSET        0  /* L1.1 ADC 偏置标定 */
+#define CALIB_L7_ENABLE_L1_ADC_GAIN          0  /* L1.2 ADC 增益标定 */
+#define CALIB_L7_ENABLE_L1_CURRENT_SENSOR    0  /* L1.3 电流传感器标定 */
+#define CALIB_L7_ENABLE_L2_PHASE_SEQ         1  /* L2.1 相序识别 */
+#define CALIB_L7_ENABLE_L2_POLE_PAIRS        1  /* L2.2 极对数辨识 */
+#define CALIB_L7_ENABLE_L2_RESISTANCE        1  /* L2.3 R 相电阻 (Ld/Lq/flux 前置) */
+#define CALIB_L7_ENABLE_L2_INDUCTANCE_D      1  /* L2.4 Ld */
+#define CALIB_L7_ENABLE_L2_INDUCTANCE_Q      1  /* L2.5 Lq */
+#define CALIB_L7_ENABLE_L2_FLUX_LINKAGE      1  /* L2.6 flux (需电机转动) */
+#define CALIB_L7_ENABLE_L3_ZERO_OFFSET       1  /* L3.1 编码器零位 */
+#define CALIB_L7_ENABLE_L3_DIRECTION         1  /* L3.2 编码器方向 */
+#define CALIB_L7_ENABLE_L4_KT                0  /* L4.1 力矩常数 */
+#define CALIB_L7_ENABLE_L5_COGGING           0  /* L5.1 齿槽转矩 */
+#define CALIB_L7_ENABLE_L5_FRICTION          0  /* L5.2 摩擦辨识 */
+#define CALIB_L7_ENABLE_L6_INERTIA           0  /* L6.1 惯量辨识 */
+#define CALIB_L7_ENABLE_L6_PID_AUTOTUNE      0  /* L6.2 PID 自整定 */
+
 static motor_param_t *s_param;
 static float s_dt;
 static uint8_t s_step;        /* 当前执行步骤索引（0..L7_SEQ_LEN）*/
 static uint8_t s_failed_step; /* 失败的步号（0xFF=无失败）*/
 static uint8_t s_retry_count; /* 当前步重试计数 */
 
-/* L7 内部子标定序列定义（真实实现时填充） */
+/* L7 内部子标定序列定义（由上面开关宏条件编译构造） */
 static const struct
 {
 	uint8_t level;
 	uint8_t submode;
 } s_sequence[] = {
+#if CALIB_L7_ENABLE_L1_ADC_OFFSET
 	{CALIB_LEVEL1_DRIVER,    CALIB_L1_ADC_OFFSET    },
+#endif
+#if CALIB_L7_ENABLE_L1_ADC_GAIN
 	{CALIB_LEVEL1_DRIVER,    CALIB_L1_ADC_GAIN      },
+#endif
+#if CALIB_L7_ENABLE_L1_CURRENT_SENSOR
 	{CALIB_LEVEL1_DRIVER,    CALIB_L1_CURRENT_SENSOR},
+#endif
+#if CALIB_L7_ENABLE_L2_PHASE_SEQ
 	{CALIB_LEVEL2_MOTOR,     CALIB_L2_PHASE_SEQ     },
+#endif
+#if CALIB_L7_ENABLE_L2_POLE_PAIRS
 	{CALIB_LEVEL2_MOTOR,     CALIB_L2_POLE_PAIRS    },
+#endif
+#if CALIB_L7_ENABLE_L2_RESISTANCE
 	{CALIB_LEVEL2_MOTOR,     CALIB_L2_RESISTANCE    },  /* R 先做，Ld/Lq 计算需用 R */
+#endif
+#if CALIB_L7_ENABLE_L2_INDUCTANCE_D
 	{CALIB_LEVEL2_MOTOR,     CALIB_L2_INDUCTANCE_D  },
+#endif
+#if CALIB_L7_ENABLE_L2_INDUCTANCE_Q
 	{CALIB_LEVEL2_MOTOR,     CALIB_L2_INDUCTANCE_Q  },
+#endif
+#if CALIB_L7_ENABLE_L2_FLUX_LINKAGE
 	{CALIB_LEVEL2_MOTOR,     CALIB_L2_FLUX_LINKAGE  },  /* flux 需电机转动，放最后 */
+#endif
+#if CALIB_L7_ENABLE_L3_ZERO_OFFSET
 	{CALIB_LEVEL3_ENCODER,   CALIB_L3_ZERO_OFFSET   },
+#endif
+#if CALIB_L7_ENABLE_L3_DIRECTION
 	{CALIB_LEVEL3_ENCODER,   CALIB_L3_DIRECTION     },
+#endif
+#if CALIB_L7_ENABLE_L4_KT
 	{CALIB_LEVEL4_TORQUE,    CALIB_L4_KT            },
+#endif
+#if CALIB_L7_ENABLE_L5_COGGING
 	{CALIB_LEVEL5_NONLINEAR, CALIB_L5_COGGING       },
+#endif
+#if CALIB_L7_ENABLE_L5_FRICTION
 	{CALIB_LEVEL5_NONLINEAR, CALIB_L5_FRICTION      },
+#endif
+#if CALIB_L7_ENABLE_L6_INERTIA
 	{CALIB_LEVEL6_SYSTEM,    CALIB_L6_INERTIA       },
+#endif
+#if CALIB_L7_ENABLE_L6_PID_AUTOTUNE
 	{CALIB_LEVEL6_SYSTEM,    CALIB_L6_PID_AUTOTUNE  },
+#endif
 };
 #define L7_SEQ_LEN (sizeof(s_sequence) / sizeof(s_sequence[0]))
 
