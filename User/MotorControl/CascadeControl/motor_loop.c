@@ -297,8 +297,10 @@ void motor_loop_isr(void)
 
 	// CALIB 态：标定模块在 calib_mgr_poll() 中直接操作 FOC 链路施加电压，
 	// 不走 cur_loop_run（避免被 IDLE 直通覆盖为零 PWM）
+	// 但须刷新相电流采样, 供 R/Ld/Lq/flux 标定调用 foc.clarke/park 读取实时电流
 	if (m->sys.top_state == TOP_FSM_CALIB)
 	{
+		m->motor.phase_current.update(&m->motor.phase_current);
 		return;
 	}
 
