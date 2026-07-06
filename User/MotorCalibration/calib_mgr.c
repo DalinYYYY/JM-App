@@ -35,8 +35,8 @@ static struct
 	const calib_level_ops_t *active_ops;
 } s_mgr;
 
-static uint64_t s_done_mask = 0;    /* 已完成子模式位图（CALIB_DONE_*）*/
-static uint32_t s_global_tick = 0;  /* 单次标定全局 tick 计数（超时保护）*/
+static uint64_t s_done_mask = 0;   /* 已完成子模式位图（CALIB_DONE_*）*/
+static uint32_t s_global_tick = 0; /* 单次标定全局 tick 计数（超时保护）*/
 
 void calib_mgr_init(struct dev_motor *motor, motor_param_t *param, float dt)
 {
@@ -129,6 +129,25 @@ calib_state_e calib_mgr_poll(void)
 calib_status_t calib_mgr_get_status(void)
 {
 	return s_mgr.status;
+}
+
+void calib_mgr_set_step(uint8_t step)
+{
+	s_mgr.status.step = step;
+}
+
+void calib_mgr_set_fail_reason(calib_fail_reason_e reason)
+{
+	s_mgr.status.fail_reason = reason;
+}
+
+void calib_mgr_set_l7_progress(uint8_t step, uint8_t step_total)
+{
+	s_mgr.status.step = step;
+	s_mgr.status.step_total = step_total;
+	/* L7 当前子项的 level/submode 由 s_sequence[step] 决定, 此处不更新;
+	 * level/submode 在 calib_mgr_start 时已设为 L7/FULL_AUTO, 保持不变即可。
+	 * L7 poll 内部推进子标定时若需细化, 可由 L7 直接调 calib_mgr_set_step。*/
 }
 
 void calib_mgr_abort(void)

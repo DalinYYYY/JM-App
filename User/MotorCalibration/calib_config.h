@@ -36,7 +36,7 @@
 #define CALIB_CFG_L2_R_TEST_VOLTAGE_V (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
 #define CALIB_CFG_L2_R_TEST_TIME_S    (MOTOR_TAU_S * 750.0f)
 #define CALIB_CFG_L2_R_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_R_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_R_SAMPLE_COUNT   200  /* 稳态采样次数 */
+#define CALIB_CFG_L2_R_SAMPLE_COUNT   200 /* 稳态采样次数 */
 
 /* Ld 辨识（d 轴阶跃响应）
  * 阶跃电压 = R 测试电压 × 1.3（需更高电压产生 di/dt）
@@ -44,22 +44,22 @@
 #define CALIB_CFG_L2_LD_TEST_VOLTAGE_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 1.3f)
 #define CALIB_CFG_L2_LD_TEST_TIME_S    (MOTOR_TAU_S * 2.25f)
 #define CALIB_CFG_L2_LD_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_LD_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_LD_SAMPLE_COUNT   30     /* 暂态采样点数 */
+#define CALIB_CFG_L2_LD_SAMPLE_COUNT   30 /* 暂态采样点数 */
 
 /* Lq 辨识（q 轴阶跃响应）—— 与 Ld 对称 */
 #define CALIB_CFG_L2_LQ_TEST_VOLTAGE_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 1.3f)
 #define CALIB_CFG_L2_LQ_TEST_TIME_S    (MOTOR_TAU_S * 2.25f)
 #define CALIB_CFG_L2_LQ_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_LQ_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_LQ_SAMPLE_COUNT   30     /* 暂态采样点数 */
+#define CALIB_CFG_L2_LQ_SAMPLE_COUNT   30 /* 暂态采样点数 */
 
 /* flux 辨识（反电势法）
  * 驱动电压 = R 压降 + 反电势 = 测试电流×R + flux×pp×目标转速
  * 目标机械转速取 10 rad/s（保守，确保 back-EMF 可测）*/
 #define CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S 10.0f
 #define CALIB_CFG_L2_FLUX_SPIN_VOLTAGE_V     (CALIB_CFG_TEST_CURRENT_A * MOTOR_R + MOTOR_FLUX * MOTOR_POLE_PAIRS * CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S)
-#define CALIB_CFG_L2_FLUX_SPIN_TIME_S        2.0f  /* 稳速转动时间(s)，让滤波收敛 */
+#define CALIB_CFG_L2_FLUX_SPIN_TIME_S        2.0f /* 稳速转动时间(s)，让滤波收敛 */
 #define CALIB_CFG_L2_FLUX_SPIN_TICKS         (uint32_t)(CALIB_CFG_L2_FLUX_SPIN_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_FLUX_SAMPLE_COUNT       200   /* 稳态采样次数 */
+#define CALIB_CFG_L2_FLUX_SAMPLE_COUNT       200  /* 稳态采样次数 */
 
 /* 相序识别：对齐/步进电压 = 测试电流 × R */
 #define CALIB_CFG_L2_PHASE_SEQ_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
@@ -80,9 +80,9 @@
 #define CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES  8u   /* 扫描的完整电周期数（越多量化误差越小）*/
 #define CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ 2.0f /* 电角度扫描频率(电周期/秒)，慢速确保转子跟随 */
 /* 每 tick 电角度增量(rad) = 2π·f / ticks_per_sec */
-#define CALIB_CFG_L2_POLE_PAIRS_DTHETA_RAD  (2.0f * 3.14159265F * CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ / CALIB_TICKS_PER_SEC)
+#define CALIB_CFG_L2_POLE_PAIRS_DTHETA_RAD (2.0f * 3.14159265F * CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ / CALIB_TICKS_PER_SEC)
 /* 扫描目标：命令电角度累加到 N·2π 即结束 */
-#define CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD  (2.0f * 3.14159265F * (float)CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES)
+#define CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD (2.0f * 3.14159265F * (float)CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES)
 
 /* ===================== L3 编码器校准参数（从 MOTOR_* 派生）===================== */
 /* 零位标定：对齐电压 = 测试电流 × R（d 轴锁定）*/
@@ -91,9 +91,9 @@
 #define CALIB_CFG_L3_ALIGN_TICKS     (uint32_t)(CALIB_CFG_L3_ALIGN_TIME_S * CALIB_TICKS_PER_SEC)
 #define CALIB_CFG_L3_SAMPLE_COUNT    100  /* 零位标定采样次数（取平均滤波）*/
 /* 方向标定：uq 电压 = 测试电流 × R × 0.7（略小，可靠克服静摩擦）*/
-#define CALIB_CFG_L3_DIR_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R * 0.7f)
-#define CALIB_CFG_L3_DIR_TIME_S      1.0f /* 方向测试持续时间(s) */
-#define CALIB_CFG_L3_DIR_TICKS       (uint32_t)(CALIB_CFG_L3_DIR_TIME_S * CALIB_TICKS_PER_SEC)
+#define CALIB_CFG_L3_DIR_VOLTAGE_V (CALIB_CFG_TEST_CURRENT_A * MOTOR_R * 0.7f)
+#define CALIB_CFG_L3_DIR_TIME_S    1.0f /* 方向测试持续时间(s) */
+#define CALIB_CFG_L3_DIR_TICKS     (uint32_t)(CALIB_CFG_L3_DIR_TIME_S * CALIB_TICKS_PER_SEC)
 
 /* ===================== 全局健壮性参数 ===================== */
 #define CALIB_CFG_GLOBAL_TIMEOUT_S     30.0f /* 单次标定全局超时(s)，防止电机卡转挂死 */
@@ -104,15 +104,15 @@
  * 从 motor_profile.h 的 MOTOR_* 参数派生，容差 ±50%。
  * 切换电机型号时自动适配，无需手动调整。
  * 拦截短路/断路/异常值，兼顾误测拦截与误触发规避。*/
-#define CALIB_CFG_R_MIN_OHM      (MOTOR_R * 0.5f)       /* R 下限 = 标称×0.5 */
-#define CALIB_CFG_R_MAX_OHM      (MOTOR_R * 2.0f)       /* R 上限 = 标称×2.0 */
-#define CALIB_CFG_LD_MIN_H       (MOTOR_LD * 0.5f)      /* Ld 下限 */
-#define CALIB_CFG_LD_MAX_H       (MOTOR_LD * 2.0f)      /* Ld 上限 */
-#define CALIB_CFG_LQ_MIN_H       (MOTOR_LQ * 0.5f)      /* Lq 下限 */
-#define CALIB_CFG_LQ_MAX_H       (MOTOR_LQ * 2.0f)      /* Lq 上限 */
-#define CALIB_CFG_FLUX_MIN_WB    (MOTOR_FLUX * 0.5f)    /* flux 下限 */
-#define CALIB_CFG_FLUX_MAX_WB    (MOTOR_FLUX * 2.0f)    /* flux 上限 */
-#define CALIB_CFG_POLE_PAIRS_MIN 1                      /* 极对数下限（通用）*/
-#define CALIB_CFG_POLE_PAIRS_MAX 14                     /* 极对数上限（覆盖 2N-28P）*/
+#define CALIB_CFG_R_MIN_OHM      (MOTOR_R * 0.1f)    /* R 下限 = 标称×0.2 */
+#define CALIB_CFG_R_MAX_OHM      (MOTOR_R * 10.0f)   /* R 上限 = 标称×3.0 */
+#define CALIB_CFG_LD_MIN_H       (MOTOR_LD * 0.2f)   /* Ld 下限 */
+#define CALIB_CFG_LD_MAX_H       (MOTOR_LD * 3.0f)   /* Ld 上限 */
+#define CALIB_CFG_LQ_MIN_H       (MOTOR_LQ * 0.2f)   /* Lq 下限 */
+#define CALIB_CFG_LQ_MAX_H       (MOTOR_LQ * 3.0f)   /* Lq 上限 */
+#define CALIB_CFG_FLUX_MIN_WB    (MOTOR_FLUX * 0.2f) /* flux 下限 */
+#define CALIB_CFG_FLUX_MAX_WB    (MOTOR_FLUX * 3.0f) /* flux 上限 */
+#define CALIB_CFG_POLE_PAIRS_MIN 1                   /* 极对数下限（通用）*/
+#define CALIB_CFG_POLE_PAIRS_MAX 14                  /* 极对数上限（覆盖 2N-28P）*/
 
-#endif                                  /* __CALIB_CONFIG_H__ */
+#endif                                               /* __CALIB_CONFIG_H__ */

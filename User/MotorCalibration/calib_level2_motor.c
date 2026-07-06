@@ -55,7 +55,9 @@ static calib_state_e poll_resistance(void)
 			calib_hw_enter(&s_l2.session, m);
 			s_l2.test_voltage = CALIB_CFG_L2_R_TEST_VOLTAGE_V;
 			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 等待稳态 */
@@ -63,6 +65,7 @@ static calib_state_e poll_resistance(void)
 			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_R_TEST_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 多次采样 id */
@@ -74,6 +77,7 @@ static calib_state_e poll_resistance(void)
 			/* 过滤异常值（NaN/过大）*/
 			if (!isfinite(id) || id < 0.001f)
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
@@ -81,6 +85,7 @@ static calib_state_e poll_resistance(void)
 			if (s_l2.step.sample_cnt < CALIB_CFG_L2_R_SAMPLE_COUNT)
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 3);
+			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 		}
 
@@ -90,6 +95,7 @@ static calib_state_e poll_resistance(void)
 			float R = s_l2.test_voltage / id_avg;
 			if (!calib_validate_r(R))
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
@@ -102,6 +108,7 @@ static calib_state_e poll_resistance(void)
 		}
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_exit(&s_l2.session);
 			return CALIB_STATE_FAILED;
 	}
@@ -130,7 +137,9 @@ static calib_state_e poll_inductance_d(void)
 			m->foc.clarke(&m->foc);
 			m->foc.park(&m->foc);
 			s_l2.prev_i = m->foc.i_dq.d;
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 暂态窗口内采样 */
@@ -152,6 +161,7 @@ static calib_state_e poll_inductance_d(void)
 			if (s_l2.step.sample_cnt < CALIB_CFG_L2_LD_SAMPLE_COUNT)
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 		}
 
@@ -159,12 +169,14 @@ static calib_state_e poll_inductance_d(void)
 		{
 			if (s_l2.step.sample_cnt == 0)
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
 			float Ld = calib_step_average(&s_l2.step);
 			if (!calib_validate_ld(Ld))
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
@@ -177,6 +189,7 @@ static calib_state_e poll_inductance_d(void)
 		}
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_exit(&s_l2.session);
 			return CALIB_STATE_FAILED;
 	}
@@ -205,7 +218,9 @@ static calib_state_e poll_inductance_q(void)
 			m->foc.clarke(&m->foc);
 			m->foc.park(&m->foc);
 			s_l2.prev_i = m->foc.i_dq.q;
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 暂态窗口内采样 */
@@ -226,6 +241,7 @@ static calib_state_e poll_inductance_q(void)
 			if (s_l2.step.sample_cnt < CALIB_CFG_L2_LQ_SAMPLE_COUNT)
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 		}
 
@@ -233,12 +249,14 @@ static calib_state_e poll_inductance_q(void)
 		{
 			if (s_l2.step.sample_cnt == 0)
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
 			float Lq = calib_step_average(&s_l2.step);
 			if (!calib_validate_lq(Lq))
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
@@ -251,6 +269,7 @@ static calib_state_e poll_inductance_q(void)
 		}
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_exit(&s_l2.session);
 			return CALIB_STATE_FAILED;
 	}
@@ -281,7 +300,9 @@ static calib_state_e poll_flux_linkage(void)
 			s_l2.session.orig_ele_cb = NULL; /* 标记不替换 */
 			s_l2.session.forced_ele_angle = 0.0f;
 			s_l2.test_voltage = CALIB_CFG_L2_FLUX_SPIN_VOLTAGE_V;
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1:                                      /* 驱动转动，等待稳速 */
@@ -291,6 +312,7 @@ static calib_state_e poll_flux_linkage(void)
 			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_FLUX_SPIN_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 		}
 
@@ -315,6 +337,7 @@ static calib_state_e poll_flux_linkage(void)
 			if (s_l2.step.sample_cnt < CALIB_CFG_L2_FLUX_SAMPLE_COUNT)
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 3);
+			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 		}
 
@@ -322,10 +345,16 @@ static calib_state_e poll_flux_linkage(void)
 		{
 			calib_hw_apply_zero(m); /* 直接置零 PWM（未替换回调，无需 exit 恢复）*/
 			if (s_l2.step.sample_cnt == 0)
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
 				return CALIB_STATE_FAILED;
+			}
 			float flux = calib_step_average(&s_l2.step);
 			if (!calib_validate_flux(flux))
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				return CALIB_STATE_FAILED;
+			}
 			motor_param_set_flux(io->param, flux);
 			(void)motor_info_calib_submit_flux(flux);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_FLUX_LINKAGE);
@@ -334,6 +363,7 @@ static calib_state_e poll_flux_linkage(void)
 		}
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_apply_zero(m);
 			return CALIB_STATE_FAILED;
 	}
@@ -360,7 +390,9 @@ static calib_state_e poll_phase_seq(void)
 		case 0: /* 对齐 d 轴 */
 			calib_hw_enter(&s_l2.session, m);
 			calib_hw_apply_voltage(&s_l2.session, CALIB_CFG_L2_PHASE_SEQ_VOLTAGE_V, 0.0f, 0.0f);
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 等待对齐 */
@@ -368,6 +400,7 @@ static calib_state_e poll_phase_seq(void)
 			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_PHASE_SEQ_ALIGN_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 记录起始角度，施加 120° 电角度步进 */
@@ -375,6 +408,7 @@ static calib_state_e poll_phase_seq(void)
 			/* 120° 电角度 = 2*pi/3 rad */
 			calib_hw_apply_voltage(&s_l2.session, CALIB_CFG_L2_PHASE_SEQ_VOLTAGE_V, 0.0f, 2.0F * 3.14159265F / 3.0F);
 			calib_step_next(&s_l2.step, 3);
+			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 
 		case 3: /* 等待转动 */
@@ -382,6 +416,7 @@ static calib_state_e poll_phase_seq(void)
 			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_PHASE_SEQ_STEP_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 4);
+			calib_mgr_set_step(4);
 			return CALIB_STATE_RUNNING;
 
 		case 4: /* 判定 */
@@ -396,13 +431,17 @@ static calib_state_e poll_phase_seq(void)
 			/* 120° 电角度应对应 120/pole_pairs 机械角度，默认 7 极对 ≈ 17°
 			 * 阈值取 5°（电机应明显转动）*/
 			if (fabsf(delta) < 5.0f)
-				return CALIB_STATE_FAILED; /* 电机未响应 */
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_MOTOR_STUCK); /* 电机未响应 */
+				return CALIB_STATE_FAILED;
+			}
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_PHASE_SEQ);
 			calib_step_reset(&s_l2.step);
 			return CALIB_STATE_DONE;
 		}
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_exit(&s_l2.session);
 			return CALIB_STATE_FAILED;
 	}
@@ -436,7 +475,9 @@ static calib_state_e poll_pole_pairs(void)
 			calib_hw_enter(&s_l2.session, m);
 			s_l2.scan_ele_rad = 0.0f;
 			calib_hw_apply_voltage(&s_l2.session, CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V, 0.0f, s_l2.scan_ele_rad);
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 等待转子对齐到 d 轴 */
@@ -444,6 +485,7 @@ static calib_state_e poll_pole_pairs(void)
 			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_POLE_PAIRS_ALIGN_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 记录起始机械角，初始化连续累加器 */
@@ -451,6 +493,7 @@ static calib_state_e poll_pole_pairs(void)
 			s_l2.prev_mech_deg = s_l2.start_mech_deg;
 			s_l2.accum_mech_deg = 0.0f;
 			calib_step_next(&s_l2.step, 3);
+			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 
 		case 3: /* 开环扫描：递增强制电角度 + 机械角连续累加（unwrap）*/
@@ -472,23 +515,30 @@ static calib_state_e poll_pole_pairs(void)
 			if (s_l2.scan_ele_rad < CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD)
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 4);
+			calib_mgr_set_step(4);
 			return CALIB_STATE_RUNNING;
 		}
 
-		case 4: /* 计算极对数 */
+		case 4:                           /* 计算极对数 */
 		{
 			calib_hw_exit(&s_l2.session); /* 撤销电压并恢复电角度回调 */
 
 			float dmech_rad = fabsf(s_l2.accum_mech_deg) * (3.14159265F / 180.0F);
 			if (dmech_rad < 0.1f)
-				return CALIB_STATE_FAILED; /* 转子未跟随转动 */
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_MOTOR_STUCK); /* 转子未跟随转动 */
+				return CALIB_STATE_FAILED;
+			}
 
 			/* pole_pairs = 命令电角度总量 / 实测机械角总量 */
 			float pp_f = CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD / dmech_rad;
 			uint8_t pp = (uint8_t)(pp_f + 0.5f); /* 四舍五入 */
 
 			if (!calib_validate_pole_pairs(pp))
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				return CALIB_STATE_FAILED;
+			}
 			motor_param_set_pole_pairs(io->param, pp);
 			(void)motor_info_calib_submit_pole_pairs(pp);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_POLE_PAIRS);
@@ -497,6 +547,7 @@ static calib_state_e poll_pole_pairs(void)
 		}
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_exit(&s_l2.session);
 			return CALIB_STATE_FAILED;
 	}

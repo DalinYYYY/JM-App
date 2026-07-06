@@ -97,7 +97,7 @@ extern "C"
 
 		/* 校准 0x90~0xAF: 类别命令+子命令模式
 	 * 0x90-0x96: payload[0]=子模式ID, 进入CALIB态并启动标定
-	 * 0x97: 进度查询, ACK=完成, NACK(0x0A)=进行中, NACK(0x03)=未标定
+	 * 0x97: 进度查询, 返回 8 字节详细状态 ACK (state/fail_reason/progress/level/submode/step/step_total/reserved)
 	 * 0x98: 中止标定, ACK */
 	JM_CMD_CALIB_LEVEL1 = 0x90,	/* L1 驱动硬件底层 */
 	JM_CMD_CALIB_LEVEL2 = 0x91,	/* L2 电机电气身份 */

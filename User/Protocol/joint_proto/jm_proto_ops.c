@@ -176,16 +176,8 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		break; /* 继续走 motor_loop_set_cmd 进入 CALIB 态 */
 	}
 
-	/* ---- 标定进度查询 0x97: 不切状态，直接返回 ---- */
-	case JM_CMD_CALIB_QUERY:
-	{
-		calib_status_t st = calib_mgr_get_status();
-		if (st.state == CALIB_STATE_DONE)
-			return JM_ERR_OK;          /* ACK */
-		if (st.state == CALIB_STATE_RUNNING)
-			return JM_ERR_CALIB_BUSY;  /* NACK(0x0A) */
-		return JM_ERR_STATE_DENY;      /* NACK(0x03) 未在标定 */
-	}
+	/* ---- 标定进度查询 0x97: 由 jm_proto.c dispatch 直接返回 8 字节详细状态 ACK,
+	 *       不进入本函数, 此处不再处理 ---- */
 
 	/* ---- 标定中止 0x98: 不切状态，直接返回 ---- */
 	case JM_CMD_CALIB_ABORT:

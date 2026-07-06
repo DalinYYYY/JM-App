@@ -17,7 +17,7 @@
 #include "calib_config.h"
 #include "calib_mgr.h"
 #include "calib_hw.h"
-#include "dev_motor.h"     /* 通过 dev_motor_t.encoder 抽象层访问编码器，不直接依赖具体芯片 */
+#include "dev_motor.h" /* 通过 dev_motor_t.encoder 抽象层访问编码器，不直接依赖具体芯片 */
 #include "motor_param.h"
 #include "calib_step.h"
 #include "calib_validate.h"
@@ -48,7 +48,9 @@ static calib_state_e poll_zero_offset(void)
 		case 0: /* 施加 d 轴对齐电压 */
 			calib_hw_enter(&s_l3.session, m);
 			calib_hw_apply_voltage(&s_l3.session, CALIB_CFG_L3_ALIGN_VOLTAGE_V, 0.0f, 0.0f);
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l3.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 等待转子稳定对齐 */
@@ -56,6 +58,7 @@ static calib_state_e poll_zero_offset(void)
 			if (calib_step_wait(&s_l3.step, CALIB_CFG_L3_ALIGN_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l3.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 多次采样编码器原始角度 */
@@ -64,6 +67,7 @@ static calib_state_e poll_zero_offset(void)
 			if (s_l3.step.sample_cnt < CALIB_CFG_L3_SAMPLE_COUNT)
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l3.step, 3);
+			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 
 		case 3: /* 写入标定结果，完成 */
@@ -75,6 +79,7 @@ static calib_state_e poll_zero_offset(void)
 			/* 写入 motor_param_t（持久化），enc_offset 用 deg 角度值 */
 			if (!calib_validate_enc_offset(avg_deg))
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				calib_hw_exit(&s_l3.session);
 				return CALIB_STATE_FAILED;
 			}
@@ -90,6 +95,7 @@ static calib_state_e poll_zero_offset(void)
 		}
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_exit(&s_l3.session);
 			return CALIB_STATE_FAILED;
 	}
@@ -116,7 +122,9 @@ static calib_state_e poll_direction(void)
 			/* 电角度=0 时 uq>0 产生正向力矩（q轴超前d轴90°，即α轴方向）*/
 			s_l3.dir_start_angle = calib_hw_get_encoder_mech_angle(m);
 			calib_hw_apply_voltage(&s_l3.session, 0.0f, CALIB_CFG_L3_DIR_VOLTAGE_V, 0.0f);
+			calib_mgr_set_step(0);
 			calib_step_next(&s_l3.step, 1);
+			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 持续施加 uq，等待电机转动 */
@@ -124,6 +132,7 @@ static calib_state_e poll_direction(void)
 			if (calib_step_wait(&s_l3.step, CALIB_CFG_L3_DIR_TICKS))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l3.step, 2);
+			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 采样当前角度，判定方向 */
@@ -137,18 +146,20 @@ static calib_state_e poll_direction(void)
 				delta += 360.0f;
 
 			int8_t enc_dir;
-			if (delta > 1.0f) /* 角度增大 → 正向 CW */
+			if (delta > 1.0f)       /* 角度增大 → 正向 CW */
 				enc_dir = 1;
 			else if (delta < -1.0f) /* 角度减小 → 反向 CCW */
 				enc_dir = -1;
-			else /* 角度几乎无变化，可能电机未转动 */
+			else                    /* 角度几乎无变化，可能电机未转动 */
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_MOTOR_STUCK);
 				calib_hw_exit(&s_l3.session);
 				return CALIB_STATE_FAILED;
 			}
 
 			if (!calib_validate_enc_direction(enc_dir))
 			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				calib_hw_exit(&s_l3.session);
 				return CALIB_STATE_FAILED;
 			}
@@ -158,6 +169,7 @@ static calib_state_e poll_direction(void)
 			motor_param_set_enc_direction(io->param, enc_dir);
 			(void)motor_info_calib_submit_enc_direction(enc_dir);
 			calib_step_next(&s_l3.step, 3);
+			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 		}
 
@@ -168,6 +180,7 @@ static calib_state_e poll_direction(void)
 			return CALIB_STATE_DONE;
 
 		default:
+			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_exit(&s_l3.session);
 			return CALIB_STATE_FAILED;
 	}

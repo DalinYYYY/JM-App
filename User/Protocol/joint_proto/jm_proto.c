@@ -18,6 +18,7 @@
  */
 #include <string.h>
 #include "jm_proto.h"
+#include "calib_mgr.h"
 
 /* 组织应答: reply[0]=cmd, 其后拷贝 body(可空), 设置 reply_len */
 static void reply_set(jm_proto_t *p, uint8_t cmd, const uint8_t *body, uint16_t body_len)
@@ -520,6 +521,26 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 		e = proto->ops->set_baudrate(baud);
 		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
+	/* 标定进度查询 0x97: 直接返回 8 字节详细状态 ACK, 不走 ops->set_mode。
+	 * 字段: state/fail_reason/progress/level/submode/step/step_total/reserved。
+	 * 无论 state 为何(空闲/进行/完成/失败)都回 ACK, 由上位机解读。*/
+	if (cmd == JM_CMD_CALIB_QUERY)
+	{
+		calib_status_t st = calib_mgr_get_status();
+		uint8_t body[8] = {
+			(uint8_t)st.state,
+			(uint8_t)st.fail_reason,
+			st.progress,
+			st.level,
+			st.submode,
+			st.step,
+			st.step_total,
+			0u /* reserved */
+		};
+		reply_set(proto, cmd, body, sizeof(body));
+		return JM_ERR_OK;
 	}
 
 	/* 其余 0x00~0xB8 控制/校准/诊断类: 统一交给 set_mode 回调,

@@ -31,6 +31,30 @@ calib_state_e calib_mgr_poll(void);
 calib_status_t calib_mgr_get_status(void);
 
 /**
+ * @brief level 模块上报当前步骤号（单步标定用）
+ * @note  level 模块在 calib_step_next 推进到新 step 时调用,
+ *        使 0x97 查询能反映"卡在第几步"。step 从 0 开始。
+ */
+void calib_mgr_set_step(uint8_t step);
+
+/**
+ * @brief level 模块上报具体失败原因（覆盖 calib_mgr 默认的 TIMEOUT）
+ * @note  level 模块在判定 FAILED 时调用,设置具体原因如
+ *        CALIB_FAIL_OUT_OF_RANGE / CALIB_FAIL_SAMPLE_ABNORMAL 等。
+ *        若不调用,calib_mgr 默认填 CALIB_FAIL_TIMEOUT。
+ */
+void calib_mgr_set_fail_reason(calib_fail_reason_e reason);
+
+/**
+ * @brief L7 上报序列进度（当前步骤索引 + 总步数）
+ * @param step     当前步骤索引（0-based）
+ * @param step_total L7 序列总步数
+ * @note  同时设置 status.step 与 status.step_total, 供 0x97 查询。
+ *        L7 调用此接口后, status.level/submode 也会被更新为当前子项。
+ */
+void calib_mgr_set_l7_progress(uint8_t step, uint8_t step_total);
+
+/**
  * @brief 强制中止当前标定
  */
 void calib_mgr_abort(void);
