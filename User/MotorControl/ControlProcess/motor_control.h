@@ -74,6 +74,7 @@ typedef struct
 	float kd;				   // MIT阻尼
 	float torque_ff;		   // 力矩前馈(N·m)
 	float vel_ff;			   // 速度前馈(rad/s)
+	float ud;				   // 开环d轴电压(V)
 	float voltage;			   // 开环q轴电压(V)
 	float duty;				   // 占空比(-1.0~1.0)
 

@@ -80,17 +80,17 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 
 	if (ref->ctrl_type == REF_CTRL_VOLTAGE)
 	{
-		/* 开环电压：旁路 PI，直接用 ref->voltage 作为 q 轴电压 */
-		ud = 0.0f;
+		/* 开环电压：旁路 PI，直接用 ref->ud / ref->voltage 作为 dq 轴电压 */
+		ud = ref->ud;
 		uq = ref->voltage;
 	}
 	else
 	{
 		/* 电流闭环 PI（CURRENT / TORQUE / VELOCITY / POSITION）*/
 		ud = pid_profile_calculate(&cl->pid_id, PID_PROFILE_CURRENT_D,
-								   out->id_ref, m->foc.i_dq.d, cl->dt);
+		                           out->id_ref, m->foc.i_dq.d, cl->dt);
 		uq = pid_profile_calculate(&cl->pid_iq, PID_PROFILE_CURRENT_Q,
-								   out->iq_ref, m->foc.i_dq.q, cl->dt);
+		                           out->iq_ref, m->foc.i_dq.q, cl->dt);
 	}
 
 	// step6: 设置 dq 电压并反 Park（dq → αβ）
@@ -102,7 +102,7 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 
 	// step8: PWM 输出
 	m->half_bridge.set_3pwm(&m->half_bridge,
-							(uint32_t)(PWM_PERIOD * m->foc.svpwm.ta),
-							(uint32_t)(PWM_PERIOD * m->foc.svpwm.tb),
-							(uint32_t)(PWM_PERIOD * m->foc.svpwm.tc));
+	                        (uint32_t)(PWM_PERIOD * m->foc.svpwm.ta),
+	                        (uint32_t)(PWM_PERIOD * m->foc.svpwm.tb),
+	                        (uint32_t)(PWM_PERIOD * m->foc.svpwm.tc));
 }

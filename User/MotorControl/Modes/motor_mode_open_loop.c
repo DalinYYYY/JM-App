@@ -12,5 +12,6 @@ void motor_mode_open_loop_run(motor_ctrl_t *ctrl)
 	ref->pos_profile = PID_PROFILE_POSITION;
 	ref->vel_profile = PID_PROFILE_VELOCITY;
 	ref->ctrl_type = REF_CTRL_VOLTAGE;
-	ref->voltage = motor_mode_clamp(ctrl->cmd.torque, -rated_v, rated_v);
+	ref->ud       = motor_mode_clamp(ctrl->cmd.id,     -rated_v, rated_v);
+	ref->voltage  = motor_mode_clamp(ctrl->cmd.torque, -rated_v, rated_v);
 }

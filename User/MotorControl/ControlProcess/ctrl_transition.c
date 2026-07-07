@@ -60,6 +60,7 @@ bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_re
 	out_ref->torque = blend(trans->old_ref.torque, new_ref->torque, trans->ratio);
 	out_ref->id = blend(trans->old_ref.id, new_ref->id, trans->ratio);
 	out_ref->iq = blend(trans->old_ref.iq, new_ref->iq, trans->ratio);
+	out_ref->ud = blend(trans->old_ref.ud, new_ref->ud, trans->ratio);
 	out_ref->voltage = blend(trans->old_ref.voltage, new_ref->voltage, trans->ratio);
 	out_ref->duty = blend(trans->old_ref.duty, new_ref->duty, trans->ratio);
 
