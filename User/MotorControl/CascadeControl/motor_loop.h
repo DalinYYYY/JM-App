@@ -34,7 +34,7 @@
 /**
  * @brief 电机三环控制运行上下文
  */
-typedef struct
+typedef struct motor_loop_s
 {
 	dev_motor_t motor;		// 底层电机设备（FOC/编码器/半桥/ADC）
 	system_state_t sys;		// 上层状态机（模式管理 + 参考生成）

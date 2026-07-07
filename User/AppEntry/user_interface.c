@@ -21,6 +21,7 @@
 #include "thread_management.h"
 #include "dev_dwt_counter.h"
 #include "dev_power_monitor.h"
+#include "dev_commun_uart.h"
 #include "motor_info_storage.h"
 #include "motor_loop.h"
 #include "motor_loop_config.h"
@@ -43,6 +44,16 @@ static void hardware_init(void)
 	/* 初始化电机三环控制（dev_motor + 状态机 + 级联控制）
      * 电流环频率由 ADC 注入转换中断决定，此处传入实际中断频率 */
 	motor_loop_init(10000.0f);
+
+	/* 调试映射指针绑定：指向已存在的全局变量地址（不复制数据）
+	 * 须在上述各 init 完成后绑定，此时对象地址与内容均已就绪，
+	 * 调试时通过 usr.p_xxx 实时反映对象最新值。
+	 * s_motor_loop 经 getter 绑定，避免直接访问伪私有变量。 */
+	usr.p_dwt_timer          = &dwt_timer;
+	usr.p_motor_loop         = motor_loop_get();
+	usr.p_motor_info_storage = &g_motor_info_storage;
+	usr.p_dev_power_monitor  = &dev_power_monitor;
+	usr.p_dev_commun_uart    = &dev_commun_uart;
 }
 
 void user_init(void)

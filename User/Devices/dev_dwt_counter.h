@@ -8,7 +8,7 @@ extern "C"
 #endif
 
 #define SYS_TIMER_RECORD_MAX_INDEX 10
-	typedef struct
+	typedef struct dwtTimer_s
 	{
 		uint32_t now_records[SYS_TIMER_RECORD_MAX_INDEX];	   /* 记录各索引对应的起始时刻(DWT_CYCCNT计数值) */
 		uint32_t duration_records[SYS_TIMER_RECORD_MAX_INDEX]; /* 记录各索引对应的持续时长(时钟周期数) */
@@ -16,6 +16,9 @@ extern "C"
 		uint32_t sys_freq_hz;								   /* 系统时钟频率，单位Hz */
 		float ticks_to_us;									   /* 时钟周期数→微秒的换算系数(1e6/freq)，用于快速换算 */
 	} dwtTimer_t;
+
+	/* 全局实例（定义在 dev_dwt_counter.c），供调试映射指针绑定 */
+	extern dwtTimer_t dwt_timer;
 
 	/**
  * @brief  初始化DWT计数器（含底层周期计数器使能与频率换算系数计算）

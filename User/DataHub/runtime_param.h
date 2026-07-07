@@ -6,6 +6,18 @@
 #include "motor_param.h"
 #include "state_define.h"
 
+/* ===== 调试映射指针的前向声明 =====
+ * 仅声明 struct 标签，不引入对应头文件，避免 DataHub 层反向依赖
+ * Devices/MotorControl/ParamService 层。完整类型在 runtime_param.c 中
+ * include 头文件后可见；调试器靠 DWARF 信息展开字段，不受前向声明影响。
+ * 前 3 个 struct 标签由 Task 1 具名化产生；后 2 个原本就是具名 struct。
+ */
+struct dwtTimer_s;            /* dev_dwt_counter.h:    dwtTimer_t              */
+struct motor_loop_s;          /* motor_loop.h:         motor_loop_t            */
+struct motor_info_storage;    /* motor_info_storage.h: motor_info_storage_t    */
+struct dev_power_monitor;     /* dev_power_monitor.h:  dev_power_monitor_t（原具名）*/
+struct dev_commun_uart;       /* dev_commun_uart.h:    dev_commun_uart_t（原具名）*/
+
 #define OFFSET_LUT_NUM 128
 #define DT (1.0f / 20000.0f)
 
@@ -222,6 +234,20 @@ typedef struct sys_data_
 	system_t sys;
 	motor_state_t motor_state[MOTOR_MAX];
 	motor_param_t motor_param[MOTOR_MAX];
+
+	/* ===== 调试映射指针 =====
+	 * 指向已存在的全局变量（dwt_timer / s_motor_loop / g_motor_info_storage /
+	 * dev_power_monitor / dev_commun_uart），不持有数据、不复制数据，
+	 * 仅方便调试时通过 usr 一个变量统一观察。
+	 * 绑定在 user_data_init() 中完成；非 const 以便调试时强制设值。
+	 * 访问示例: usr.p_dwt_timer->duration_us[0], usr.p_motor_loop->vel_cnt,
+	 *           usr.p_dev_power_monitor->vbus, usr.p_dev_commun_uart->tx_count
+	 */
+	struct dwtTimer_s           *p_dwt_timer;          /* -> dwt_timer            */
+	struct motor_loop_s         *p_motor_loop;         /* -> s_motor_loop         */
+	struct motor_info_storage   *p_motor_info_storage; /* -> g_motor_info_storage */
+	struct dev_power_monitor    *p_dev_power_monitor;  /* -> dev_power_monitor    */
+	struct dev_commun_uart      *p_dev_commun_uart;    /* -> dev_commun_uart      */
 } sys_data_t;
 
 void user_data_init(void);
