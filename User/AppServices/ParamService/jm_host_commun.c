@@ -2,7 +2,7 @@
  * @file        jm_host_commun.c
  * @brief       关节电机上位机通信(承载 joint_proto 协议)接入层实现
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-24
  *
@@ -63,7 +63,7 @@ static uint16_t commun_uart_pack_telemetry(uint16_t mask, const jm_feedback_t *f
 	uint16_t n = 0;
 
 	jm_wr_u16(&o[n], mask);
-	n += 2; /* 帧头: 订阅掩码 */
+	n += 2;                    /* 帧头: 订阅掩码 */
 
 	if (mask & JM_TLM_POS_VEL) /* pos,vel  8B */
 	{

@@ -2,7 +2,7 @@
  * @file        jm_host_commun.h
  * @brief       关节电机上位机通信(承载 joint_proto 协议)接入层
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-24
  *

@@ -2,7 +2,7 @@
  * @file vofa.c
  * @brief 
  * 
- * @author dalin (dalin@robot.com)
+ * @author dalin (dalinyy@163.com)
  * @version 1.0
  * @date 2026-06-10
  * 
@@ -31,13 +31,13 @@ void vofa_upload(void *data, uint8_t len)
     drv_usart_send(DEV_VOFA, (uint8_t *)&vofa_frame.tail[0], 4, 1000);
 #elif 0
 
-    uint8_t *msg = (uint8_t *)malloc(len + 4);
+	uint8_t *msg = (uint8_t *)malloc(len + 4);
 
-    memcpy(msg, data, len);
-    memcpy(&msg[len], &vofa_frame.tail[0], 4);
-    drv_uart_dma_send(DEV_VOFA, (uint8_t *)msg, len + 4);
+	memcpy(msg, data, len);
+	memcpy(&msg[len], &vofa_frame.tail[0], 4);
+	drv_uart_dma_send(DEV_VOFA, (uint8_t *)msg, len + 4);
 
-    free(msg);
+	free(msg);
 #endif
 }
 
@@ -48,21 +48,21 @@ void vofa_rcv_unpack(uint8_t *data_buf, uint8_t len)
 
 void vofa_receive_data(void)
 {
-    // static int en = 0;
-    // static uint8_t rx_buffer[64];
-    // uint16_t rx_len = 0;
+	// static int en = 0;
+	// static uint8_t rx_buffer[64];
+	// uint16_t rx_len = 0;
 
-    // if (en == 0)
-    // {
-    //     usart_idle_init(DEV_VOFA, 64);
-    //     en = 1;
-    // }
-    // else
-    // {
-    //     usart_idle_get_data(DEV_VOFA, rx_buffer, &rx_len);
-    //     if (rx_len != 0)
-    //     {
-    //         vofa_rcv_unpack(rx_buffer, rx_len);
-    //     }
-    // }
+	// if (en == 0)
+	// {
+	//     usart_idle_init(DEV_VOFA, 64);
+	//     en = 1;
+	// }
+	// else
+	// {
+	//     usart_idle_get_data(DEV_VOFA, rx_buffer, &rx_len);
+	//     if (rx_len != 0)
+	//     {
+	//         vofa_rcv_unpack(rx_buffer, rx_len);
+	//     }
+	// }
 }

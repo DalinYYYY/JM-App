@@ -2,7 +2,7 @@
  * @file        dev_half_bridge.c
  * @brief       三相半桥PWM输出设备(含互补输出与ADC注入同步触发)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.1
  * @date        2026-06-17
  *
@@ -23,9 +23,9 @@
 enum
 {
 	PHASE_U = 0, /* U相通道下标 */
-	PHASE_V,	 /* V相通道下标 */
-	PHASE_W,	 /* W相通道下标 */
-	ADC_TRIG,	 /* 触发ADC注入组的通道下标 */
+	PHASE_V,     /* V相通道下标 */
+	PHASE_W,     /* W相通道下标 */
+	ADC_TRIG,    /* 触发ADC注入组的通道下标 */
 };
 
 /* 启动三相PWM(含互补)及ADC注入触发通道, 并缓存ARR */
@@ -70,7 +70,7 @@ static int dev_half_bridge_stop(struct dev_half_bridge *pobj)
 
 /* 设置三相比较值(自动限幅至ARR); output_enable=0时强制三相0占空比(软急停) */
 static int dev_half_bridge_set_3pwm(struct dev_half_bridge *pobj,
-									uint32_t ccr1, uint32_t ccr2, uint32_t ccr3)
+                                    uint32_t ccr1, uint32_t ccr2, uint32_t ccr3)
 {
 	assert_report(pobj != NULL);
 	const dev_half_bridge_config_t *cfg = &half_bridge_list[pobj->id];

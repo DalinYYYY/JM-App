@@ -2,7 +2,7 @@
  * @file        dev_mt6835.c
  * @brief       MT6835磁编码器(21bit SPI): 角度/零点读写(寄存器/EEPROM)/方向
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.1
  * @date        2026-06-17
  *
@@ -104,7 +104,6 @@ static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
 	return pobj->mechanical_angle;
 }
 
-
 /* 读零点寄存器原始值(ZERO_POS2:高8位, ZERO_POS1:低4位)
  * 注: read_reg固定写3字节, 故每个接收缓冲须>=3字节, 否则越界破坏栈 */
 static uint16_t mt6835_get_raw_zero_angle(dev_mt6835_t *pobj)
@@ -138,7 +137,7 @@ static bool mt6835_set_zero_angle(dev_mt6835_t *pobj, float rad)
 		return false;
 	}
 
-	uint8_t zero_pos2 = (uint8_t)(angle >> 4);		   /* 高8位 */
+	uint8_t zero_pos2 = (uint8_t)(angle >> 4);          /* 高8位 */
 	uint8_t zero_pos1 = (uint8_t)((angle & 0x0F) << 4); /* 低4位置于bit[7:4], bit[3:0]保留位写0 */
 
 	bool ok = mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, zero_pos2);
@@ -179,4 +178,3 @@ void dev_mt6835_init(dev_mt6835_t *pobj, mt6835_id_e dev_id)
 	pobj->get_raw_zero_angle = mt6835_get_zero_angle;
 }
 #endif /* USE_DEV_MT6835 */
-

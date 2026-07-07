@@ -26,7 +26,7 @@
  * @note        Flash 分区由 Keil 链接脚本预留（用户自行配置）。
  *              存储地址定义在本头文件的宏中，与应用逻辑同模块。
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     3.0
  * @date        2026-07-02
  *
@@ -49,7 +49,7 @@
 #if defined(USE_DEV_FLASH)
 
 #include "motor_info.h"
-#include "dev_flash.h"   /* 组合子设备:通用 Flash 设备 */
+#include "dev_flash.h" /* 组合子设备:通用 Flash 设备 */
 
 #ifdef __cplusplus
 extern "C"
@@ -64,10 +64,10 @@ extern "C"
  *   页大小 2KB（双Bank），2 个扇区 A/B 轮转磨损均衡。
  * @note 须在 Keil 链接脚本中将代码区限制在 0x0804F000 之前，避免代码覆盖存储区。*/
 #define MOTORINFO_FLASH_START_ADDR 0x0804F000U
-#define MOTORINFO_FLASH_TOTAL_SIZE 0x00001000U  /* 4KB */
-#define MOTORINFO_FLASH_PAGE_SIZE  2048U        /* 2KB，双Bank页大小 */
+#define MOTORINFO_FLASH_TOTAL_SIZE 0x00001000U /* 4KB */
+#define MOTORINFO_FLASH_PAGE_SIZE  2048U       /* 2KB，双Bank页大小 */
 
-/**
+	/**
  * @brief  模块状态码枚举
  * @note   值域约定：
  *         - 0            = 成功
@@ -76,67 +76,68 @@ extern "C"
  *                                     save 路径: 透传 motor_info_validate 的越界 param_id）
  *         此约定与 jm_proto_ops.c 的 `rc>0 ? OUT_OF_RANGE : FLASH` 判断兼容。
  */
-typedef enum
-{
-    /* ===== 成功 ===== */
-    MOTOR_INFO_STORAGE_OK           =  0,  /* 操作成功 */
+	typedef enum
+	{
+		/* ===== 成功 ===== */
+		MOTOR_INFO_STORAGE_OK = 0, /* 操作成功 */
 
-    /* ===== 数据状态 (>0)：调用方可回退默认值，非致命 ===== */
-    MOTOR_INFO_STORAGE_NO_DATA      =  1,  /* load: Flash 无有效数据(首次上电/全擦除) */
-    MOTOR_INFO_STORAGE_CRC_FAIL     =  2,  /* load: CRC 校验失败，数据损坏 */
-    MOTOR_INFO_STORAGE_RANGE_FAIL   =  3,  /* load: 字段范围校验失败 */
-    /* 注: >3 区间预留给 motor_info_validate 透传的 param_id (save 路径) */
+		/* ===== 数据状态 (>0)：调用方可回退默认值，非致命 ===== */
+		MOTOR_INFO_STORAGE_NO_DATA = 1,    /* load: Flash 无有效数据(首次上电/全擦除) */
+		MOTOR_INFO_STORAGE_CRC_FAIL = 2,   /* load: CRC 校验失败，数据损坏 */
+		MOTOR_INFO_STORAGE_RANGE_FAIL = 3, /* load: 字段范围校验失败 */
+		/* 注: >3 区间预留给 motor_info_validate 透传的 param_id (save 路径) */
 
-    /* ===== 系统错误 (<0)：致命，调用方不应继续使用 ===== */
-    MOTOR_INFO_STORAGE_ERR_ARG      = -1,  /* 空指针/非法参数 */
-    MOTOR_INFO_STORAGE_ERR_FLASH    = -2,  /* Flash 读/写失败 */
-    MOTOR_INFO_STORAGE_ERR_INIT    = -3,  /* 服务未初始化 */
-} motor_info_storage_status_t;
+		/* ===== 系统错误 (<0)：致命，调用方不应继续使用 ===== */
+		MOTOR_INFO_STORAGE_ERR_ARG = -1,   /* 空指针/非法参数 */
+		MOTOR_INFO_STORAGE_ERR_FLASH = -2, /* Flash 读/写失败 */
+		MOTOR_INFO_STORAGE_ERR_INIT = -3,  /* 服务未初始化 */
+	} motor_info_storage_status_t;
 
-/* ===== 设备对象前置声明（供 ops 函数指针类型引用） ===== */
-struct motor_info_storage;
+	/* ===== 设备对象前置声明（供 ops 函数指针类型引用） ===== */
+	struct motor_info_storage;
 
-/**
+	/**
  * @brief  设备对象方法表（ops 虚函数表）
  * @details 同一类型所有实例共享同一张 static const ops 表（进 Flash 只读），
  *          对象只持有 `const ops *` 指针指向它，构造时一行装配所有方法。
  *          对外提供包装函数，由包装函数检查 pobj、ops、必要函数指针。
  */
-typedef struct {
-    motor_info_t *(*get)(struct motor_info_storage *pobj);                          /* 取全局 motor_info 句柄 */
-    motor_info_storage_status_t (*load)(struct motor_info_storage *pobj, motor_info_t *cfg);   /* 从 Flash 加载 */
-    motor_info_storage_status_t (*save)(struct motor_info_storage *pobj, const motor_info_t *cfg); /* 保存到 Flash */
-    void (*deinit)(struct motor_info_storage *pobj);                                /* 反初始化 */
-} motor_info_storage_ops_t;
+	typedef struct
+	{
+		motor_info_t *(*get)(struct motor_info_storage *pobj);                                         /* 取全局 motor_info 句柄 */
+		motor_info_storage_status_t (*load)(struct motor_info_storage *pobj, motor_info_t *cfg);       /* 从 Flash 加载 */
+		motor_info_storage_status_t (*save)(struct motor_info_storage *pobj, const motor_info_t *cfg); /* 保存到 Flash */
+		void (*deinit)(struct motor_info_storage *pobj);                                               /* 反初始化 */
+	} motor_info_storage_ops_t;
 
-/**
+	/**
  * @brief  motor_info 存储设备对象结构体
  * @details 组合 dev_flash 子设备 + motor_info 实例 + 状态标志 + ops 指针。
  *          - 静态单例分配（g_motor_info_storage），无 malloc。
  *          - 共享 ops 表（static const，进 Flash）。
  */
-typedef struct motor_info_storage
-{
-    /* 组合子设备：通用 Flash 设备（提供页擦写+磨损均衡） */
-    dev_flash_t   flash_dev;
+	typedef struct motor_info_storage
+	{
+		/* 组合子设备：通用 Flash 设备（提供页擦写+磨损均衡） */
+		dev_flash_t flash_dev;
 
-    /* 全局唯一 motor_info 实例（外部经 get 方法取句柄） */
-    motor_info_t   motor_info;
+		/* 全局唯一 motor_info 实例（外部经 get 方法取句柄） */
+		motor_info_t motor_info;
 
-    /* 状态标志 */
-    bool inited;             /* Flash 存储服务初始化完成 */
-    bool motor_info_loaded;  /* motor_info 已加载默认+Flash+profile */
+		/* 状态标志 */
+		bool inited;            /* Flash 存储服务初始化完成 */
+		bool motor_info_loaded; /* motor_info 已加载默认+Flash+profile */
 
-    /* 方法表指针（指向共享 static const ops，构造时装配） */
-    const motor_info_storage_ops_t *ops;
-} motor_info_storage_t;
+		/* 方法表指针（指向共享 static const ops，构造时装配） */
+		const motor_info_storage_ops_t *ops;
+	} motor_info_storage_t;
 
-/* ===== 全局单例（extern，调用方不需持有对象） ===== */
-extern motor_info_storage_t g_motor_info_storage;
+	/* ===== 全局单例（extern，调用方不需持有对象） ===== */
+	extern motor_info_storage_t g_motor_info_storage;
 
-/* ===== 构造与生命周期 ===== */
+	/* ===== 构造与生命周期 ===== */
 
-/**
+	/**
  * @brief  构造 motor_info 存储设备对象并上电自动加载默认配置
  * @details 一次性完成全流程（上电自动加载）：
  *          1. 装配 ops 方法表指针
@@ -151,28 +152,28 @@ extern motor_info_storage_t g_motor_info_storage;
  * @return MOTOR_INFO_STORAGE_OK 成功;
  *         MOTOR_INFO_STORAGE_ERR_FLASH dev_flash 初始化失败（Flash 读取异常）。
  */
-motor_info_storage_status_t motor_info_storage_init(void);
+	motor_info_storage_status_t motor_info_storage_init(void);
 
-/**
+	/**
  * @brief  反初始化 motor_info 存储设备对象（包装 ops->deinit）
  * @details 清零内部状态标志，下一次 init 可重新加载。
  *          不释放资源（无动态内存），不擦除 Flash。
  * @note   调用后 get/load/save 不得再调用（行为未定义）。
  */
-void motor_info_storage_deinit(void);
+	void motor_info_storage_deinit(void);
 
-/* ===== 对外包装函数（包装 ops 方法，集中处理 pobj/ops 检查） ===== */
+	/* ===== 对外包装函数（包装 ops 方法，集中处理 pobj/ops 检查） ===== */
 
-/**
+	/**
  * @brief  获取全局 motor_info 实例句柄（包装 ops->get）
  * @return 已初始化的 g_motor_info_storage.motor_info 指针。
  * @note   须先调用 motor_info_storage_init。返回指针指向模块内部存储，
  *         外部可读可写；写操作即修改全局 motor_info 实例。
  *         不阻塞；可在任意线程/上下文调用。
  */
-motor_info_t *motor_info_storage_get(void);
+	motor_info_t *motor_info_storage_get(void);
 
-/**
+	/**
  * @brief  从 Flash 加载 motor_info 配置（包装 ops->load，覆盖传入 cfg）
  * @param  cfg  目标参数区指针（成功时整块覆盖 1024B）
  * @return MOTOR_INFO_STORAGE_OK            加载成功且校验通过;
@@ -184,9 +185,9 @@ motor_info_t *motor_info_storage_get(void);
  *         MOTOR_INFO_STORAGE_ERR_INIT      服务未初始化.
  * @note   不阻塞（Flash 读取无擦写）。可在主线程/通信线程调用。
  */
-motor_info_storage_status_t motor_info_storage_load(motor_info_t *cfg);
+	motor_info_storage_status_t motor_info_storage_load(motor_info_t *cfg);
 
-/**
+	/**
  * @brief  将 motor_info 配置保存到 Flash（包装 ops->save）
  * @param  cfg  源参数区指针
  * @return MOTOR_INFO_STORAGE_OK            保存成功;
@@ -198,7 +199,7 @@ motor_info_storage_status_t motor_info_storage_load(motor_info_t *cfg);
  *         (含电机控制等实时中断)。仅在 0xEA 命令处理线程调用，
  *         严禁在 ISR / 电流环 / 控制环调用。
  */
-motor_info_storage_status_t motor_info_storage_save(const motor_info_t *cfg);
+	motor_info_storage_status_t motor_info_storage_save(const motor_info_t *cfg);
 
 #ifdef __cplusplus
 }

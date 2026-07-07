@@ -2,7 +2,7 @@
  * @file        drv_delay.c
  * @brief       延时驱动实现，基于DWT周期计数器实现us/ms级阻塞延时
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *

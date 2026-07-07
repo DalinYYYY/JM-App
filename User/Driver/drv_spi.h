@@ -2,7 +2,7 @@
  * @file        drv_spi.h
  * @brief       SPI驱动接口，封装HAL的SPI阻塞/中断/DMA收发及片选控制
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *

@@ -2,7 +2,7 @@
  * @file        drv_tim_pwm.h
  * @brief       PWM驱动接口，封装HAL的定时器PWM输出(含互补输出)功能
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *

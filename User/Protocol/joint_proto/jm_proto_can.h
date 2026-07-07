@@ -2,7 +2,7 @@
  * @file        jm_proto_can.h
  * @brief       关节电机协议-CAN绑定层: 扩展帧 ID=(CMD<<8)|电机ID, 独立编解码
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -34,8 +34,8 @@ extern "C"
 	/* 本层自定义的最小CAN帧(不含HAL/drv_can类型, 保证可独立编译) */
 	typedef struct
 	{
-		uint32_t id;	 /* 仲裁ID(扩展帧29位): (CMD<<8)|电机ID */
-		uint8_t len;	 /* 数据长度 0~8 */
+		uint32_t id;     /* 仲裁ID(扩展帧29位): (CMD<<8)|电机ID */
+		uint8_t len;     /* 数据长度 0~8 */
 		uint8_t data[8]; /* 数据区 */
 	} jm_can_frame_t;
 
@@ -47,10 +47,10 @@ extern "C"
  * 多帧: data[0] = 控制字 = (末帧标志<<7) | (分包序号&0x7F),
  *       data[1..] = 该分包的载荷片段(每帧最多7字节)。
  *       序号从0递增, 末帧置bit7。接收方按序号拼接, 收到末帧后整体分发。*/
-#define JM_CAN_SEG_LAST 0x80u
+#define JM_CAN_SEG_LAST     0x80u
 #define JM_CAN_SEG_SEQ_MASK 0x7Fu
-#define JM_CAN_SEG_PAYLOAD 7u /* 多帧时每帧有效载荷字节数 */
-#define JM_CAN_SINGLE_MAX 8u  /* 单帧可直接承载的载荷上限 */
+#define JM_CAN_SEG_PAYLOAD  7u /* 多帧时每帧有效载荷字节数 */
+#define JM_CAN_SINGLE_MAX   8u /* 单帧可直接承载的载荷上限 */
 
 /* ---------------- MIT 控制帧定点压缩范围(可按电机改) ----------------
  * 与达妙/CubeMars习惯一致: pos16 vel12 kp12 kd12 tff12 = 64bit。*/
@@ -58,10 +58,10 @@ extern "C"
 #define JM_MIT_POS_MAX (12.5f)
 #define JM_MIT_VEL_MIN (-65.0f)
 #define JM_MIT_VEL_MAX (65.0f)
-#define JM_MIT_KP_MIN (0.0f)
-#define JM_MIT_KP_MAX (500.0f)
-#define JM_MIT_KD_MIN (0.0f)
-#define JM_MIT_KD_MAX (5.0f)
+#define JM_MIT_KP_MIN  (0.0f)
+#define JM_MIT_KP_MAX  (500.0f)
+#define JM_MIT_KD_MIN  (0.0f)
+#define JM_MIT_KD_MAX  (5.0f)
 #define JM_MIT_TFF_MIN (-50.0f)
 #define JM_MIT_TFF_MAX (50.0f)
 
@@ -78,10 +78,10 @@ extern "C"
 
 		/* 多帧接收重组缓冲 */
 		uint8_t rx_buf[1 + JM_PAYLOAD_MAX]; /* 重组区: [0]=CMD, 其后载荷 */
-		uint16_t rx_len;					/* 已重组字节数 */
-		uint8_t rx_cmd;						/* 当前重组的CMD */
-		uint8_t rx_seq;						/* 期望的下一分包序号 */
-		uint8_t rx_active;					/* 是否正在重组多帧 */
+		uint16_t rx_len;                    /* 已重组字节数 */
+		uint8_t rx_cmd;                     /* 当前重组的CMD */
+		uint8_t rx_seq;                     /* 期望的下一分包序号 */
+		uint8_t rx_active;                  /* 是否正在重组多帧 */
 	} jm_proto_can_t;
 
 	/**
@@ -93,7 +93,7 @@ extern "C"
 	 * @return 0 成功, -1 参数错误
 	 */
 	int jm_proto_can_init(jm_proto_can_t *c, const jm_proto_ops_t *ops,
-						  uint8_t motor_id, jm_can_tx_fn tx);
+	                      uint8_t motor_id, jm_can_tx_fn tx);
 
 	/**
 	 * @brief  喂入收到的一帧CAN报文(在CAN接收中断/线程中调用)

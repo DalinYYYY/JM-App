@@ -2,7 +2,7 @@
  * @file thread_communication.c
  * @brief 
  * 
- * @author dalin (dalin@robot.com)
+ * @author dalin (dalinyy@163.com)
  * @version 1.0
  * @date 2026-06-10
  * 
@@ -43,10 +43,10 @@ static void commun_vesc_fill_values(vesc_values_t *v)
 {
 	const motor_state_t *m = &usr.motor_state[M1];
 
-	v->id = m->electrical.id_meas;					  /* 直轴电流 A */
-	v->iq = m->electrical.iq_meas;					  /* 交轴电流 A */
-	v->current_motor = m->electrical.iq_meas;		  /* 电机电流 A (近似取 iq) */
-	v->rpm = m->motion.velocity_rad_s;				  /* 转速 (rad/s, 如需 ERPM 另换算) */
+	v->id = m->electrical.id_meas;                    /* 直轴电流 A */
+	v->iq = m->electrical.iq_meas;                    /* 交轴电流 A */
+	v->current_motor = m->electrical.iq_meas;         /* 电机电流 A (近似取 iq) */
+	v->rpm = m->motion.velocity_rad_s;                /* 转速 (rad/s, 如需 ERPM 另换算) */
 	v->pid_pos = m->motion.position_rad * RAD_TO_DEG; /* PID 位置 ° */
 	v->fault_code = 0;
 	v->controller_id = 0;

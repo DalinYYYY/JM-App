@@ -2,7 +2,7 @@
  * @file        dev_power_monitor.c
  * @brief       电源监控设备(ADC规则组DMA采样: 母线电压/电流/温度等板级监控量)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.1
  * @date        2026-06-17
  *

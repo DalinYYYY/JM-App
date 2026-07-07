@@ -2,7 +2,7 @@
  * @file        dev_commun_uart.h
  * @brief       关节电机串口通信设备(USART+DMA空闲中断, 承载 joint_proto 协议)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -29,8 +29,8 @@
 #include "dev_config.h"
 #if defined(USE_DEV_COMMUN_UART)
 
-#include "drv_usart.h"		/* usartNumber_e / 空闲中断收发接口 */
-#include "jm_proto_uart.h"	/* jm_proto_uart_t / jm_proto_ops_t */
+#include "drv_usart.h"     /* usartNumber_e / 空闲中断收发接口 */
+#include "jm_proto_uart.h" /* jm_proto_uart_t / jm_proto_ops_t */
 #include <stdint.h>
 
 #ifdef __cplusplus

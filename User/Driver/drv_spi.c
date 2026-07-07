@@ -2,7 +2,7 @@
  * @file        drv_spi.c
  * @brief       SPI驱动实现，封装HAL的SPI阻塞/中断/DMA收发及片选控制
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *
@@ -261,4 +261,3 @@ int drv_spi_transfer_dma(spiDrv_t drv, uint8_t *tx_data, uint8_t *rx_data, uint1
 }
 
 #endif /* USE_SPI_DRIVER */
-

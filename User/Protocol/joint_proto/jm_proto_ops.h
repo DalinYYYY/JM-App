@@ -2,7 +2,7 @@
  * @file        jm_proto_ops.h
  * @brief       关节电机协议-业务回调实现(传输无关, 串口/CAN 共用)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-23
  *

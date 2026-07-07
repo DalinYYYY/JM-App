@@ -24,7 +24,7 @@
  * @file        drv_xxx.h
  * @brief       XXX驱动接口，封装HAL的XXX运行期收发功能
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-XX
  *

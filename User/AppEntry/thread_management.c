@@ -2,7 +2,7 @@
  * @file thread_management.c
  * @brief 
  * 
- * @author dalin (dalin@robot.com)
+ * @author dalin (dalinyy@163.com)
  * @version 1.0
  * @date 2026-06-10
  * 
@@ -28,10 +28,10 @@
 #include "thread_period.h"
 #include "thread_idle.h"
 
-#define THREAD_IDLE_SIZE 128 * 2
-#define THREAD_PERIOD_SIZE 128 * 8
+#define THREAD_IDLE_SIZE    128 * 2
+#define THREAD_PERIOD_SIZE  128 * 8
 #define THREAD_DISPLAY_SIZE 128 * 8
-#define THREAD_COMMUN_SIZE 128 * 24 /* 3072B：容纳 motor_info_storage_save(1024B tmp) + crc32_compute 嵌套(1024B) + 调用链余量 */
+#define THREAD_COMMUN_SIZE  128 * 24 /* 3072B：容纳 motor_info_storage_save(1024B tmp) + crc32_compute 嵌套(1024B) + 调用链余量 */
 #define THREAD_CONTROL_SIZE 128 * 16
 
 /* 任务列表ID */
@@ -62,50 +62,50 @@ void thread_init(void)
 #ifdef USE_CONTROL_THREAD
 	index = THREAD_ID_CONTROL;
 	TaskHandle[index] = drv_rtos_thread_create("ControlTask",
-											   control_thread,
-											   DRV_RTOS_PRIORITY_HIGH,
-											   THREAD_CONTROL_SIZE,
-											   NULL);
+	                                           control_thread,
+	                                           DRV_RTOS_PRIORITY_HIGH,
+	                                           THREAD_CONTROL_SIZE,
+	                                           NULL);
 #endif
 
 #ifdef USE_COMMUN_THREAD
 	/* 主通讯任务 */
 	index = THREAD_ID_COMMUN;
 	TaskHandle[index] = drv_rtos_thread_create("CommunTask",
-											   commun_thread,
-											   DRV_RTOS_PRIORITY_HIGH,
-											   THREAD_COMMUN_SIZE,
-											   NULL);
+	                                           commun_thread,
+	                                           DRV_RTOS_PRIORITY_HIGH,
+	                                           THREAD_COMMUN_SIZE,
+	                                           NULL);
 #endif
 
 #ifdef USE_DISPLAY_THREAD
 	/* 显示及可视化任务 */
 	index = THREAD_ID_DISPLAY;
 	TaskHandle[index] = drv_rtos_thread_create("DisplayTask",
-											   display_thread,
-											   DRV_RTOS_PRIORITY_ABOVE_NORMAL,
-											   THREAD_DISPLAY_SIZE,
-											   NULL);
+	                                           display_thread,
+	                                           DRV_RTOS_PRIORITY_ABOVE_NORMAL,
+	                                           THREAD_DISPLAY_SIZE,
+	                                           NULL);
 #endif
 
 #ifdef USE_PERIOD_THREAD
 	/* 周期任务*/
 	index = THREAD_ID_PERIOD;
 	TaskHandle[index] = drv_rtos_thread_create("PeriodTask",
-											   period_thread,
-											   DRV_RTOS_PRIORITY_ABOVE_NORMAL,
-											   THREAD_PERIOD_SIZE,
-											   NULL);
+	                                           period_thread,
+	                                           DRV_RTOS_PRIORITY_ABOVE_NORMAL,
+	                                           THREAD_PERIOD_SIZE,
+	                                           NULL);
 #endif
 
 #ifdef USE_IDLE_THREAD
 	/* 空闲任务 */
 	index = THREAD_ID_IDLE;
 	TaskHandle[index] = drv_rtos_thread_create("IdleTask",
-											   idle_thread,
-											   DRV_RTOS_PRIORITY_ABOVE_NORMAL,
-											   THREAD_IDLE_SIZE,
-											   NULL);
+	                                           idle_thread,
+	                                           DRV_RTOS_PRIORITY_ABOVE_NORMAL,
+	                                           THREAD_IDLE_SIZE,
+	                                           NULL);
 #endif
 
 	drv_rtos_exit_critical();

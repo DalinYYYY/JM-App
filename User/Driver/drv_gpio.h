@@ -2,7 +2,7 @@
  * @file        drv_gpio.h
  * @brief       GPIO驱动接口，封装HAL的GPIO读写/翻转/运行期重配置功能
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-15
  *

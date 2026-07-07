@@ -233,7 +233,7 @@ Expected: 0 errors(警告数应与基线一致,约 46-48)
  * @note        L1 相电流 ADC offset 不入 motor_info（属驱动层运行时校准）。
  *              L4 力矩常数当前是桩实现，无数据可提交，本期不提供 submit API。
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-07-02
  */
@@ -328,7 +328,7 @@ int motor_info_calib_reset(void);
  * @file        motor_info_calib.c
  * @brief       标定结果回流 motor_info 的提交 API 实现
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-07-02
  */

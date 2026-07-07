@@ -2,7 +2,7 @@
  * @file        jm_proto_can.c
  * @brief       关节电机协议-CAN绑定层实现: 定点压缩 + 多帧分包 + 共用dispatch
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *

@@ -2,7 +2,7 @@
  * @file        drv_flash_g4.h
  * @brief       STM32G4内部FLASH驱动接口，双Bank页擦除/读/读改写
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *
@@ -27,7 +27,7 @@
 #include "main.h"
 
 /* 简写整型别名（本工程无独立 types.h，内联定义供 drv_flash_g4/dev_flash 共用） */
-typedef uint8_t  u8;
+typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
@@ -42,22 +42,22 @@ typedef uint64_t u64;
  */
 #define STM32_FLASH_BASE FLASH_BASE /* STM32 FLASH 起始地址(0x08000000) */
 
-#define FLASH_WAITETIME 50000U /* FLASH操作等待超时(FLASH_WaitForLastOperation单位) */
+#define FLASH_WAITETIME 50000U      /* FLASH操作等待超时(FLASH_WaitForLastOperation单位) */
 
 /* FLASH空值定义 */
-#define FLASH_NULL_U8 0xff
+#define FLASH_NULL_U8  0xff
 #define FLASH_NULL_U16 0xffff
 #define FLASH_NULL_U32 0xffffffff
 #define FLASH_NULL_U64 0xffffffffffffffff
 
 /* 统一错误码定义 */
-#define FLASH_ERR_OK 0U				/* 成功 */
+#define FLASH_ERR_OK             0U /* 成功 */
 #define FLASH_ERR_ADDR_OUT_RANGE 1U /* 地址越界/无效地址/未对齐 */
-#define FLASH_ERR_BUSY 2U			/* FLASH忙 */
-#define FLASH_ERR_ERASE_FAILED 3U	/* 擦除失败 */
-#define FLASH_ERR_BANK_INVALID 4U	/* Bank编号非法（仅支持1/2） */
-#define FLASH_ERR_WRITE_VERIFY 5U	/* 写入校验失败 */
-#define FLASH_ERR_PARAM 6U			/* 参数非法 */
+#define FLASH_ERR_BUSY           2U /* FLASH忙 */
+#define FLASH_ERR_ERASE_FAILED   3U /* 擦除失败 */
+#define FLASH_ERR_BANK_INVALID   4U /* Bank编号非法（仅支持1/2） */
+#define FLASH_ERR_WRITE_VERIFY   5U /* 写入校验失败 */
+#define FLASH_ERR_PARAM          6U /* 参数非法 */
 
 /**
  * @brief       判断当前FLASH是否为双Bank模式(运行期读DBANK选项位)
@@ -85,9 +85,9 @@ u32 drv_g4_flash_page_size(void);
 u8 drv_g4_flash_get_bank(u32 addr);
 
 /* 底层FLASH操作函数 */
-u8 drv_g4_flash_erase_page(const u32 addr, u8 len, u8 bank);					 // 按页擦除FLASH
-u8 drv_g4_flash_read(const u32 addr, u64 *pdata64, u32 len_64);					 // 读取FLASH
-u8 drv_g4_flash_write(const u32 addr, u64 *pdata64, u32 len_64, u8 bank);		 // 写入FLASH
+u8 drv_g4_flash_erase_page(const u32 addr, u8 len, u8 bank);                     // 按页擦除FLASH
+u8 drv_g4_flash_read(const u32 addr, u64 *pdata64, u32 len_64);                  // 读取FLASH
+u8 drv_g4_flash_write(const u32 addr, u64 *pdata64, u32 len_64, u8 bank);        // 写入FLASH
 u8 drv_g4_flash_write_buffer(const u32 addr, u64 *pdata64, u32 len_64, u8 bank); // 批量写入FLASH
 
 /* 上层通用FLASH操作函数 */

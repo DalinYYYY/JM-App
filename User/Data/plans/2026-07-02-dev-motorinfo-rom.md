@@ -151,7 +151,7 @@ Flash 分区配置（链接脚本、Keil Target Options）由用户自行完成�
  * @file        dev_flash.h
  * @brief       通用片内 Flash 页存储设备（磨损均衡）
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     2.0
  * @date        2026-07-02
  *
@@ -256,7 +256,7 @@ git commit -m "refactor(dev_flash): 重写头文件为通用接口(init 传地�
  * @file        dev_flash.c
  * @brief       通用片内 Flash 页存储设备（磨损均衡）
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     2.0
  * @date        2026-07-02
  *
@@ -480,7 +480,7 @@ git commit -m "refactor(dev_flash): 重写实现，通用化接口+修复地址/
  * @note        Flash 分区由 Keil 链接脚本预留（用户自行配置）。
  *              存储地址定义在本头文件的宏中，与应用逻辑同模块。
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-07-02
  *
@@ -567,7 +567,7 @@ int motor_info_storage_save(const motor_info_t *cfg);
  * @file        motor_info_storage.c
  * @brief       motor_info Flash 持久化应用服务实现
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-07-02
  *

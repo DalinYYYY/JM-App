@@ -2,7 +2,7 @@
  * @file        drv_tim.h
  * @brief       定时器驱动接口，封装HAL的定时器计数/重装载/中断等运行期接口
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *

@@ -2,7 +2,7 @@
  * @file        dev_commun_vesc.c
  * @brief       VESC Tool 串口通信设备(USART+DMA空闲中断, 把本机伪装成VESC从机)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -97,7 +97,7 @@ static void dev_commun_vesc_poll(struct dev_commun_vesc *pobj)
 
 /* 注入仪表盘实时值数据源(应用把传感器/控制量填进 vesc_values_t) */
 static void dev_commun_vesc_set_values_cb(struct dev_commun_vesc *pobj,
-										  void (*cb)(vesc_values_t *v))
+                                          void (*cb)(vesc_values_t *v))
 {
 	assert_report(pobj != NULL);
 	pobj->fill_values = cb;

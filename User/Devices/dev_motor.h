@@ -2,7 +2,7 @@
  * @file        dev_motor.h
  * @brief 		电机实例化：编码器+多圈计数+FOC+PWM+相电流采样
  * 
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-17
  * 
@@ -20,7 +20,7 @@
 #define __DEV_MOTOR_H__
 
 #include <stdint.h>
-#include "dev_encoder.h"        /* dev_encoder_t 抽象接口（替代内联定义）*/
+#include "dev_encoder.h" /* dev_encoder_t 抽象接口（替代内联定义）*/
 #include "foc_core.h"
 #include "dev_power_monitor.h"
 #include "dev_half_bridge.h"

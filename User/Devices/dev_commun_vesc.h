@@ -2,7 +2,7 @@
  * @file        dev_commun_vesc.h
  * @brief       VESC Tool 串口通信设备(USART+DMA空闲中断, 把本机伪装成VESC从机)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -30,7 +30,7 @@
 #include "dev_config.h"
 #if defined(USE_DEV_COMMUN_VESC)
 
-#include "drv_usart.h" /* usartNumber_e / 空闲中断收发接口 */
+#include "drv_usart.h"  /* usartNumber_e / 空闲中断收发接口 */
 #include "vesc_slave.h" /* vesc_slave_t / vesc_values_t */
 #include <stdint.h>
 

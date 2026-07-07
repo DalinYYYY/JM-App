@@ -2,7 +2,7 @@
  * @file        jm_proto.h
  * @brief       关节电机通信协议核心(传输无关): CMD分发 + 小端编解码助手
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -37,24 +37,24 @@ extern "C"
 	/* ---------------- 实时反馈数据(读命令的数据源) ---------------- */
 	typedef struct
 	{
-		float pos;			 /* 电机端多圈位置 θ_m rad (带符号, ±∞) */
-		float vel;			 /* 电机端机械角速度 rad/s */
-		float torque;		 /* 输出端力矩 Nm */
-		float id;			 /* d轴电流 A */
-		float iq;			 /* q轴电流 A */
-		float ia, ib, ic;	 /* 三相电流 A */
-		float vbus;			 /* 母线电压 V */
-		float ibus;			 /* 母线电流 A */
-		float temp_fet;		 /* 功率管温度 ℃ */
-		float temp_motor;	 /* 电机温度 ℃ */
-		int32_t multiturn;	 /* 多圈计数 (整圈, 带符号) */
-		float single;		 /* 单圈机械角 rad [0,2π) */
+		float pos;           /* 电机端多圈位置 θ_m rad (带符号, ±∞) */
+		float vel;           /* 电机端机械角速度 rad/s */
+		float torque;        /* 输出端力矩 Nm */
+		float id;            /* d轴电流 A */
+		float iq;            /* q轴电流 A */
+		float ia, ib, ic;    /* 三相电流 A */
+		float vbus;          /* 母线电压 V */
+		float ibus;          /* 母线电流 A */
+		float temp_fet;      /* 功率管温度 ℃ */
+		float temp_motor;    /* 电机温度 ℃ */
+		int32_t multiturn;   /* 多圈计数 (整圈, 带符号) */
+		float single;        /* 单圈机械角 rad [0,2π) */
 		uint32_t fault_mask; /* 故障位掩码 */
-		uint32_t warn_mask;	 /* 警告位掩码 */
-		uint8_t top_fsm;	 /* 顶层状态 top_fsm_e */
-		uint8_t run_state;	 /* 运行子状态 run_state_e */
-		uint8_t ctrl_mode;	 /* 当前控制模式 ctrl_mode_e */
-		uint8_t enable;		 /* 是否使能 */
+		uint32_t warn_mask;  /* 警告位掩码 */
+		uint8_t top_fsm;     /* 顶层状态 top_fsm_e */
+		uint8_t run_state;   /* 运行子状态 run_state_e */
+		uint8_t ctrl_mode;   /* 当前控制模式 ctrl_mode_e */
+		uint8_t enable;      /* 是否使能 */
 	} jm_feedback_t;
 
 	/* ---------------- 业务回调(由应用层实现, 注入到协议) ----------------
@@ -100,19 +100,19 @@ extern "C"
 		 * [start_id:u16][count:u8][[type:u8][value]...] 并写入 out, 写回 *out_len。
 		 * out 容量为 JM_PAYLOAD_MAX。可为 NULL(回 NACK)。*/
 		jm_err_e (*param_read_bulk)(uint16_t start_id, uint16_t count,
-								   uint8_t *out, uint16_t *out_len);
+		                            uint8_t *out, uint16_t *out_len);
 
 		/* 批量写参数(CMD 0xE3): 从 start_id 起连续写 count 个, values 为按参数表类型
 		 * 逐个拼接的原始字节(每个值长度由 (start_id+i) 的类型决定, 字符串亦按完整 size)。
 		 * 可为 NULL(回 NACK)。*/
 		jm_err_e (*param_write_bulk)(uint16_t start_id, uint16_t count,
-									const uint8_t *values, uint16_t len);
+		                             const uint8_t *values, uint16_t len);
 
 		/* 电机配置(motor_info)读写 0xE6~0xE8: 与0xE0-0xE5的运行时参数独立, 面向
 		 * Flash/EEPROM持久化的硬件配置/校准数据。帧内 value 固定4字节, 固件按字段类型
 		 * (u8/i8/u16/i16/u32/i32/f32)自动转换。可为 NULL(回 NACK)。*/
 		jm_err_e (*motor_info_read)(uint16_t param_id, uint8_t *value4,
-									uint8_t *out_type, uint8_t *out_len);
+		                            uint8_t *out_type, uint8_t *out_len);
 		jm_err_e (*motor_info_write)(uint16_t param_id, const uint8_t *value4, uint8_t len);
 		jm_err_e (*motor_info_save)(void);
 		/* 批量读/写(CMD 0xE9/0xEA): 从 start_id 起连续读/写 count 个, 每值固定4B。
@@ -120,9 +120,9 @@ extern "C"
 		 * write 的 values 为 count*4B 拼接。块内连续ID有效, 跨块间隔返回 BAD_PARAM_ID。
 		 * 可为 NULL(回 NACK)。*/
 		jm_err_e (*motor_info_read_bulk)(uint16_t start_id, uint16_t count,
-										 uint8_t *out, uint16_t *out_len);
+		                                 uint8_t *out, uint16_t *out_len);
 		jm_err_e (*motor_info_write_bulk)(uint16_t start_id, uint16_t count,
-										  const uint8_t *values, uint16_t len);
+		                                  const uint8_t *values, uint16_t len);
 		/* 恢复默认(CMD 0xEB): param_id=0xFFFF 表示全部恢复默认。可为 NULL(回 NACK)。*/
 		jm_err_e (*motor_info_reset)(uint16_t param_id);
 
@@ -140,10 +140,10 @@ extern "C"
 	typedef struct jm_proto
 	{
 		const jm_proto_ops_t *ops; /* 业务回调 */
-		uint8_t motor_id;		   /* 本机地址(CAN用; 串口可忽略) */
+		uint8_t motor_id;          /* 本机地址(CAN用; 串口可忽略) */
 		/* 应答输出缓冲(由 dispatch 填充, 调用方取走发送) */
 		uint8_t reply[1 + JM_PAYLOAD_MAX]; /* reply[0]=CMD, 其后为载荷 */
-		uint16_t reply_len;				   /* 含CMD的总长度; 0 表示无需应答 */
+		uint16_t reply_len;                /* 含CMD的总长度; 0 表示无需应答 */
 	} jm_proto_t;
 
 	/* ---------------- 小端编解码助手(串口/CAN共用) ---------------- */

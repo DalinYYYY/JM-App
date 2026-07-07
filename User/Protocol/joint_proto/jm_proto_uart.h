@@ -2,7 +2,7 @@
  * @file        jm_proto_uart.h
  * @brief       关节电机协议-串口绑定层: 用 packer_parser 完成组帧/拆帧
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -35,9 +35,9 @@ extern "C"
 
 	typedef struct
 	{
-		jm_proto_t proto;	 /* 协议核心实例 */
+		jm_proto_t proto;    /* 协议核心实例 */
 		upacker_inst packer; /* packer_parser 解/封包器 */
-		jm_uart_tx_fn tx;	 /* 字节流发送 */
+		jm_uart_tx_fn tx;    /* 字节流发送 */
 	} jm_proto_uart_t;
 
 	/**
@@ -49,7 +49,7 @@ extern "C"
 	 * @return 0 成功, -1 参数错误
 	 */
 	int jm_proto_uart_init(jm_proto_uart_t *u, const jm_proto_ops_t *ops,
-						   uint8_t motor_id, jm_uart_tx_fn tx);
+	                       uint8_t motor_id, jm_uart_tx_fn tx);
 
 	/**
 	 * @brief  喂入串口收到的原始字节(可在中断/线程中分批调用)

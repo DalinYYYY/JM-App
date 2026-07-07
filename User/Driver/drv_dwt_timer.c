@@ -2,7 +2,7 @@
  * @file        drv_dwt_timer.c
  * @brief       DWT周期计数器驱动实现，提供CPU周期级高精度计时
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-12
  *

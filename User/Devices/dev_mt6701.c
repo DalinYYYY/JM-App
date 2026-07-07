@@ -2,7 +2,7 @@
  * @file        dev_mt6701.c
  * @brief       MT6701磁编码器(14bit SSI/SPI): 角度/磁场状态/CRC校验/零点/方向
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.2
  * @date        2026-06-17
  *
@@ -107,10 +107,10 @@ static uint8_t mt6701_crc6_check(uint32_t data_word)
 	uint8_t idx;
 	uint8_t crc_calc;
 
-	idx = (uint8_t)((crc_data >> 12) & 0x3Fu);		/* [17:12] 高6位 */
-	crc_calc = (uint8_t)((crc_data >> 6) & 0x3Fu);	/* [11:6]  中6位 */
+	idx = (uint8_t)((crc_data >> 12) & 0x3Fu);     /* [17:12] 高6位 */
+	crc_calc = (uint8_t)((crc_data >> 6) & 0x3Fu); /* [11:6]  中6位 */
 	idx = (uint8_t)(crc_calc ^ tableCRC6[idx]);
-	crc_calc = (uint8_t)(crc_data & 0x3Fu);			/* [5:0]   低6位 */
+	crc_calc = (uint8_t)(crc_data & 0x3Fu);        /* [5:0]   低6位 */
 	idx = (uint8_t)(crc_calc ^ tableCRC6[idx]);
 	crc_calc = tableCRC6[idx];
 
@@ -124,8 +124,8 @@ static uint8_t mt6701_try_decode(struct dev_mt6701 *pobj, uint32_t word32, uint8
 {
 	uint32_t frame = (word32 >> (8u - offset)) & 0xFFFFFFu;
 	uint16_t angle = (uint16_t)((frame >> 10) & 0x3FFFu); /* [23:10] 14bit角度 */
-	uint8_t mg_raw = (uint8_t)((frame >> 6) & 0x0Fu);	  /* [9:6]   4bit磁场 */
-	uint8_t crc = (uint8_t)(frame & 0x3Fu);				  /* [5:0]   6bit CRC */
+	uint8_t mg_raw = (uint8_t)((frame >> 6) & 0x0Fu);     /* [9:6]   4bit磁场 */
+	uint8_t crc = (uint8_t)(frame & 0x3Fu);               /* [5:0]   6bit CRC */
 
 	if (mt6701_crc6_check(frame) != 0)
 	{
@@ -161,8 +161,7 @@ static void dev_mt6701_get_raw(struct dev_mt6701 *pobj)
 		return;
 	}
 
-	word32 = ((uint32_t)pobj->raw_buf[0] << 24) | ((uint32_t)pobj->raw_buf[1] << 16) |
-			 ((uint32_t)pobj->raw_buf[2] << 8) | (uint32_t)pobj->raw_buf[3];
+	word32 = ((uint32_t)pobj->raw_buf[0] << 24) | ((uint32_t)pobj->raw_buf[1] << 16) | ((uint32_t)pobj->raw_buf[2] << 8) | (uint32_t)pobj->raw_buf[3];
 
 	/* 先用上次锁定的偏移尝试(稳态下一次命中) */
 	if (mt6701_try_decode(pobj, word32, pobj->bit_offset) == 0)

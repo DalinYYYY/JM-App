@@ -3,7 +3,7 @@
  * @file        dev_motor.h
  * @brief 		电机实例化：编码器+多圈计数+FOC+PWM+相电流采样
  * 
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-17
  * 
@@ -94,7 +94,7 @@ void dev_motor_init(dev_motor_t *pobj,
 
 	pobj->fsm_tim = DRV_TIM2; // 定时器2 // TODO: 后续支持配置表
 
-	/* 创建编码器实例并装配抽象接口（1行替代原30行 #if 装配）
+							  /* 创建编码器实例并装配抽象接口（1行替代原30行 #if 装配）
 	 * 适配层内部持有 static 实体，绑定到 encoder.ctx 并装配全部方法指针 */
 #if (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6701)
 	dev_encoder_mt6701_create(&pobj->encoder, (mt6701_id_e)id);

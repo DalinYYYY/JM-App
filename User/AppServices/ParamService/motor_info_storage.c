@@ -2,7 +2,7 @@
  * @file        motor_info_storage.c
  * @brief       motor_info Flash 持久化设备对象实现
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     3.0
  * @date        2026-07-02
  *
@@ -163,14 +163,14 @@ motor_info_storage_status_t motor_info_storage_init(void)
 	 *    dev_flash_init 扫描扇区 flag，last_sequence>0 表示有写入过的数据 */
 	dev_flash_init(&pobj->flash_dev,
 	               MOTORINFO_FLASH_START_ADDR,
-	               MOTORINFO_FLASH_PAGE_SIZE,    /* total_size = page_size，单扇区 */
+	               MOTORINFO_FLASH_PAGE_SIZE, /* total_size = page_size，单扇区 */
 	               MOTORINFO_FLASH_PAGE_SIZE);
 	pobj->inited = pobj->flash_dev.inited ? true : false;
 
 	/* 3. 加载全局 motor_info（上电自动加载，仅一次） */
 	if (!pobj->motor_info_loaded)
 	{
-		bool need_init_default = true;  /* 是否走首次上电默认路径 */
+		bool need_init_default = true; /* 是否走首次上电默认路径 */
 
 		/* 路径A：非首次上电——dev_flash 扫描到有效 flag（last_sequence > 0） */
 		if (pobj->inited && pobj->flash_dev.last_sequence > 0U)

@@ -2,7 +2,7 @@
  * @file        drv_rtos.h
  * @brief       RTOS接口封装层，封装任务创建/延时/临界区/系统节拍，隔离具体RTOS
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-10
  *
@@ -81,10 +81,10 @@ void drv_rtos_exit_critical(void);
   * @return : 成功返回线程句柄，失败返回NULL
   */
 drv_rtos_thread_handle_t drv_rtos_thread_create(const char *name,
-												drv_rtos_thread_func_t func,
-												drv_rtos_priority_e priority,
-												uint32_t stack_size,
-												void const *arg);
+                                                drv_rtos_thread_func_t func,
+                                                drv_rtos_priority_e priority,
+                                                uint32_t stack_size,
+                                                void const *arg);
 
 /**
  * @brief 任务延时

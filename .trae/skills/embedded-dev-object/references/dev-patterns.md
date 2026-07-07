@@ -28,7 +28,7 @@
  * @file        dev_xxx.h
  * @brief       XXX设备(简述功能)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-XX
  *

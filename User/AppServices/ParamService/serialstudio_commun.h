@@ -2,7 +2,7 @@
  * @file        serialstudio_commun.h
  * @brief       SerialStudio 上位机通信(承载 joint_proto 协议)接入层
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-22
  *

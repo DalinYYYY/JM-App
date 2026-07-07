@@ -2,7 +2,7 @@
  * @file        dev_power_monitor.h
  * @brief       电源监控设备(ADC规则组DMA采样: 母线电压/电流/温度等板级监控量)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.1
  * @date        2026-06-17
  *
@@ -43,8 +43,8 @@ extern "C"
 		PM_CH_MAX,
 	} dev_pm_channel_e;
 
-#define PM_CH_NBRS (PM_CH_MAX)							 /* 规则组通道数 */
-#define PM_AVERAGE_LPF (1)								 /* 平均滤波窗口(每通道采样倍数) */
+#define PM_CH_NBRS     (PM_CH_MAX)                       /* 规则组通道数 */
+#define PM_AVERAGE_LPF (1)                               /* 平均滤波窗口(每通道采样倍数) */
 #define PM_SAMPLE_NBRS ((PM_CH_NBRS) * (PM_AVERAGE_LPF)) /* DMA单ADC缓冲深度 */
 
 	/**

@@ -2,7 +2,7 @@
  * @file        jm_proto_ops.c
  * @brief       关节电机协议-业务回调实现(传输无关, 串口/CAN 共用)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-23
  *
@@ -28,14 +28,14 @@
 #include <string.h>
 
 #include "jm_proto_ops.h"
-#include "runtime_param.h" /* usr, motor_state_t, motor_param_t, M1 */
-#include "motor_param.h"   /* motor_param_init / 字段类型 */
-#include "motor_profile.h" /* motor_profile_apply_param/info 覆盖电机电气身份 */
-#include "version.h"	   /* HW_/APP_ 版本号 */
-#include "motor_loop.h"	   /* motor_loop_get / motor_loop_set_cmd */
-#include "motor_info.h"		   /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
-#include "motor_info_storage.h"  /* motor_info_storage_get: 获取全局 motor_info 句柄 */
-#include "calib_mgr.h"	   /* 标定管理器 start/poll/abort/get_status */
+#include "runtime_param.h"      /* usr, motor_state_t, motor_param_t, M1 */
+#include "motor_param.h"        /* motor_param_init / 字段类型 */
+#include "motor_profile.h"      /* motor_profile_apply_param/info 覆盖电机电气身份 */
+#include "version.h"            /* HW_/APP_ 版本号 */
+#include "motor_loop.h"         /* motor_loop_get / motor_loop_set_cmd */
+#include "motor_info.h"         /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
+#include "motor_info_storage.h" /* motor_info_storage_get: 获取全局 motor_info 句柄 */
+#include "calib_mgr.h"          /* 标定管理器 start/poll/abort/get_status */
 
 /* ============================================================================
  *  1) 控制/模式: CMD 0x00~0xB8  ->  set_mode
@@ -69,7 +69,7 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		case JM_CMD_OPEN_LOOP:
 			if (len < 8)
 				return JM_ERR_LENGTH;
-			mc->id = jm_rd_f32(&pl[0]);	   /* ud(暂存, 预留) */
+			mc->id = jm_rd_f32(&pl[0]);     /* ud(暂存, 预留) */
 			mc->torque = jm_rd_f32(&pl[4]); /* uq -> 开环电压 */
 			break;
 
@@ -149,48 +149,48 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 			mc->torque = jm_rd_f32(&pl[0]);
 			break;
 
-		/* ---- 标定启动 0x90-0x96: payload[0]=子模式 ---- */
-	case JM_CMD_CALIB_LEVEL1:
-	case JM_CMD_CALIB_LEVEL2:
-	case JM_CMD_CALIB_LEVEL3:
-	case JM_CMD_CALIB_LEVEL4:
-	case JM_CMD_CALIB_LEVEL5:
-	case JM_CMD_CALIB_LEVEL6:
-	case JM_CMD_CALIB_LEVEL7:
-	{
-		if (len < 1)
-			return JM_ERR_LENGTH;
-		uint8_t level = cmd - JM_CMD_CALIB_LEVEL1 + 1;
-		uint8_t submode = pl[0];
-		if (!calib_mgr_start(level, submode))
+			/* ---- 标定启动 0x90-0x96: payload[0]=子模式 ---- */
+		case JM_CMD_CALIB_LEVEL1:
+		case JM_CMD_CALIB_LEVEL2:
+		case JM_CMD_CALIB_LEVEL3:
+		case JM_CMD_CALIB_LEVEL4:
+		case JM_CMD_CALIB_LEVEL5:
+		case JM_CMD_CALIB_LEVEL6:
+		case JM_CMD_CALIB_LEVEL7:
 		{
-			/* 区分失败原因：已在标定中 → BUSY，前置依赖未完成 → STATE_DENY，
+			if (len < 1)
+				return JM_ERR_LENGTH;
+			uint8_t level = cmd - JM_CMD_CALIB_LEVEL1 + 1;
+			uint8_t submode = pl[0];
+			if (!calib_mgr_start(level, submode))
+			{
+				/* 区分失败原因：已在标定中 → BUSY，前置依赖未完成 → STATE_DENY，
 			 * 其余（submode 越界/不支持）→ OUT_OF_RANGE */
-			calib_status_t st = calib_mgr_get_status();
-			if (st.state == CALIB_STATE_RUNNING)
-				return JM_ERR_CALIB_BUSY;     /* NACK(0x0A) 已在标定中 */
-			if (st.fail_reason == CALIB_FAIL_DEP_NOT_MET)
-				return JM_ERR_STATE_DENY;     /* NACK(0x03) 前置标定未完成 */
-			return JM_ERR_OUT_OF_RANGE;       /* NACK(0x02) submode 不合法 */
+				calib_status_t st = calib_mgr_get_status();
+				if (st.state == CALIB_STATE_RUNNING)
+					return JM_ERR_CALIB_BUSY; /* NACK(0x0A) 已在标定中 */
+				if (st.fail_reason == CALIB_FAIL_DEP_NOT_MET)
+					return JM_ERR_STATE_DENY; /* NACK(0x03) 前置标定未完成 */
+				return JM_ERR_OUT_OF_RANGE;   /* NACK(0x02) submode 不合法 */
+			}
+			break;                            /* 继续走 motor_loop_set_cmd 进入 CALIB 态 */
 		}
-		break; /* 继续走 motor_loop_set_cmd 进入 CALIB 态 */
-	}
 
-	/* ---- 标定进度查询 0x97: 由 jm_proto.c dispatch 直接返回 8 字节详细状态 ACK,
+		/* ---- 标定进度查询 0x97: 由 jm_proto.c dispatch 直接返回 8 字节详细状态 ACK,
 	 *       不进入本函数, 此处不再处理 ---- */
 
-	/* ---- 标定中止 0x98: 不切状态，直接返回 ---- */
-	case JM_CMD_CALIB_ABORT:
-	{
-		calib_mgr_abort();
-		return JM_ERR_OK; /* ACK */
-	}
+		/* ---- 标定中止 0x98: 不切状态，直接返回 ---- */
+		case JM_CMD_CALIB_ABORT:
+		{
+			calib_mgr_abort();
+			return JM_ERR_OK; /* ACK */
+		}
 
-	/* ---- 其余模式(力控/轨迹/特殊/测试/诊断): 暂仅切状态 ----
+		/* ---- 其余模式(力控/轨迹/特殊/测试/诊断): 暂仅切状态 ----
 	 * 这些模式的载荷由各自 run_*_control 处理逻辑后续接管; 当前先保证
 	 * 模式切换可达。无法识别的码不在 0x00~0xB8 段(dispatch 已过滤)。*/
-	default:
-		break;
+		default:
+			break;
 	}
 
 	/* 触发状态机: cmd 数值与 ctrl_mode_e 一致, 由 process_ctrl_cmd 解释 */
@@ -211,22 +211,22 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 		return JM_ERR_STATE_DENY;
 	}
 
-	fb->pos = m->motion.position_rad;		/* 电机端多圈位置 θ_m rad(带符号,±∞) -> UI"电机位置" */
-	fb->vel = m->motion.velocity_rad_s;		/* 电机端机械角速度 rad/s -> UI"电机速度" */
-	fb->torque = m->power.torque_est;		/* 输出端力矩 Nm(估算) */
-	fb->id = m->electrical.id_meas;			/* d轴电流 A */
-	fb->iq = m->electrical.iq_meas;			/* q轴电流 A */
-	fb->ia = m->electrical.ia;				/* A 相电流 A */
-	fb->ib = m->electrical.ib;				/* B 相电流 A */
-	fb->ic = m->electrical.ic;				/* C 相电流 A */
-	fb->vbus = m->power.v_bus;				/* 母线电压 V */
-	fb->ibus = m->power.i_bus;				/* 母线电流 A */
-	fb->temp_fet = m->thermal.temp_fet;		/* 功率管温度 ℃ */
+	fb->pos = m->motion.position_rad;       /* 电机端多圈位置 θ_m rad(带符号,±∞) -> UI"电机位置" */
+	fb->vel = m->motion.velocity_rad_s;     /* 电机端机械角速度 rad/s -> UI"电机速度" */
+	fb->torque = m->power.torque_est;       /* 输出端力矩 Nm(估算) */
+	fb->id = m->electrical.id_meas;         /* d轴电流 A */
+	fb->iq = m->electrical.iq_meas;         /* q轴电流 A */
+	fb->ia = m->electrical.ia;              /* A 相电流 A */
+	fb->ib = m->electrical.ib;              /* B 相电流 A */
+	fb->ic = m->electrical.ic;              /* C 相电流 A */
+	fb->vbus = m->power.v_bus;              /* 母线电压 V */
+	fb->ibus = m->power.i_bus;              /* 母线电流 A */
+	fb->temp_fet = m->thermal.temp_fet;     /* 功率管温度 ℃ */
 	fb->temp_motor = m->thermal.temp_motor; /* 电机温度 ℃ */
-	fb->multiturn = m->motion.multiturn;	/* 多圈计数(整圈,带符号) -> UI"多圈计数" */
+	fb->multiturn = m->motion.multiturn;    /* 多圈计数(整圈,带符号) -> UI"多圈计数" */
 	fb->single = m->motion.single_turn_rad; /* 单圈机械角 rad [0,2π) -> UI"机械角度"(转°)/电角度计算源 */
-	fb->fault_mask = m->fault.fault_mask;	/* 故障掩码 */
-	fb->warn_mask = m->fault.warn_mask;		/* 警告掩码 */
+	fb->fault_mask = m->fault.fault_mask;   /* 故障掩码 */
+	fb->warn_mask = m->fault.warn_mask;     /* 警告掩码 */
 	fb->top_fsm = (uint8_t)m->top_state;
 	fb->run_state = (uint8_t)m->run_state;
 	fb->ctrl_mode = (uint8_t)m->ctrl_mode;
@@ -249,20 +249,19 @@ static jm_err_e app_get_feedback(jm_feedback_t *fb)
 typedef struct
 {
 	uint16_t offset; /* 字段在 motor_param_t 内的字节偏移 */
-	uint8_t type;	 /* jm_param_type_e */
-	uint8_t size;	 /* 字段字节数 */
+	uint8_t type;    /* jm_param_type_e */
+	uint8_t size;    /* 字段字节数 */
 } param_desc_t;
 
 /* 子结构字段 -> 全局偏移; size 由类型决定, 避免与 type 不一致 */
-#define PT_SZ(t) ((t) == JM_PT_U8 || (t) == JM_PT_I8 ? 1 : \
-				  (t) == JM_PT_U16 || (t) == JM_PT_I16 ? 2 : \
-				  (t) == JM_PT_STR ? 16 : 4)
+#define PT_SZ(t) ((t) == JM_PT_U8 || (t) == JM_PT_I8 ? 1 : (t) == JM_PT_U16 || (t) == JM_PT_I16 ? 2  \
+	                                                   : (t) == JM_PT_STR                       ? 16 \
+	                                                                                            : 4)
 
-#define PARAM_ENT(grp, subtype, field, ptype)                                   \
-	{                                                                           \
-		(uint16_t)(offsetof(motor_param_t, grp) + offsetof(subtype, field)),    \
-			(uint8_t)(ptype), (uint8_t)PT_SZ(ptype)                             \
-	}
+#define PARAM_ENT(grp, subtype, field, ptype)                                \
+	{                                                                        \
+		(uint16_t)(offsetof(motor_param_t, grp) + offsetof(subtype, field)), \
+		(uint8_t)(ptype), (uint8_t)PT_SZ(ptype)}
 
 /* 索引即 param_id(0~82), 顺序严格对齐 joint_motor_param_index.csv */
 static const param_desc_t s_param_tbl[MOTOR_PARAM_PARAM_COUNT] = {
@@ -363,7 +362,7 @@ static const param_desc_t s_param_tbl[MOTOR_PARAM_PARAM_COUNT] = {
 };
 
 static jm_err_e app_param_read(uint16_t param_id, uint8_t *value,
-							   uint8_t *out_type, uint8_t *out_len)
+                               uint8_t *out_type, uint8_t *out_len)
 {
 	const param_desc_t *d;
 	const uint8_t *base = (const uint8_t *)&usr.motor_param[M1];
@@ -463,7 +462,7 @@ static jm_err_e app_param_reset(uint16_t param_id)
  * 应答体布局: [start_id:u16][count:u8][[type:u8][value]...] (count 为实际读到的个数,
  * 越界或超单帧容量时截断; 主机据每个 type 的字节数顺序解析至帧尾)。*/
 static jm_err_e app_param_read_bulk(uint16_t start_id, uint16_t count,
-									uint8_t *out, uint16_t *out_len)
+                                    uint8_t *out, uint16_t *out_len)
 {
 	const uint8_t *base = (const uint8_t *)&usr.motor_param[M1];
 	uint16_t n = 0;
@@ -507,7 +506,7 @@ static jm_err_e app_param_read_bulk(uint16_t start_id, uint16_t count,
  * 每个值长度由 (start_id+i) 的类型决定(字符串亦按完整 size=16); 不足则 LENGTH。
  * 任一参数越界则整体失败回 BAD_PARAM_ID(已写入的前序值不回滚, 由主机重读校正)。*/
 static jm_err_e app_param_write_bulk(uint16_t start_id, uint16_t count,
-									 const uint8_t *values, uint16_t len)
+                                     const uint8_t *values, uint16_t len)
 {
 	uint8_t *base = (uint8_t *)&usr.motor_param[M1];
 	uint16_t off = 0;
@@ -563,7 +562,7 @@ static const char *app_get_dev_name(void)
  *     存上报总开关/订阅掩码/周期, 供绑定层(串口/CAN 周期帧)读取后自行打包上报。
  *     enable=1 启动周期上报, enable=0 停止; 数据帧 0xCA 周期主动推送, 不逐帧应答。
  * ==========================================================================*/
-static uint8_t s_tlm_enable = 0u;	  /* 周期上报总开关: 0=停止, 1=启动 */
+static uint8_t s_tlm_enable = 0u;     /* 周期上报总开关: 0=停止, 1=启动 */
 static uint16_t s_tlm_mask = 0xFFFFu; /* 默认订阅全部组 */
 static uint16_t s_tlm_period_ms = 0u; /* 0 表示沿用绑定层默认周期 */
 
@@ -625,8 +624,8 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 	/* 写入参数表 motor_id; 范围 1~127 已由 dispatch 校验。
 	 * CAN 滤波地址在绑定层初始化时读取, 故重启后生效。*/
 	return (motor_param_set_motor_id(&usr.motor_param[M1], new_id) == 0)
-			   ? JM_ERR_OK
-			   : JM_ERR_OUT_OF_RANGE;
+	           ? JM_ERR_OK
+	           : JM_ERR_OUT_OF_RANGE;
 }
 
 static jm_err_e app_set_baudrate(uint8_t baud_code)
@@ -683,10 +682,10 @@ static jm_err_e mi_dispatch_to_err(int rc)
 
 /* ---- 0xE6 读单个电机配置 ---- */
 static jm_err_e app_motor_info_read(uint16_t param_id, uint8_t *value4,
-									uint8_t *out_type, uint8_t *out_len)
+                                    uint8_t *out_type, uint8_t *out_len)
 {
 	int rc = motor_info_dispatch_read(param_id, motor_info_storage_get(),
-									  value4, out_type, out_len);
+	                                  value4, out_type, out_len);
 	return mi_dispatch_to_err(rc);
 }
 
@@ -711,7 +710,7 @@ static jm_err_e app_motor_info_save(void)
 
 /* ---- 0xE8 批量读(块内连续ID有效, 跨块间隔返回 BAD_PARAM_ID) ---- */
 static jm_err_e app_motor_info_read_bulk(uint16_t start_id, uint16_t count,
-										 uint8_t *out, uint16_t *out_len)
+                                         uint8_t *out, uint16_t *out_len)
 {
 	uint16_t i, n = 0;
 	motor_info_t *cfg = motor_info_storage_get();
@@ -752,7 +751,7 @@ static jm_err_e app_motor_info_read_bulk(uint16_t start_id, uint16_t count,
 
 /* ---- 0xE9 批量写(块内连续ID有效) ---- */
 static jm_err_e app_motor_info_write_bulk(uint16_t start_id, uint16_t count,
-										  const uint8_t *values, uint16_t len)
+                                          const uint8_t *values, uint16_t len)
 {
 	uint16_t i;
 	motor_info_t *cfg = motor_info_storage_get();

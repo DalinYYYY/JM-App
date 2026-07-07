@@ -2,7 +2,7 @@
  * @file thread_config.h
  * @brief 
  * 
- * @author dalin (dalin@robot.com)
+ * @author dalin (dalinyy@163.com)
  * @version 1.0
  * @date 2026-06-10
  * 
@@ -23,10 +23,10 @@
 /* 任务周期控制 */
 
 #define THREAD_DELAY_CONTROL 1
-#define THREAD_DELAY_COMMUN 1
-#define THREAD_DELAY_PERIOD 20
+#define THREAD_DELAY_COMMUN  1
+#define THREAD_DELAY_PERIOD  20
 #define THREAD_DELAY_DISPLAY 10
-#define THREAD_DELAY_IDLE 1000
+#define THREAD_DELAY_IDLE    1000
 
 /* 任务启动延时 */
 #define INTO_THREAD_DELAY 500

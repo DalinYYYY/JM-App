@@ -2,7 +2,7 @@
  * @file        drv_can.h
  * @brief       CAN/FDCAN驱动接口，封装收发与接收回调，跨F4(CAN)/G4·H7(FDCAN)统一
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *

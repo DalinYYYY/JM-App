@@ -2,7 +2,7 @@
  * @file        dev_half_bridge.c
  * @brief       三相半桥PWM输出设备(含互补输出与ADC注入同步触发)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.1
  * @date        2026-06-17
  *
@@ -93,7 +93,7 @@ extern "C"
 		int (*start)(struct dev_half_bridge *pobj);
 		int (*stop)(struct dev_half_bridge *pobj);
 		int (*set_3pwm)(struct dev_half_bridge *pobj,
-						uint32_t ccr1, uint32_t ccr2, uint32_t ccr3);
+		                uint32_t ccr1, uint32_t ccr2, uint32_t ccr3);
 		void (*set_output_enable)(struct dev_half_bridge *pobj, uint8_t enable);
 	} dev_half_bridge_t;
 

@@ -2,7 +2,7 @@
  * @file thread_management.h
  * @brief 
  * 
- * @author dalin (dalin@robot.com)
+ * @author dalin (dalinyy@163.com)
  * @version 1.0
  * @date 2026-06-10
  * 

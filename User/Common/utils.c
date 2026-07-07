@@ -6,7 +6,7 @@
  *              避免单精度操作数被隐式提升为双精度（编译告警 #1035-D），从而保证
  *              运算全程走单精度硬件 FPU，消除 double 软/硬件转换开销。
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-17
  *
@@ -739,7 +739,7 @@ static int uint16_cmp_func(const void *a, const void *b)
  * @return  当前窗口的中值
  */
 uint16_t utils_median_filter_uint16_run(uint16_t *buffer,
-										unsigned int *buffer_index, unsigned int filter_len, uint16_t sample)
+                                        unsigned int *buffer_index, unsigned int filter_len, uint16_t sample)
 {
 	buffer[(*buffer_index)++] = sample;
 	*buffer_index %= filter_len;

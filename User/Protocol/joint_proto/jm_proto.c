@@ -2,7 +2,7 @@
  * @file        jm_proto.c
  * @brief       关节电机通信协议核心: 传输无关的 CMD 分发与应答组织
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -498,7 +498,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		{
 			return reply_nack(proto, cmd, e);
 		}
-		proto->motor_id = new_id;			  /* 同步 RAM 地址, CAN 滤波重启后生效 */
+		proto->motor_id = new_id;             /* 同步 RAM 地址, CAN 滤波重启后生效 */
 		return reply_ack(proto, cmd, new_id); /* ACK{new_id:u8} */
 	}
 	/* 设置波特率 0xF1: {baud_code:u8} -> ACK; 0=1M 1=500K 2=250K 3=125K, 重启生效 */

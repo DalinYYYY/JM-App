@@ -2,7 +2,7 @@
  * @file        drv_i2c.c
  * @brief       I2C驱动实现，封装HAL的I2C内存读写/设备就绪检测
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *

@@ -2,7 +2,7 @@
  * @file        dev_mt6701.c
  * @brief       MT6701磁编码器(14bit SSI/SPI): 角度/磁场状态/CRC校验/零点/方向
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.2
  * @date        2026-06-17
  *
@@ -31,8 +31,8 @@ extern "C"
 {
 #endif
 
-#define MT6701_ANGLE_RESOLUTION (1 << 14)						/* 2^14 = 16384 */
-#define MT6701_ZERO_REG_STEP (360.0F / MT6701_ANGLE_RESOLUTION) /* 零点步进, ° */
+#define MT6701_ANGLE_RESOLUTION (1 << 14)                          /* 2^14 = 16384 */
+#define MT6701_ZERO_REG_STEP    (360.0F / MT6701_ANGLE_RESOLUTION) /* 零点步进, ° */
 
 	typedef enum
 	{
@@ -105,12 +105,12 @@ extern "C"
 		mt6701_dir_e dir;
 
 		/* public */
-		void (*update)(struct dev_mt6701 *pobj);					/* 读取并刷新机械角度 */
+		void (*update)(struct dev_mt6701 *pobj);                    /* 读取并刷新机械角度 */
 		bool (*set_zero_angle)(struct dev_mt6701 *pobj, float deg); /* 设置零点角度(°), 成功 true */
-		float (*get_zero_angle)(struct dev_mt6701 *pobj);			/* 读取当前零点角度(°) */
-		void (*calibrate_zero)(struct dev_mt6701 *pobj);			/* 将当前角度标定为 0° */
+		float (*get_zero_angle)(struct dev_mt6701 *pobj);           /* 读取当前零点角度(°) */
+		void (*calibrate_zero)(struct dev_mt6701 *pobj);            /* 将当前角度标定为 0° */
 		void (*set_dir)(struct dev_mt6701 *pobj, mt6701_dir_e dir); /* 设置方向 */
-		mt6701_dir_e (*get_dir)(struct dev_mt6701 *pobj);			/* 获取方向 */
+		mt6701_dir_e (*get_dir)(struct dev_mt6701 *pobj);           /* 获取方向 */
 	} dev_mt6701_t;
 
 	/**

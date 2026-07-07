@@ -2,7 +2,7 @@
  * @file        motion_param.c
  * @brief       电机运动参数解算模块（仅角度/速度，不含多圈计数）
  * 
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-12
  * 
@@ -36,7 +36,7 @@
 #ifndef MOTION_PI
 #define MOTION_PI 3.14159265358979323846f
 #endif
-#define MOTION_2PI (2.0f * MOTION_PI)
+#define MOTION_2PI     (2.0f * MOTION_PI)
 #define MOTION_DEG2RAD (MOTION_PI / 180.0f) // °  -> rad
 #define MOTION_RAD2DEG (180.0f / MOTION_PI) // rad -> °
 
@@ -385,7 +385,7 @@ static float feedforword_get_acc(struct motion_param *pobj)
 /* 更新分发                                                            */
 /* ------------------------------------------------------------------ */
 static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
-							   float mechanical_angle)
+                               float mechanical_angle)
 {
 	MOTION_GUARD(pobj != NULL);
 
@@ -478,7 +478,7 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 }
 
 void motion_param_init(motion_param_t *pobj, uint8_t poles, uint16_t slide_window_size,
-					   float (*unused_compensation_callback)(void))
+                       float (*unused_compensation_callback)(void))
 {
 	motion_param_config_t cfg;
 	memset(&cfg, 0, sizeof(cfg));

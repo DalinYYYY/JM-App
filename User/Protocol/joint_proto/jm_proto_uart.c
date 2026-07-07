@@ -2,7 +2,7 @@
  * @file        jm_proto_uart.c
  * @brief       关节电机协议-串口绑定层实现
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *

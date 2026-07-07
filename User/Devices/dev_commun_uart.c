@@ -2,7 +2,7 @@
  * @file        dev_commun_uart.c
  * @brief       关节电机串口通信设备(USART+DMA空闲中断, 承载 joint_proto 协议)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-18
  *
@@ -126,7 +126,7 @@ static void dev_commun_uart_poll(struct dev_commun_uart *pobj)
 
 /* 主动上报一帧(电机->上位机方向, 如周期反馈), 无需上位机轮询 */
 static void dev_commun_uart_report(struct dev_commun_uart *pobj, uint8_t cmd,
-								   const uint8_t *body, uint16_t len)
+                                   const uint8_t *body, uint16_t len)
 {
 	assert_report(pobj != NULL);
 	if (!pobj->started)

@@ -2,7 +2,7 @@
  * @file        drv_i2c_soft.h
  * @brief       软件模拟I2C驱动接口，通过GPIO回调实现，与具体MCU/HAL解耦
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *
@@ -107,11 +107,11 @@ typedef struct i2c_soft_drv
  * @param        hw_addr           : 从机地址(8bit基址)
  */
 void drv_i2c_init(i2c_soft_drv_t *pobj, i2c_id_e id,
-				  uint8_t (*sda_read)(i2c_id_e id),
-				  void (*sda_dir)(i2c_id_e id, i2c_sda_dir_e dir),
-				  void (*sda)(i2c_id_e id, i2c_state_e level),
-				  void (*scl)(i2c_id_e id, i2c_state_e level),
-				  uint8_t hw_addr);
+                  uint8_t (*sda_read)(i2c_id_e id),
+                  void (*sda_dir)(i2c_id_e id, i2c_sda_dir_e dir),
+                  void (*sda)(i2c_id_e id, i2c_state_e level),
+                  void (*scl)(i2c_id_e id, i2c_state_e level),
+                  uint8_t hw_addr);
 
 /**
  * @brief       向从机寄存器写一个字节

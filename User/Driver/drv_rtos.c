@@ -2,7 +2,7 @@
  * @file        drv_rtos.c
  * @brief       RTOS接口封装层实现(基于FreeRTOS + CMSIS-OS v1)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-10
  *
@@ -77,10 +77,10 @@ void drv_rtos_exit_critical(void)
 
 // 创建一个RTOS线程
 drv_rtos_thread_handle_t drv_rtos_thread_create(const char *name,
-												drv_rtos_thread_func_t func,
-												drv_rtos_priority_e priority,
-												uint32_t stack_size,
-												void const *arg)
+                                                drv_rtos_thread_func_t func,
+                                                drv_rtos_priority_e priority,
+                                                uint32_t stack_size,
+                                                void const *arg)
 {
 	int i;
 	drv_rtos_thread_ctrl_t *ctrl = NULL;

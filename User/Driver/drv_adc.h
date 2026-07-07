@@ -2,7 +2,7 @@
  * @file        drv_adc.h
  * @brief       ADC驱动接口，封装HAL的ADC规则/注入/DMA转换功能
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-15
  *

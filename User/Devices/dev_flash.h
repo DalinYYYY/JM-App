@@ -2,7 +2,7 @@
  * @file        dev_flash.h
  * @brief       通用片内 Flash 页存储设备（磨损均衡）
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     2.0
  * @date        2026-07-02
  *
@@ -23,7 +23,8 @@
 #define __DEV_FLASH_H__
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
 #include "dev_config.h"
@@ -40,36 +41,36 @@ extern "C" {
 /* 扇区标志位：magic(高32) + sequence(低32)
  * 擦除态 0xFFFF...F → magic 不匹配 → 无效
  * 有效态 magic 匹配 + seq > 0 */
-#define FLASH_FLAG_MAGIC  0x4D4F544Fu  /* "MOTO" */
-#define FLASH_FLAG_MAKE(seq)    (((uint64_t)FLASH_FLAG_MAGIC << 32) | ((seq) & 0xFFFFFFFFu))
-#define FLASH_FLAG_IS_VALID(f)  (((uint32_t)((f) >> 32)) == FLASH_FLAG_MAGIC)
-#define FLASH_FLAG_SEQ(f)       ((uint32_t)((f) & 0xFFFFFFFFu))
+#define FLASH_FLAG_MAGIC       0x4D4F544Fu /* "MOTO" */
+#define FLASH_FLAG_MAKE(seq)   (((uint64_t)FLASH_FLAG_MAGIC << 32) | ((seq) & 0xFFFFFFFFu))
+#define FLASH_FLAG_IS_VALID(f) (((uint32_t)((f) >> 32)) == FLASH_FLAG_MAGIC)
+#define FLASH_FLAG_SEQ(f)      ((uint32_t)((f) & 0xFFFFFFFFu))
 
-/**
+	/**
  * @brief  flash 设备句柄结构体
  */
-typedef struct dev_flash
-{
-    uint32_t start_addr;     /* 数据区起始绝对地址(init 时传入) */
-    uint32_t total_size;     /* 数据区总大小(字节) */
-    uint32_t page_size;      /* 单页大小(字节) */
-    uint32_t sector_count;   /* 扇区数 = total_size / page_size */
-    uint32_t last_sector;    /* 当前有效扇区索引 */
-    uint32_t last_sequence;  /* 当前有效扇区的 sequence 号 */
-    bool inited;             /* 初始化完成标志 */
+	typedef struct dev_flash
+	{
+		uint32_t start_addr;    /* 数据区起始绝对地址(init 时传入) */
+		uint32_t total_size;    /* 数据区总大小(字节) */
+		uint32_t page_size;     /* 单页大小(字节) */
+		uint32_t sector_count;  /* 扇区数 = total_size / page_size */
+		uint32_t last_sector;   /* 当前有效扇区索引 */
+		uint32_t last_sequence; /* 当前有效扇区的 sequence 号 */
+		bool inited;            /* 初始化完成标志 */
 
-    int (*flash_write)(struct dev_flash *pobj, u32 offset, u64 *data, u16 size);
-    int (*flash_read)(struct dev_flash *pobj, u32 offset, u64 *data, u16 size);
-} dev_flash_t;
+		int (*flash_write)(struct dev_flash *pobj, u32 offset, u64 *data, u16 size);
+		int (*flash_read)(struct dev_flash *pobj, u32 offset, u64 *data, u16 size);
+	} dev_flash_t;
 
-/**
+	/**
  * @brief  初始化 flash 设备(传入地址+大小+页大小，扫描扇区定位最新有效数据)
  * @param  pobj       flash 设备句柄
  * @param  start_addr 数据区起始绝对地址(须页对齐)
  * @param  total_size 数据区总大小(字节，须为 page_size 的整数倍)
  * @param  page_size  单页大小(字节，须等于 drv_g4_flash_page_size() 返回值)
  */
-void dev_flash_init(struct dev_flash *pobj, uint32_t start_addr, uint32_t total_size, uint32_t page_size);
+	void dev_flash_init(struct dev_flash *pobj, uint32_t start_addr, uint32_t total_size, uint32_t page_size);
 
 #ifdef __cplusplus
 }

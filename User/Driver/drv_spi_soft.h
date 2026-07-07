@@ -2,7 +2,7 @@
  * @file        drv_spi_soft.h
  * @brief       软件模拟SPI驱动接口，通过GPIO回调实现，与具体MCU/HAL解耦
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *
@@ -77,9 +77,9 @@ typedef struct spi_soft_drv
  * @param        miso_read         : 读MISO电平回调(仅发送时可传NULL)
  */
 void drv_soft_spi_init(spi_soft_drv_t *spi,
-					   void (*mosi)(spi_state_t level),
-					   void (*scl)(spi_state_t level),
-					   uint8_t (*miso_read)(void));
+                       void (*mosi)(spi_state_t level),
+                       void (*scl)(spi_state_t level),
+                       uint8_t (*miso_read)(void));
 
 #endif /* USE_SOFT_SPI_DRIVER */
 #endif // __DRV_SPI_SOFT_H__

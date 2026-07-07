@@ -2,7 +2,7 @@
  * @file        drv_spi_soft.c
  * @brief       软件模拟SPI驱动实现，通过GPIO回调实现，与具体MCU/HAL解耦
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *
@@ -80,9 +80,9 @@ static uint8_t spi_transfer_byte(struct spi_soft_drv *pobj, uint8_t byte)
  * @brief       初始化软件SPI设备(注入GPIO操作回调)
  */
 void drv_soft_spi_init(spi_soft_drv_t *spi,
-					   void (*mosi)(spi_state_t level),
-					   void (*scl)(spi_state_t level),
-					   uint8_t (*miso_read)(void))
+                       void (*mosi)(spi_state_t level),
+                       void (*scl)(spi_state_t level),
+                       uint8_t (*miso_read)(void))
 {
 	spi->mosi = mosi;
 	spi->scl = scl;

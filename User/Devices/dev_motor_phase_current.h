@@ -2,7 +2,7 @@
  * @file        dev_motor_phase_current.h
  * @brief       电机三相相电流采样设备(ADC注入组, 与PWM同步触发)
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-17
  *

@@ -2,7 +2,7 @@
  * @file        dev_mt6835.h
  * @brief       MT6835磁编码器(21bit SPI): 角度/零点读写(寄存器/EEPROM)/方向
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.1
  * @date        2026-06-17
  *
@@ -33,16 +33,16 @@ extern "C"
 #endif
 
 /* 操作指令 */
-#define MT6835_READ 0x3000			 /* 读寄存器 */
-#define MT6835_WRITE 0x6000			 /* 写寄存器 */
-#define MT6835_WRITEEEPROM 0xC000	 /* 写 EEPROM */
-#define MT6835_SETZEROPOINT 0x5000	 /* 自动设零点 */
-#define MT6835_CONTINUOUSREAD 0xA000 /* 连续读 */
+#define MT6835_READ           0x3000            /* 读寄存器 */
+#define MT6835_WRITE          0x6000            /* 写寄存器 */
+#define MT6835_WRITEEEPROM    0xC000            /* 写 EEPROM */
+#define MT6835_SETZEROPOINT   0x5000            /* 自动设零点 */
+#define MT6835_CONTINUOUSREAD 0xA000            /* 连续读 */
 
-#define MT6835_ZERO_REG_STEP (0.088f)	  /* 零点寄存器步进, ° */
-#define MT6835_ANGLE_RESOLUTION (1 << 21) /* 2^21 = 2097152 */
-#define MT6835_ANGLE_MASK (0x1FFFFF)	  /* 21bit 角度掩码 */
-#define MT6835_RAD2DEG (57.295779513f)	  /* 弧度转角度 */
+#define MT6835_ZERO_REG_STEP    (0.088f)        /* 零点寄存器步进, ° */
+#define MT6835_ANGLE_RESOLUTION (1 << 21)       /* 2^21 = 2097152 */
+#define MT6835_ANGLE_MASK       (0x1FFFFF)      /* 21bit 角度掩码 */
+#define MT6835_RAD2DEG          (57.295779513f) /* 弧度转角度 */
 
 	/* 寄存器地址 */
 	typedef enum
@@ -90,22 +90,22 @@ extern "C"
 	{
 		mt6835_id_e id;
 		spiDrv_t spi_num;
-		uint32_t raw;				 /* 原始 21bit 角度值 */
-		float mechanical_angle;		 /* 机械角度, ° [0,360) */
-		float mech_angle_org;		 /* 原始机械角度, ° */
+		uint32_t raw;                /* 原始 21bit 角度值 */
+		float mechanical_angle;      /* 机械角度, ° [0,360) */
+		float mech_angle_org;        /* 原始机械角度, ° */
 		float mech_angle_remove_off; /* 去偏移角度, ° */
-		float offset;				 /* 偏移 */
-		float foc_offset_static;	 /* 静态偏移(电角度对齐用) */
-		int running_dir;			 /* 运行方向 (<=1 正向, 否则反向) */
+		float offset;                /* 偏移 */
+		float foc_offset_static;     /* 静态偏移(电角度对齐用) */
+		int running_dir;             /* 运行方向 (<=1 正向, 否则反向) */
 
 		/* public */
-		void (*update)(struct dev_mt6835 *pobj);					   /* 读取并刷新机械角度 */
-		float (*get_mechanical_angle)(struct dev_mt6835 *pobj);		   /* 获取机械角度, ° */
+		void (*update)(struct dev_mt6835 *pobj);                       /* 读取并刷新机械角度 */
+		float (*get_mechanical_angle)(struct dev_mt6835 *pobj);        /* 获取机械角度, ° */
 		uint32_t (*get_mechanical_angle_raw)(struct dev_mt6835 *pobj); /* 获取原始角度值 */
-		void (*set_offset)(struct dev_mt6835 *pobj, float offset);	   /* 设置偏移角度 */
-		void (*set_dir)(struct dev_mt6835 *pobj, int dir);			   /* 设置运行方向 */
-		bool (*set_zero_angle)(struct dev_mt6835 *pobj, float rad);	   /* 写零点寄存器, 成功 true */
-		float (*get_raw_zero_angle)(struct dev_mt6835 *pobj);		   /* 读零点角度, ° */
+		void (*set_offset)(struct dev_mt6835 *pobj, float offset);     /* 设置偏移角度 */
+		void (*set_dir)(struct dev_mt6835 *pobj, int dir);             /* 设置运行方向 */
+		bool (*set_zero_angle)(struct dev_mt6835 *pobj, float rad);    /* 写零点寄存器, 成功 true */
+		float (*get_raw_zero_angle)(struct dev_mt6835 *pobj);          /* 读零点角度, ° */
 	} dev_mt6835_t;
 
 	/**

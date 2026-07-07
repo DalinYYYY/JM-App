@@ -2,7 +2,7 @@
  * @file        drv_flash_g4.c
  * @brief       STM32G4内部FLASH驱动实现，双Bank页擦除/读/读改写
  *
- * @author      Dalin (dalin@robot.com)
+ * @author      Dalin (dalinyy@163.com)
  * @version     1.0
  * @date        2026-06-16
  *
@@ -83,7 +83,7 @@ u8 drv_g4_flash_get_bank(u32 addr)
 	}
 
 	/* 双Bank：Bank1、Bank2 地址不连续，分别校验 */
-	u32 bank_sz = total >> 1;  /* 每 Bank 大小 */
+	u32 bank_sz = total >> 1; /* 每 Bank 大小 */
 	if (addr >= FLASH_BASE && addr < FLASH_BASE + bank_sz)
 		return 1U;
 	if (addr >= STM32G4_FLASH_BANK2_BASE && addr < STM32G4_FLASH_BANK2_BASE + bank_sz)
