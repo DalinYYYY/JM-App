@@ -1,0 +1,62 @@
+#ifndef CTRL_TRANSITION_MGR_H
+#define CTRL_TRANSITION_MGR_H
+
+#include "ctrl_transition.h"
+#include "motor_control.h"
+
+/* 前向声明打破与 system_state.h 的循环依赖。
+ * 前提：system_state.h 需把匿名 typedef 改为带 tag 的
+ *      typedef struct system_state_s { ... } system_state_t;（见 Task 3 Step 1）。*/
+typedef struct system_state_s system_state_t;
+
+/**
+ * @brief 过渡管理器：收拢所有过渡策略（模式切换过渡 + 同模式渐变 + 应急终止）
+ * @details transition_t 实例与 ref_smooth_cfg_t 配置均内聚于此结构，
+ *          system_state.c 不再直接操作 transition_*，改为调用 transition_mgr_*。
+ *          不再保留全局 g_ref_smooth_cfg，配置完全由 mgr->smooth_cfg 持有。
+ */
+typedef struct
+{
+	transition_t trans;		    /* 过渡引擎实例（从 system_state_t 迁入） */
+	ref_smooth_cfg_t smooth_cfg; /* 同模式渐变配置（完全内聚） */
+	run_state_e target_run_state; /* 模式切换过渡的目标 run_state */
+	float dt;					/* 控制周期(s)，默认 100µs，供 rate 模式算 duration，运行期可改 */
+} transition_mgr_t;
+
+/**
+ * @brief 初始化过渡管理器
+ * @param mgr 管理器指针
+ * @param dt 控制周期(s)，默认 100µs(1e-4)，存入 mgr->dt
+ */
+void transition_mgr_init(transition_mgr_t *mgr, float dt);
+
+/**
+ * @brief 顶层状态变化通知（替代 top_fsm_switch 内的 transition_force_complete）
+ * @details 退出 RUN 或进入 FAULT/SAFETY 时调用，立即结束任何进行中的过渡
+ * @param mgr 管理器指针
+ * @param new_state 即将进入的顶层状态
+ */
+void transition_mgr_on_top_fsm_change(transition_mgr_t *mgr, top_fsm_e new_state);
+
+/**
+ * @brief 模式切换请求（替代 run_state_switch 内的 transition_start）
+ * @param mgr 管理器指针
+ * @param new_state 目标运行子状态
+ * @param trans_count 过渡时长(调用次数)
+ * @param cur_ref 当前参考（作为过渡起点 old_ref）
+ */
+void transition_mgr_on_mode_switch(transition_mgr_t *mgr,
+								   run_state_e new_state,
+								   uint32_t trans_count,
+								   const motor_ref_t *cur_ref);
+
+/**
+ * @brief 每拍步进（替代 motor_control_loop 的 if/else 分支 + 同模式渐变逻辑）
+ * @details 统一入口：模式切换过渡中则 blend；否则 dispatch + ref_smooth 检测 + 渐变。
+ *          结果写入 sys->motor.ref。
+ * @param mgr 管理器指针
+ * @param sys 系统状态（读 run_state/dt，写 motor.ref）
+ */
+void transition_mgr_step(transition_mgr_t *mgr, system_state_t *sys);
+
+#endif /* CTRL_TRANSITION_MGR_H */

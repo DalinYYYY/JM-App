@@ -25,20 +25,19 @@
 
 #include "state_define.h"
 #include "motor_control.h"
-#include "ctrl_transition.h"
+#include "ctrl_transition_mgr.h"
 #include "calib_types.h"
 
 /* 前向声明，避免 system_state.h 直接依赖 dev_motor.h */
 struct dev_motor;
 
-typedef struct
+typedef struct system_state_s
 {
 	top_fsm_e top_state;		  /*!< 顶层有限状态机状态 */
 	ctrl_mode_e ctrl_mode;	  /*!< 当前控制模式 */
 	uint32_t fault_code;		  /*!< 系统故障码 */
 	motor_ctrl_t motor;			  /*!< 电机控制核心上下文 */
-	transition_t transition;	  /*!< 状态过渡器 */
-	run_state_e target_run_state; /*!< 目标运行状态 */
+	transition_mgr_t trans_mgr; /*!< 过渡管理器（内含 transition_t + ref_smooth_cfg） */
 	calib_state_e calib_state;	/*!< 标定子状态（仅 CALIB 态有效）*/
 } system_state_t;
 

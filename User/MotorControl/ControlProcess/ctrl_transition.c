@@ -76,3 +76,170 @@ void transition_force_complete(transition_t *trans)
 	trans->state = TRANSITION_COMPLETED;
 	trans->ratio = 1.0f;
 }
+
+/* ===== 同模式目标值渐变 ===== */
+
+void ref_smooth_cfg_init_defaults(ref_smooth_cfg_t *cfg)
+{
+	cfg->enable = true;
+	cfg->smooth_duration = 500;
+	cfg->pos_thresh = 0.1f;
+	cfg->vel_thresh = 1.0f;
+	cfg->torque_thresh = 0.1f;
+	cfg->current_thresh = 0.5f;
+	cfg->voltage_thresh = 1.0f;
+	cfg->duty_thresh = 0.1f;
+	/* 速率模式默认启用（>0 即生效），覆盖 smooth_duration */
+	cfg->pos_rate = 50.0f;		/* 50 rad/s：5 rad 突变 → 0.1s 过渡 */
+	cfg->vel_rate = 500.0f;		/* 500 rad/s²：50 rad/s 突变 → 0.1s 过渡 */
+	cfg->torque_rate = 20.0f;	/* 20 N·m/s */
+	cfg->current_rate = 100.0f; /* 100 A/s */
+}
+
+static float ref_smooth_absf(float v)
+{
+	return (v < 0.0f) ? -v : v;
+}
+
+/**
+ * @brief 按 rate 模式计算过渡时长(调用次数)
+ * @details duration_i = ceil(|delta_i| / (rate_i × dt))，取各字段最大值。
+ *          rate_i <= 0 表示该字段不参与速率计算（交由 smooth_duration 兜底）。
+ *          所有 rate 都 <= 0 时返回 0，由调用方回退到 smooth_duration。
+ */
+static uint32_t ref_smooth_calc_duration_by_rate(const motor_ref_t *raw,
+												 const motor_ref_t *prev,
+												 const ref_smooth_cfg_t *cfg,
+												 float dt)
+{
+	if (dt <= 0.0f)
+		return 0;
+
+	float max_needed = 0.0f;
+
+	if (cfg->pos_rate > 0.0f)
+	{
+		float d = ref_smooth_absf(raw->pos - prev->pos) / (cfg->pos_rate * dt);
+		if (d > max_needed)
+			max_needed = d;
+	}
+	if (cfg->vel_rate > 0.0f)
+	{
+		float d = ref_smooth_absf(raw->vel - prev->vel) / (cfg->vel_rate * dt);
+		if (d > max_needed)
+			max_needed = d;
+	}
+	if (cfg->torque_rate > 0.0f)
+	{
+		float d = ref_smooth_absf(raw->torque - prev->torque) / (cfg->torque_rate * dt);
+		if (d > max_needed)
+			max_needed = d;
+	}
+	if (cfg->current_rate > 0.0f)
+	{
+		float d_id = ref_smooth_absf(raw->id - prev->id) / (cfg->current_rate * dt);
+		float d_iq = ref_smooth_absf(raw->iq - prev->iq) / (cfg->current_rate * dt);
+		float d = (d_id > d_iq) ? d_id : d_iq;
+		if (d > max_needed)
+			max_needed = d;
+	}
+
+	if (max_needed <= 0.0f)
+		return 0;
+
+	/* ceil，至少 1 */
+	uint32_t dur = (uint32_t)(max_needed + 0.999f);
+	return (dur < 1) ? 1 : dur;
+}
+
+/**
+ * @brief run_state 白名单：仅纯参考型闭环模式启用同模式渐变
+ * @details 排除 MIT（反馈型，ctrl_type 与 TORQUE 相同无法用 ctrl_type 区分）、
+ *          HOLD（目标跟随 fb.pos）、OPEN_LOOP/DUTY/VOLTAGE（直控）。
+ */
+static bool ref_smooth_run_state_enabled(run_state_e s)
+{
+	switch (s)
+	{
+		case RUN_STATE_POSITION:
+		case RUN_STATE_POSITION_VELOCITY:
+		case RUN_STATE_POSITION_TORQUE:
+		case RUN_STATE_VELOCITY:
+		case RUN_STATE_TORQUE:
+		case RUN_STATE_CURRENT:
+			return true;
+		default:
+			return false;
+	}
+}
+
+bool transition_ref_smooth_check(transition_t *trans,
+								 run_state_e run_state,
+								 const motor_ref_t *raw_ref,
+								 const motor_ref_t *prev_ref,
+								 const ref_smooth_cfg_t *cfg,
+								 float dt)
+{
+	/* 总开关关闭：完全跳过 */
+	if (!cfg->enable)
+		return false;
+
+	/* 过渡进行中：不重启，让现有渐变朝最新 raw_ref 继续混合 */
+	if (trans->state == TRANSITION_IN_PROGRESS)
+		return false;
+
+	/* 过渡刚完成：复位为 IDLE，本拍不检测。
+	 * 关键：模式切换过渡与同模式渐变共用同一 trans，若不在此复位，
+	 * 模式切换完成那拍（state=COMPLETED）会继续往下走检测，可能误触发渐变。 */
+	if (trans->state == TRANSITION_COMPLETED)
+	{
+		trans->state = TRANSITION_IDLE;
+		return false;
+	}
+
+	/* run_state 白名单：排除 MIT/HOLD/直控模式 */
+	if (!ref_smooth_run_state_enabled(run_state))
+		return false;
+
+	/* 量纲变化交给模式切换过渡处理 */
+	if (raw_ref->ctrl_type != prev_ref->ctrl_type)
+		return false;
+
+	bool exceed = false;
+	switch (raw_ref->ctrl_type)
+	{
+		case REF_CTRL_POSITION:
+			if (ref_smooth_absf(raw_ref->pos - prev_ref->pos) > cfg->pos_thresh)
+				exceed = true;
+			break;
+		case REF_CTRL_VELOCITY:
+			if (ref_smooth_absf(raw_ref->vel - prev_ref->vel) > cfg->vel_thresh)
+				exceed = true;
+			break;
+		case REF_CTRL_TORQUE:
+			if (ref_smooth_absf(raw_ref->torque - prev_ref->torque) > cfg->torque_thresh)
+				exceed = true;
+			break;
+		case REF_CTRL_CURRENT:
+			if (ref_smooth_absf(raw_ref->id - prev_ref->id) > cfg->current_thresh ||
+				ref_smooth_absf(raw_ref->iq - prev_ref->iq) > cfg->current_thresh)
+				exceed = true;
+			break;
+		default:
+			break;
+	}
+
+	if (!exceed)
+		return false;
+
+	/* 计算过渡时长：优先速率模式，回退固定时长 */
+	uint32_t duration = ref_smooth_calc_duration_by_rate(raw_ref, prev_ref, cfg, dt);
+	if (duration == 0)
+		duration = cfg->smooth_duration;
+	if (duration == 0)
+		return false; /* 无效配置，不启动 */
+
+	/* 以上一拍实际输出为起点启动渐变 */
+	transition_start(trans, duration, prev_ref);
+	return true;
+}

@@ -153,7 +153,7 @@ void system_state_init(system_state_t *sys, struct dev_motor *motor, motor_param
 
 	motor_ctrl_init(&sys->motor, param, dt);
 	calib_mgr_init(motor, param, dt);
-	transition_init(&sys->transition);
+	transition_mgr_init(&sys->trans_mgr, dt);
 
 	sys->top_state = TOP_FSM_INIT;
 	sys->ctrl_mode = CONTROL_MODE_IDLE;
@@ -181,7 +181,7 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
 		case TOP_FSM_RUN:
 			// 退出运行：停止参考输出，强制结束过渡
 			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
-			transition_force_complete(&sys->transition);
+			transition_mgr_on_top_fsm_change(&sys->trans_mgr, new_state);
 			break;
 
 		case TOP_FSM_CALIB:
@@ -214,7 +214,7 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
 		case TOP_FSM_SAFETY:
 			// 故障/急停：立即失能输出
 			sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
-			transition_force_complete(&sys->transition);
+			transition_mgr_on_top_fsm_change(&sys->trans_mgr, new_state);
 			break;
 
 		case TOP_FSM_CALIB:
@@ -238,8 +238,7 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 	if (new_state >= RUN_STATE_MAX || new_state == sys->motor.run_state)
 		return;
 
-	sys->target_run_state = new_state;
-	transition_start(&sys->transition, trans_count, &sys->motor.ref);
+	transition_mgr_on_mode_switch(&sys->trans_mgr, new_state, trans_count, &sys->motor.ref);
 }
 
 /**
@@ -266,30 +265,8 @@ void motor_control_loop(system_state_t *sys)
 		return;
 	}
 
-	// 运行态：处理模式切换的平滑过渡
-	if (sys->transition.state == TRANSITION_IN_PROGRESS)
-	{
-		// 生成目标状态参考（过渡起点已记录在 transition 内）
-		run_state_e old_state = sys->motor.run_state;
-		sys->motor.run_state = sys->target_run_state;
-		motor_ctrl_dispatch(&sys->motor);
-		motor_ref_t new_ref = sys->motor.ref;
-		sys->motor.run_state = old_state;
-
-		// 参考层混合输出
-		motor_ref_t mixed_ref;
-		bool trans_done = transition_update(&sys->transition, &new_ref, &mixed_ref);
-		sys->motor.ref = mixed_ref;
-
-		// 过渡完成后正式切换运行状态
-		if (trans_done)
-			sys->motor.run_state = sys->target_run_state;
-	}
-	else
-	{
-		// 无过渡：直接生成当前状态参考
-		motor_ctrl_dispatch(&sys->motor);
-	}
+	// 运行态：所有过渡策略收敛到 transition_mgr_step
+	transition_mgr_step(&sys->trans_mgr, sys);
 }
 
 /**

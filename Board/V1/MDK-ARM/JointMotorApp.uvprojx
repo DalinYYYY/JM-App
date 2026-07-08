@@ -494,6 +494,11 @@
               <FilePath>..\..\..\User\MotorControl\ControlProcess\ctrl_transition.c</FilePath>
             </File>
             <File>
+              <FileName>ctrl_transition_mgr.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\ControlProcess\ctrl_transition_mgr.c</FilePath>
+            </File>
+            <File>
               <FileName>motor_control.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorControl\ControlProcess\motor_control.c</FilePath>
