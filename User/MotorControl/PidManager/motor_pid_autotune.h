@@ -23,9 +23,9 @@
  */
 typedef struct
 {
-	float kp;              /* 比例增益 */
-	float ki;              /* 积分增益 */
-	float integral_limit;  /* 积分限幅 */
+	float kp;             /* 比例增益 */
+	float ki;             /* 积分增益 */
+	float integral_limit; /* 积分限幅 */
 } autotune_result_t;
 
 /**

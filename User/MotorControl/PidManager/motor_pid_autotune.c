@@ -48,10 +48,10 @@ int motor_pid_autotune_current(const motor_info_t *info, float bandwidth_hz,
 	if (bandwidth_hz <= 0.0f)
 		bandwidth_hz = AUTOTUNE_DEFAULT_CURRENT_BW;
 
-	float r  = info->blocks.motor_calib.phase_resistance;
+	float r = info->blocks.motor_calib.phase_resistance;
 	float ld = info->blocks.motor_calib.phase_inductance_d;
 	float lq = info->blocks.motor_calib.phase_inductance_q;
-	float wc = 2.0f * M_PI * bandwidth_hz;  /* 截止角频率 rad/s */
+	float wc = 2.0f * M_PI * bandwidth_hz; /* 截止角频率 rad/s */
 
 	/* 电流环零极点对消: Kp = ωc·L, Ki = ωc·R */
 	out_d->kp = wc * ld;
@@ -78,7 +78,7 @@ int motor_pid_autotune_velocity(const motor_info_t *info, float bandwidth_hz,
 		return -2;
 
 	/* 检查 J/Kt 有效性 */
-	float j  = info->blocks.motor_calib.rotor_inertia;
+	float j = info->blocks.motor_calib.rotor_inertia;
 	float kt = info->blocks.motor_calib.torque_constant;
 	if (j < 1e-7f || kt < 0.01f)
 		return -2;

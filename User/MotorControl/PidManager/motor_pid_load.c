@@ -37,47 +37,47 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 	/* ---- 电流环：按 s_ring_source[PID_RING_CURRENT] 独立选择 ---- */
 	switch (s_ring_source[PID_RING_CURRENT])
 	{
-	case PID_SOURCE_FLASH:
-	case PID_SOURCE_AUTOTUNE:
-		/* Flash 值由 0xE7 写入；autotune 值由 motor_pid_autotune_apply 写入。
+		case PID_SOURCE_FLASH:
+		case PID_SOURCE_AUTOTUNE:
+			/* Flash 值由 0xE7 写入；autotune 值由 motor_pid_autotune_apply 写入。
 		 * 两者都存于 ctl 同一字段，读取路径一致。 */
-		param->current_loop.current_kp_d = ctl->kp_ld;
-		param->current_loop.current_ki_d = ctl->ki_ld;
-		param->current_loop.current_kp_q = ctl->kp_lq;
-		param->current_loop.current_ki_q = ctl->ki_lq;
-		param->current_loop.current_integral_limit = ctl->integral_limit;
-		break;
-	case PID_SOURCE_DEFAULT:
-	default:
-		/* 保留 motor_param_init/motor_profile 的默认值，不覆盖 */
-		break;
+			param->current_loop.current_kp_d = ctl->kp_ld;
+			param->current_loop.current_ki_d = ctl->ki_ld;
+			param->current_loop.current_kp_q = ctl->kp_lq;
+			param->current_loop.current_ki_q = ctl->ki_lq;
+			param->current_loop.current_integral_limit = ctl->integral_limit;
+			break;
+		case PID_SOURCE_DEFAULT:
+		default:
+			/* 保留 motor_param_init/motor_profile 的默认值，不覆盖 */
+			break;
 	}
 
 	/* ---- 速度环：按 s_ring_source[PID_RING_VELOCITY] 独立选择 ---- */
 	switch (s_ring_source[PID_RING_VELOCITY])
 	{
-	case PID_SOURCE_FLASH:
-	case PID_SOURCE_AUTOTUNE:
-		param->position_loop.speed_kp = ctl->kp_s;
-		param->position_loop.speed_ki = ctl->ki_s;
-		param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
-		break;
-	case PID_SOURCE_DEFAULT:
-	default:
-		break;
+		case PID_SOURCE_FLASH:
+		case PID_SOURCE_AUTOTUNE:
+			param->position_loop.speed_kp = ctl->kp_s;
+			param->position_loop.speed_ki = ctl->ki_s;
+			param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
+			break;
+		case PID_SOURCE_DEFAULT:
+		default:
+			break;
 	}
 
 	/* ---- 位置环：按 s_ring_source[PID_RING_POSITION] 独立选择 ---- */
 	switch (s_ring_source[PID_RING_POSITION])
 	{
-	case PID_SOURCE_FLASH:
-	case PID_SOURCE_AUTOTUNE:
-		param->position_loop.position_kp = ctl->kp_p;
-		param->position_loop.position_integral_limit = ctl->position_integral_limit;
-		break;
-	case PID_SOURCE_DEFAULT:
-	default:
-		break;
+		case PID_SOURCE_FLASH:
+		case PID_SOURCE_AUTOTUNE:
+			param->position_loop.position_kp = ctl->kp_p;
+			param->position_loop.position_integral_limit = ctl->position_integral_limit;
+			break;
+		case PID_SOURCE_DEFAULT:
+		default:
+			break;
 	}
 }
 

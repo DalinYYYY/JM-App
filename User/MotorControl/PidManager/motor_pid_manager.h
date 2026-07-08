@@ -18,7 +18,7 @@
 #define __MOTOR_PID_MANAGER_H__
 
 #include "motor_pid_profile.h"
-#include "motor_pid_load.h"      /* pid_source_e / pid_ring_e 定义于此 */
+#include "motor_pid_load.h" /* pid_source_e / pid_ring_e 定义于此 */
 #include "motor_pid_autotune.h"
 
 #endif /* __MOTOR_PID_MANAGER_H__ */

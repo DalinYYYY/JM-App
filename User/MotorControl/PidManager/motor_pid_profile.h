@@ -12,13 +12,13 @@
 typedef enum
 {
 	MOTOR_PID_PROFILE_CURRENT_D = 0, // d轴电流环
-	MOTOR_PID_PROFILE_CURRENT_Q,	   // q轴电流环
-	MOTOR_PID_PROFILE_VELOCITY,	   // 速度环
-	MOTOR_PID_PROFILE_POSITION,	   // 位置环
-	MOTOR_PID_PROFILE_IMPEDANCE,	   // 阻抗控制
-	MOTOR_PID_PROFILE_HOMING,		   // 回零模式
-	MOTOR_PID_PROFILE_JOG,		   // 点动模式
-	MOTOR_PID_PROFILE_TEST,		   // 测试模式
+	MOTOR_PID_PROFILE_CURRENT_Q,     // q轴电流环
+	MOTOR_PID_PROFILE_VELOCITY,      // 速度环
+	MOTOR_PID_PROFILE_POSITION,      // 位置环
+	MOTOR_PID_PROFILE_IMPEDANCE,     // 阻抗控制
+	MOTOR_PID_PROFILE_HOMING,        // 回零模式
+	MOTOR_PID_PROFILE_JOG,           // 点动模式
+	MOTOR_PID_PROFILE_TEST,          // 测试模式
 	MOTOR_PID_PROFILE_MAX
 } motor_pid_profile_id_e;
 
@@ -103,10 +103,10 @@ void motor_pid_profile_preload(pid_state_t *state, motor_pid_profile_id_e id, fl
  * @return PID输出值
  */
 float motor_pid_profile_calculate(pid_state_t *state,
-							motor_pid_profile_id_e id,
-							float target,
-							float actual,
-							float dt);
+                                  motor_pid_profile_id_e id,
+                                  float target,
+                                  float actual,
+                                  float dt);
 
 /**
  * @brief 使用指定配置文件执行带前馈的PID计算
@@ -119,10 +119,10 @@ float motor_pid_profile_calculate(pid_state_t *state,
  * @return PID输出值
  */
 float motor_pid_profile_calculate_with_ff(pid_state_t *state,
-									motor_pid_profile_id_e id,
-									float target,
-									float actual,
-									float feedforward,
-									float dt);
+                                          motor_pid_profile_id_e id,
+                                          float target,
+                                          float actual,
+                                          float feedforward,
+                                          float dt);
 
 #endif /* __MOTOR_PID_PROFILE_H__ */

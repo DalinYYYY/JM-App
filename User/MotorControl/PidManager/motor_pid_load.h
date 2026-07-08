@@ -27,9 +27,9 @@
  */
 typedef enum
 {
-	PID_SOURCE_DEFAULT  = 0,  /* 用 motor_param.c 默认值（不覆盖 motor_param_t） */
-	PID_SOURCE_FLASH    = 1,  /* 用 Flash 中 ControlParam_t 工程调试值 */
-	PID_SOURCE_AUTOTUNE = 2,  /* 用理论估计值（零极点对消法，已写入 ControlParam_t） */
+	PID_SOURCE_DEFAULT = 0,  /* 用 motor_param.c 默认值（不覆盖 motor_param_t） */
+	PID_SOURCE_FLASH = 1,    /* 用 Flash 中 ControlParam_t 工程调试值 */
+	PID_SOURCE_AUTOTUNE = 2, /* 用理论估计值（零极点对消法，已写入 ControlParam_t） */
 } pid_source_e;
 
 /**
@@ -37,9 +37,9 @@ typedef enum
  */
 typedef enum
 {
-	PID_RING_CURRENT  = 0,  /* 电流环（d/q 双轴） */
-	PID_RING_VELOCITY = 1,  /* 速度环 */
-	PID_RING_POSITION = 2,  /* 位置环 */
+	PID_RING_CURRENT = 0,  /* 电流环（d/q 双轴） */
+	PID_RING_VELOCITY = 1, /* 速度环 */
+	PID_RING_POSITION = 2, /* 位置环 */
 	PID_RING_MAX
 } pid_ring_e;
 
