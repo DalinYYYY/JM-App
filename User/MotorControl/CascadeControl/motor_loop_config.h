@@ -8,9 +8,9 @@
  *              分频判断在中断中执行，为兼顾执行效率，采用自增计数器与阈值比较，
  *              避免在中断里做取模/除法运算。
  *
- *              示例（电流环 20kHz 时）：
- *                VEL_DIV = 5  → 速度环 4kHz
- *                POS_DIV = 10 → 位置环 2kHz
+ *              示例（电流环 10kHz 时）：
+ *                VEL_DIV = 5  → 速度环 2kHz
+ *                POS_DIV = 10 → 位置环 1kHz
  *
  * @author      yangsl
  * @version     1.0

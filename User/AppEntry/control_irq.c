@@ -14,7 +14,7 @@ void CURRENT_LOOP_IRQ_TASK(ADC_HandleTypeDef *hadc)
 
 		dev_dwt_counter_start(SYS_TIMER_RECORD_CURRENT_LOOP_TIME); // 测量电流环运行时间
 
-		// 三环控制入口（电流20kHz / 速度4kHz / 位置2kHz 分频）
+		// 三环控制入口（电流10kHz / 速度2kHz / 位置1kHz 分频）
 		motor_loop_isr();
 
 		dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_TIME);

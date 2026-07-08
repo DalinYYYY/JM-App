@@ -70,7 +70,7 @@ int motor_info_init(motor_info_t *cfg)
 	cfg->blocks.motor_calib.enc_direction = 1;
 	cfg->blocks.motor_calib.enc_offset = 0.0f;
 	cfg->blocks.motor_calib.elec_angle_bias = 0.0f;
-	cfg->blocks.motor_calib.pwm_freq_hz = 20000U;
+	cfg->blocks.motor_calib.pwm_freq_hz = 10000U;
 	cfg->blocks.motor_calib.dead_time_ns = 500.0f;
 	cfg->blocks.motor_calib.shunt_resistance = 0.01f;
 	cfg->blocks.motor_calib.current_amp_gain = 50.0f;

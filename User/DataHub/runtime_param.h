@@ -19,7 +19,7 @@ struct dev_power_monitor;     /* dev_power_monitor.h:  dev_power_monitor_t（原
 struct dev_commun_uart;       /* dev_commun_uart.h:    dev_commun_uart_t（原具名）*/
 
 #define OFFSET_LUT_NUM 128
-#define DT (1.0f / 20000.0f)
+#define DT (1.0f / 10000.0f)
 
 /************************************* 枚举变量 *************************************/
 typedef enum
