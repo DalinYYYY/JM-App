@@ -78,10 +78,10 @@ static const motor_param_t g_default_config =
 							 },
 		.current_loop =
 			{
-							 .current_kp_d = 3.6f,
-							 .current_ki_d = 2700.0f,
-							 .current_kp_q = 3.6f,
-							 .current_ki_q = 2700.0f,
+							 .current_kp_d = 0.5f,
+							 .current_ki_d = 10.0f,
+							 .current_kp_q = 0.5f,
+							 .current_ki_q = 10.0f,
 							 .current_integral_limit = 12.0f,
 							 .decoupling_gain = 1.0f,
 							 .deadtime_comp_v = 0.0f,

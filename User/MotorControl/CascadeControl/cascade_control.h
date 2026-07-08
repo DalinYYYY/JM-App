@@ -7,7 +7,7 @@
  *              环路结构（级联）：
  *                位置环 ──vel_sp──► 速度环 ──iq_ref──► [电流环]
  *
- *              PID 全部通过 pid_profile 统一封装：位置环与速度环使用的参数
+ *              PID 全部通过 motor_pid_profile 统一封装：位置环与速度环使用的参数
  *              配置文件由 motor_ref_t.pos_profile / vel_profile 指定，使不同
  *              运行模式（标准/点动/回零/阻抗）可加载不同 PID 参数。
  *
@@ -35,7 +35,7 @@
 
 #include <stdint.h>
 #include "pid_core.h"
-#include "pid_profile.h"
+#include "motor_pid_profile.h"
 #include "motor_param.h"
 #include "motor_control.h"
 
@@ -61,7 +61,7 @@ typedef struct
 
 /**
  * @brief 三环级联控制器
- * @note PID 参数由 pid_profile 统一管理，本结构仅持有外环运行时状态。
+ * @note PID 参数由 motor_pid_profile 统一管理，本结构仅持有外环运行时状态。
  */
 typedef struct
 {
@@ -74,8 +74,8 @@ typedef struct
 	float vel_setpoint; // 位置环输出的速度设定（调试可观测）
 
 	ref_ctrl_type_e last_ctrl_type;	   // 上一拍入环层级（无扰切换检测）
-	pid_profile_id_e last_pos_profile; // 上一拍位置环配置文件
-	pid_profile_id_e last_vel_profile; // 上一拍速度环配置文件
+	motor_pid_profile_id_e last_pos_profile; // 上一拍位置环配置文件
+	motor_pid_profile_id_e last_vel_profile; // 上一拍速度环配置文件
 
 	float dt_pos; // 位置环周期(s)
 	float dt_vel; // 速度环周期(s)

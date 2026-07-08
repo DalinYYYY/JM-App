@@ -109,6 +109,12 @@ extern "C"
 		JM_CMD_CALIB_QUERY = 0x97,  /* 进度查询 */
 		JM_CMD_CALIB_ABORT = 0x98,  /* 中止标定 */
 
+		/* PID 管理 0x9A~0x9B: 三环独立参数来源管理
+		 * 0x9A: 触发理论估计(零极点对消法)并自动设 source=2, 仅IDLE态
+		 * 0x9B: 独立切换某环 source, 仅IDLE态 */
+		JM_CMD_PID_AUTOTUNE   = 0x9A, /* PID 理论估计 */
+		JM_CMD_PID_SOURCE_SET = 0x9B, /* PID 来源切换 */
+
 		/* 系统诊断 0xB0~0xBF */
 		JM_CMD_CLEAR_FAULT = 0xB0,
 		JM_CMD_DIAGNOSTIC = 0xB1,

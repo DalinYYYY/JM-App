@@ -1,6 +1,6 @@
 /**
  * @file        cascade_control.c
- * @brief       三环级联控制算法层实现（PID 经 pid_profile 统一封装）
+ * @brief       三环级联控制算法层实现（PID 经 motor_pid_profile 统一封装）
  *
  * @author      yangsl
  * @version     1.0
@@ -31,17 +31,17 @@ void cascade_control_init(cascade_ctrl_t *c, motor_param_t *param, float dt_pos,
 	c->dt_pos = dt_pos;
 	c->dt_vel = dt_vel;
 	c->last_ctrl_type = REF_CTRL_IDLE;
-	c->last_pos_profile = PID_PROFILE_POSITION;
-	c->last_vel_profile = PID_PROFILE_VELOCITY;
+	c->last_pos_profile = MOTOR_PID_PROFILE_POSITION;
+	c->last_vel_profile = MOTOR_PID_PROFILE_VELOCITY;
 
-	pid_profile_init_state(&c->pid_pos);
-	pid_profile_init_state(&c->pid_vel);
+	motor_pid_profile_init_state(&c->pid_pos);
+	motor_pid_profile_init_state(&c->pid_vel);
 }
 
 void cascade_control_reset(cascade_ctrl_t *c)
 {
-	pid_profile_reset_state(&c->pid_pos);
-	pid_profile_reset_state(&c->pid_vel);
+	motor_pid_profile_reset_state(&c->pid_pos);
+	motor_pid_profile_reset_state(&c->pid_vel);
 	c->vel_setpoint = 0.0f;
 }
 
@@ -56,13 +56,13 @@ static void cascade_bumpless_preload(cascade_ctrl_t *c, const motor_ref_t *ref, 
 	switch (ref->ctrl_type)
 	{
 		case REF_CTRL_POSITION:
-			pid_profile_preload(&c->pid_pos, ref->pos_profile, fb->vel, fb->pos);
-			pid_profile_preload(&c->pid_vel, ref->vel_profile, fb->iq, fb->vel);
+			motor_pid_profile_preload(&c->pid_pos, ref->pos_profile, fb->vel, fb->pos);
+			motor_pid_profile_preload(&c->pid_vel, ref->vel_profile, fb->iq, fb->vel);
 			c->vel_setpoint = fb->vel;
 			break;
 
 		case REF_CTRL_VELOCITY:
-			pid_profile_preload(&c->pid_vel, ref->vel_profile, fb->iq, fb->vel);
+			motor_pid_profile_preload(&c->pid_vel, ref->vel_profile, fb->iq, fb->vel);
 			break;
 
 		default:
@@ -76,8 +76,8 @@ void cascade_control_run_position(cascade_ctrl_t *c, const motor_ref_t *ref, con
 	if (ref->ctrl_type != REF_CTRL_POSITION)
 		return;
 
-	// 位置环：位置误差 → 速度设定（pid_profile 内部已按 max_speed 限幅）
-	float vel_sp = pid_profile_calculate(&c->pid_pos, ref->pos_profile, ref->pos, fb->pos, c->dt_pos);
+	// 位置环：位置误差 → 速度设定（motor_pid_profile 内部已按 max_speed 限幅）
+	float vel_sp = motor_pid_profile_calculate(&c->pid_pos, ref->pos_profile, ref->pos, fb->pos, c->dt_pos);
 
 	// 叠加速度前馈
 	vel_sp += ref->vel_ff * motor_param_get_velocity_ff_gain(c->param);
@@ -110,7 +110,7 @@ void cascade_control_run(cascade_ctrl_t *c, const motor_ref_t *ref, const cascad
 		// 位置模式：使用位置环输出的速度设定跑速度环
 		case REF_CTRL_POSITION:
 		{
-			float iq = pid_profile_calculate(&c->pid_vel, ref->vel_profile, c->vel_setpoint, fb->vel, c->dt_vel);
+			float iq = motor_pid_profile_calculate(&c->pid_vel, ref->vel_profile, c->vel_setpoint, fb->vel, c->dt_vel);
 			out->iq_ref = clamp(iq, -peak_i, peak_i);
 			break;
 		}
@@ -119,7 +119,7 @@ void cascade_control_run(cascade_ctrl_t *c, const motor_ref_t *ref, const cascad
 		case REF_CTRL_VELOCITY:
 		{
 			float iq_ff = (kt > 0.0f) ? (ref->torque_ff / kt) : 0.0f;
-			float iq = pid_profile_calculate_with_ff(&c->pid_vel, ref->vel_profile, ref->vel, fb->vel, iq_ff, c->dt_vel);
+			float iq = motor_pid_profile_calculate_with_ff(&c->pid_vel, ref->vel_profile, ref->vel, fb->vel, iq_ff, c->dt_vel);
 			out->iq_ref = clamp(iq, -peak_i, peak_i);
 			break;
 		}

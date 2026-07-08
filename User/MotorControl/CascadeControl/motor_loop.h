@@ -50,7 +50,7 @@ typedef struct motor_loop_s
 /**
  * @brief 初始化电机三环控制
  * @param current_freq_hz 电流环中断频率(Hz)，由触发中断的硬件决定
- * @note 内部完成 pid_profile、dev_motor、状态机、级联外环、电流环的初始化。
+ * @note 内部完成 motor_pid_profile、dev_motor、状态机、级联外环、电流环的初始化。
  *       速度/位置环周期 = 电流环周期 × 对应分频系数。
  *       FOC 三相电流/电弧度回调由本模块内部实现（读取全局电机对象）。
  */

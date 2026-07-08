@@ -10,8 +10,8 @@ void motor_mode_position_run(motor_ctrl_t *ctrl)
 	motor_ref_t *ref = &ctrl->ref;
 	float peak_t = motor_param_get_peak_torque(p);
 
-	ref->pos_profile = PID_PROFILE_POSITION;
-	ref->vel_profile = PID_PROFILE_VELOCITY;
+	ref->pos_profile = MOTOR_PID_PROFILE_POSITION;
+	ref->vel_profile = MOTOR_PID_PROFILE_VELOCITY;
 	ref->ctrl_type = REF_CTRL_POSITION;
 	ref->pos = ctrl->cmd.pos;
 	ref->vel_ff = 0.0f;

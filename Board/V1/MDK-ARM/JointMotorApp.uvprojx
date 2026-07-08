@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx,JM_BOARD_V1</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorCalibration;../../../User/Protocol;../../../User/Protocol/vesc_proto;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorCalibration;../../../User/Protocol;../../../User/Protocol/vesc_proto;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl;../../../User/MotorControl/PidManager</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -564,9 +564,19 @@
               <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_test_sweep.c</FilePath>
             </File>
             <File>
-              <FileName>pid_profile.c</FileName>
+              <FileName>motor_pid_profile.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\User\MotorControl\ControlProcess\pid_profile.c</FilePath>
+              <FilePath>..\..\..\User\MotorControl\PidManager\motor_pid_profile.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_pid_load.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\PidManager\motor_pid_load.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_pid_autotune.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\PidManager\motor_pid_autotune.c</FilePath>
             </File>
             <File>
               <FileName>cascade_control.c</FileName>

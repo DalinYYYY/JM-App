@@ -9,13 +9,13 @@
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- *              电流环 PI 使用 pid_profile（PID_PROFILE_CURRENT_D / _Q）。
+ *              电流环 PI 使用 motor_pid_profile（MOTOR_PID_PROFILE_CURRENT_D / _Q）。
  *              底层链路（Clarke/Park/反Park/SVPWM/PWM）复用 dev_motor 的 foc 与
  *              half_bridge 接口，调用方式参考 foc_current_control.c。
  */
 
 #include "current_loop.h"
-#include "pid_profile.h"
+#include "motor_pid_profile.h"
 #include "foc_core.h"
 #include "motor_loop_config.h"
 #if MOTOR_LOOP_ENABLE_DEV_DRIVER
@@ -27,14 +27,14 @@ void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, float dt)
 	cl->motor = motor;
 	cl->dt = dt;
 
-	pid_profile_init_state(&cl->pid_id);
-	pid_profile_init_state(&cl->pid_iq);
+	motor_pid_profile_init_state(&cl->pid_id);
+	motor_pid_profile_init_state(&cl->pid_iq);
 }
 
 void cur_loop_reset(cur_loop_t *cl)
 {
-	pid_profile_reset_state(&cl->pid_id);
-	pid_profile_reset_state(&cl->pid_iq);
+	motor_pid_profile_reset_state(&cl->pid_id);
+	motor_pid_profile_reset_state(&cl->pid_iq);
 }
 
 void cur_loop_calibrate_offset(cur_loop_t *cl)
@@ -104,9 +104,9 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	else
 	{
 		/* 电流闭环 PI（CURRENT / TORQUE / VELOCITY / POSITION）*/
-		ud = pid_profile_calculate(&cl->pid_id, PID_PROFILE_CURRENT_D,
+		ud = motor_pid_profile_calculate(&cl->pid_id, MOTOR_PID_PROFILE_CURRENT_D,
 		                           out->id_ref, m->foc.i_dq.d, cl->dt);
-		uq = pid_profile_calculate(&cl->pid_iq, PID_PROFILE_CURRENT_Q,
+		uq = motor_pid_profile_calculate(&cl->pid_iq, MOTOR_PID_PROFILE_CURRENT_Q,
 		                           out->iq_ref, m->foc.i_dq.q, cl->dt);
 #if MOTOR_LOOP_ENABLE_DEV_DRIVER
 		/* 真实电机 SVPWM 归一化：PI 输出为电压值（伏特），SVPWM 期望占空比（0~1），

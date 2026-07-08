@@ -36,6 +36,8 @@
 #include "motor_info.h"         /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
 #include "motor_info_storage.h" /* motor_info_storage_get: 获取全局 motor_info 句柄 */
 #include "calib_mgr.h"          /* 标定管理器 start/poll/abort/get_status */
+#include "motor_pid_autotune.h" /* motor_pid_autotune_apply: 零极点对消法理论估计 */
+#include "motor_pid_load.h"     /* motor_pid_set_source / motor_pid_reload: 三环独立 source */
 
 /* ============================================================================
  *  1) 控制/模式: CMD 0x00~0xB8  ->  set_mode
@@ -195,6 +197,99 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 
 	/* 触发状态机: cmd 数值与 ctrl_mode_e 一致, 由 process_ctrl_cmd 解释 */
 	motor_loop_set_cmd((ctrl_mode_e)cmd);
+	return JM_ERR_OK;
+}
+
+/* ============================================================================
+ *  1b) PID 理论估计: CMD 0x9A  ->  pid_autotune
+ *      基于辨识参数(R/L)用零极点对消法计算三环PID, 写入 ControlParam_t,
+ *      按 ring_select 自动设 source=AUTOTUNE 并 reload。仅 IDLE 态可执行。
+ * ==========================================================================*/
+static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw, float pos_bw,
+                                 uint8_t *out_fail_reason)
+{
+	if (out_fail_reason != NULL)
+	{
+		*out_fail_reason = 0;
+	}
+
+	/* 状态检查: 仅 IDLE 态允许(并发安全) */
+	if (motor_loop_get()->sys.top_state != TOP_FSM_IDLE)
+	{
+		if (out_fail_reason != NULL)
+		{
+			*out_fail_reason = 2; /* 非 IDLE 态 */
+		}
+		return JM_ERR_STATE_DENY;
+	}
+
+	/* ring_select 范围检查: 0~3 */
+	if (ring_select > 3)
+	{
+		if (out_fail_reason != NULL)
+		{
+			*out_fail_reason = 3; /* 参数无效 */
+		}
+		return JM_ERR_OUT_OF_RANGE;
+	}
+
+	/* 事务性计算并写入 ControlParam_t */
+	motor_info_t *info = motor_info_storage_get();
+	int ret = motor_pid_autotune_apply(info, cur_bw, vel_bw, pos_bw);
+	if (ret != 0)
+	{
+		if (out_fail_reason != NULL)
+		{
+			*out_fail_reason = (ret == -2) ? 1 : 3; /* 1=辨识未就绪, 3=参数无效 */
+		}
+		return JM_ERR_STATE_DENY;
+	}
+
+	/* 按 ring_select 自动设 source=AUTOTUNE */
+	if (ring_select == 0 || ring_select == 3)
+	{
+		motor_pid_set_source(PID_RING_CURRENT, PID_SOURCE_AUTOTUNE);
+	}
+	if (ring_select == 1 || ring_select == 3)
+	{
+		motor_pid_set_source(PID_RING_VELOCITY, PID_SOURCE_AUTOTUNE);
+	}
+	if (ring_select == 2 || ring_select == 3)
+	{
+		motor_pid_set_source(PID_RING_POSITION, PID_SOURCE_AUTOTUNE);
+	}
+
+	/* 立即 reload 到运行期 */
+	motor_pid_reload();
+
+	/* 不自动保存 Flash, 由上位机显式发 0xEA 固化 */
+	return JM_ERR_OK;
+}
+
+/* ============================================================================
+ *  1c) PID 来源切换: CMD 0x9B  ->  pid_source_set
+ *      独立设置某环参数来源(默认/Flash/理论估计), 立即 reload。仅 IDLE 态可执行。
+ * ==========================================================================*/
+static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
+{
+	/* 状态检查: 仅 IDLE 态允许 */
+	if (motor_loop_get()->sys.top_state != TOP_FSM_IDLE)
+	{
+		return JM_ERR_STATE_DENY;
+	}
+
+	/* 参数范围检查 */
+	if (ring_select > 2 || source > 2)
+	{
+		return JM_ERR_OUT_OF_RANGE;
+	}
+
+	/* 调用 PidManager API 设置 source(不写 motor_info) */
+	motor_pid_set_source((pid_ring_e)ring_select, (pid_source_e)source);
+
+	/* 立即 reload 生效 */
+	motor_pid_reload();
+
 	return JM_ERR_OK;
 }
 
@@ -829,6 +924,9 @@ static const jm_proto_ops_t s_app_ops = {
 	.motor_info_read_bulk = app_motor_info_read_bulk,
 	.motor_info_write_bulk = app_motor_info_write_bulk,
 	.motor_info_reset = app_motor_info_reset,
+	/* PID 管理 0x9A~0x9B */
+	.pid_autotune = app_pid_autotune,
+	.pid_source_set = app_pid_source_set,
 };
 
 const jm_proto_ops_t *jm_app_ops_get(void)

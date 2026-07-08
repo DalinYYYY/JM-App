@@ -543,6 +543,58 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		return JM_ERR_OK;
 	}
 
+	/* PID 理论估计 0x9A: 触发 autotune 计算 + 自动设 source=2 + reload。
+	 * ACK: 8字节 {status, fail_reason, ring_select_done, reserved[5]} */
+	if (cmd == JM_CMD_PID_AUTOTUNE)
+	{
+		uint8_t ring_select;
+		float cur_bw, vel_bw, pos_bw;
+		uint8_t fail_reason = 0;
+		jm_err_e e;
+
+		if (len < 13) /* ring(1) + 3*float(12) */
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->pid_autotune == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		ring_select = payload[0];
+		memcpy(&cur_bw, &payload[1], 4);
+		memcpy(&vel_bw, &payload[5], 4);
+		memcpy(&pos_bw, &payload[9], 4);
+		e = proto->ops->pid_autotune(ring_select, cur_bw, vel_bw, pos_bw, &fail_reason);
+		/* 0x9A 总是回 8字节 ACK(成功/失败均回), 返回 JM_ERR_OK 避免调用方覆盖 reply。
+		 * 成败信息编码在 body[0](status) 和 body[1](fail_reason) 中, 同 0x97 先例。*/
+		{
+			uint8_t body[8] = {(e == JM_ERR_OK) ? 0u : 1u, fail_reason,
+			                   (e == JM_ERR_OK) ? ring_select : 0u, 0, 0, 0, 0, 0};
+			reply_set(proto, cmd, body, sizeof(body));
+			return JM_ERR_OK;
+		}
+	}
+
+	/* PID 来源切换 0x9B: 独立设置某环 source, 立即 reload。简单 ACK。*/
+	if (cmd == JM_CMD_PID_SOURCE_SET)
+	{
+		uint8_t ring_select, source;
+		jm_err_e e;
+
+		if (len < 2)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->pid_source_set == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		ring_select = payload[0];
+		source = payload[1];
+		e = proto->ops->pid_source_set(ring_select, source);
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
 	/* 其余 0x00~0xB8 控制/校准/诊断类: 统一交给 set_mode 回调,
 	 * CMD 值即 ctrl_mode_e, 由应用层按模式解析 payload 并执行。*/
 	if (cmd <= JM_CMD_SINGLE_STEP)

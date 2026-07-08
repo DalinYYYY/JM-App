@@ -87,8 +87,8 @@ void motor_ctrl_init(motor_ctrl_t *ctrl, motor_param_t *param, float dt)
 
 	ctrl->run_state = RUN_STATE_IDLE;
 	ctrl->ref.ctrl_type = REF_CTRL_IDLE;
-	ctrl->ref.pos_profile = PID_PROFILE_POSITION;
-	ctrl->ref.vel_profile = PID_PROFILE_VELOCITY;
+	ctrl->ref.pos_profile = MOTOR_PID_PROFILE_POSITION;
+	ctrl->ref.vel_profile = MOTOR_PID_PROFILE_VELOCITY;
 
 	ctrl->test_phase = 0.0f;
 	ctrl->test_freq = 1.0f;
@@ -103,8 +103,8 @@ void motor_ctrl_init(motor_ctrl_t *ctrl, motor_param_t *param, float dt)
 void motor_mode_legacy_run(motor_ctrl_t *ctrl)
 {
 	motor_ref_t *ref = &ctrl->ref;
-	ref->pos_profile = PID_PROFILE_POSITION;
-	ref->vel_profile = PID_PROFILE_VELOCITY;
+	ref->pos_profile = MOTOR_PID_PROFILE_POSITION;
+	ref->vel_profile = MOTOR_PID_PROFILE_VELOCITY;
 
 	switch (ctrl->run_state)
 	{
@@ -122,7 +122,7 @@ void motor_mode_legacy_run(motor_ctrl_t *ctrl)
 
 		case RUN_STATE_HOMING:
 			ref->ctrl_type = REF_CTRL_POSITION;
-			ref->pos_profile = PID_PROFILE_HOMING;
+			ref->pos_profile = MOTOR_PID_PROFILE_HOMING;
 			ref->pos = ctrl->cmd.pos;
 			ref->vel_ff = ctrl->cmd.vel_ff;
 			break;
@@ -140,7 +140,7 @@ void motor_mode_legacy_run(motor_ctrl_t *ctrl)
 		case RUN_STATE_ADAPTIVE_GRAVITY_COMP:
 		case RUN_STATE_LANDING_BUFFER:
 			ref->ctrl_type = REF_CTRL_POSITION;
-			ref->pos_profile = PID_PROFILE_IMPEDANCE;
+			ref->pos_profile = MOTOR_PID_PROFILE_IMPEDANCE;
 			ref->pos = ctrl->cmd.pos;
 			ref->vel_ff = 0.0f;
 			break;
@@ -148,7 +148,7 @@ void motor_mode_legacy_run(motor_ctrl_t *ctrl)
 		/* ---- 特殊模式 ---- */
 		case RUN_STATE_JOG:
 			ref->ctrl_type = REF_CTRL_VELOCITY;
-			ref->vel_profile = PID_PROFILE_JOG;
+			ref->vel_profile = MOTOR_PID_PROFILE_JOG;
 			ref->vel = motor_mode_clamp(ctrl->cmd.vel,
 			                            -motor_param_get_max_speed(ctrl->param),
 			                            motor_param_get_max_speed(ctrl->param));

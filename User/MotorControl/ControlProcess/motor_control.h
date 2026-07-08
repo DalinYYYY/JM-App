@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "motor_param.h"
-#include "pid_profile.h"
+#include "motor_pid_profile.h"
 #include "state_define.h"
 #include "utils.h"
 
@@ -79,8 +79,8 @@ typedef struct
 	float duty;				   // 占空比(-1.0~1.0)
 
 	// PID参数配置文件选择（下游级联控制据此为不同模式加载不同PID参数）
-	pid_profile_id_e pos_profile; // 位置环参数配置文件
-	pid_profile_id_e vel_profile; // 速度环参数配置文件
+	motor_pid_profile_id_e pos_profile; // 位置环参数配置文件
+	motor_pid_profile_id_e vel_profile; // 速度环参数配置文件
 } motor_ref_t;
 
 /**

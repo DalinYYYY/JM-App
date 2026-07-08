@@ -9,8 +9,8 @@
 void motor_mode_test_sweep_run(motor_ctrl_t *ctrl)
 {
 	motor_ref_t *ref = &ctrl->ref;
-	ref->pos_profile = PID_PROFILE_POSITION;
-	ref->vel_profile = PID_PROFILE_VELOCITY;
+	ref->pos_profile = MOTOR_PID_PROFILE_POSITION;
+	ref->vel_profile = MOTOR_PID_PROFILE_VELOCITY;
 	ref->ctrl_type = REF_CTRL_TORQUE;
 	ref->torque = sinf(ctrl->test_phase) * 0.5f; /* 0.5N·m 振幅 */
 	ref->torque_ff = 0.0f;

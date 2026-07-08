@@ -12,7 +12,8 @@
  */
 
 #include "motor_loop.h"
-#include "pid_profile.h"
+#include "motor_pid_profile.h"
+#include "motor_pid_load.h"
 #include "runtime_param.h"
 #include "motion_param.h"
 #include "multiturn_counter.h"
@@ -68,6 +69,9 @@ void motor_loop_init(float current_freq_hz)
 	/* Flash 标定参数同步到运行期 motor_param_t*/
 	motor_profile_sync_to_param(param, motor_info_storage_get());
 
+	/* 按 pid_source 独立加载三环 PID（默认 source=0 用 motor_param.c 默认值） */
+	motor_pid_load(param, motor_info_storage_get());
+
 	// 各环控制周期：电流环由中断频率决定，外环按分频系数派生
 	float dt_current = 1.0f / current_freq_hz;
 	float dt_velocity = dt_current * MOTOR_LOOP_VEL_DIV;
@@ -78,7 +82,7 @@ void motor_loop_init(float current_freq_hz)
 	m->sync_pending = false;
 
 	// PID 参数管理器（位置/速度/电流环共用同一套 profile 体系）
-	pid_profile_init(param);
+	motor_pid_profile_init(param);
 
 	// 底层电机设备（真实硬件 或 虚拟 dq 物理模型，由 select 头决定）
 	dev_motor_init(&m->motor, DEV_MOTOR_1, motor_loop_current_cb, motor_loop_ele_radian_cb);

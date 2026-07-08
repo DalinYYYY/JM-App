@@ -236,13 +236,13 @@ int motor_info_validate(const motor_info_t *cfg)
 	/* 控制参数（三环PID+前馈+滤波） */
 	if (cfg->blocks.control.kp_ld < 0.0f || cfg->blocks.control.kp_ld > 100.0f)
 		return 64; /* kp_ld */
-	if (cfg->blocks.control.ki_ld < 0.0f || cfg->blocks.control.ki_ld > 1000.0f)
+	if (cfg->blocks.control.ki_ld < 0.0f || cfg->blocks.control.ki_ld > 10000.0f)
 		return 65; /* ki_ld */
 	if (cfg->blocks.control.kp_lq < 0.0f || cfg->blocks.control.kp_lq > 100.0f)
 		return 66; /* kp_lq */
-	if (cfg->blocks.control.ki_lq < 0.0f || cfg->blocks.control.ki_lq > 1000.0f)
+	if (cfg->blocks.control.ki_lq < 0.0f || cfg->blocks.control.ki_lq > 10000.0f)
 		return 67; /* ki_lq */
-	if (cfg->blocks.control.integral_limit < 0.0f || cfg->blocks.control.integral_limit > 100.0f)
+	if (cfg->blocks.control.integral_limit < 0.0f || cfg->blocks.control.integral_limit > 500.0f)
 		return 68; /* integral_limit */
 	if (cfg->blocks.control.decoupling_gain < 0.0f || cfg->blocks.control.decoupling_gain > 1.0f)
 		return 69; /* decoupling_gain */

@@ -3,9 +3,9 @@
  * @brief       FOC 电流环控制模块（dq 电流闭环 + SVPWM + PWM 输出）
  * @details     封装 FOC 电流环完整链路：
  *                编码器电角度 → 三相电流采样 → Clarke → Park
- *                → d/q 轴 PI（pid_profile 统一封装）→ 反 Park → SVPWM → PWM
+ *                → d/q 轴 PI（motor_pid_profile 统一封装）→ 反 Park → SVPWM → PWM
  *
- *              PID 参数通过 pid_profile 管理（PID_PROFILE_CURRENT_D / _Q），
+ *              PID 参数通过 motor_pid_profile 管理（MOTOR_PID_PROFILE_CURRENT_D / _Q），
  *              可在运行时按需调参，与位置/速度环共用同一套参数体系。
  *
  *              底层接口调用方式参考 foc_current_control.c。
