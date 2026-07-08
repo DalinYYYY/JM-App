@@ -17,6 +17,10 @@
 #include "current_loop.h"
 #include "pid_profile.h"
 #include "foc_core.h"
+#include "motor_loop_config.h"
+#if MOTOR_LOOP_ENABLE_DEV_DRIVER
+#include "dev_power_monitor.h" /* 真实电机：SVPWM 归一化用 Vbus */
+#endif
 
 void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, float dt)
 {
@@ -83,6 +87,19 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 		/* 开环电压：旁路 PI，直接用 ref->ud / ref->voltage 作为 dq 轴电压 */
 		ud = ref->ud;
 		uq = ref->voltage;
+#if MOTOR_LOOP_ENABLE_DEV_DRIVER
+		/* 真实电机 SVPWM 归一化：foc_core.c 的 SVPWM Ts=1.0（归一化周期），
+		 * 输入 u_alpha/u_beta 须为占空比（0~1）而非电压值（伏特）。
+		 * ud/uq 是真实电压，须除以 Vbus 转换为占空比，否则电压值（如 1.0V）
+		 * 会被当作占空比触发过调制限幅，实际电压幅值失真且随角度非线性波动。
+		 * 虚拟电机直接用 ud/uq 推进物理模型（不走 SVPWM），不归一化。
+		 * Vbus 由 dev_power_monitor 在 task 层 100ms 周期更新。 */
+		float vbus = dev_power_monitor.vbus;
+		if (vbus < 1.0f)
+			vbus = 1.0f; /* 保护：Vbus 未就绪时避免除零，标称 Vbus >= 12V */
+		ud /= vbus;
+		uq /= vbus;
+#endif
 	}
 	else
 	{
