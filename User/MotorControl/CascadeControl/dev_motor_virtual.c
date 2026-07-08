@@ -43,9 +43,9 @@
 #endif
 
 /* 物理参数下限保护，避免未初始化(全0)导致除零/发散 */
-#define VIRT_MIN_L 1.0e-5f		 /* 电感下限 10µH */
+#define VIRT_MIN_L       1.0e-5f /* 电感下限 10µH */
 #define VIRT_MIN_INERTIA 1.0e-7f /* 惯量下限 */
-#define VIRT_MIN_FLUX 1.0e-4f	 /* 磁链下限 */
+#define VIRT_MIN_FLUX    1.0e-4f /* 磁链下限 */
 
 /* 单个 dev_motor 虚拟对象的自引用指针：供无参 FOC 回调访问模型。
  * 工程仅 DEV_MOTOR_1 一路电机，单实例足够。 */
@@ -257,8 +257,8 @@ void virtual_motor_set_load(dev_motor_t *pobj, float load_nm)
 }
 
 void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
-					focCurrent_t (*current_callback)(void),
-					float (*ele_radian_callback)(void))
+                    focCurrent_t (*current_callback)(void),
+                    float (*ele_radian_callback)(void))
 {
 	if (pobj == NULL)
 		return;

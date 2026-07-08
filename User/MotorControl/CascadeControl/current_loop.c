@@ -104,10 +104,8 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	else
 	{
 		/* 电流闭环 PI（CURRENT / TORQUE / VELOCITY / POSITION）*/
-		ud = motor_pid_profile_calculate(&cl->pid_id, MOTOR_PID_PROFILE_CURRENT_D,
-		                           out->id_ref, m->foc.i_dq.d, cl->dt);
-		uq = motor_pid_profile_calculate(&cl->pid_iq, MOTOR_PID_PROFILE_CURRENT_Q,
-		                           out->iq_ref, m->foc.i_dq.q, cl->dt);
+		ud = motor_pid_profile_calculate(&cl->pid_id, MOTOR_PID_PROFILE_CURRENT_D, out->id_ref, m->foc.i_dq.d, cl->dt);
+		uq = motor_pid_profile_calculate(&cl->pid_iq, MOTOR_PID_PROFILE_CURRENT_Q, out->iq_ref, m->foc.i_dq.q, cl->dt);
 #if MOTOR_LOOP_ENABLE_DEV_DRIVER
 		/* 真实电机 SVPWM 归一化：PI 输出为电压值（伏特），SVPWM 期望占空比（0~1），
 		 * 须除以 Vbus 转换。与 OPEN_LOOP 分支、calib_hw.c 保持一致。

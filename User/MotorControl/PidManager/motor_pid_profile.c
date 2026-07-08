@@ -2,18 +2,18 @@
 #include <string.h>
 #include <math.h>
 
-static motor_pid_profile_t s_motor_pid_profiles[MOTOR_PID_PROFILE_MAX];
+motor_pid_profile_t s_motor_pid_profiles[MOTOR_PID_PROFILE_MAX];
 static const motor_param_t *s_motor_param;
 
 /**
  * @brief 默认PID参数配置
  */
 static const motor_pid_profile_t s_default_profiles[MOTOR_PID_PROFILE_MAX] = {
-	[MOTOR_PID_PROFILE_CURRENT_D] = {.param = {.kp = 0.3f,
-                                               .ki = 10.0f,
+	[MOTOR_PID_PROFILE_CURRENT_D] = {.param = {.kp = 5.5f,
+                                               .ki = 1500.0f,
                                                .kd = 0.0f,
-                                               .output_limit = 48.0f,
-                                               .integral_limit = 10.0f,
+                                               .output_limit = 24.0f,
+                                               .integral_limit = 200.0f,
                                                .output_filter_alpha = 1.0f,
                                                .flags = PID_FLAG_ANTI_WINDUP},
                                      .name = "current_d"},
@@ -25,11 +25,11 @@ static const motor_pid_profile_t s_default_profiles[MOTOR_PID_PROFILE_MAX] = {
                                                .output_filter_alpha = 1.0f,
                                                .flags = PID_FLAG_ANTI_WINDUP},
                                      .name = "current_q"},
-	[MOTOR_PID_PROFILE_VELOCITY] = {.param = {.kp = 0.5f,
-                                              .ki = 0.1f,
+	[MOTOR_PID_PROFILE_VELOCITY] = {.param = {.kp = 5.5f,
+                                              .ki = 1500.0f,
                                               .kd = 0.005f,
                                               .output_limit = 20.0f,
-                                              .integral_limit = 5.0f,
+                                              .integral_limit = 200.0f,
                                               .output_filter_alpha = 1.0f,
                                               .flags = PID_FLAG_ANTI_WINDUP | PID_FLAG_DIFFERENTIAL_ON_MEASUREMENT},
                                      .name = "velocity" },

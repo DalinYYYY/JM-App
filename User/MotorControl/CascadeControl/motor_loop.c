@@ -278,9 +278,7 @@ void motor_loop_isr(void)
 
 	// step0: 刷新编码器与电角度（所有模式统一执行，确保上位机随时可读角度）
 	m->motor.encoder.update(&m->motor.encoder);
-	m->motor.motor_param.update(&m->motor.motor_param,
-	                            MOTION_TYPE_ELE_RADIAN,
-	                            m->motor.encoder.mechanical_angle);
+	m->motor.motor_param.update(&m->motor.motor_param, MOTION_TYPE_ELE_RADIAN, m->motor.encoder.mechanical_angle);
 
 	// step1: 解算运动反馈（使用本拍刷新的角度）
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);
