@@ -5,6 +5,7 @@
  */
 #include "motor_pid_load.h"
 #include "motor_pid_profile.h"
+#include "motor_pid_autotune.h"
 #include "runtime_param.h"
 #include "motor_info_storage.h"
 
@@ -78,6 +79,109 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 		case PID_SOURCE_DEFAULT:
 		default:
 			break;
+	}
+}
+
+/* ==================== Flash ControlParam 有效性检查 ==================== */
+
+static int flash_current_valid(const ControlParam_t *ctl)
+{
+	return (ctl->kp_ld > 0.0f && ctl->kp_ld < 1000.0f && ctl->ki_ld > 0.0f && ctl->ki_ld < 100000.0f && ctl->kp_lq > 0.0f && ctl->kp_lq < 1000.0f && ctl->ki_lq > 0.0f && ctl->ki_lq < 100000.0f && ctl->integral_limit > 0.0f);
+}
+
+static int flash_velocity_valid(const ControlParam_t *ctl)
+{
+	return (ctl->kp_s > 0.0f && ctl->kp_s < 10000.0f && ctl->ki_s > 0.0f && ctl->ki_s < 100000.0f && ctl->speed_integral_limit > 0.0f);
+}
+
+static int flash_position_valid(const ControlParam_t *ctl)
+{
+	/* 位置环纯比例，ki 可为 0，只检查 kp_p */
+	return (ctl->kp_p > 0.0f && ctl->kp_p < 10000.0f);
+}
+
+void motor_pid_load_boot(motor_param_t *param, const motor_info_t *info)
+{
+	if (param == NULL || info == NULL)
+		return;
+
+	const ControlParam_t *ctl = &info->blocks.control;
+
+	/* ---- 电流环：Flash → autotune → default ---- */
+	if (flash_current_valid(ctl))
+	{
+		s_ring_source[PID_RING_CURRENT] = PID_SOURCE_FLASH;
+		param->current_loop.current_kp_d = ctl->kp_ld;
+		param->current_loop.current_ki_d = ctl->ki_ld;
+		param->current_loop.current_kp_q = ctl->kp_lq;
+		param->current_loop.current_ki_q = ctl->ki_lq;
+		param->current_loop.current_integral_limit = ctl->integral_limit;
+	}
+	else
+	{
+		autotune_result_t d, q;
+		if (motor_pid_autotune_current(info, 0.0f, &d, &q) == 0)
+		{
+			s_ring_source[PID_RING_CURRENT] = PID_SOURCE_AUTOTUNE;
+			param->current_loop.current_kp_d = d.kp;
+			param->current_loop.current_ki_d = d.ki;
+			param->current_loop.current_kp_q = q.kp;
+			param->current_loop.current_ki_q = q.ki;
+			param->current_loop.current_integral_limit = q.integral_limit;
+		}
+		else
+		{
+			s_ring_source[PID_RING_CURRENT] = PID_SOURCE_DEFAULT;
+			/* 保留 motor_param_init 默认值 */
+		}
+	}
+
+	/* ---- 速度环：Flash → autotune → default ---- */
+	if (flash_velocity_valid(ctl))
+	{
+		s_ring_source[PID_RING_VELOCITY] = PID_SOURCE_FLASH;
+		param->position_loop.speed_kp = ctl->kp_s;
+		param->position_loop.speed_ki = ctl->ki_s;
+		param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
+	}
+	else
+	{
+		autotune_result_t v;
+		if (motor_pid_autotune_velocity(info, 0.0f, &v) == 0)
+		{
+			s_ring_source[PID_RING_VELOCITY] = PID_SOURCE_AUTOTUNE;
+			param->position_loop.speed_kp = v.kp;
+			param->position_loop.speed_ki = v.ki;
+			param->position_loop.speed_integral_limit = v.integral_limit;
+		}
+		else
+		{
+			s_ring_source[PID_RING_VELOCITY] = PID_SOURCE_DEFAULT;
+			/* 保留 motor_param_init 默认值 */
+		}
+	}
+
+	/* ---- 位置环：Flash → autotune → default ---- */
+	if (flash_position_valid(ctl))
+	{
+		s_ring_source[PID_RING_POSITION] = PID_SOURCE_FLASH;
+		param->position_loop.position_kp = ctl->kp_p;
+		param->position_loop.position_integral_limit = ctl->position_integral_limit;
+	}
+	else
+	{
+		autotune_result_t p;
+		if (motor_pid_autotune_position(info, 0.0f, &p) == 0)
+		{
+			s_ring_source[PID_RING_POSITION] = PID_SOURCE_AUTOTUNE;
+			param->position_loop.position_kp = p.kp;
+			param->position_loop.position_integral_limit = p.integral_limit;
+		}
+		else
+		{
+			s_ring_source[PID_RING_POSITION] = PID_SOURCE_DEFAULT;
+			/* 保留 motor_param_init 默认值 */
+		}
 	}
 }
 

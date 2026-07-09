@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.c
  * @brief   MotorInfo 配置参数 API 实现
- * @date    2026-06-30
+ * @date    2026-07-09
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -70,7 +70,7 @@ int motor_info_init(motor_info_t *cfg)
 	cfg->blocks.motor_calib.enc_direction = 1;
 	cfg->blocks.motor_calib.enc_offset = 0.0f;
 	cfg->blocks.motor_calib.elec_angle_bias = 0.0f;
-	cfg->blocks.motor_calib.pwm_freq_hz = 10000U;
+	cfg->blocks.motor_calib.pwm_freq_hz = 20000U;
 	cfg->blocks.motor_calib.dead_time_ns = 500.0f;
 	cfg->blocks.motor_calib.shunt_resistance = 0.01f;
 	cfg->blocks.motor_calib.current_amp_gain = 50.0f;
@@ -90,7 +90,7 @@ int motor_info_init(motor_info_t *cfg)
 	cfg->blocks.control.ki_ld = 10.0f;
 	cfg->blocks.control.kp_lq = 0.5f;
 	cfg->blocks.control.ki_lq = 10.0f;
-	cfg->blocks.control.integral_limit = 10.0f;
+	cfg->blocks.control.integral_limit = 12.0f;
 	cfg->blocks.control.decoupling_gain = 1.0f;
 	cfg->blocks.control.comp_du_V = 0.0f;
 	cfg->blocks.control.pwm_duty_max = 0.9f;
@@ -162,43 +162,43 @@ int motor_info_validate(const motor_info_t *cfg)
 	/* 电机标定参数（含减速器/编码器/功率级/电流采样） */
 	if (cfg->blocks.motor_calib.is_calibrated > (uint32_t)1)
 		return 16; /* is_calibrated */
-	if (cfg->blocks.motor_calib.pole_pairs < (uint32_t)1 || cfg->blocks.motor_calib.pole_pairs > (uint32_t)64)
+	if (cfg->blocks.motor_calib.pole_pairs < (uint32_t)1 || cfg->blocks.motor_calib.pole_pairs > (uint32_t)128)
 		return 17; /* pole_pairs */
 	if (cfg->blocks.motor_calib.motor_type > (uint32_t)2)
 		return 18; /* motor_type */
 	if (cfg->blocks.motor_calib.direction > (uint32_t)1)
 		return 19; /* direction */
-	if (cfg->blocks.motor_calib.phase_resistance < 0.001f || cfg->blocks.motor_calib.phase_resistance > 10.0f)
+	if (cfg->blocks.motor_calib.phase_resistance < 0.001f || cfg->blocks.motor_calib.phase_resistance > 50.0f)
 		return 20; /* phase_resistance */
-	if (cfg->blocks.motor_calib.phase_inductance_d < 0.00001f || cfg->blocks.motor_calib.phase_inductance_d > 0.01f)
+	if (cfg->blocks.motor_calib.phase_inductance_d < 0.000001f || cfg->blocks.motor_calib.phase_inductance_d > 0.1f)
 		return 21; /* phase_inductance_d */
-	if (cfg->blocks.motor_calib.phase_inductance_q < 0.00001f || cfg->blocks.motor_calib.phase_inductance_q > 0.01f)
+	if (cfg->blocks.motor_calib.phase_inductance_q < 0.000001f || cfg->blocks.motor_calib.phase_inductance_q > 0.1f)
 		return 22; /* phase_inductance_q */
-	if (cfg->blocks.motor_calib.flux_linkage < 0.0001f || cfg->blocks.motor_calib.flux_linkage > 0.1f)
+	if (cfg->blocks.motor_calib.flux_linkage < 0.00001f || cfg->blocks.motor_calib.flux_linkage > 1.0f)
 		return 23; /* flux_linkage */
-	if (cfg->blocks.motor_calib.torque_constant < 0.01f || cfg->blocks.motor_calib.torque_constant > 10.0f)
+	if (cfg->blocks.motor_calib.torque_constant < 0.001f || cfg->blocks.motor_calib.torque_constant > 50.0f)
 		return 24; /* torque_constant */
-	if (cfg->blocks.motor_calib.rotor_inertia < 0.0000001f || cfg->blocks.motor_calib.rotor_inertia > 0.01f)
+	if (cfg->blocks.motor_calib.rotor_inertia < 0.0000001f || cfg->blocks.motor_calib.rotor_inertia > 1.0f)
 		return 25; /* rotor_inertia */
-	if (cfg->blocks.motor_calib.friction_coulomb < 0.0f || cfg->blocks.motor_calib.friction_coulomb > 100.0f)
+	if (cfg->blocks.motor_calib.friction_coulomb < 0.0f || cfg->blocks.motor_calib.friction_coulomb > 500.0f)
 		return 26; /* friction_coulomb */
-	if (cfg->blocks.motor_calib.friction_viscous < 0.0f || cfg->blocks.motor_calib.friction_viscous > 10.0f)
+	if (cfg->blocks.motor_calib.friction_viscous < 0.0f || cfg->blocks.motor_calib.friction_viscous > 100.0f)
 		return 27; /* friction_viscous */
-	if (cfg->blocks.motor_calib.gear_ratio < 1.0f || cfg->blocks.motor_calib.gear_ratio > 1000.0f)
+	if (cfg->blocks.motor_calib.gear_ratio < 1.0f || cfg->blocks.motor_calib.gear_ratio > 10000.0f)
 		return 28; /* gear_ratio */
 	if (cfg->blocks.motor_calib.gear_efficiency < 0.1f || cfg->blocks.motor_calib.gear_efficiency > 1.0f)
 		return 29; /* gear_efficiency */
-	if (cfg->blocks.motor_calib.calibration_current < 0.1f || cfg->blocks.motor_calib.calibration_current > 20.0f)
+	if (cfg->blocks.motor_calib.calibration_current < 0.1f || cfg->blocks.motor_calib.calibration_current > 50.0f)
 		return 30; /* calibration_current */
 	if (cfg->blocks.motor_calib.resistance_calib_max_voltage < 0.1f || cfg->blocks.motor_calib.resistance_calib_max_voltage > 60.0f)
 		return 31; /* resistance_calib_max_voltage */
-	if (cfg->blocks.motor_calib.current_lim < 0.1f || cfg->blocks.motor_calib.current_lim > 200.0f)
+	if (cfg->blocks.motor_calib.current_lim < 0.1f || cfg->blocks.motor_calib.current_lim > 500.0f)
 		return 32; /* current_lim */
-	if (cfg->blocks.motor_calib.current_control_bandwidth < 100.0f || cfg->blocks.motor_calib.current_control_bandwidth > 5000.0f)
+	if (cfg->blocks.motor_calib.current_control_bandwidth < 50.0f || cfg->blocks.motor_calib.current_control_bandwidth > 20000.0f)
 		return 33; /* current_control_bandwidth */
 	if (cfg->blocks.motor_calib.enc_type > (uint32_t)10)
 		return 34; /* enc_type */
-	if (cfg->blocks.motor_calib.enc_lines < (uint32_t)100 || cfg->blocks.motor_calib.enc_lines > (uint32_t)1000000)
+	if (cfg->blocks.motor_calib.enc_lines < (uint32_t)100 || cfg->blocks.motor_calib.enc_lines > (uint32_t)10000000)
 		return 35; /* enc_lines */
 	if (cfg->blocks.motor_calib.enc_direction < (int32_t)-1 || cfg->blocks.motor_calib.enc_direction > (int32_t)1)
 		return 36; /* enc_direction */
@@ -206,13 +206,13 @@ int motor_info_validate(const motor_info_t *cfg)
 		return 37; /* enc_offset */
 	if (cfg->blocks.motor_calib.elec_angle_bias < -3.1416f || cfg->blocks.motor_calib.elec_angle_bias > 3.1416f)
 		return 38; /* elec_angle_bias */
-	if (cfg->blocks.motor_calib.pwm_freq_hz < (uint32_t)5000 || cfg->blocks.motor_calib.pwm_freq_hz > (uint32_t)100000)
+	if (cfg->blocks.motor_calib.pwm_freq_hz < (uint32_t)1000 || cfg->blocks.motor_calib.pwm_freq_hz > (uint32_t)200000)
 		return 39; /* pwm_freq_hz */
-	if (cfg->blocks.motor_calib.dead_time_ns < 100.0f || cfg->blocks.motor_calib.dead_time_ns > 2000.0f)
+	if (cfg->blocks.motor_calib.dead_time_ns < 50.0f || cfg->blocks.motor_calib.dead_time_ns > 5000.0f)
 		return 40; /* dead_time_ns */
-	if (cfg->blocks.motor_calib.shunt_resistance < 0.001f || cfg->blocks.motor_calib.shunt_resistance > 1.0f)
+	if (cfg->blocks.motor_calib.shunt_resistance < 0.0001f || cfg->blocks.motor_calib.shunt_resistance > 1.0f)
 		return 41; /* shunt_resistance */
-	if (cfg->blocks.motor_calib.current_amp_gain < 1.0f || cfg->blocks.motor_calib.current_amp_gain > 1000.0f)
+	if (cfg->blocks.motor_calib.current_amp_gain < 1.0f || cfg->blocks.motor_calib.current_amp_gain > 10000.0f)
 		return 42; /* current_amp_gain */
 
 	/* 设备参数（CAN/UART） */
@@ -224,105 +224,105 @@ int motor_info_validate(const motor_info_t *cfg)
 		return 50; /* can_id */
 	if (cfg->blocks.device.can_baudrate < (uint32_t)10000 || cfg->blocks.device.can_baudrate > (uint32_t)8000000)
 		return 51; /* can_baudrate */
-	if (cfg->blocks.device.can_timeout_s < 0.0f || cfg->blocks.device.can_timeout_s > 10.0f)
+	if (cfg->blocks.device.can_timeout_s < 0.0f || cfg->blocks.device.can_timeout_s > 60.0f)
 		return 52; /* can_timeout_s */
 	if (cfg->blocks.device.can_fd_enable > (uint32_t)1)
 		return 53; /* can_fd_enable */
 	if (cfg->blocks.device.can_fd_baudrate < (uint32_t)100000 || cfg->blocks.device.can_fd_baudrate > (uint32_t)8000000)
 		return 54; /* can_fd_baudrate */
-	if (cfg->blocks.device.uart_baudrate < (uint32_t)1200 || cfg->blocks.device.uart_baudrate > (uint32_t)4000000)
+	if (cfg->blocks.device.uart_baudrate < (uint32_t)1200 || cfg->blocks.device.uart_baudrate > (uint32_t)8000000)
 		return 55; /* uart_baudrate */
 
 	/* 控制参数（三环PID+前馈+滤波） */
-	if (cfg->blocks.control.kp_ld < 0.0f || cfg->blocks.control.kp_ld > 100.0f)
+	if (cfg->blocks.control.kp_ld < 0.0f || cfg->blocks.control.kp_ld > 1000.0f)
 		return 64; /* kp_ld */
-	if (cfg->blocks.control.ki_ld < 0.0f || cfg->blocks.control.ki_ld > 10000.0f)
+	if (cfg->blocks.control.ki_ld < 0.0f || cfg->blocks.control.ki_ld > 100000.0f)
 		return 65; /* ki_ld */
-	if (cfg->blocks.control.kp_lq < 0.0f || cfg->blocks.control.kp_lq > 100.0f)
+	if (cfg->blocks.control.kp_lq < 0.0f || cfg->blocks.control.kp_lq > 1000.0f)
 		return 66; /* kp_lq */
-	if (cfg->blocks.control.ki_lq < 0.0f || cfg->blocks.control.ki_lq > 10000.0f)
+	if (cfg->blocks.control.ki_lq < 0.0f || cfg->blocks.control.ki_lq > 100000.0f)
 		return 67; /* ki_lq */
-	if (cfg->blocks.control.integral_limit < 0.0f || cfg->blocks.control.integral_limit > 500.0f)
+	if (cfg->blocks.control.integral_limit < 0.0f || cfg->blocks.control.integral_limit > 1000.0f)
 		return 68; /* integral_limit */
-	if (cfg->blocks.control.decoupling_gain < 0.0f || cfg->blocks.control.decoupling_gain > 1.0f)
+	if (cfg->blocks.control.decoupling_gain < 0.0f || cfg->blocks.control.decoupling_gain > 5.0f)
 		return 69; /* decoupling_gain */
-	if (cfg->blocks.control.comp_du_V < 0.0f || cfg->blocks.control.comp_du_V > 5.0f)
+	if (cfg->blocks.control.comp_du_V < 0.0f || cfg->blocks.control.comp_du_V > 20.0f)
 		return 70; /* comp_du_V */
-	if (cfg->blocks.control.pwm_duty_max < 0.5f || cfg->blocks.control.pwm_duty_max > 0.95f)
+	if (cfg->blocks.control.pwm_duty_max < 0.1f || cfg->blocks.control.pwm_duty_max > 0.99f)
 		return 71; /* pwm_duty_max */
-	if (cfg->blocks.control.kp_s < 0.0f || cfg->blocks.control.kp_s > 100.0f)
+	if (cfg->blocks.control.kp_s < 0.0f || cfg->blocks.control.kp_s > 10000.0f)
 		return 72; /* kp_s */
-	if (cfg->blocks.control.ki_s < 0.0f || cfg->blocks.control.ki_s > 1000.0f)
+	if (cfg->blocks.control.ki_s < 0.0f || cfg->blocks.control.ki_s > 100000.0f)
 		return 73; /* ki_s */
-	if (cfg->blocks.control.speed_integral_limit < 0.0f || cfg->blocks.control.speed_integral_limit > 100.0f)
+	if (cfg->blocks.control.speed_integral_limit < 0.0f || cfg->blocks.control.speed_integral_limit > 1000.0f)
 		return 74; /* speed_integral_limit */
-	if (cfg->blocks.control.vff < 0.0f || cfg->blocks.control.vff > 1.0f)
+	if (cfg->blocks.control.vff < 0.0f || cfg->blocks.control.vff > 5.0f)
 		return 75; /* vff */
-	if (cfg->blocks.control.aff < 0.0f || cfg->blocks.control.aff > 1.0f)
+	if (cfg->blocks.control.aff < 0.0f || cfg->blocks.control.aff > 5.0f)
 		return 76; /* aff */
-	if (cfg->blocks.control.jerk_ff < 0.0f || cfg->blocks.control.jerk_ff > 1.0f)
+	if (cfg->blocks.control.jerk_ff < 0.0f || cfg->blocks.control.jerk_ff > 5.0f)
 		return 77; /* jerk_ff */
 	if (cfg->blocks.control.speed_filter_alpha < 0.0f || cfg->blocks.control.speed_filter_alpha > 1.0f)
 		return 78; /* speed_filter_alpha */
 	if (cfg->blocks.control.speed_filter_enable > (uint32_t)1)
 		return 79; /* speed_filter_enable */
-	if (cfg->blocks.control.kp_p < 0.0f || cfg->blocks.control.kp_p > 1000.0f)
+	if (cfg->blocks.control.kp_p < 0.0f || cfg->blocks.control.kp_p > 10000.0f)
 		return 80; /* kp_p */
-	if (cfg->blocks.control.ki_p < 0.0f || cfg->blocks.control.ki_p > 1000.0f)
+	if (cfg->blocks.control.ki_p < 0.0f || cfg->blocks.control.ki_p > 10000.0f)
 		return 81; /* ki_p */
-	if (cfg->blocks.control.position_integral_limit < 0.0f || cfg->blocks.control.position_integral_limit > 100.0f)
+	if (cfg->blocks.control.position_integral_limit < 0.0f || cfg->blocks.control.position_integral_limit > 1000.0f)
 		return 82; /* position_integral_limit */
 	if (cfg->blocks.control.position_filter_alpha < 0.0f || cfg->blocks.control.position_filter_alpha > 1.0f)
 		return 83; /* position_filter_alpha */
 	if (cfg->blocks.control.position_filter_enable > (uint32_t)1)
 		return 84; /* position_filter_enable */
-	if (cfg->blocks.control.following_error_limit < 0.0f || cfg->blocks.control.following_error_limit > 100000.0f)
+	if (cfg->blocks.control.following_error_limit < 0.0f || cfg->blocks.control.following_error_limit > 1000000.0f)
 		return 85; /* following_error_limit */
 
 	/* 保护与通信参数 */
-	if (cfg->blocks.protect_comm.over_current_A < 1.0f || cfg->blocks.protect_comm.over_current_A > 200.0f)
+	if (cfg->blocks.protect_comm.over_current_A < 0.1f || cfg->blocks.protect_comm.over_current_A > 1000.0f)
 		return 128; /* over_current_A */
-	if (cfg->blocks.protect_comm.over_voltage_V < 20.0f || cfg->blocks.protect_comm.over_voltage_V > 100.0f)
+	if (cfg->blocks.protect_comm.over_voltage_V < 5.0f || cfg->blocks.protect_comm.over_voltage_V > 120.0f)
 		return 129; /* over_voltage_V */
-	if (cfg->blocks.protect_comm.under_voltage_V < 5.0f || cfg->blocks.protect_comm.under_voltage_V > 30.0f)
+	if (cfg->blocks.protect_comm.under_voltage_V < 0.0f || cfg->blocks.protect_comm.under_voltage_V > 60.0f)
 		return 130; /* under_voltage_V */
-	if (cfg->blocks.protect_comm.over_temp_drive < 50.0f || cfg->blocks.protect_comm.over_temp_drive > 120.0f)
+	if (cfg->blocks.protect_comm.over_temp_drive < 20.0f || cfg->blocks.protect_comm.over_temp_drive > 150.0f)
 		return 131; /* over_temp_drive */
-	if (cfg->blocks.protect_comm.over_temp_motor < 50.0f || cfg->blocks.protect_comm.over_temp_motor > 120.0f)
+	if (cfg->blocks.protect_comm.over_temp_motor < 20.0f || cfg->blocks.protect_comm.over_temp_motor > 200.0f)
 		return 132; /* over_temp_motor */
-	if (cfg->blocks.protect_comm.under_temp_d < -40.0f || cfg->blocks.protect_comm.under_temp_d > 0.0f)
+	if (cfg->blocks.protect_comm.under_temp_d < -80.0f || cfg->blocks.protect_comm.under_temp_d > 0.0f)
 		return 133; /* under_temp_d */
-	if (cfg->blocks.protect_comm.over_speed_rad_s < 10.0f || cfg->blocks.protect_comm.over_speed_rad_s > 2000.0f)
+	if (cfg->blocks.protect_comm.over_speed_rad_s < 1.0f || cfg->blocks.protect_comm.over_speed_rad_s > 20000.0f)
 		return 134; /* over_speed_rad_s */
-	if (cfg->blocks.protect_comm.position_following_error_p < (int32_t)100 || cfg->blocks.protect_comm.position_following_error_p > (int32_t)100000)
+	if (cfg->blocks.protect_comm.position_following_error_p < (int32_t)1 || cfg->blocks.protect_comm.position_following_error_p > (int32_t)1000000)
 		return 135; /* position_following_error_p */
-	if (cfg->blocks.protect_comm.pos_limit_min < (int32_t)-1000000 || cfg->blocks.protect_comm.pos_limit_min > (int32_t)0)
+	if (cfg->blocks.protect_comm.pos_limit_min < (int32_t)-10000000 || cfg->blocks.protect_comm.pos_limit_min > (int32_t)0)
 		return 136; /* pos_limit_min */
-	if (cfg->blocks.protect_comm.pos_limit_max < (int32_t)0 || cfg->blocks.protect_comm.pos_limit_max > (int32_t)1000000)
+	if (cfg->blocks.protect_comm.pos_limit_max < (int32_t)0 || cfg->blocks.protect_comm.pos_limit_max > (int32_t)10000000)
 		return 137; /* pos_limit_max */
 	if (cfg->blocks.protect_comm.error_enable_mask > (uint32_t)4294967295)
 		return 138; /* error_enable_mask */
 
 	/* 高级算法参数（MIT/力控/回零） */
-	if (cfg->blocks.advanced.mit_kp < 0.0f || cfg->blocks.advanced.mit_kp > 1000.0f)
+	if (cfg->blocks.advanced.mit_kp < 0.0f || cfg->blocks.advanced.mit_kp > 10000.0f)
 		return 160; /* mit_kp */
-	if (cfg->blocks.advanced.mit_kd < 0.0f || cfg->blocks.advanced.mit_kd > 100.0f)
+	if (cfg->blocks.advanced.mit_kd < 0.0f || cfg->blocks.advanced.mit_kd > 1000.0f)
 		return 161; /* mit_kd */
-	if (cfg->blocks.advanced.mit_max_current < 0.0f || cfg->blocks.advanced.mit_max_current > 100.0f)
+	if (cfg->blocks.advanced.mit_max_current < 0.0f || cfg->blocks.advanced.mit_max_current > 500.0f)
 		return 162; /* mit_max_current */
-	if (cfg->blocks.advanced.mit_feedforward_torque < 0.0f || cfg->blocks.advanced.mit_feedforward_torque > 100.0f)
+	if (cfg->blocks.advanced.mit_feedforward_torque < 0.0f || cfg->blocks.advanced.mit_feedforward_torque > 500.0f)
 		return 163; /* mit_feedforward_torque */
-	if (cfg->blocks.advanced.force_kp < 0.0f || cfg->blocks.advanced.force_kp > 1000.0f)
+	if (cfg->blocks.advanced.force_kp < 0.0f || cfg->blocks.advanced.force_kp > 10000.0f)
 		return 164; /* force_kp */
-	if (cfg->blocks.advanced.force_ki < 0.0f || cfg->blocks.advanced.force_ki > 1000.0f)
+	if (cfg->blocks.advanced.force_ki < 0.0f || cfg->blocks.advanced.force_ki > 10000.0f)
 		return 165; /* force_ki */
-	if (cfg->blocks.advanced.force_limit < 0.0f || cfg->blocks.advanced.force_limit > 100.0f)
+	if (cfg->blocks.advanced.force_limit < 0.0f || cfg->blocks.advanced.force_limit > 1000.0f)
 		return 166; /* force_limit */
 	if (cfg->blocks.advanced.force_control_enable > (uint32_t)1)
 		return 167; /* force_control_enable */
 	if (cfg->blocks.advanced.homing_method > (uint32_t)10)
 		return 168; /* homing_method */
-	if (cfg->blocks.advanced.homing_speed < 0.01f || cfg->blocks.advanced.homing_speed > 50.0f)
+	if (cfg->blocks.advanced.homing_speed < 0.001f || cfg->blocks.advanced.homing_speed > 500.0f)
 		return 169; /* homing_speed */
 	if (cfg->blocks.advanced.homing_offset < -6.283f || cfg->blocks.advanced.homing_offset > 6.283f)
 		return 170; /* homing_offset */
@@ -370,7 +370,7 @@ void motor_info_print(const motor_info_t *cfg)
 	printf("enc_type: %u\n", (unsigned)cfg->blocks.motor_calib.enc_type);
 	printf("enc_lines: %u CPR\n", (unsigned)cfg->blocks.motor_calib.enc_lines);
 	printf("enc_direction: %d\n", (int)cfg->blocks.motor_calib.enc_direction);
-	printf("enc_offset: %.4f deg\n", cfg->blocks.motor_calib.enc_offset);
+	printf("enc_offset: %f deg\n", cfg->blocks.motor_calib.enc_offset);
 	printf("elec_angle_bias: %f rad\n", cfg->blocks.motor_calib.elec_angle_bias);
 	printf("pwm_freq_hz: %u Hz\n", (unsigned)cfg->blocks.motor_calib.pwm_freq_hz);
 	printf("dead_time_ns: %f ns\n", cfg->blocks.motor_calib.dead_time_ns);
@@ -545,7 +545,7 @@ int motor_info_set_pole_pairs(motor_info_t *cfg, uint32_t value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (uint32_t)1 || value > (uint32_t)64)
+	if (value < (uint32_t)1 || value > (uint32_t)128)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.pole_pairs = value;
 	return 0;
@@ -590,7 +590,7 @@ int motor_info_set_phase_resistance(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.001f || value > 10.0f)
+	if (value < 0.001f || value > 50.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.phase_resistance = value;
 	return 0;
@@ -605,7 +605,7 @@ int motor_info_set_phase_inductance_d(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.00001f || value > 0.01f)
+	if (value < 0.000001f || value > 0.1f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.phase_inductance_d = value;
 	return 0;
@@ -620,7 +620,7 @@ int motor_info_set_phase_inductance_q(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.00001f || value > 0.01f)
+	if (value < 0.000001f || value > 0.1f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.phase_inductance_q = value;
 	return 0;
@@ -635,7 +635,7 @@ int motor_info_set_flux_linkage(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0001f || value > 0.1f)
+	if (value < 0.00001f || value > 1.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.flux_linkage = value;
 	return 0;
@@ -650,7 +650,7 @@ int motor_info_set_torque_constant(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.01f || value > 10.0f)
+	if (value < 0.001f || value > 50.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.torque_constant = value;
 	return 0;
@@ -665,7 +665,7 @@ int motor_info_set_rotor_inertia(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0000001f || value > 0.01f)
+	if (value < 0.0000001f || value > 1.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.rotor_inertia = value;
 	return 0;
@@ -680,7 +680,7 @@ int motor_info_set_friction_coulomb(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 500.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.friction_coulomb = value;
 	return 0;
@@ -695,7 +695,7 @@ int motor_info_set_friction_viscous(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 10.0f)
+	if (value < 0.0f || value > 100.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.friction_viscous = value;
 	return 0;
@@ -710,7 +710,7 @@ int motor_info_set_gear_ratio(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 1.0f || value > 1000.0f)
+	if (value < 1.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.gear_ratio = value;
 	return 0;
@@ -740,7 +740,7 @@ int motor_info_set_calibration_current(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.1f || value > 20.0f)
+	if (value < 0.1f || value > 50.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.calibration_current = value;
 	return 0;
@@ -770,7 +770,7 @@ int motor_info_set_current_lim(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.1f || value > 200.0f)
+	if (value < 0.1f || value > 500.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.current_lim = value;
 	return 0;
@@ -785,7 +785,7 @@ int motor_info_set_current_control_bandwidth(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 100.0f || value > 5000.0f)
+	if (value < 50.0f || value > 20000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.current_control_bandwidth = value;
 	return 0;
@@ -815,7 +815,7 @@ int motor_info_set_enc_lines(motor_info_t *cfg, uint32_t value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (uint32_t)100 || value > (uint32_t)1000000)
+	if (value < (uint32_t)100 || value > (uint32_t)10000000)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.enc_lines = value;
 	return 0;
@@ -875,7 +875,7 @@ int motor_info_set_pwm_freq_hz(motor_info_t *cfg, uint32_t value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (uint32_t)5000 || value > (uint32_t)100000)
+	if (value < (uint32_t)1000 || value > (uint32_t)200000)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.pwm_freq_hz = value;
 	return 0;
@@ -890,7 +890,7 @@ int motor_info_set_dead_time_ns(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 100.0f || value > 2000.0f)
+	if (value < 50.0f || value > 5000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.dead_time_ns = value;
 	return 0;
@@ -905,7 +905,7 @@ int motor_info_set_shunt_resistance(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.001f || value > 1.0f)
+	if (value < 0.0001f || value > 1.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.shunt_resistance = value;
 	return 0;
@@ -920,7 +920,7 @@ int motor_info_set_current_amp_gain(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 1.0f || value > 1000.0f)
+	if (value < 1.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.current_amp_gain = value;
 	return 0;
@@ -998,7 +998,7 @@ int motor_info_set_can_timeout_s(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 10.0f)
+	if (value < 0.0f || value > 60.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.device.can_timeout_s = value;
 	return 0;
@@ -1043,7 +1043,7 @@ int motor_info_set_uart_baudrate(motor_info_t *cfg, uint32_t value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (uint32_t)1200 || value > (uint32_t)4000000)
+	if (value < (uint32_t)1200 || value > (uint32_t)8000000)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.device.uart_baudrate = value;
 	return 0;
@@ -1061,7 +1061,7 @@ int motor_info_set_kp_ld(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.kp_ld = value;
 	return 0;
@@ -1076,7 +1076,7 @@ int motor_info_set_ki_ld(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 100000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.ki_ld = value;
 	return 0;
@@ -1091,7 +1091,7 @@ int motor_info_set_kp_lq(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.kp_lq = value;
 	return 0;
@@ -1106,7 +1106,7 @@ int motor_info_set_ki_lq(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 100000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.ki_lq = value;
 	return 0;
@@ -1121,7 +1121,7 @@ int motor_info_set_integral_limit(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.integral_limit = value;
 	return 0;
@@ -1136,7 +1136,7 @@ int motor_info_set_decoupling_gain(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1.0f)
+	if (value < 0.0f || value > 5.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.decoupling_gain = value;
 	return 0;
@@ -1151,7 +1151,7 @@ int motor_info_set_comp_du_V(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 5.0f)
+	if (value < 0.0f || value > 20.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.comp_du_V = value;
 	return 0;
@@ -1166,7 +1166,7 @@ int motor_info_set_pwm_duty_max(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.5f || value > 0.95f)
+	if (value < 0.1f || value > 0.99f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.pwm_duty_max = value;
 	return 0;
@@ -1181,7 +1181,7 @@ int motor_info_set_kp_s(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.kp_s = value;
 	return 0;
@@ -1196,7 +1196,7 @@ int motor_info_set_ki_s(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 100000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.ki_s = value;
 	return 0;
@@ -1211,7 +1211,7 @@ int motor_info_set_speed_integral_limit(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.speed_integral_limit = value;
 	return 0;
@@ -1226,7 +1226,7 @@ int motor_info_set_vff(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1.0f)
+	if (value < 0.0f || value > 5.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.vff = value;
 	return 0;
@@ -1241,7 +1241,7 @@ int motor_info_set_aff(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1.0f)
+	if (value < 0.0f || value > 5.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.aff = value;
 	return 0;
@@ -1256,7 +1256,7 @@ int motor_info_set_jerk_ff(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1.0f)
+	if (value < 0.0f || value > 5.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.jerk_ff = value;
 	return 0;
@@ -1301,7 +1301,7 @@ int motor_info_set_kp_p(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.kp_p = value;
 	return 0;
@@ -1316,7 +1316,7 @@ int motor_info_set_ki_p(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.ki_p = value;
 	return 0;
@@ -1331,7 +1331,7 @@ int motor_info_set_position_integral_limit(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.position_integral_limit = value;
 	return 0;
@@ -1376,7 +1376,7 @@ int motor_info_set_following_error_limit(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100000.0f)
+	if (value < 0.0f || value > 1000000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.control.following_error_limit = value;
 	return 0;
@@ -1394,7 +1394,7 @@ int motor_info_set_over_current_A(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 1.0f || value > 200.0f)
+	if (value < 0.1f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.over_current_A = value;
 	return 0;
@@ -1409,7 +1409,7 @@ int motor_info_set_over_voltage_V(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 20.0f || value > 100.0f)
+	if (value < 5.0f || value > 120.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.over_voltage_V = value;
 	return 0;
@@ -1424,7 +1424,7 @@ int motor_info_set_under_voltage_V(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 5.0f || value > 30.0f)
+	if (value < 0.0f || value > 60.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.under_voltage_V = value;
 	return 0;
@@ -1439,7 +1439,7 @@ int motor_info_set_over_temp_drive(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 50.0f || value > 120.0f)
+	if (value < 20.0f || value > 150.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.over_temp_drive = value;
 	return 0;
@@ -1454,7 +1454,7 @@ int motor_info_set_over_temp_motor(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 50.0f || value > 120.0f)
+	if (value < 20.0f || value > 200.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.over_temp_motor = value;
 	return 0;
@@ -1469,7 +1469,7 @@ int motor_info_set_under_temp_d(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < -40.0f || value > 0.0f)
+	if (value < -80.0f || value > 0.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.under_temp_d = value;
 	return 0;
@@ -1484,7 +1484,7 @@ int motor_info_set_over_speed_rad_s(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 10.0f || value > 2000.0f)
+	if (value < 1.0f || value > 20000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.over_speed_rad_s = value;
 	return 0;
@@ -1499,7 +1499,7 @@ int motor_info_set_position_following_error_p(motor_info_t *cfg, int32_t value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (int32_t)100 || value > (int32_t)100000)
+	if (value < (int32_t)1 || value > (int32_t)1000000)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.position_following_error_p = value;
 	return 0;
@@ -1514,7 +1514,7 @@ int motor_info_set_pos_limit_min(motor_info_t *cfg, int32_t value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (int32_t)-1000000 || value > (int32_t)0)
+	if (value < (int32_t)-10000000 || value > (int32_t)0)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.pos_limit_min = value;
 	return 0;
@@ -1529,7 +1529,7 @@ int motor_info_set_pos_limit_max(motor_info_t *cfg, int32_t value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < (int32_t)0 || value > (int32_t)1000000)
+	if (value < (int32_t)0 || value > (int32_t)10000000)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.protect_comm.pos_limit_max = value;
 	return 0;
@@ -1562,7 +1562,7 @@ int motor_info_set_mit_kp(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.mit_kp = value;
 	return 0;
@@ -1577,7 +1577,7 @@ int motor_info_set_mit_kd(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.mit_kd = value;
 	return 0;
@@ -1592,7 +1592,7 @@ int motor_info_set_mit_max_current(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 500.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.mit_max_current = value;
 	return 0;
@@ -1607,7 +1607,7 @@ int motor_info_set_mit_feedforward_torque(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 500.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.mit_feedforward_torque = value;
 	return 0;
@@ -1622,7 +1622,7 @@ int motor_info_set_force_kp(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.force_kp = value;
 	return 0;
@@ -1637,7 +1637,7 @@ int motor_info_set_force_ki(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 1000.0f)
+	if (value < 0.0f || value > 10000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.force_ki = value;
 	return 0;
@@ -1652,7 +1652,7 @@ int motor_info_set_force_limit(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.0f || value > 100.0f)
+	if (value < 0.0f || value > 1000.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.force_limit = value;
 	return 0;
@@ -1697,7 +1697,7 @@ int motor_info_set_homing_speed(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.01f || value > 50.0f)
+	if (value < 0.001f || value > 500.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.advanced.homing_speed = value;
 	return 0;
@@ -1939,7 +1939,7 @@ int motor_info_dispatch_read(uint16_t pid, const motor_info_t *cfg, uint8_t out4
 			return 0;
 		}
 		case 37:
-		{ /* enc_offset (float, deg) */
+		{ /* enc_offset (float) */
 			float v = motor_info_get_enc_offset(cfg);
 			memcpy(out4, &v, 4);
 			*out_type = 6;
@@ -2597,7 +2597,7 @@ int motor_info_dispatch_write(uint16_t pid, motor_info_t *cfg, const uint8_t in4
 			return (rc == 0) ? 0 : -2;
 		}
 		case 37:
-		{ /* enc_offset (float, deg) */
+		{ /* enc_offset (float) */
 			float v;
 			memcpy(&v, in4, 4);
 			int rc = motor_info_set_enc_offset(cfg, v);

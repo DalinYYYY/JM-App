@@ -54,6 +54,19 @@ typedef enum
 void motor_pid_load(motor_param_t *param, const motor_info_t *info);
 
 /**
+ * @brief  上电启动加载：Flash → autotune → default 三级回退
+ * @param  param  目标 motor_param_t（已由 motor_param_init 填入默认值）
+ * @param  info   源 motor_info_t（Flash 加载的 ControlParam_t + 辨识参数）
+ * @note   三环各自独立判断，互不影响：
+ *         1. Flash ControlParam 对应字段范围检查通过 → source=FLASH
+ *         2. Flash 无效 → 尝试 autotune 计算（纯数学，不施加电压）
+ *            辨识参数就绪 → source=AUTOTUNE，写入 param
+ *         3. autotune 失败（未标定）→ source=DEFAULT，保留 motor_param.c 默认值
+ *         此函数在 motor_loop_init 中替代 motor_pid_load 调用一次。
+ */
+void motor_pid_load_boot(motor_param_t *param, const motor_info_t *info);
+
+/**
  * @brief  运行时 reload（协议修改 source 或 autotune 写入后调用）
  * @note   重新从 motor_info 按 source 加载到 motor_param_t，
  *         并同步到 motor_pid_profile 管理器。仅在 IDLE 态调用（并发安全）。

@@ -69,8 +69,9 @@ void motor_loop_init(float current_freq_hz)
 	/* Flash 标定参数同步到运行期 motor_param_t*/
 	motor_profile_sync_to_param(param, motor_info_storage_get());
 
-	/* 按 pid_source 独立加载三环 PID（默认 source=0 用 motor_param.c 默认值） */
-	motor_pid_load(param, motor_info_storage_get());
+	/* 上电启动加载：Flash ControlParam 范围检查 → autotune 理论估计 → default 三级回退
+	 * 三环各自独立判断，有效则用 Flash 值，无效则尝试 autotune，再无效用 motor_param.c 默认值 */
+	motor_pid_load_boot(param, motor_info_storage_get());
 
 	// 各环控制周期：电流环由中断频率决定，外环按分频系数派生
 	float dt_current = 1.0f / current_freq_hz;

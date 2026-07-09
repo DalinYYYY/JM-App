@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.h
  * @brief   MotorInfo 配置参数 API 接口（1024B 整块空间）
- * @date    2026-06-30
+ * @date    2026-07-09
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -26,29 +26,29 @@ extern "C"
 #endif
 
 /* ===== 自动生成元信息 ===== */
-#define MOTOR_INFO_GEN_DATE "2026-06-30"
-#define MOTOR_INFO_PARAM_COUNT 84
+#define MOTOR_INFO_GEN_DATE      "2026-07-09"
+#define MOTOR_INFO_PARAM_COUNT   84
 #define MOTOR_INFO_VERSION_MAJOR 1
 #define MOTOR_INFO_VERSION_MINOR 0
 
 /* ===== Flash 区域布局常量 ===== */
-#define PARAM_MAGIC 0x53455256u /* "SERVO_V2" */
+#define PARAM_MAGIC     0x53455256u /* "SERVO_V2" */
 #define PARAM_AREA_SIZE 1024
 #define MAX_BLOCK_COUNT 6
 
 /* 各子块偏移/大小常量（供 Flash 读写寻址） */
-#define MOTOR_INFO_BLOCK_SYSTEMPARAM_OFFSET 0x0040u
-#define MOTOR_INFO_BLOCK_SYSTEMPARAM_SIZE 64u
-#define MOTOR_INFO_BLOCK_MOTORCALIBPARAM_OFFSET 0x0080u
-#define MOTOR_INFO_BLOCK_MOTORCALIBPARAM_SIZE 128u
-#define MOTOR_INFO_BLOCK_DEVICEPARAM_OFFSET 0x0100u
-#define MOTOR_INFO_BLOCK_DEVICEPARAM_SIZE 64u
-#define MOTOR_INFO_BLOCK_CONTROLPARAM_OFFSET 0x0140u
-#define MOTOR_INFO_BLOCK_CONTROLPARAM_SIZE 320u
-#define MOTOR_INFO_BLOCK_PROTECTCOMMPARAM_OFFSET 0x0280u
-#define MOTOR_INFO_BLOCK_PROTECTCOMMPARAM_SIZE 128u
+#define MOTOR_INFO_BLOCK_SYSTEMPARAM_OFFSET       0x0040u
+#define MOTOR_INFO_BLOCK_SYSTEMPARAM_SIZE         64u
+#define MOTOR_INFO_BLOCK_MOTORCALIBPARAM_OFFSET   0x0080u
+#define MOTOR_INFO_BLOCK_MOTORCALIBPARAM_SIZE     128u
+#define MOTOR_INFO_BLOCK_DEVICEPARAM_OFFSET       0x0100u
+#define MOTOR_INFO_BLOCK_DEVICEPARAM_SIZE         64u
+#define MOTOR_INFO_BLOCK_CONTROLPARAM_OFFSET      0x0140u
+#define MOTOR_INFO_BLOCK_CONTROLPARAM_SIZE        320u
+#define MOTOR_INFO_BLOCK_PROTECTCOMMPARAM_OFFSET  0x0280u
+#define MOTOR_INFO_BLOCK_PROTECTCOMMPARAM_SIZE    128u
 #define MOTOR_INFO_BLOCK_ADVANCEDALGOPARAM_OFFSET 0x0300u
-#define MOTOR_INFO_BLOCK_ADVANCEDALGOPARAM_SIZE 64u
+#define MOTOR_INFO_BLOCK_ADVANCEDALGOPARAM_SIZE   64u
 
 	/* ===== 全局头部与子块索引表 ===== */
 	typedef struct __ALIGNED_4
@@ -74,10 +74,10 @@ extern "C"
  */
 	typedef struct __ALIGNED_4
 	{
-		uint32_t config_version;    /* 配置版本号  [主版本:次版本(高16位.低16位) [SystemParam段0-15 本表占用0-4]] */
+		uint32_t config_version;    /* 配置版本号  [主版本.次版本(高16位.低16位) [SystemParam段0-15 本表占用0-4]] */
 		uint32_t enable_uart;       /* 接口使能  [bit0:UART bit1:CAN bit2:CANFD bit3:USB] */
 		uint32_t enable_bus_sensor; /* 总线传感器使能  [0:禁用 1:启用] */
-		uint32_t safety_limit;      /* 安全限制使能  [0:禁用 1:启用] */
+		uint32_t safety_limit;      /* 安全限制使能  [0:禁用 1:启用 调试期建议关闭] */
 		uint32_t total_runtime_s;   /* 累计运行时间 (s)  [掉电保存 运维数据 定期写入避免频繁擦写] */
 		uint32_t reserved[11];      /* 预留 44B */
 	} SystemParam_t;
@@ -89,27 +89,27 @@ extern "C"
 	typedef struct __ALIGNED_4
 	{
 		uint32_t is_calibrated;             /* 电机是否校准  [0:未校准 1:已校准 [MotorCalibParam段16-47 本表占用16-42]] */
-		uint32_t pole_pairs;                /* 电机极对数 (pairs) */
+		uint32_t pole_pairs;                /* 电机极对数 (pairs)  [电机极对数 影响电角度=机械角×极对数] */
 		uint32_t motor_type;                /* 电机类型  [0:SPMSM 1:IPMSM 2:BLDC] */
 		uint32_t direction;                 /* 电机方向  [0:正向 1:反向] */
-		float phase_resistance;             /* 相电阻 (ohm) */
-		float phase_inductance_d;           /* d轴相电感 (H) */
-		float phase_inductance_q;           /* q轴相电感 (H) */
-		float flux_linkage;                 /* 永磁体磁链 (Wb) */
-		float torque_constant;              /* 转矩常数 (Nm/A) */
-		float rotor_inertia;                /* 转子惯量 (kg·m²) */
-		float friction_coulomb;             /* 库仑摩擦力矩 (Nm) */
-		float friction_viscous;             /* 粘滞摩擦系数 (Nm/(rad/s)) */
+		float phase_resistance;             /* 相电阻 (ohm)  [标定值 电流环Ki=ωc·R依赖此值] */
+		float phase_inductance_d;           /* d轴相电感 (H)  [标定值 电流环Kp=ωc·Ld依赖此值] */
+		float phase_inductance_q;           /* q轴相电感 (H)  [标定值 IPMSM的Lq一般略大于Ld] */
+		float flux_linkage;                 /* 永磁体磁链 (Wb)  [标定值 反电势法辨识] */
+		float torque_constant;              /* 转矩常数 (Nm/A)  [标定值 速度环Kp=J·ωc/Kt依赖此值] */
+		float rotor_inertia;                /* 转子惯量 (kg·m²)  [标定值 速度环Kp/Ki依赖此值] */
+		float friction_coulomb;             /* 库仑摩擦力矩 (Nm)  [标定值 L5摩擦辨识] */
+		float friction_viscous;             /* 粘滞摩擦系数 (Nm/(rad/s))  [标定值 L5摩擦辨识] */
 		float gear_ratio;                   /* 减速比  [电机转速/输出转速] */
 		float gear_efficiency;              /* 减速器效率  [传动效率 0~1] */
-		float calibration_current;          /* 校准电流 (A)  [电阻电感校准电流] */
-		float resistance_calib_max_voltage; /* 电阻校准最大电压 (V) */
-		float current_lim;                  /* 峰值电流限制 (A) */
-		float current_control_bandwidth;    /* 电流环带宽 (Hz) */
+		float calibration_current;          /* 校准电流 (A)  [R/L标定施加电流 注意发热] */
+		float resistance_calib_max_voltage; /* 电阻校准最大电压 (V)  [R标定电压限幅 防过流] */
+		float current_lim;                  /* 峰值电流限制 (A)  [硬件保护 瞬时最大电流] */
+		float current_control_bandwidth;    /* 电流环带宽 (Hz)  [autotune用此值算电流环PID] */
 		uint32_t enc_type;                  /* 编码器类型  [1:MT6701 2:MT6835 0:ABZ增量 3:霍尔 同板可换] */
 		uint32_t enc_lines;                 /* 编码器分辨率 (CPR)  [SPI绝对值为分辨率 增量式为CPR] */
 		int32_t enc_direction;              /* 编码器计数方向  [1:正向 -1:反向] */
-		float enc_offset;                   /* 编码器初始位置偏移 (deg)    [校准后保存] */
+		float enc_offset;                   /* 编码器初始位置偏移 (deg)  [校准后保存 机械零点偏移] */
 		float elec_angle_bias;              /* 电角度偏移 (rad)  [FOC换相必需 校准后保存 最关键] */
 		uint32_t pwm_freq_hz;               /* PWM载波频率 (Hz)  [不同功率器件可能不同] */
 		float dead_time_ns;                 /* PWM死区时间 (ns)  [不同功率器件可能不同] */
@@ -141,28 +141,28 @@ extern "C"
  */
 	typedef struct __ALIGNED_4
 	{
-		float kp_ld;                     /* d轴比例增益 (V/A)  [电流环d轴P增益 [ControlParam段64-127 本表占用64-85]] */
-		float ki_ld;                     /* d轴积分增益 (V/(A·s))  [电流环d轴I增益] */
-		float kp_lq;                     /* q轴比例增益 (V/A)  [电流环q轴P增益] */
-		float ki_lq;                     /* q轴积分增益 (V/(A·s))  [电流环q轴I增益] */
-		float integral_limit;            /* 积分限幅 (V)  [电流环积分输出限幅] */
-		float decoupling_gain;           /* dq轴解耦增益  [0~1] */
-		float comp_du_V;                 /* 死区补偿电压 (V) */
-		float pwm_duty_max;              /* PWM最大占空比  [0~1] */
-		float kp_s;                      /* 速度环比例增益 (A/(rad/s)) */
-		float ki_s;                      /* 速度环积分增益 (A/rad) */
-		float speed_integral_limit;      /* 速度环积分限幅 (A) */
-		float vff;                       /* 速度前馈系数  [0~1] */
-		float aff;                       /* 加速度前馈系数  [0~1] */
-		float jerk_ff;                   /* 加加速度前馈系数  [0~1] */
-		float speed_filter_alpha;        /* 速度滤波系数  [一阶低通滤波系数] */
+		float kp_ld;                     /* d轴比例增益 (V/A)  [电流环d轴P增益 autotune默认Kp=ωc·Ld [ControlParam段64-127 本表占用64-85]] */
+		float ki_ld;                     /* d轴积分增益 (V/(A·s))  [电流环d轴I增益 autotune默认Ki=ωc·R] */
+		float kp_lq;                     /* q轴比例增益 (V/A)  [电流环q轴P增益 autotune默认Kp=ωc·Lq] */
+		float ki_lq;                     /* q轴积分增益 (V/(A·s))  [电流环q轴I增益 autotune默认Ki=ωc·R] */
+		float integral_limit;            /* 积分限幅 (V)  [电流环积分输出限幅 建议Kp_q×额定电流×1.5 与motor_param.c默认值对齐] */
+		float decoupling_gain;           /* dq轴解耦增益  [0~1 调试期可适当增大观察效果] */
+		float comp_du_V;                 /* 死区补偿电压 (V)  [死区非线性补偿电压] */
+		float pwm_duty_max;              /* PWM最大占空比  [0~1 防过调制] */
+		float kp_s;                      /* 速度环比例增益 (A/(rad/s))  [速度环P增益 autotune默认Kp=J·ωc/Kt] */
+		float ki_s;                      /* 速度环积分增益 (A/rad)  [速度环I增益 autotune默认Ki=J·ωc²/(4·Kt)] */
+		float speed_integral_limit;      /* 速度环积分限幅 (A)  [建议额定电流×0.5] */
+		float vff;                       /* 速度前馈系数  [0~1 调试期可适当增大] */
+		float aff;                       /* 加速度前馈系数  [0~1 加速度前馈] */
+		float jerk_ff;                   /* 加加速度前馈系数  [0~1 加加速度前馈] */
+		float speed_filter_alpha;        /* 速度滤波系数  [一阶低通滤波系数 越大滤波越弱] */
 		uint32_t speed_filter_enable;    /* 速度滤波使能  [0:禁用 1:启用] */
-		float kp_p;                      /* 位置环比例增益 (Hz) */
-		float ki_p;                      /* 位置环积分增益 (1/s) */
-		float position_integral_limit;   /* 位置环积分限幅 (rad) */
+		float kp_p;                      /* 位置环比例增益 (Hz)  [位置环P增益 autotune默认Kp=2π·f] */
+		float ki_p;                      /* 位置环积分增益 (1/s)  [位置环I增益 一般为0] */
+		float position_integral_limit;   /* 位置环积分限幅 (rad)  [位置环积分输出限幅] */
 		float position_filter_alpha;     /* 位置滤波系数  [一阶低通滤波系数] */
 		uint32_t position_filter_enable; /* 位置滤波使能  [0:禁用 1:启用] */
-		float following_error_limit;     /* 跟随误差限制 (P)  [位置跟随误差保护阈值] */
+		float following_error_limit;     /* 跟随误差限制 (P)  [位置跟随误差保护阈值 调试期建议放大] */
 		uint32_t reserved[58];           /* 预留 232B */
 	} ControlParam_t;
 
@@ -617,13 +617,13 @@ extern "C"
 	int motor_info_set_enc_direction(motor_info_t *cfg, int32_t value);
 
 	/**
- * @brief   读取 编码器初始位置偏移 (counts)
+ * @brief   读取 编码器初始位置偏移 (deg)
  * @param   cfg 参数区指针
  * @return  编码器初始位置偏移
  */
 	float motor_info_get_enc_offset(const motor_info_t *cfg);
 	/**
- * @brief   设置 编码器初始位置偏移 (counts)
+ * @brief   设置 编码器初始位置偏移 (deg)
  * @param   cfg 参数区指针
  * @param   value 要设置的值
  * @return  0=成功, -EINVAL=空指针或越界
@@ -1444,10 +1444,10 @@ extern "C"
  * @brief   协议分发表 (param_id -> get/set), 供 0xE6-0xEB 单参读写
  ******************************************************************************/
 /* dispatch 返回码 */
-#define MOTOR_INFO_DISPATCH_OK 0
+#define MOTOR_INFO_DISPATCH_OK       0
 #define MOTOR_INFO_DISPATCH_E_BAD_ID -1
 #define MOTOR_INFO_DISPATCH_E_BOUNDS -2
-#define MOTOR_INFO_DISPATCH_E_RO -3
+#define MOTOR_INFO_DISPATCH_E_RO     -3
 
 	/**
  * @brief 按 param_id 读单个参数, 值写入 out4(固定4B, 零填充)
