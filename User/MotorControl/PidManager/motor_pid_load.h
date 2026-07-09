@@ -30,6 +30,7 @@ typedef enum
 	PID_SOURCE_DEFAULT = 0,  /* 用 motor_param.c 默认值（不覆盖 motor_param_t） */
 	PID_SOURCE_FLASH = 1,    /* 用 Flash 中 ControlParam_t 工程调试值 */
 	PID_SOURCE_AUTOTUNE = 2, /* 用理论估计值（零极点对消法，已写入 ControlParam_t） */
+	PID_SOURCE_DEBUG = 3,    /* 调试值：直接用 0xA5 下发的参数（不持久化，不覆盖 profile） */
 } pid_source_e;
 
 /**
@@ -88,5 +89,53 @@ void motor_pid_set_source(pid_ring_e ring, pid_source_e src);
  * @return 当前 source 值
  */
 pid_source_e motor_pid_get_source(pid_ring_e ring);
+
+/**
+ * @brief  从 Flash 加载三环 source（上电时调用）
+ * @param  info  Flash 加载的 motor_info_t
+ * @note   读取 ControlParam.pid_source_mask，非 DEFAULT 值覆盖 load_boot 的自动回退。
+ *         source=DEFAULT 的环保留 load_boot 的自动回退结果。
+ *         调用后需再调 motor_pid_load() 按 source 重新加载参数。
+ */
+void motor_pid_load_source_from_flash(const motor_info_t *info);
+
+/* ===================== pid_source_mask 位域访问 ===================== */
+/* mask 布局: bit[3:0]=电流环 bit[7:4]=速度环 bit[11:8]=位置环 */
+#define PID_SRC_CUR_SHIFT  0u
+#define PID_SRC_VEL_SHIFT  4u
+#define PID_SRC_POS_SHIFT  8u
+#define PID_SRC_FIELD_MASK 0xFu
+
+/**
+ * @brief  从 mask 提取指定环 source
+ */
+static inline pid_source_e pid_source_from_mask(uint32_t mask, pid_ring_e ring)
+{
+	uint8_t s;
+	switch (ring)
+	{
+		case PID_RING_CURRENT:  s = (uint8_t)((mask >> PID_SRC_CUR_SHIFT) & PID_SRC_FIELD_MASK); break;
+		case PID_RING_VELOCITY: s = (uint8_t)((mask >> PID_SRC_VEL_SHIFT) & PID_SRC_FIELD_MASK); break;
+		case PID_RING_POSITION: s = (uint8_t)((mask >> PID_SRC_POS_SHIFT) & PID_SRC_FIELD_MASK); break;
+		default: return PID_SOURCE_DEFAULT;
+	}
+	return (s <= (uint8_t)PID_SOURCE_DEBUG) ? (pid_source_e)s : PID_SOURCE_DEFAULT;
+}
+
+/**
+ * @brief  把指定环 source 写入 mask 对应位段，返回新 mask
+ */
+static inline uint32_t pid_source_to_mask(uint32_t mask, pid_ring_e ring, pid_source_e src)
+{
+	uint32_t shift;
+	switch (ring)
+	{
+		case PID_RING_CURRENT:  shift = PID_SRC_CUR_SHIFT; break;
+		case PID_RING_VELOCITY: shift = PID_SRC_VEL_SHIFT; break;
+		case PID_RING_POSITION: shift = PID_SRC_POS_SHIFT; break;
+		default: return mask;
+	}
+	return (mask & ~(PID_SRC_FIELD_MASK << shift)) | ((uint32_t)src << shift);
+}
 
 #endif /* __MOTOR_PID_LOAD_H__ */

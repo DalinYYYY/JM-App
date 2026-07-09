@@ -210,3 +210,91 @@ float motor_pid_profile_calculate_with_ff(pid_state_t *state, motor_pid_profile_
 
 	return pid_core_calculate_with_ff(state, param, target, actual, feedforward, dt);
 }
+
+/* ==================== 0xA5/0xA6 单字段读写 API ==================== */
+
+int motor_pid_profile_set_param(uint8_t id, uint8_t param_type, const uint8_t *value4)
+{
+	if (id >= MOTOR_PID_PROFILE_MAX || value4 == NULL)
+		return -1;
+
+	pid_param_t *p = &s_motor_pid_profiles[id].param;
+	float fv;
+
+	switch (param_type)
+	{
+		case 1: /* kp */
+			memcpy(&fv, value4, 4);
+			p->kp = fv;
+			break;
+		case 2: /* ki */
+			memcpy(&fv, value4, 4);
+			p->ki = fv;
+			break;
+		case 3: /* kd */
+			memcpy(&fv, value4, 4);
+			p->kd = fv;
+			break;
+		case 4: /* output_limit */
+			memcpy(&fv, value4, 4);
+			p->output_limit = fv;
+			break;
+		case 5: /* integral_limit */
+			memcpy(&fv, value4, 4);
+			p->integral_limit = fv;
+			break;
+		case 6: /* output_filter_alpha */
+			memcpy(&fv, value4, 4);
+			p->output_filter_alpha = fv;
+			break;
+		case 7: /* flags */
+			memcpy(&p->flags, value4, 4);
+			break;
+		default:
+			return -1;
+	}
+	return 0;
+}
+
+int motor_pid_profile_get_param(uint8_t id, uint8_t param_type, uint8_t *out_value4)
+{
+	if (id >= MOTOR_PID_PROFILE_MAX || out_value4 == NULL)
+		return -1;
+
+	const pid_param_t *p = &s_motor_pid_profiles[id].param;
+	float fv;
+
+	switch (param_type)
+	{
+		case 1: /* kp */
+			fv = p->kp;
+			memcpy(out_value4, &fv, 4);
+			break;
+		case 2: /* ki */
+			fv = p->ki;
+			memcpy(out_value4, &fv, 4);
+			break;
+		case 3: /* kd */
+			fv = p->kd;
+			memcpy(out_value4, &fv, 4);
+			break;
+		case 4: /* output_limit */
+			fv = p->output_limit;
+			memcpy(out_value4, &fv, 4);
+			break;
+		case 5: /* integral_limit */
+			fv = p->integral_limit;
+			memcpy(out_value4, &fv, 4);
+			break;
+		case 6: /* output_filter_alpha */
+			fv = p->output_filter_alpha;
+			memcpy(out_value4, &fv, 4);
+			break;
+		case 7: /* flags */
+			memcpy(out_value4, &p->flags, 4);
+			break;
+		default:
+			return -1;
+	}
+	return 0;
+}

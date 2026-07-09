@@ -64,6 +64,29 @@ void motor_pid_profile_load_from_motor_param(const motor_param_t *motor_param);
  */
 void motor_pid_profile_save_to_motor_param(motor_param_t *motor_param);
 
+/* ==================== 0xA5/0xA6 单字段读写 API ==================== */
+/* param_type: 1=kp 2=ki 3=kd 4=output_limit 5=integral_limit 6=output_filter_alpha 7=flags
+ * value4 为 4 字节小端, float 字段按 memcpy 转换, flags 为 uint32_t 直传。
+ * 0xA5(写)仅 DEBUG source 下调用; 0xA6(读)随时可调。 */
+
+/**
+ * @brief  按参数类型写入单个 PID 参数 (0xA5 调用)
+ * @param  id          profile ID (0=D轴 1=Q轴 2=速度 3=位置)
+ * @param  param_type  参数类型 (1~7)
+ * @param  value4      4 字节小端值指针
+ * @return 0=成功 -1=参数非法
+ */
+int motor_pid_profile_set_param(uint8_t id, uint8_t param_type, const uint8_t *value4);
+
+/**
+ * @brief  按参数类型读取单个 PID 参数 (0xA6 调用)
+ * @param  id          profile ID (0=D轴 1=Q轴 2=速度 3=位置)
+ * @param  param_type  参数类型 (1~7)
+ * @param  out_value4  输出 4 字节小端值
+ * @return 0=成功 -1=参数非法
+ */
+int motor_pid_profile_get_param(uint8_t id, uint8_t param_type, uint8_t *out_value4);
+
 /**
  * @brief 恢复指定配置文件的默认值
  * @param id 配置文件ID

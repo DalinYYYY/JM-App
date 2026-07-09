@@ -201,7 +201,7 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 }
 
 /* ============================================================================
- *  1b) PID 理论估计: CMD 0x9A  ->  pid_autotune
+ *  1b) PID 理论估计: CMD 0xA0  ->  pid_autotune
  *      基于辨识参数(R/L)用零极点对消法计算三环PID, 写入 ControlParam_t,
  *      按 ring_select 自动设 source=AUTOTUNE 并 reload。仅 IDLE 态可执行。
  * ==========================================================================*/
@@ -267,8 +267,9 @@ static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw
 }
 
 /* ============================================================================
- *  1c) PID 来源切换: CMD 0x9B  ->  pid_source_set
- *      独立设置某环参数来源(默认/Flash/理论估计), 立即 reload。仅 IDLE 态可执行。
+ *  1c) PID 来源切换: CMD 0xA1  ->  pid_source_set
+ *      独立设置某环参数来源(默认/Flash/理论估计/调试), 立即 reload。仅 IDLE 态可执行。
+ *      source=3(DEBUG) 不持久化到 pid_source_mask, 重启自动消失。
  * ==========================================================================*/
 static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 {
@@ -278,17 +279,98 @@ static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 		return JM_ERR_STATE_DENY;
 	}
 
-	/* 参数范围检查 */
-	if (ring_select > 2 || source > 2)
+	/* 参数范围检查: ring_select 0=电流 1=速度 2=位置, source 0~3 */
+	if (ring_select > 2 || source > (uint8_t)PID_SOURCE_DEBUG)
 	{
 		return JM_ERR_OUT_OF_RANGE;
 	}
 
-	/* 调用 PidManager API 设置 source(不写 motor_info) */
+	/* 调用 PidManager API 设置 source */
 	motor_pid_set_source((pid_ring_e)ring_select, (pid_source_e)source);
+
+	/* 同步写入 Flash 持久化字段 pid_source_mask（RAM，由 0xEA 固化）
+	 * DEBUG 不持久化: 重启自动回 DEFAULT/FLASH/AUTOTUNE */
+	if (source != (uint8_t)PID_SOURCE_DEBUG)
+	{
+		motor_info_t *info = motor_info_storage_get();
+		uint32_t mask = info->blocks.control.pid_source_mask;
+		mask = pid_source_to_mask(mask, (pid_ring_e)ring_select, (pid_source_e)source);
+		info->blocks.control.pid_source_mask = mask;
+	}
 
 	/* 立即 reload 生效 */
 	motor_pid_reload();
+
+	return JM_ERR_OK;
+}
+
+/* ----------------------------------------------------------------------------
+ *  1d) PID 来源查询: CMD 0xA2  ->  pid_source_get
+ *      返回三环当前 source 状态 (3字节: cur/vel/pos)
+ * ==========================================================================*/
+static jm_err_e app_pid_source_get(uint8_t *out_cur, uint8_t *out_vel, uint8_t *out_pos)
+{
+	if (out_cur == NULL || out_vel == NULL || out_pos == NULL)
+	{
+		return JM_ERR_BAD_PARAM;
+	}
+	*out_cur = (uint8_t)motor_pid_get_source(PID_RING_CURRENT);
+	*out_vel = (uint8_t)motor_pid_get_source(PID_RING_VELOCITY);
+	*out_pos = (uint8_t)motor_pid_get_source(PID_RING_POSITION);
+	return JM_ERR_OK;
+}
+
+/* ----------------------------------------------------------------------------
+ *  1e) PID 参数实时写: CMD 0xA5  ->  pid_param_set
+ *      仅 DEBUG source 下允许写, 直接写 s_motor_pid_profiles, ISR 下一拍生效。
+ *      ring: 0=D轴 1=Q轴 2=速度 3=位置
+ *      param_type: 1=kp 2=ki 3=kd 4=output_limit 5=integral_limit 6=output_filter_alpha 7=flags
+ * ==========================================================================*/
+static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type, const uint8_t *value4)
+{
+	if (value4 == NULL || ring > 3 || param_type < 1 || param_type > 7)
+	{
+		return JM_ERR_OUT_OF_RANGE;
+	}
+
+	/* 检查对应环是否处于 DEBUG 模式 */
+	pid_ring_e src_ring;
+	if (ring <= 1)
+		src_ring = PID_RING_CURRENT;      /* D轴/Q轴 → 电流环 */
+	else if (ring == 2)
+		src_ring = PID_RING_VELOCITY;
+	else
+		src_ring = PID_RING_POSITION;
+
+	if (motor_pid_get_source(src_ring) != PID_SOURCE_DEBUG)
+	{
+		return JM_ERR_STATE_DENY;
+	}
+
+	/* 直接写 s_motor_pid_profiles, ISR 下一拍生效 */
+	if (motor_pid_profile_set_param(ring, param_type, value4) != 0)
+	{
+		return JM_ERR_OUT_OF_RANGE;
+	}
+
+	return JM_ERR_OK;
+}
+
+/* ----------------------------------------------------------------------------
+ *  1f) PID 参数实时读: CMD 0xA6  ->  pid_param_get
+ *      随时可读, 返回当前 profile 中的值 (4字节)。
+ * ==========================================================================*/
+static jm_err_e app_pid_param_get(uint8_t ring, uint8_t param_type, uint8_t *out_value4)
+{
+	if (out_value4 == NULL || ring > 3 || param_type < 1 || param_type > 7)
+	{
+		return JM_ERR_OUT_OF_RANGE;
+	}
+
+	if (motor_pid_profile_get_param(ring, param_type, out_value4) != 0)
+	{
+		return JM_ERR_OUT_OF_RANGE;
+	}
 
 	return JM_ERR_OK;
 }
@@ -924,9 +1006,12 @@ static const jm_proto_ops_t s_app_ops = {
 	.motor_info_read_bulk = app_motor_info_read_bulk,
 	.motor_info_write_bulk = app_motor_info_write_bulk,
 	.motor_info_reset = app_motor_info_reset,
-	/* PID 管理 0x9A~0x9B */
+	/* PID 管理 0xA0~0xA6 */
 	.pid_autotune = app_pid_autotune,
 	.pid_source_set = app_pid_source_set,
+	.pid_source_get = app_pid_source_get,
+	.pid_param_set = app_pid_param_set,
+	.pid_param_get = app_pid_param_get,
 };
 
 const jm_proto_ops_t *jm_app_ops_get(void)

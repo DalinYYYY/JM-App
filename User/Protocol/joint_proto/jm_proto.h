@@ -135,7 +135,7 @@ extern "C"
 		 * 重启后由 CAN 绑定层加载生效。可为 NULL(回 NACK)。*/
 		jm_err_e (*set_baudrate)(uint8_t baud_code);
 
-		/* PID 理论估计(CMD 0x9A): 基于辨识参数计算三环PID写入ControlParam_t,
+		/* PID 理论估计(CMD 0xA0): 基于辨识参数计算三环PID写入ControlParam_t,
 		 * 自动设 source=AUTOTUNE 并 reload。仅IDLE态可执行。
 		 * ring_select: 0=电流环 1=速度环 2=位置环 3=全部三环
 		 * cur_bw/vel_bw/pos_bw: 各环带宽Hz, <=0用推荐默认值
@@ -144,11 +144,26 @@ extern "C"
 		jm_err_e (*pid_autotune)(uint8_t ring_select, float cur_bw, float vel_bw, float pos_bw,
 		                         uint8_t *out_fail_reason);
 
-		/* PID 来源切换(CMD 0x9B): 独立设置某环参数来源, 立即 reload。仅IDLE态可执行。
+		/* PID 来源切换(CMD 0xA1): 独立设置某环参数来源, 立即 reload。仅IDLE态可执行。
 		 * ring_select: 0=电流环 1=速度环 2=位置环
-		 * source: 0=默认 1=Flash工程值 2=理论估计
+		 * source: 0=默认 1=Flash工程值 2=理论估计 3=调试
 		 * 返回 JM_ERR_OK 成功, 其余失败。可为 NULL(回 NACK)。*/
 		jm_err_e (*pid_source_set)(uint8_t ring_select, uint8_t source);
+
+		/* PID 来源查询(CMD 0xA2): 读取三环当前 source 状态。
+		 * 输出 3 字节: cur_src/vel_src/pos_src (0=默认 1=Flash 2=理论估计 3=调试)
+		 * 返回 JM_ERR_OK 成功, 其余失败。可为 NULL(回 NACK)。*/
+		jm_err_e (*pid_source_get)(uint8_t *out_cur, uint8_t *out_vel, uint8_t *out_pos);
+
+		/* PID 参数实时写(CMD 0xA5): 仅 DEBUG source 下允许写, 直接写 profile。
+		 * ring: 0=D轴 1=Q轴 2=速度 3=位置; param_type: 1=kp 2=ki 3=kd
+		 * 4=output_limit 5=integral_limit 6=output_filter_alpha 7=flags
+		 * value4: 4字节小端值。可为 NULL(回 NACK)。*/
+		jm_err_e (*pid_param_set)(uint8_t ring, uint8_t param_type, const uint8_t *value4);
+
+		/* PID 参数实时读(CMD 0xA6): 随时可读, 返回当前 profile 中的值(4字节)。
+		 * ring/param_type 同 0xA5。可为 NULL(回 NACK)。*/
+		jm_err_e (*pid_param_get)(uint8_t ring, uint8_t param_type, uint8_t *out_value4);
 	} jm_proto_ops_t;
 
 	/* ---------------- 协议实例 ---------------- */

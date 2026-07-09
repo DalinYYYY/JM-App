@@ -28,6 +28,20 @@ pid_source_e motor_pid_get_source(pid_ring_e ring)
 	return (ring < PID_RING_MAX) ? s_ring_source[ring] : PID_SOURCE_DEFAULT;
 }
 
+void motor_pid_load_source_from_flash(const motor_info_t *info)
+{
+	if (info == NULL) return;
+
+	uint32_t mask = info->blocks.control.pid_source_mask;
+	/* 非 DEFAULT 值表示用户曾显式选择，覆盖 load_boot 的自动回退结果 */
+	pid_source_e cur = pid_source_from_mask(mask, PID_RING_CURRENT);
+	pid_source_e vel = pid_source_from_mask(mask, PID_RING_VELOCITY);
+	pid_source_e pos = pid_source_from_mask(mask, PID_RING_POSITION);
+	if (cur != PID_SOURCE_DEFAULT) s_ring_source[PID_RING_CURRENT]  = cur;
+	if (vel != PID_SOURCE_DEFAULT) s_ring_source[PID_RING_VELOCITY] = vel;
+	if (pos != PID_SOURCE_DEFAULT) s_ring_source[PID_RING_POSITION] = pos;
+}
+
 void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 {
 	if (param == NULL || info == NULL)
@@ -48,6 +62,9 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 			param->current_loop.current_ki_q = ctl->ki_lq;
 			param->current_loop.current_integral_limit = ctl->integral_limit;
 			break;
+		case PID_SOURCE_DEBUG:
+			/* 不覆盖 motor_param_t，保留 0xA5 直接写入 s_motor_pid_profiles 的值 */
+			break;
 		case PID_SOURCE_DEFAULT:
 		default:
 			/* 保留 motor_param_init/motor_profile 的默认值，不覆盖 */
@@ -63,6 +80,9 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 			param->position_loop.speed_ki = ctl->ki_s;
 			param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
 			break;
+		case PID_SOURCE_DEBUG:
+			/* 不覆盖 motor_param_t，保留 0xA5 直接写入 s_motor_pid_profiles 的值 */
+			break;
 		case PID_SOURCE_DEFAULT:
 		default:
 			break;
@@ -75,6 +95,9 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 		case PID_SOURCE_AUTOTUNE:
 			param->position_loop.position_kp = ctl->kp_p;
 			param->position_loop.position_integral_limit = ctl->position_integral_limit;
+			break;
+		case PID_SOURCE_DEBUG:
+			/* 不覆盖 motor_param_t，保留 0xA5 直接写入 s_motor_pid_profiles 的值 */
 			break;
 		case PID_SOURCE_DEFAULT:
 		default:

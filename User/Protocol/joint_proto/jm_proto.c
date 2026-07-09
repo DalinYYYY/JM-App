@@ -543,7 +543,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		return JM_ERR_OK;
 	}
 
-	/* PID 理论估计 0x9A: 触发 autotune 计算 + 自动设 source=2 + reload。
+	/* PID 理论估计 0xA0: 触发 autotune 计算 + 自动设 source=2 + reload。
 	 * ACK: 8字节 {status, fail_reason, ring_select_done, reserved[5]} */
 	if (cmd == JM_CMD_PID_AUTOTUNE)
 	{
@@ -575,7 +575,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 	}
 
-	/* PID 来源切换 0x9B: 独立设置某环 source, 立即 reload。简单 ACK。*/
+	/* PID 来源切换 0xA1: 独立设置某环 source, 立即 reload。简单 ACK。*/
 	if (cmd == JM_CMD_PID_SOURCE_SET)
 	{
 		uint8_t ring_select, source;
@@ -593,6 +593,78 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		source = payload[1];
 		e = proto->ops->pid_source_set(ring_select, source);
 		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
+	/* PID 来源查询 0xA2: 返回三环当前 source (3字节: cur/vel/pos) */
+	if (cmd == JM_CMD_PID_SOURCE_GET)
+	{
+		uint8_t o[3];
+		jm_err_e e;
+		if (proto->ops == NULL || proto->ops->pid_source_get == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		e = proto->ops->pid_source_get(&o[0], &o[1], &o[2]);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		reply_set(proto, cmd, o, 3);
+		return JM_ERR_OK;
+	}
+
+	/* PID 参数实时写 0xA5: 仅 DEBUG source 下允许, 直接写 profile, ISR 下一拍生效。
+	 * 载荷: ring(1) + param_type(1) + value(4)  = 6 字节
+	 * ACK: {status:u8}  0=成功, 失败走 NACK */
+	if (cmd == JM_CMD_PID_PARAM_SET)
+	{
+		uint8_t ring, param_type;
+		jm_err_e e;
+
+		if (len < 6) /* ring(1) + param_type(1) + value(4) */
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->pid_param_set == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		ring = payload[0];
+		param_type = payload[1];
+		e = proto->ops->pid_param_set(ring, param_type, &payload[2]);
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
+	/* PID 参数实时读 0xA6: 随时可读, 返回当前 profile 中的值。
+	 * 载荷: ring(1) + param_type(1) = 2 字节
+	 * 应答: {ring:u8, param_type:u8, value:4B} = 6 字节 */
+	if (cmd == JM_CMD_PID_PARAM_GET)
+	{
+		uint8_t ring, param_type;
+		uint8_t value4[4];
+		uint8_t body[6];
+		jm_err_e e;
+
+		if (len < 2) /* ring(1) + param_type(1) */
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->pid_param_get == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		ring = payload[0];
+		param_type = payload[1];
+		e = proto->ops->pid_param_get(ring, param_type, value4);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		body[0] = ring;
+		body[1] = param_type;
+		memcpy(&body[2], value4, 4);
+		reply_set(proto, cmd, body, 6);
+		return JM_ERR_OK;
 	}
 
 	/* 其余 0x00~0xB8 控制/校准/诊断类: 统一交给 set_mode 回调,
