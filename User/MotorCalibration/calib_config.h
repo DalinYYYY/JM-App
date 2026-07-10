@@ -31,12 +31,17 @@
 
 /* ===================== L2 电机电气身份参数（从 MOTOR_* 派生）===================== */
 
-/* R 辨识（DC 法）
- * 测试电压 = 测试电流 × R；稳态等待 = 750τ（充分稳定）*/
-#define CALIB_CFG_L2_R_TEST_VOLTAGE_V (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
+/* R 辨识（两点差分法 R = ΔV/Δid）
+ * 命令电压经死区/MOSFET-Rds/体二极管压降后，实际相压 < 命令值，且这些损耗
+ * 近似为"恒定压降 V_loss"。单点 R=V/id 把命令值当实际值，会把 R 系统性抬高。
+ * 两点法在两个不同电流点各测稳态 (V,id)，R=(V2-V1)/(id2-id1)，相减即抵消 V_loss，
+ * 得到不受命令电压绝对精度影响的斜率。高档 V2 保持原测试电压，低档 V1 取其 40%。
+ * 稳态等待 = 750τ（充分稳定）*/
+#define CALIB_CFG_L2_R_TEST_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)        /* 高档 V2 */
+#define CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.4f)     /* 低档 V1 */
 #define CALIB_CFG_L2_R_TEST_TIME_S    (MOTOR_TAU_S * 750.0f)
 #define CALIB_CFG_L2_R_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_R_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_R_SAMPLE_COUNT   2000 /* 稳态采样次数 */
+#define CALIB_CFG_L2_R_SAMPLE_COUNT   2000 /* 每档稳态采样次数 */
 
 /* Ld 辨识（d 轴阶跃响应）
  * 阶跃电压 = R 测试电压 × 1.3（需更高电压产生 di/dt）

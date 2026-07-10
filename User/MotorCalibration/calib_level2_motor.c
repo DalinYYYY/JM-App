@@ -36,14 +36,20 @@ static struct
 	float accum_mech_deg;       /* 极对数扫描：连续累加的机械角(deg，跨 360° 不 wrap)*/
 	float prev_mech_deg;        /* 极对数扫描：上一 tick 机械角原始读数(deg，用于差分)*/
 	float test_voltage;         /* 本次施加的测试电压（R/Ld/Lq/flux 算结果时用）*/
+	float r_id_low;             /* R 两点差分法：低电压档稳态 id 均值（高档采样时暂存）*/
 } s_l2;
 
-/* ===================== R 辨识（DC 法）=====================
- * STEP 0: 施加 ud DC 电压（theta=0 锁定转子 d 轴）
- * STEP 1: 等待稳态（CALIB_CFG_L2_R_TEST_TICKS）
- * STEP 2: 多次采样 id 取平均
- * STEP 3: R = ud / id_avg，校验后写入 motor_param，完成
- * ========================================================= */
+/* ===================== R 辨识（两点差分法 R = ΔV/Δid）=====================
+ * 单点 R=V/id 把命令电压当实际相压，会被死区/MOSFET-Rds/体二极管的恒定压降
+ * V_loss 系统性抬高（低测试电压下占比大）。本法在两个电流点各测稳态，相减
+ * 抵消 V_loss：R = (V2 - V1) / (id2 - id1)。
+ *
+ * STEP 0: 进入会话，施加低档电压 V1（theta=0 锁定 d 轴）
+ * STEP 1: 等待 V1 稳态
+ * STEP 2: 低档多次采样 id 取均值 → 暂存 r_id_low，切到高档 V2
+ * STEP 3: 等待 V2 稳态
+ * STEP 4: 高档多次采样 id 取均值 id2，R=(V2-V1)/(id2-r_id_low)，校验写入
+ * ========================================================================= */
 static calib_state_e poll_resistance(void)
 {
 	const calib_io_t *io = calib_mgr_get_io();
@@ -51,16 +57,16 @@ static calib_state_e poll_resistance(void)
 
 	switch (s_l2.step.cur)
 	{
-		case 0: /* 进入标定会话，施加 DC 电压 */
+		case 0: /* 进入会话，施加低档电压 V1 */
 			calib_hw_enter(&s_l2.session, m);
-			s_l2.test_voltage = CALIB_CFG_L2_R_TEST_VOLTAGE_V;
+			s_l2.test_voltage = CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V;
 			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
 			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
 			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
-		case 1: /* 等待稳态 */
+		case 1: /* 等待 V1 稳态 */
 			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
 			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_R_TEST_TICKS))
 				return CALIB_STATE_RUNNING;
@@ -68,13 +74,12 @@ static calib_state_e poll_resistance(void)
 			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
-		case 2: /* 多次采样 id */
+		case 2: /* 低档采样 id → 均值暂存，切高档 V2 */
 		{
 			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
 			m->foc.clarke(&m->foc); /* 刷新 i_alphaBeta（内部调 current_callback）*/
 			m->foc.park(&m->foc);   /* 刷新 i_dq */
 			float id = m->foc.i_dq.d;
-			/* 过滤异常值（NaN/过大）*/
 			if (!isfinite(id) || id < 0.001f)
 			{
 				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
@@ -84,15 +89,51 @@ static calib_state_e poll_resistance(void)
 			calib_step_accumulate(&s_l2.step, id);
 			if (s_l2.step.sample_cnt < CALIB_CFG_L2_R_SAMPLE_COUNT)
 				return CALIB_STATE_RUNNING;
+			s_l2.r_id_low = calib_step_average(&s_l2.step); /* 暂存 V1 档 id 均值 */
+			s_l2.step.sample_cnt = 0;                       /* 复位累加器供高档复用 */
+			s_l2.step.sample_sum = 0.0f;
+			s_l2.test_voltage = CALIB_CFG_L2_R_TEST_VOLTAGE_V; /* 切到高档 V2 */
+			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
 			calib_step_next(&s_l2.step, 3);
 			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 		}
 
-		case 3: /* 计算 R，校验，写入 */
+		case 3: /* 等待 V2 稳态 */
+			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
+			if (calib_step_wait(&s_l2.step, CALIB_CFG_L2_R_TEST_TICKS))
+				return CALIB_STATE_RUNNING;
+			calib_step_next(&s_l2.step, 4);
+			calib_mgr_set_step(4);
+			return CALIB_STATE_RUNNING;
+
+		case 4: /* 高档采样 id2，两点差分算 R，校验写入 */
 		{
-			float id_avg = calib_step_average(&s_l2.step);
-			float R = s_l2.test_voltage / id_avg;
+			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
+			m->foc.clarke(&m->foc);
+			m->foc.park(&m->foc);
+			float id = m->foc.i_dq.d;
+			if (!isfinite(id) || id < 0.001f)
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
+				calib_hw_exit(&s_l2.session);
+				return CALIB_STATE_FAILED;
+			}
+			calib_step_accumulate(&s_l2.step, id);
+			if (s_l2.step.sample_cnt < CALIB_CFG_L2_R_SAMPLE_COUNT)
+				return CALIB_STATE_RUNNING;
+
+			float id_high = calib_step_average(&s_l2.step);
+			float d_id = id_high - s_l2.r_id_low;
+			float d_v = CALIB_CFG_L2_R_TEST_VOLTAGE_V - CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V;
+			/* Δid 过小则差分放大噪声，判为异常 */
+			if (!isfinite(d_id) || d_id < 0.001f)
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
+				calib_hw_exit(&s_l2.session);
+				return CALIB_STATE_FAILED;
+			}
+			float R = d_v / d_id;
 			if (!calib_validate_r(R))
 			{
 				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
