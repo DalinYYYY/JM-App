@@ -36,7 +36,7 @@
 #define CALIB_CFG_L2_R_TEST_VOLTAGE_V (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
 #define CALIB_CFG_L2_R_TEST_TIME_S    (MOTOR_TAU_S * 750.0f)
 #define CALIB_CFG_L2_R_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_R_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_R_SAMPLE_COUNT   200 /* 稳态采样次数 */
+#define CALIB_CFG_L2_R_SAMPLE_COUNT   2000 /* 稳态采样次数 */
 
 /* Ld 辨识（d 轴阶跃响应）
  * 阶跃电压 = R 测试电压 × 1.3（需更高电压产生 di/dt）

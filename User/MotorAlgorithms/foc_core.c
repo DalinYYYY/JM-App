@@ -141,6 +141,22 @@ static void foc_svpwm(struct foc *pobj)
 	pobj->svpwm.u_alpha = pobj->u_alphaBeta.alpha;
 	pobj->svpwm.u_beta = pobj->u_alphaBeta.beta;
 
+	/* 作用时间基量（标准 SVPWM，Uα/Uβ 已归一化为占空比）
+	 * 令 A=Uα, B=Uβ/√3，各扇区两邻矢量作用时间均可由 A、B 线性表示。
+	 * 修正前代码误把扇区判断量 u1/u2/u3 当作作用时间，导致输出电压幅值
+	 * 统一偏小 √3/2 倍(≈0.866)，方向正确但幅值失真，影响所有开环标定。
+	 *
+	 * 幅值补偿 k_amp = 3/2：等幅值(2/3)Clarke 约定下，单一满占空比有效矢量
+	 * 仅产生 (2/3)·Vbus 的相-中性点电压，故轴向作用时间须为 1.5·Uα 才能使
+	 * 实际相电压 Va = 命令电压 ud。缺此因子时 Va 仅为 (2/3)·ud，开环标定
+	 * R = ud/id 会偏大 3/2 倍(电流偏大→R 偏小)。补偿后前向增益=1，与反馈侧
+	 * 等幅值 Clarke(增益=1)一致，R_code = R_true。
+	 * 线性区上限 |Uα|max=1/√3 时轴向作用时间=0.866<1，过调制钳位仍正常触发。*/
+	const float k_amp = 1.5f;
+	float ua = k_amp * pobj->svpwm.u_alpha;
+	float ub_sqrt3 = k_amp * pobj->svpwm.u_beta * ONE_BY_SQRT3;  /* 1.5·Uβ/√3 */
+	float ub_2sqrt3 = k_amp * pobj->svpwm.u_beta * TWO_BY_SQRT3; /* 1.5·2·Uβ/√3 */
+
 	// step1 计算u1、u2和u3 , 计算SVPWM算法中的三个控制电压u1、u2和u3
 	pobj->svpwm.u1 = pobj->svpwm.u_beta;
 
@@ -159,8 +175,8 @@ static void foc_svpwm(struct foc *pobj)
 	switch (pobj->svpwm.sector)
 	{
 		case 3:
-			pobj->svpwm.t4 = pobj->svpwm.u2;
-			pobj->svpwm.t6 = pobj->svpwm.u1;
+			pobj->svpwm.t4 = ua - ub_sqrt3; /* Uα - Uβ/√3 */
+			pobj->svpwm.t6 = ub_2sqrt3;     /* 2·Uβ/√3 */
 			sum = pobj->svpwm.t4 + pobj->svpwm.t6;
 			if (sum > pobj->svpwm.Ts)
 			{
@@ -174,8 +190,8 @@ static void foc_svpwm(struct foc *pobj)
 			pobj->svpwm.tc = pobj->svpwm.t0;
 			break;
 		case 1:
-			pobj->svpwm.t6 = -pobj->svpwm.u3;
-			pobj->svpwm.t2 = -pobj->svpwm.u2;
+			pobj->svpwm.t6 = ua + ub_sqrt3;  /* Uα + Uβ/√3 */
+			pobj->svpwm.t2 = -ua + ub_sqrt3; /* -Uα + Uβ/√3 */
 			sum = pobj->svpwm.t2 + pobj->svpwm.t6;
 			if (sum > pobj->svpwm.Ts)
 			{
@@ -189,8 +205,8 @@ static void foc_svpwm(struct foc *pobj)
 			pobj->svpwm.tc = pobj->svpwm.t0;
 			break;
 		case 5:
-			pobj->svpwm.t2 = pobj->svpwm.u1;
-			pobj->svpwm.t3 = pobj->svpwm.u3;
+			pobj->svpwm.t2 = ub_2sqrt3;      /* 2·Uβ/√3 */
+			pobj->svpwm.t3 = -ua - ub_sqrt3; /* -Uα - Uβ/√3 */
 			sum = pobj->svpwm.t2 + pobj->svpwm.t3;
 			if (sum > pobj->svpwm.Ts)
 			{
@@ -205,8 +221,8 @@ static void foc_svpwm(struct foc *pobj)
 			break;
 
 		case 4:
-			pobj->svpwm.t3 = -pobj->svpwm.u2;
-			pobj->svpwm.t1 = -pobj->svpwm.u1;
+			pobj->svpwm.t3 = -ua + ub_sqrt3; /* -Uα + Uβ/√3 */
+			pobj->svpwm.t1 = -ub_2sqrt3;     /* -2·Uβ/√3 */
 			sum = pobj->svpwm.t1 + pobj->svpwm.t3;
 			if (sum > pobj->svpwm.Ts)
 			{
@@ -220,8 +236,8 @@ static void foc_svpwm(struct foc *pobj)
 			pobj->svpwm.tc = pobj->svpwm.t1 + pobj->svpwm.t3 + pobj->svpwm.t0;
 			break;
 		case 6:
-			pobj->svpwm.t1 = pobj->svpwm.u3;
-			pobj->svpwm.t5 = pobj->svpwm.u2;
+			pobj->svpwm.t1 = -ua - ub_sqrt3; /* -Uα - Uβ/√3 */
+			pobj->svpwm.t5 = ua - ub_sqrt3;  /* Uα - Uβ/√3 */
 			sum = pobj->svpwm.t1 + pobj->svpwm.t5;
 			if (sum > pobj->svpwm.Ts)
 			{
@@ -235,8 +251,8 @@ static void foc_svpwm(struct foc *pobj)
 			pobj->svpwm.tc = pobj->svpwm.t1 + pobj->svpwm.t5 + pobj->svpwm.t0;
 			break;
 		case 2:
-			pobj->svpwm.t5 = -pobj->svpwm.u1;
-			pobj->svpwm.t4 = -pobj->svpwm.u3;
+			pobj->svpwm.t5 = -ub_2sqrt3;    /* -2·Uβ/√3 */
+			pobj->svpwm.t4 = ua + ub_sqrt3; /* Uα + Uβ/√3 */
 			sum = pobj->svpwm.t4 + pobj->svpwm.t5;
 			if (sum > pobj->svpwm.Ts)
 			{
