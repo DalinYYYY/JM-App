@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>速度模式控制框图 · 深色主题</title>
+<style>
+:root {
+  color-scheme: dark;
+  --font-sans: "SF Pro Text", "PingFang SC", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+  --text-caption: 12px/18px;
+  --text-body: 14px/20px;
+  --text-title: 16px/24px;
+  --text-code: 13px/20px;
+  --radius: 8px;
+  --radius-card: 14px;
+  --radius-full: 999px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: var(--spacer-24);
+  background: #06080C;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  font-family: var(--font-sans);
+}
+.ol-card {
+  --m2-bg: #0B0E14;
+  --m2-panel: #131822;
+  --m2-panel-2: #1A2030;
+  --m2-border: rgba(96, 165, 250, 0.18);
+  --m2-border-strong: rgba(96, 165, 250, 0.35);
+  --m2-text: #E2E8F0;
+  --m2-text-muted: #94A3B8;
+  --m2-text-subtle: #64748B;
+  --m2-brand: #60A5FA;
+  --m2-brand-glow: rgba(96, 165, 250, 0.5);
+  --m2-brand-soft: rgba(96, 165, 250, 0.12);
+  --m2-accent: #2DD4BF;
+  --m2-accent-glow: rgba(45, 212, 191, 0.5);
+  --m2-accent-soft: rgba(45, 212, 191, 0.12);
+  --m2-grid: rgba(96, 165, 250, 0.06);
+  color: var(--m2-text);
+  background: var(--m2-bg);
+  border: 1px solid var(--m2-border);
+  border-radius: var(--radius-card);
+  padding: var(--spacer-24);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(96, 165, 250, 0.08) inset;
+  font: var(--weight-regular) var(--text-body) var(--font-sans);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+}
+.ol-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--m2-brand), var(--m2-accent), transparent);
+  opacity: 0.8;
+}
+.ol-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacer-16); flex-wrap: wrap; margin-bottom: var(--spacer-20); }
+.ol-title-block { flex: 1 1 auto; min-width: 200px; }
+.ol-title { font: var(--weight-strong) 18px/26px var(--font-sans); color: var(--m2-text); margin: 0; letter-spacing: -0.01em; }
+.ol-sub { font: var(--weight-regular) var(--text-caption) var(--font-sans); color: var(--m2-text-muted); margin: var(--spacer-4) 0 0 0; }
+.ol-tags { display: flex; gap: var(--spacer-8); align-items: center; flex-wrap: wrap; }
+.ol-badge { display: inline-flex; align-items: center; gap: var(--spacer-4); padding: var(--spacer-4) var(--spacer-12); border-radius: var(--radius-full); background: var(--m2-brand-soft); color: var(--m2-brand); font: var(--weight-medium) var(--text-caption) var(--font-sans); border: 1px solid var(--m2-brand); white-space: nowrap; box-shadow: 0 0 12px var(--m2-brand-glow); }
+.ol-badge::before { content: ""; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--m2-brand); box-shadow: 0 0 6px var(--m2-brand); animation: pulse-dot 1.8s ease-in-out infinite; }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+.ol-blueprint { background: var(--m2-panel); border: 1px solid var(--m2-border); border-radius: var(--radius); padding: var(--spacer-16); box-shadow: 0 0 24px rgba(96, 165, 250, 0.06) inset; position: relative; background-image: linear-gradient(var(--m2-grid) 1px, transparent 1px), linear-gradient(90deg, var(--m2-grid) 1px, transparent 1px); background-size: 24px 24px; }
+.ol-blueprint-label { position: absolute; top: var(--spacer-8); right: var(--spacer-12); font: var(--weight-medium) 10px/14px var(--font-mono); color: var(--m2-text-subtle); letter-spacing: 0.1em; text-transform: uppercase; }
+.ol-diagram { width: 100%; height: auto; display: block; }
+.ol-section-label { font: var(--weight-medium) var(--text-caption) var(--font-sans); color: var(--m2-text-subtle); margin: var(--spacer-24) 0 var(--spacer-12) 0; letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center; gap: var(--spacer-8); }
+.ol-section-label::after { content: ""; flex: 1; height: 1px; background: var(--m2-border); }
+.ol-params { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacer-12); }
+@media (max-width: 640px) { .ol-params { grid-template-columns: 1fr; } }
+.ol-param { background: var(--m2-panel); border: 1px solid var(--m2-border); border-radius: var(--radius); padding: var(--spacer-16); transition: all 0.2s ease; position: relative; overflow: hidden; }
+.ol-param::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.ol-param.d::before { background: var(--m2-brand); box-shadow: 0 0 8px var(--m2-brand-glow); }
+.ol-param.q::before { background: var(--m2-accent); box-shadow: 0 0 8px var(--m2-accent-glow); }
+.ol-param:hover { border-color: var(--m2-border-strong); box-shadow: 0 0 20px rgba(96, 165, 250, 0.1); }
+.ol-param-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacer-8); margin-bottom: var(--spacer-12); }
+.ol-param-axis { display: inline-flex; align-items: center; gap: var(--spacer-4); font: var(--weight-strong) 11px/16px var(--font-sans); padding: 2px var(--spacer-8); border-radius: var(--radius-full); letter-spacing: 0.04em; }
+.ol-param-axis.d { background: var(--m2-brand-soft); color: var(--m2-brand); border: 1px solid var(--m2-brand); }
+.ol-param-axis.q { background: var(--m2-accent-soft); color: var(--m2-accent); border: 1px solid var(--m2-accent); }
+.ol-param-unit { font: var(--weight-medium) var(--text-code) var(--font-mono); color: var(--m2-text-muted); }
+.ol-param-flow { display: flex; align-items: center; gap: var(--spacer-8); margin: var(--spacer-8) 0 var(--spacer-12); padding: var(--spacer-8) var(--spacer-12); background: var(--m2-panel-2); border-radius: var(--radius); border: 1px solid var(--m2-border); }
+.ol-param-flow .src { font: var(--weight-medium) var(--text-code) var(--font-mono); color: var(--m2-brand); }
+.ol-param-flow .arr { color: var(--m2-text-subtle); font: var(--text-code) var(--font-mono); }
+.ol-param-flow .dst { font: var(--weight-medium) var(--text-code) var(--font-mono); color: var(--m2-text); }
+.ol-param-desc { font: var(--weight-regular) var(--text-caption) var(--font-sans); color: var(--m2-text-muted); margin: 0 0 var(--spacer-12) 0; line-height: 18px; }
+.ol-range { margin-top: var(--spacer-8); }
+.ol-range-label { display: flex; justify-content: space-between; font: var(--weight-regular) 11px/14px var(--font-mono); color: var(--m2-text-subtle); margin-bottom: var(--spacer-4); }
+.ol-range-bar { position: relative; height: 6px; background: var(--m2-panel-2); border-radius: var(--radius-full); overflow: hidden; border: 1px solid var(--m2-border); }
+.ol-range-fill { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: var(--radius-full); }
+.ol-range-fill.d { width: 100%; background: linear-gradient(90deg, transparent, var(--m2-brand), transparent); box-shadow: 0 0 8px var(--m2-brand-glow); animation: flow-d 3s ease-in-out infinite; }
+.ol-range-fill.q { width: 100%; background: linear-gradient(90deg, transparent, var(--m2-accent), transparent); box-shadow: 0 0 8px var(--m2-accent-glow); animation: flow-q 3s ease-in-out infinite; animation-delay: 1.5s; }
+@keyframes flow-d { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes flow-q { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+.ol-range-center { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: var(--m2-text-subtle); transform: translateX(-50%); }
+.ol-range-meta { display: flex; justify-content: space-between; margin-top: var(--spacer-12); }
+.ol-range-meta span { font: var(--weight-regular) 11px/14px var(--font-mono); color: var(--m2-text-muted); }
+.ol-range-meta strong { font-weight: var(--weight-medium); color: var(--m2-text); }
+.th { fill: var(--m2-text); font: var(--weight-medium) var(--text-body) var(--font-sans); }
+.t  { fill: var(--m2-text); font: var(--weight-regular) var(--text-body) var(--font-sans); }
+.ts { fill: var(--m2-text-muted); font: var(--weight-regular) var(--text-caption) var(--font-sans); }
+.tss { fill: var(--m2-text-subtle); font: var(--weight-regular) 11px/14px var(--font-mono); }
+.tc { fill: var(--m2-text); font: var(--weight-medium) var(--text-code) var(--font-mono); }
+.tcb{ fill: var(--m2-brand); font: var(--weight-medium) var(--text-code) var(--font-mono); }
+.tca{ fill: var(--m2-accent); font: var(--weight-medium) var(--text-code) var(--font-mono); }
+.tw { fill: #FFFFFF; font: var(--weight-medium) var(--text-body) var(--font-sans); }
+.tws { fill: rgba(255,255,255,0.85); font: var(--weight-regular) var(--text-caption) var(--font-sans); }
+.arr  { stroke: var(--m2-text-muted); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.arr-static { stroke: var(--m2-brand); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; opacity: 0.25; }
+.arr-flow { stroke: var(--m2-brand); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; filter: drop-shadow(0 0 3px var(--m2-brand-glow)); stroke-dasharray: 6 10; animation: dash-flow 1.5s linear infinite; }
+@keyframes dash-flow { to { stroke-dashoffset: -16; } }
+.leader { stroke: var(--m2-accent); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 4 4; fill: none; filter: drop-shadow(0 0 2px var(--m2-accent-glow)); animation: dash-flow-slow 2s linear infinite; }
+@keyframes dash-flow-slow { to { stroke-dashoffset: -8; } }
+.node-pill { fill: var(--m2-panel-2); stroke: var(--m2-border-strong); }
+.node-box  { fill: var(--m2-panel-2); stroke: var(--m2-border-strong); }
+.node-focal { fill: #60A5FA; stroke: #93C5FD; stroke-width: 2; filter: drop-shadow(0 0 8px var(--m2-brand-glow)); animation: node-glow 2.4s ease-in-out infinite; }
+@keyframes node-glow { 0%, 100% { filter: drop-shadow(0 0 6px var(--m2-brand-glow)); } 50% { filter: drop-shadow(0 0 14px var(--m2-brand-glow)); } }
+.node-accent-solid { fill: #2DD4BF; stroke: #5EEAD4; stroke-width: 1.5; filter: drop-shadow(0 0 6px var(--m2-accent-glow)); }
+.junction { fill: var(--m2-brand); filter: drop-shadow(0 0 4px var(--m2-brand-glow)); }
+.bypass-badge { fill: var(--m2-panel); stroke: var(--m2-border-strong); }
+.grid-tick { stroke: var(--m2-text-subtle); stroke-width: 0.5; fill: none; }
+@media (prefers-reduced-motion: reduce) {
+  .arr-flow, .leader, .node-focal, .ol-range-fill, .ol-badge::before { animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="ol-card">
+  <div class="ol-header">
+    <div class="ol-title-block">
+      <p class="ol-title">速度模式控制框图</p>
+      <p class="ol-sub">VELOCITY · REF_CTRL_VELOCITY — 速度环 PI + 力矩前馈，VELOCITY_TORQUE 变体附力矩限幅</p>
+    </div>
+    <div class="ol-tags">
+      <span class="ol-badge">速度模式</span>
+    </div>
+  </div>
+
+  <div class="ol-blueprint">
+    <span class="ol-blueprint-label">SIGNAL FLOW · LIVE</span>
+    <svg class="ol-diagram" viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="速度模式控制框图">
+      <defs>
+        <marker id="mid-vel" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#94A3B8"/>
+        </marker>
+      </defs>
+
+      <rect class="bypass-badge" x="308" y="18" width="96" height="22" rx="11"/>
+      <text x="356" y="33" text-anchor="middle" class="ts">旁路 位置环</text>
+
+      <rect class="node-pill" x="24" y="121" width="96" height="32" rx="16"/>
+      <text x="72" y="141" text-anchor="middle" class="tc">cmd.vel</text>
+      <path class="arr" d="M120,137 L140,137" marker-end="url(#mid-vel)"/>
+      <text x="130" y="101" text-anchor="middle" class="tss">vel_ref</text>
+      <text x="130" y="89" text-anchor="middle" class="tss">+ vel_ff</text>
+
+      <rect class="node-box" x="140" y="113" width="88" height="48" rx="8"/>
+      <text x="184" y="142" text-anchor="middle" class="th">速度环 PI</text>
+      <path class="arr" d="M228,137 L248,137" marker-end="url(#mid-vel)"/>
+      <text x="238" y="101" text-anchor="middle" class="tss">iq_ref</text>
+
+      <rect class="node-box" x="248" y="113" width="88" height="48" rx="8"/>
+      <text x="292" y="142" text-anchor="middle" class="th">电流环 PI</text>
+      <path class="arr" d="M336,137 L356,137" marker-end="url(#mid-vel)"/>
+      <text x="346" y="101" text-anchor="middle" class="tss">ud/uq</text>
+
+      <rect class="node-box" x="356" y="113" width="64" height="48" rx="8"/>
+      <text x="388" y="142" text-anchor="middle" class="th">÷ Vbus</text>
+      <path class="arr" d="M420,137 L440,137" marker-end="url(#mid-vel)"/>
+
+      <rect class="node-focal" x="440" y="109" width="88" height="56" rx="10"/>
+      <text x="484" y="132" text-anchor="middle" class="tw">反 Park</text>
+      <text x="484" y="151" text-anchor="middle" class="tws">dq → αβ</text>
+      <path class="arr" d="M528,137 L548,137" marker-end="url(#mid-vel)"/>
+
+      <rect class="node-box" x="548" y="113" width="68" height="48" rx="8"/>
+      <text x="582" y="142" text-anchor="middle" class="th">SVPWM</text>
+      <path class="arr" d="M616,137 L636,137" marker-end="url(#mid-vel)"/>
+
+      <rect class="node-box" x="636" y="113" width="52" height="48" rx="8"/>
+      <text x="662" y="142" text-anchor="middle" class="th">PWM</text>
+
+      <path class="arr" d="M184,208 L184,161" marker-end="url(#mid-vel)"/>
+      <rect class="node-pill" x="156" y="208" width="56" height="28" rx="14"/>
+      <text x="184" y="227" text-anchor="middle" class="tc">fb.vel</text>
+
+      <path class="leader" d="M484,208 L484,165" marker-end="url(#mid-vel)"/>
+      <rect class="node-accent-solid" x="446" y="208" width="76" height="40" rx="20"/>
+      <text x="484" y="227" text-anchor="middle" class="tw">θ_elec</text>
+      <text x="484" y="241" text-anchor="middle" class="tws">编码器电角度</text>
+
+      <line class="grid-tick" x1="24" y1="280" x2="688" y2="280"/>
+      <text x="72" y="276" class="tss" text-anchor="middle">输入</text>
+      <text x="184" y="276" class="tss" text-anchor="middle">速度环</text>
+      <text x="292" y="276" class="tss" text-anchor="middle">电流环</text>
+      <text x="388" y="276" class="tss" text-anchor="middle">归一化</text>
+      <text x="484" y="276" class="tss" text-anchor="middle">坐标变换</text>
+      <text x="582" y="276" class="tss" text-anchor="middle">调制</text>
+      <text x="662" y="276" class="tss" text-anchor="middle">输出</text>
+    </svg>
+  </div>
+
+  <p class="ol-section-label">输入命令参数</p>
+  <div class="ol-params">
+    <div class="ol-param d">
+      <div class="ol-param-head">
+        <span class="ol-param-axis d">速度</span>
+        <span class="ol-param-unit">rad/s</span>
+      </div>
+      <div class="ol-param-flow">
+        <span class="src">cmd.vel</span>
+        <span class="arr">→</span>
+        <span class="dst">ref->vel_sp</span>
+      </div>
+      <p class="ol-param-desc">速度指令，经 ±max_spd 限幅后作为速度环 PI 目标</p>
+      <div class="ol-range">
+        <div class="ol-range-label">
+          <span>−max_spd</span>
+          <span>0</span>
+          <span>+max_spd</span>
+        </div>
+        <div class="ol-range-bar">
+          <div class="ol-range-fill d"></div>
+          <div class="ol-range-center"></div>
+        </div>
+        <div class="ol-range-meta">
+          <span><strong>类型</strong> float</span>
+          <span><strong>限幅</strong> ±max_spd</span>
+        </div>
+      </div>
+    </div>
+    <div class="ol-param q">
+      <div class="ol-param-head">
+        <span class="ol-param-axis q">前馈</span>
+        <span class="ol-param-unit">N·m</span>
+      </div>
+      <div class="ol-param-flow">
+        <span class="src">cmd.torque_ff</span>
+        <span class="arr">→</span>
+        <span class="dst">iq_ff</span>
+      </div>
+      <p class="ol-param-desc">力矩前馈，÷Kt 转换为 iq 前馈，叠加到速度环 PI 输出的 iq_ref</p>
+      <div class="ol-range-meta">
+        <span><strong>类型</strong> float</span>
+        <span><strong>前馈</strong> 叠加 iq_ref</span>
+      </div>
+    </div>
+    <div class="ol-param d" style="grid-column:1/-1;">
+      <div class="ol-param-head">
+        <span class="ol-param-axis d">变体</span>
+        <span class="ol-param-unit">VELOCITY_TORQUE</span>
+      </div>
+      <p class="ol-param-desc">VELOCITY_TORQUE 变体在速度环输出后追加力矩限幅 ±peak_t，再 ÷Kt 转为 iq_ref，适用于需限制输出力矩的场景。</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>

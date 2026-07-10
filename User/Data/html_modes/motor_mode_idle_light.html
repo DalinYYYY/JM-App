@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>空闲模式控制框图 · 浅色主题</title>
+<style>
+:root {
+  color-scheme: light;
+  --font-sans: "SF Pro Text", "PingFang SC", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --weight-regular: 400;
+  --weight-medium: 500;
+  --weight-strong: 600;
+  --text-caption: 12px/18px;
+  --text-body: 14px/20px;
+  --text-title: 16px/24px;
+  --text-code: 13px/20px;
+  --radius: 8px;
+  --radius-card: 14px;
+  --radius-full: 999px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  padding: var(--spacer-24);
+  background: #EEF0F4;
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  font-family: var(--font-sans);
+}
+.ol-card {
+  --lt-bg: #F7F8FA;
+  --lt-panel: #FFFFFF;
+  --lt-panel-2: #F1F3F8;
+  --lt-border: rgba(30, 41, 59, 0.10);
+  --lt-border-strong: rgba(30, 41, 59, 0.18);
+  --lt-text: #0F172A;
+  --lt-text-muted: #475569;
+  --lt-text-subtle: #94A3B8;
+  --lt-brand: #4B3FE3;
+  --lt-brand-glow: rgba(75, 63, 227, 0.28);
+  --lt-brand-soft: rgba(75, 63, 227, 0.08);
+  --lt-accent: #0D9488;
+  --lt-accent-glow: rgba(13, 148, 136, 0.28);
+  --lt-accent-soft: rgba(13, 148, 136, 0.08);
+  --lt-grid: rgba(75, 63, 227, 0.05);
+  color: var(--lt-text);
+  background: var(--lt-panel);
+  border: 1px solid var(--lt-border);
+  border-radius: var(--radius-card);
+  padding: var(--spacer-24);
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(75, 63, 227, 0.04) inset;
+  font: var(--weight-regular) var(--text-body) var(--font-sans);
+  overflow: hidden;
+  position: relative;
+  width: 100%;
+  max-width: 960px;
+}
+.ol-card::before {
+  content: ""; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, transparent, var(--lt-brand), var(--lt-accent), transparent);
+  opacity: 0.7;
+}
+.ol-header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--spacer-16); flex-wrap: wrap; margin-bottom: var(--spacer-20); }
+.ol-title-block { flex: 1 1 auto; min-width: 200px; }
+.ol-title { font: var(--weight-strong) 18px/26px var(--font-sans); color: var(--lt-text); margin: 0; letter-spacing: -0.01em; }
+.ol-sub { font: var(--weight-regular) var(--text-caption) var(--font-sans); color: var(--lt-text-muted); margin: var(--spacer-4) 0 0 0; }
+.ol-tags { display: flex; gap: var(--spacer-8); align-items: center; flex-wrap: wrap; }
+.ol-badge { display: inline-flex; align-items: center; gap: var(--spacer-4); padding: var(--spacer-4) var(--spacer-12); border-radius: var(--radius-full); background: var(--lt-brand-soft); color: var(--lt-brand); font: var(--weight-medium) var(--text-caption) var(--font-sans); border: 1px solid var(--lt-brand); white-space: nowrap; box-shadow: 0 0 10px var(--lt-brand-glow); }
+.ol-badge::before { content: ""; width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--lt-brand); box-shadow: 0 0 6px var(--lt-brand); animation: pulse-dot 1.8s ease-in-out infinite; }
+@keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+.ol-blueprint { background: var(--lt-bg); border: 1px solid var(--lt-border); border-radius: var(--radius); padding: var(--spacer-16); box-shadow: 0 0 20px rgba(75, 63, 227, 0.04) inset; position: relative; background-image: linear-gradient(var(--lt-grid) 1px, transparent 1px), linear-gradient(90deg, var(--lt-grid) 1px, transparent 1px); background-size: 24px 24px; }
+.ol-blueprint-label { position: absolute; top: var(--spacer-8); right: var(--spacer-12); font: var(--weight-medium) 10px/14px var(--font-mono); color: var(--lt-text-subtle); letter-spacing: 0.1em; text-transform: uppercase; }
+.ol-diagram { width: 100%; height: auto; display: block; }
+.ol-section-label { font: var(--weight-medium) var(--text-caption) var(--font-sans); color: var(--lt-text-subtle); margin: var(--spacer-24) 0 var(--spacer-12) 0; letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center; gap: var(--spacer-8); }
+.ol-section-label::after { content: ""; flex: 1; height: 1px; background: var(--lt-border); }
+.ol-params { display: grid; grid-template-columns: 1fr 1fr; gap: var(--spacer-12); }
+@media (max-width: 640px) { .ol-params { grid-template-columns: 1fr; } }
+.ol-param { background: var(--lt-bg); border: 1px solid var(--lt-border); border-radius: var(--radius); padding: var(--spacer-16); transition: all 0.2s ease; position: relative; overflow: hidden; }
+.ol-param::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+.ol-param.d::before { background: var(--lt-brand); box-shadow: 0 0 6px var(--lt-brand-glow); }
+.ol-param.q::before { background: var(--lt-accent); box-shadow: 0 0 6px var(--lt-accent-glow); }
+.ol-param:hover { border-color: var(--lt-border-strong); box-shadow: 0 2px 12px rgba(75, 63, 227, 0.08); }
+.ol-param-head { display: flex; align-items: center; justify-content: space-between; gap: var(--spacer-8); margin-bottom: var(--spacer-12); }
+.ol-param-axis { display: inline-flex; align-items: center; gap: var(--spacer-4); font: var(--weight-strong) 11px/16px var(--font-sans); padding: 2px var(--spacer-8); border-radius: var(--radius-full); letter-spacing: 0.04em; }
+.ol-param-axis.d { background: var(--lt-brand-soft); color: var(--lt-brand); border: 1px solid var(--lt-brand); }
+.ol-param-axis.q { background: var(--lt-accent-soft); color: var(--lt-accent); border: 1px solid var(--lt-accent); }
+.ol-param-unit { font: var(--weight-medium) var(--text-code) var(--font-mono); color: var(--lt-text-muted); }
+.ol-param-flow { display: flex; align-items: center; gap: var(--spacer-8); margin: var(--spacer-8) 0 var(--spacer-12); padding: var(--spacer-8) var(--spacer-12); background: var(--lt-panel-2); border-radius: var(--radius); border: 1px solid var(--lt-border); }
+.ol-param-flow .src { font: var(--weight-medium) var(--text-code) var(--font-mono); color: var(--lt-brand); }
+.ol-param-flow .arr { color: var(--lt-text-subtle); font: var(--text-code) var(--font-mono); }
+.ol-param-flow .dst { font: var(--weight-medium) var(--text-code) var(--font-mono); color: var(--lt-text); }
+.ol-param-desc { font: var(--weight-regular) var(--text-caption) var(--font-sans); color: var(--lt-text-muted); margin: 0 0 var(--spacer-12) 0; line-height: 18px; }
+.ol-range { margin-top: var(--spacer-8); }
+.ol-range-label { display: flex; justify-content: space-between; font: var(--weight-regular) 11px/14px var(--font-mono); color: var(--lt-text-subtle); margin-bottom: var(--spacer-4); }
+.ol-range-bar { position: relative; height: 6px; background: var(--lt-panel-2); border-radius: var(--radius-full); overflow: hidden; border: 1px solid var(--lt-border); }
+.ol-range-fill { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); border-radius: var(--radius-full); }
+.ol-range-fill.d { width: 100%; background: linear-gradient(90deg, transparent, var(--lt-brand), transparent); box-shadow: 0 0 6px var(--lt-brand-glow); animation: flow-d 3s ease-in-out infinite; }
+.ol-range-fill.q { width: 100%; background: linear-gradient(90deg, transparent, var(--lt-accent), transparent); box-shadow: 0 0 6px var(--lt-accent-glow); animation: flow-q 3s ease-in-out infinite; animation-delay: 1.5s; }
+@keyframes flow-d { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+@keyframes flow-q { 0%, 100% { opacity: 0.5; } 50% { opacity: 1; } }
+.ol-range-center { position: absolute; top: -2px; bottom: -2px; left: 50%; width: 1px; background: var(--lt-text-subtle); transform: translateX(-50%); }
+.ol-range-meta { display: flex; justify-content: space-between; margin-top: var(--spacer-12); }
+.ol-range-meta span { font: var(--weight-regular) 11px/14px var(--font-mono); color: var(--lt-text-muted); }
+.ol-range-meta strong { font-weight: var(--weight-medium); color: var(--lt-text); }
+.th { fill: var(--lt-text); font: var(--weight-medium) var(--text-body) var(--font-sans); }
+.t  { fill: var(--lt-text); font: var(--weight-regular) var(--text-body) var(--font-sans); }
+.ts { fill: var(--lt-text-muted); font: var(--weight-regular) var(--text-caption) var(--font-sans); }
+.tss { fill: var(--lt-text-subtle); font: var(--weight-regular) 11px/14px var(--font-mono); }
+.tc { fill: var(--lt-text); font: var(--weight-medium) var(--text-code) var(--font-mono); }
+.tcb{ fill: var(--lt-brand); font: var(--weight-medium) var(--text-code) var(--font-mono); }
+.tca{ fill: var(--lt-accent); font: var(--weight-medium) var(--text-code) var(--font-mono); }
+.tw { fill: #FFFFFF; font: var(--weight-medium) var(--text-body) var(--font-sans); }
+.tws { fill: rgba(255,255,255,0.85); font: var(--weight-regular) var(--text-caption) var(--font-sans); }
+.arr  { stroke: var(--lt-text-muted); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.arr-static { stroke: var(--lt-brand); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; opacity: 0.2; }
+.arr-flow { stroke: var(--lt-brand); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; fill: none; filter: drop-shadow(0 0 3px var(--lt-brand-glow)); stroke-dasharray: 6 10; animation: dash-flow 1.5s linear infinite; }
+@keyframes dash-flow { to { stroke-dashoffset: -16; } }
+.leader { stroke: var(--lt-accent); stroke-width: 1.2; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 4 4; fill: none; filter: drop-shadow(0 0 2px var(--lt-accent-glow)); animation: dash-flow-slow 2s linear infinite; }
+@keyframes dash-flow-slow { to { stroke-dashoffset: -8; } }
+.node-pill { fill: var(--lt-panel-2); stroke: var(--lt-border-strong); }
+.node-box  { fill: var(--lt-panel-2); stroke: var(--lt-border-strong); }
+.node-focal { fill: #4B3FE3; stroke: #6F6FFF; stroke-width: 2; filter: drop-shadow(0 0 8px var(--lt-brand-glow)); animation: node-glow 2.4s ease-in-out infinite; }
+@keyframes node-glow { 0%, 100% { filter: drop-shadow(0 0 5px var(--lt-brand-glow)); } 50% { filter: drop-shadow(0 0 12px var(--lt-brand-glow)); } }
+.node-accent-solid { fill: #0D9488; stroke: #14B8A6; stroke-width: 1.5; filter: drop-shadow(0 0 6px var(--lt-accent-glow)); }
+.junction { fill: var(--lt-brand); filter: drop-shadow(0 0 3px var(--lt-brand-glow)); }
+.bypass-badge { fill: var(--lt-panel); stroke: var(--lt-border-strong); }
+.grid-tick { stroke: var(--lt-text-subtle); stroke-width: 0.5; fill: none; }
+@media (prefers-reduced-motion: reduce) {
+  .arr-flow, .leader, .node-focal, .ol-range-fill, .ol-badge::before { animation: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="ol-card">
+  <div class="ol-header">
+    <div class="ol-title-block">
+      <p class="ol-title">空闲模式控制框图</p>
+      <p class="ol-sub">IDLE · REF_CTRL_IDLE — PWM 置零，参考锁定当前位置（安全失能输出）</p>
+    </div>
+    <div class="ol-tags">
+      <span class="ol-badge">空闲模式</span>
+    </div>
+  </div>
+
+  <div class="ol-blueprint">
+    <span class="ol-blueprint-label">SIGNAL FLOW · LIVE</span>
+    <svg class="ol-diagram" viewBox="0 0 820 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="空闲模式控制框图">
+      <defs>
+        <marker id="mid-idle" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="8" markerHeight="8" markerUnits="userSpaceOnUse" orient="auto">
+          <path d="M1 1 L7 4 L1 7 Z" fill="#475569"/>
+        </marker>
+      </defs>
+
+      <rect class="bypass-badge" x="350" y="18" width="120" height="22" rx="11"/>
+      <text x="410" y="33" text-anchor="middle" class="ts">旁路 整个 FOC</text>
+
+      <rect class="node-box" x="329" y="113" width="104" height="48" rx="8"/>
+      <text x="381" y="142" text-anchor="middle" class="th">PWM 置零</text>
+
+      <path class="arr" d="M433,137 L451,137" marker-end="url(#mid-idle)"/>
+
+      <rect class="node-box" x="451" y="113" width="40" height="48" rx="8"/>
+      <text x="471" y="142" text-anchor="middle" class="th">PWM</text>
+
+      <line class="grid-tick" x1="329" y1="280" x2="491" y2="280"/>
+      <text x="381" y="276" class="tss" text-anchor="middle">失能</text>
+      <text x="471" y="276" class="tss" text-anchor="middle">输出</text>
+    </svg>
+  </div>
+
+  <p class="ol-section-label">参数说明</p>
+  <div class="ol-params">
+    <div class="ol-param" style="grid-column:1/-1">
+      <div class="ol-param-head">
+        <span class="ol-param-axis d">IDLE</span>
+        <span class="ol-param-unit">无参数</span>
+      </div>
+      <div class="ol-param-flow">
+        <span class="src">ref.pos</span>
+        <span class="arr">←</span>
+        <span class="dst">fb.pos</span>
+        <span class="arr">·</span>
+        <span class="src">PWM</span>
+        <span class="arr">=</span>
+        <span class="dst">0</span>
+      </div>
+      <p class="ol-param-desc">本模式不消费任何 cmd 字段。ref.pos 跟随 fb.pos，输出 PWM 强制为 0，电机自由停转。</p>
+    </div>
+  </div>
+</div>
+</body>
+</html>
