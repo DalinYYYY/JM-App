@@ -312,7 +312,7 @@ static jm_err_e app_pid_source_get(uint8_t *out_cur, uint8_t *out_vel, uint8_t *
 {
 	if (out_cur == NULL || out_vel == NULL || out_pos == NULL)
 	{
-		return JM_ERR_BAD_PARAM;
+		return JM_ERR_OUT_OF_RANGE;
 	}
 	*out_cur = (uint8_t)motor_pid_get_source(PID_RING_CURRENT);
 	*out_vel = (uint8_t)motor_pid_get_source(PID_RING_VELOCITY);
