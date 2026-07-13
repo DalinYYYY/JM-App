@@ -37,11 +37,11 @@
  * 两点法在两个不同电流点各测稳态 (V,id)，R=(V2-V1)/(id2-id1)，相减即抵消 V_loss，
  * 得到不受命令电压绝对精度影响的斜率。高档 V2 保持原测试电压，低档 V1 取其 40%。
  * 稳态等待 = 750τ（充分稳定）*/
-#define CALIB_CFG_L2_R_TEST_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)        /* 高档 V2 */
-#define CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.4f)     /* 低档 V1 */
-#define CALIB_CFG_L2_R_TEST_TIME_S    (MOTOR_TAU_S * 750.0f)
-#define CALIB_CFG_L2_R_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_R_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_R_SAMPLE_COUNT   2000 /* 每档稳态采样次数 */
+#define CALIB_CFG_L2_R_TEST_VOLTAGE_V    (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)   /* 高档 V2 */
+#define CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.4f) /* 低档 V1 */
+#define CALIB_CFG_L2_R_TEST_TIME_S       (MOTOR_TAU_S * 750.0f)
+#define CALIB_CFG_L2_R_TEST_TICKS        (uint32_t)(CALIB_CFG_L2_R_TEST_TIME_S * CALIB_TICKS_PER_SEC)
+#define CALIB_CFG_L2_R_SAMPLE_COUNT      500 /* 每档稳态采样次数 */
 
 /* Ld 辨识（d 轴阶跃响应）
  * 阶跃电压 = R 测试电压 × 1.3（需更高电压产生 di/dt）
