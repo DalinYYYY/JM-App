@@ -119,10 +119,43 @@ static float dev_power_monitor_get_vbus(struct dev_power_monitor *pobj)
 static float dev_power_monitor_get_ibus(struct dev_power_monitor *pobj)
 {
 	assert_report(pobj != NULL);
-	/* INA199B1 双向检测: 零电流时输出 VREF/2, 需减去偏置再乘比例 */
+#if (PM_IBUS_SOURCE == 1)
+	/* SYNTH 源: 由 motor_loop_isr 调用 dev_power_monitor_synthesize_ibus 写入 pobj->ibus
+	 * 此处仅返回缓存值, 不再做硬件采样解算 */
+	return pobj->ibus;
+#else
+	/* HW_ADC 源: INA199B1 双向检测, 零电流时输出 VREF/2, 需减去偏置再乘比例 */
 	pobj->ibus = -((pobj->voltage[DRV_ADC_1][PM_IBUS] - pobj->ibus_offset) * PM_IBUS_RATIO);
 	return pobj->ibus;
+#endif
 }
+
+#if (PM_IBUS_SOURCE == 1)
+/**
+ * @brief 三相电流 + SVPWM 占空比合成母线电流 (SYNTH 源)
+ * @details 功率守恒推导: P_in = Vbus*Ibus = Va*Ia + Vb*Ib + Vc*Ic
+ *          中心对齐 SVPWM 下 Va = (2*da-1)*Vbus/2, 代入并利用 Ia+Ib+Ic=0 化简得:
+ *          Ibus = da*Ia + db*Ib + dc*Ic
+ *          da/db/dc 为各相上桥臂占空比 (0~1, 来自 foc.svpwm.ta/tb/tc)
+ *          合成结果写入 dev_power_monitor.ibus, 供 get_ibus 读取
+ * @note  调用者: motor_loop_isr 在 cur_loop_run 之后 (RUN 态, 10kHz 高频)
+ *         CALIB/IDLE 态不调用, ibus 保持上次值
+ *         通过 dev_config.h 的 PM_IBUS_SOURCE 宏启用 (1=合成 / 0=硬件ADC)
+ */
+void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic,
+                                       float da, float db, float dc)
+{
+	/* da/db/dc 已归一化为 0~1, ia/ib/ic 单位 A
+	 * 流入电机为正 (与硬件 INA199B1 极性约定一致: ibus_offset 减去后取反)
+	 * 调用方应传入 phase_current 原始采样值 (未经 Clarke 两相重构),
+	 * 避免重构相 (占空比最大=权重最大) 噪声放大 */
+	float ibus_raw = da * ia + db * ib + dc * ic;
+	/* 一阶低通滤波, 抑制小电流时三相采样噪声叠加导致的波动
+	 * 硬件 INA199B1 自带 RC 滤波, 合成方法无对应物, 这里数字补偿 */
+	dev_power_monitor.ibus = PM_IBUS_LPF_ALPHA * ibus_raw
+	                       + (1.0f - PM_IBUS_LPF_ALPHA) * dev_power_monitor.ibus;
+}
+#endif
 
 /* 温度/使能通道暂未接入配置表, 接入后按对应通道解算; 当前返回缓存值 */
 static float dev_power_monitor_get_temp_driver(struct dev_power_monitor *pobj)

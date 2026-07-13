@@ -91,7 +91,7 @@ extern "C"
 		float voltage[DRV_ADC_MAX][PM_CH_NBRS];
 		int32_t offset[PM_SAMPLE_NBRS];
 
-		float ibus_offset; /* IBUS 零电流偏置电压(V), 默认PM_IBUS_OFFSET_V */
+		float ibus_offset; /* IBUS 零电流偏置电压(V), 默认PM_IBUS_OFFSET_V (HW_ADC源使用) */
 		float vbus;
 		float ibus;
 		float temp_driver;
@@ -109,10 +109,26 @@ extern "C"
 	} dev_power_monitor_t;
 
 	/**
-	 * @brief       初始化电源监控对象
-	 * @param        pobj             : 电源监控设备对象
+	 * @brief  初始化电源监控对象
+	 * @param   pobj             : 电源监控设备对象
 	 */
 	void dev_power_monitor_init(dev_power_monitor_t *pobj);
+
+#if (PM_IBUS_SOURCE == 1)
+	/**
+	 * @brief 三相电流 + SVPWM 占空比合成母线电流 (SYNTH 源)
+	 * @details 功率守恒推导: P_in = Vbus*Ibus = Va*Ia + Vb*Ib + Vc*Ic
+	 *          中心对齐 SVPWM 下 Va = (2*da-1)*Vbus/2, 代入并利用 Ia+Ib+Ic=0 化简得:
+	 *          Ibus = da*Ia + db*Ib + dc*Ic
+	 *          da/db/dc 为各相上桥臂占空比 (0~1, 来自 foc.svpwm.ta/tb/tc)
+	 *          合成结果写入 dev_power_monitor.ibus, 供 get_ibus 读取
+	 * @note  调用者: motor_loop_isr 在 cur_loop_run 之后 (RUN 态, 10kHz 高频)
+	 *         CALIB/IDLE 态不调用, ibus 保持上次值
+	 *         通过 dev_config.h 的 PM_IBUS_SOURCE 宏启用 (1=合成 / 0=硬件ADC)
+	 */
+	void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic,
+	                                       float da, float db, float dc);
+#endif
 
 	extern dev_power_monitor_t dev_power_monitor;
 

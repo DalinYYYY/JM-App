@@ -266,6 +266,13 @@ static void foc_svpwm(struct foc *pobj)
 			pobj->svpwm.tc = pobj->svpwm.t5 + pobj->svpwm.t0;
 			break;
 		default:
+			/* sector=0: ud/uq=0 (零电压指令), 输出零矢量 ta=tb=tc=0.5
+			 * 原 default:break 什么都不做, ta/tb/tc 保持旧值(可能为 memset 的 0),
+			 * 导致 PWM 全下桥臂导通(CCR=0), 电机无电压, 母线电流合成 ibus=0 */
+			pobj->svpwm.t0 = pobj->svpwm.Ts / 2;
+			pobj->svpwm.ta = pobj->svpwm.t0;
+			pobj->svpwm.tb = pobj->svpwm.t0;
+			pobj->svpwm.tc = pobj->svpwm.t0;
 			break;
 	}
 }

@@ -17,9 +17,12 @@
 #include "runtime_param.h"
 #include "motion_param.h"
 #include "multiturn_counter.h"
-#include "motor_param.h"                       /* motor_param_init 加载默认电机参数 */
-#include "motor_profile.h"                     /* motor_profile_apply_param / sync_to_param */
-#include "motor_info_storage.h"                /* motor_info_storage_get：Flash 加载的标定参数 */
+#include "motor_param.h"        /* motor_param_init 加载默认电机参数 */
+#include "motor_profile.h"      /* motor_profile_apply_param / sync_to_param */
+#include "motor_info_storage.h" /* motor_info_storage_get：Flash 加载的标定参数 */
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR) && (PM_IBUS_SOURCE == 1)
+#include "dev_power_monitor.h"  /* 母线电流合成: SYNTH 源时 ISR 调用 */
+#endif
 
 #define MOTOR_LOOP_DEG_TO_RAD (0.01745329252f) /* π/180 */
 
@@ -333,6 +336,18 @@ void motor_loop_isr(void)
 
 	// step5: 电流环（基频）——传入完整 ref，内部按 ctrl_type 分流
 	cur_loop_run(&m->current, &m->sys.motor.ref, &m->out);
+
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR) && (PM_IBUS_SOURCE == 1)
+	/* step6: 合成母线电流 (SYNTH 源, 10kHz 高频)
+	 * 仅 RUN 态执行: CALIB/IDLE 态 PWM 未真正驱动电机, ibus 保持上次值
+	 * 公式: Ibus = da*Ia + db*Ib + dc*Ic (功率守恒推导) */
+	{
+		const foc_t *foc = &m->motor.foc;
+		const dev_phase_current_t *pc = &m->motor.phase_current;
+		dev_power_monitor_synthesize_ibus(pc->current.a, pc->current.b, pc->current.c,
+		                                  foc->svpwm.ta, foc->svpwm.tb, foc->svpwm.tc);
+	}
+#endif
 }
 
 void motor_loop_set_cmd(ctrl_mode_e cmd)

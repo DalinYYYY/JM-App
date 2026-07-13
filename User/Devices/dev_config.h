@@ -24,12 +24,24 @@
 /* ===================================================================== */
 
 #if defined(USE_DEV_POWER_MONITOR)
-#define PM_VREF (3.3f)
-#define PM_RESOLUTION (4096.0f)
-#define PM_VBUS_RATIO (11.0f)   /* 板级分压网络 11:1 */
-#define PM_IBUS_RATIO (2.0f)    /* 1/(gain*shunt) = 1/(50*0.01) */
+#define PM_VREF          (3.3f)
+#define PM_RESOLUTION    (4096.0f)
+#define PM_VBUS_RATIO    (11.0f) /* 板级分压网络 11:1 */
+#define PM_IBUS_RATIO    (2.0f)  /* 1/(gain*shunt) = 1/(50*0.01) */
 #define PM_IBUS_OFFSET_V (1.65f) /* INA199B1 REF=VREF/2, 零电流偏置电压 */
-#define PM_TEMP_RATIO (10.0f)
+#define PM_TEMP_RATIO    (10.0f)
+/* 母线电流来源选择:
+ *   0 = 硬件 ADC 采样 (INA199B1, 旧板子)
+ *   1 = 三相电流 + SVPWM 占空比合成 (新板子无母线电流检测)
+ * 合成公式: Ibus = da*Ia + db*Ib + dc*Ic (功率守恒推导) */
+#ifndef PM_IBUS_SOURCE
+#define PM_IBUS_SOURCE (0)
+#endif
+/* 合成母线电流低通滤波系数 (SYNTH 源专用)
+ * 抑制小电流时三相采样噪声叠加导致的波动, alpha=0.05 时 10kHz 采样下时间常数约 2ms, 遥测足够, 响应不迟滞 */
+#ifndef PM_IBUS_LPF_ALPHA
+#define PM_IBUS_LPF_ALPHA (0.05f)
+#endif
 #endif
 
 #if defined(USE_DEV_HALF_BRIDGE)
