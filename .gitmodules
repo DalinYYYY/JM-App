@@ -4,3 +4,6 @@
 [submodule "Board/SFOC"]
 	path = Board/SFOC
 	url = ./Board/SFOC
+[submodule "Board/ODriveMKS"]
+	path = Board/ODriveMKS
+	url = ./Board/ODriveMKS
