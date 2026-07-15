@@ -17,11 +17,11 @@ const drv8301_config_t drv8301_list[DRV8301_ID_MAX] = {
         .spi_num = {.hspi = DRV_SPI3},  /* 共享 SPI3 */
         .nscs = {.gpiox = DRV_GPIOC, .pin = DRV_PIN_13, .ste = DRV_PIN_LOW},  /* PC13 */
         .nfault = {.gpiox = DRV_GPIOD, .pin = DRV_PIN_2, .ste = DRV_PIN_LOW},  /* PD2 */
-        /* CTRL1: GAIN=40V/V(bit10:9=10b → 0x0400), DC_CAL off
-         * CTRL2: 6PWM mode(bit7=0), OCP=current limit(bit5:4=00), GATE_CURRENT=1.7A(bit2:1=11b → 0x0006)
-         * @note 寄存器值需对照 DRV8301 datasheet 最终确认 */
-        .ctrl1_value = 0x0400,  /* GAIN=40V/V */
-        .ctrl2_value = 0x0006,  /* GATE_CURRENT=1.7A, 6PWM, OCP=current limit */
+        /* CTRL1: D0=DC_CAL(0=正常), D2:D1=GAIN(10=40V/V), D5:D3=OCTW(111=默认上报OT+OC)
+         *        → GAIN=40V/V: D2:D1=10b=0x0004, OCTW=111b=0x0038, 合并=0x003C
+         * CTRL2: D7=PWM_MODE(0=6PWM), D5:D4=OCP(00=current limit), D2:D1=GATE_CURRENT(11=3.0A) */
+        .ctrl1_value = 0x003C,  /* GAIN=40V/V, DC_CAL=0, OCTW=111(默认保护) */
+        .ctrl2_value = 0x0006,  /* GATE_CURRENT=3.0A, 6PWM, OCP=current limit */
     },
 };
 #endif

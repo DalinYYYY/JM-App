@@ -313,7 +313,7 @@
           </ArmAdsMisc>
           <Cads>
             <interw>1</interw>
-            <Optim>1</Optim>
+            <Optim>3</Optim>
             <oTime>0</oTime>
             <SplitLS>0</SplitLS>
             <OneElfS>1</OneElfS>
@@ -1969,6 +1969,9 @@
           </Files>
         </Group>
         <Group>
+          <GroupName>::CMSIS</GroupName>
+        </Group>
+        <Group>
           <GroupName>Middlewares/Library/DSP Library/DSP Library</GroupName>
           <GroupOption>
             <CommonProperty>
@@ -2065,9 +2068,6 @@
               </FileOption>
             </File>
           </Files>
-        </Group>
-        <Group>
-          <GroupName>::CMSIS</GroupName>
         </Group>
       </Groups>
     </Target>
