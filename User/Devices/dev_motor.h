@@ -35,9 +35,10 @@
  *==========================================================================*/
 #define DEV_MOTOR_ENCODER_MT6701 1
 #define DEV_MOTOR_ENCODER_MT6835 2
+#define DEV_MOTOR_ENCODER_AS5047 3
 
 #ifndef DEV_MOTOR_ENCODER_TYPE
-#define DEV_MOTOR_ENCODER_TYPE DEV_MOTOR_ENCODER_MT6701
+#define DEV_MOTOR_ENCODER_TYPE DEV_MOTOR_ENCODER_AS5047
 #endif
 
 typedef enum

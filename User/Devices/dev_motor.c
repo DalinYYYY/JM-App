@@ -34,6 +34,8 @@
 #include "dev_encoder_mt6701.h"
 #elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
 #include "dev_encoder_mt6835.h"
+#elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_AS5047)
+#include "dev_encoder_as5047.h"
 #endif
 
 static dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
@@ -100,6 +102,8 @@ void dev_motor_init(dev_motor_t *pobj,
 	dev_encoder_mt6701_create(&pobj->encoder, (mt6701_id_e)id);
 #elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_MT6835)
 	dev_encoder_mt6835_create(&pobj->encoder, (mt6835_id_e)id);
+#elif (DEV_MOTOR_ENCODER_TYPE == DEV_MOTOR_ENCODER_AS5047)
+       dev_encoder_as5047_create(&pobj->encoder, (as5047_id_e)id);
 #else
 #error "未知的 DEV_MOTOR_ENCODER_TYPE，请在 dev_motor.h 选择支持的编码器型号"
 #endif
