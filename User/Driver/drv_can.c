@@ -17,15 +17,16 @@
  */
 #include "drv_can.h"
 #include "main.h"
+#include "mcu_compat.h"
 #include <string.h>
 
 #ifdef USE_CAN_DRIVER
 
 /* 弱声明句柄(实际由CubeMX生成) */
-#if defined(STM32F4)
+#if defined(JM_PERIPH_CAN_CLASSIC)
 __weak CAN_HandleTypeDef hcan1;
 __weak CAN_HandleTypeDef hcan2;
-#elif defined(STM32G4) || defined(STM32H7)
+#elif defined(JM_PERIPH_CAN_FD)
 __weak FDCAN_HandleTypeDef hfdcan1;
 __weak FDCAN_HandleTypeDef hfdcan2;
 #endif
@@ -34,12 +35,12 @@ __weak FDCAN_HandleTypeDef hfdcan2;
 static can_rx_callback_t user_can_rx_callback[DRV_CAN_NUMBER_MAX] = {NULL};
 
 /* 句柄查找表：以canNumber_e为索引(DRV_CAN1=0)，O(1)定位HAL句柄 */
-#if defined(STM32F4)
+#if defined(JM_PERIPH_CAN_CLASSIC)
 static CAN_HandleTypeDef *const s_can_map[DRV_CAN_NUMBER_MAX] = {
 	[DRV_CAN1] = &hcan1,
 	[DRV_CAN2] = &hcan2,
 };
-#elif defined(STM32G4) || defined(STM32H7)
+#elif defined(JM_PERIPH_CAN_FD)
 static FDCAN_HandleTypeDef *const s_can_map[DRV_CAN_NUMBER_MAX] = {
 	[DRV_CAN1] = &hfdcan1,
 	[DRV_CAN2] = &hfdcan2,
@@ -54,7 +55,7 @@ static inline void *get_can_handle(canNumber_e can)
 	return s_can_map[can];
 }
 
-#if defined(STM32G4) || defined(STM32H7)
+#if defined(JM_PERIPH_CAN_FD)
 /* 数据长度(字节)转FDCAN DLC宏：经典CAN仅0~8，FD支持到64。
  * 本HAL中 FDCAN_DLC_BYTES_0~8 == 0~8，12/16/.../64 == 0x9~0xF */
 static uint32_t fdcan_len_to_dlc(uint8_t len)
@@ -103,7 +104,7 @@ int drv_can_init(canNumber_e can, drvCanFilter_t *filter)
 	if (h == NULL)
 		return DRV_ERROR;
 
-#if defined(STM32F4)
+#if defined(JM_PERIPH_CAN_CLASSIC)
 	CAN_HandleTypeDef *handle = (CAN_HandleTypeDef *)h;
 	CAN_FilterTypeDef fcfg = {0};
 
@@ -126,7 +127,7 @@ int drv_can_init(canNumber_e can, drvCanFilter_t *filter)
 	if (HAL_CAN_ActivateNotification(handle, CAN_IT_RX_FIFO0_MSG_PENDING) != HAL_OK)
 		return DRV_ERROR;
 
-#elif defined(STM32G4) || defined(STM32H7)
+#elif defined(JM_PERIPH_CAN_FD)
 	FDCAN_HandleTypeDef *handle = (FDCAN_HandleTypeDef *)h;
 	FDCAN_FilterTypeDef fcfg = {0};
 
@@ -157,7 +158,7 @@ int drv_can_send(canNumber_e can, drvCanMsg_t *msg)
 	if (h == NULL || msg == NULL)
 		return DRV_ERROR;
 
-#if defined(STM32F4)
+#if defined(JM_PERIPH_CAN_CLASSIC)
 	CAN_HandleTypeDef *handle = (CAN_HandleTypeDef *)h;
 	CAN_TxHeaderTypeDef header = {0};
 	uint32_t mailbox;
@@ -177,7 +178,7 @@ int drv_can_send(canNumber_e can, drvCanMsg_t *msg)
 	if (HAL_CAN_AddTxMessage(handle, &header, msg->data, &mailbox) != HAL_OK)
 		return DRV_ERROR;
 
-#elif defined(STM32G4) || defined(STM32H7)
+#elif defined(JM_PERIPH_CAN_FD)
 	FDCAN_HandleTypeDef *handle = (FDCAN_HandleTypeDef *)h;
 	FDCAN_TxHeaderTypeDef header = {0};
 
@@ -210,7 +211,7 @@ int drv_can_recv(canNumber_e can, drvCanMsg_t *msg)
 	if (h == NULL || msg == NULL)
 		return DRV_ERROR;
 
-#if defined(STM32F4)
+#if defined(JM_PERIPH_CAN_CLASSIC)
 	CAN_HandleTypeDef *handle = (CAN_HandleTypeDef *)h;
 	CAN_RxHeaderTypeDef header = {0};
 
@@ -222,7 +223,7 @@ int drv_can_recv(canNumber_e can, drvCanMsg_t *msg)
 	msg->rtr = (header.RTR == CAN_RTR_REMOTE) ? 1u : 0u;
 	msg->len = (uint8_t)header.DLC;
 
-#elif defined(STM32G4) || defined(STM32H7)
+#elif defined(JM_PERIPH_CAN_FD)
 	FDCAN_HandleTypeDef *handle = (FDCAN_HandleTypeDef *)h;
 	FDCAN_RxHeaderTypeDef header = {0};
 
@@ -251,7 +252,7 @@ int drv_can_register_rx_callback(canNumber_e can, can_rx_callback_t callback)
 }
 
 /* 接收中断回调：读取报文并转发给用户回调 */
-#if defined(STM32F4)
+#if defined(JM_PERIPH_CAN_CLASSIC)
 void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 {
 	canNumber_e can_id;
@@ -270,7 +271,7 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan)
 	if (user_can_rx_callback[can_id])
 		user_can_rx_callback[can_id](can_id, &msg);
 }
-#elif defined(STM32G4) || defined(STM32H7)
+#elif defined(JM_PERIPH_CAN_FD)
 void HAL_FDCAN_RxFifo0Callback(FDCAN_HandleTypeDef *hfdcan, uint32_t RxFifo0ITs)
 {
 	canNumber_e can_id;

@@ -18,6 +18,7 @@
 #include "drv_adc.h"
 
 #ifdef USE_ADC_DRIVER
+#include "mcu_compat.h"
 #include "adc.h"
 
 __weak ADC_HandleTypeDef hadc1;
@@ -94,10 +95,18 @@ static uint32_t get_adc_mode(adcMode_e adc_mode)
 	switch (adc_mode)
 	{
 		case DRV_ADC_SINGLE_ENDED:
+#if defined(ADC_SINGLE_ENDED)
 			mode = ADC_SINGLE_ENDED;
+#else
+			mode = 0;
+#endif
 			break;
 		case DRV_ADC_DIFFERENTIAL:
+#if defined(ADC_DIFFERENTIAL_ENDED)
 			mode = ADC_DIFFERENTIAL_ENDED;
+#else
+			mode = 0;
+#endif
 			break;
 		default:
 			break;
@@ -117,12 +126,14 @@ int drv_adc_calibration_start(adcNumber_e adcx)
 	{
 		return DRV_ERROR;
 	}
-	/* G4/L4/H7系列校准接口为双参(句柄+单端/差分)，签名跨型号一致 */
-#if defined(STM32G4) || defined(STM32L4) || defined(STM32H7)
+	/* ADC 校准接口按 MCU 系列分组(mcu_compat.h 已定义):
+	 * - JM_PERIPH_ADC_CALIB_DUAL_PARAM:   G4/L4/H7, 双参(句柄+单端/差分模式)
+	 * - JM_PERIPH_ADC_CALIB_SINGLE_PARAM: F1/F3, 单参(句柄)
+	 * - F4: 无校准接口(ADC 硬件不支持软件校准), 跳过 */
+#if defined(JM_PERIPH_ADC_CALIB_DUAL_PARAM)
 	uint32_t mode = get_adc_mode(DRV_ADC_SINGLE_ENDED);
 	HAL_ADCEx_Calibration_Start(handle, mode);
-#elif defined(STM32F1) || defined(STM32F3)
-	/* F1/F3系列校准接口为单参 */
+#elif defined(JM_PERIPH_ADC_CALIB_SINGLE_PARAM)
 	HAL_ADCEx_Calibration_Start(handle);
 #endif
 	return DRV_EOK;

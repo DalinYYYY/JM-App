@@ -20,7 +20,7 @@
 #ifdef USE_USART_DRIVER
 #include "dma.h"
 #include "usart.h"
-#include "stm32g4xx_hal.h"
+#include "main.h"
 #include <stdlib.h>
 #include <string.h>
 
