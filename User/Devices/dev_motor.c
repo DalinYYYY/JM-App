@@ -38,9 +38,17 @@
 #include "dev_encoder_as5047.h"
 #endif
 
+#if defined(JM_BOARD_ODRIVE)
+/* ODrive Mini: EN_GATE = PB12 (DRV8301) */
+static dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
+	{"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_12, (drvPinState_e)0}},
+};
+#else
+/* SFOC/V1: EN = PB2 */
 static dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
 	{"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_2, (drvPinState_e)0}},
 };
+#endif
 
 /* 使能电机功率级(拉高EN引脚) */
 static void dev_motor_enable(void)
