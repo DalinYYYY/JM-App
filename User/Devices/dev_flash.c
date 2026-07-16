@@ -68,11 +68,35 @@ int dev_flash_write(struct dev_flash *pobj, u32 offset, u64 *data, u16 size)
 	if ((offset % WORD_SIZE) != 0U)
 		return DEV_ERROR;
 
-	uint32_t page_u64 = pobj->page_size / WORD_SIZE; /* 页内 u64 个数 */
-	uint32_t usable = pobj->page_size - WORD_SIZE;   /* 扣除 flag 后可用字节 */
-
+	uint32_t usable = pobj->page_size - WORD_SIZE; /* 扣除 flag 后可用字节 */
 	if ((uint64_t)offset + (uint64_t)size * WORD_SIZE > usable)
 		return DEV_ERROR;
+
+#if defined(USE_FLASH_F4_DRIVER)
+	/* F4: 单扇区无磨损均衡。直接擦除扇区 + 写 flag+data, 无需整页读回。
+	 * motor_info 每次写全量(~1KB=128 u64), page_buf 只需容纳 flag+data。
+	 * F4 末段扇区 128KB, G4 路径的整页 read-modify-write 需 128KB 缓冲 → RAM 溢出,
+	 * 故 F4 下跳过整页读回, 每次擦扇区 + 全量写。 */
+	static u64 f4_buf[257U]; /* flag(1) + 最多 256 个 u64 数据 = 2056 字节 */
+	if (size > 256U)
+		return DEV_ERROR;
+
+	uint32_t new_seq = pobj->last_sequence + 1U;
+	f4_buf[0] = FLASH_FLAG_MAKE(new_seq);
+	for (uint16_t i = 0; i < size; i++)
+		f4_buf[1U + i] = data[i];
+
+	/* 写入起始地址 = start_addr(扇区首), drv_flash_f4_write 会先擦除该扇区 */
+	u8 ret = drv_flash_write(pobj->start_addr, f4_buf, (u16)(1U + size));
+	if (ret != FLASH_ERR_OK)
+		return DEV_ERROR;
+
+	pobj->last_sector = 0U;
+	pobj->last_sequence = new_seq;
+	return DEV_EOK;
+#else
+	/* G4: 读改写 + 磨损均衡 */
+	uint32_t page_u64 = pobj->page_size / WORD_SIZE; /* 页内 u64 个数 */
 
 	/* 1. 静态页缓冲（按最大单 Bank 页 4KB 预分配，避免堆不足导致 save 静默失败） */
 	static u64 page_buf[0x1000U / sizeof(u64)]; /* 4KB / 8 = 512 个 u64，兼容单 Bank 4KB 页 */
@@ -112,6 +136,7 @@ int dev_flash_write(struct dev_flash *pobj, u32 offset, u64 *data, u16 size)
 	pobj->last_sequence = new_seq;
 
 	return DEV_EOK;
+#endif
 }
 
 /*

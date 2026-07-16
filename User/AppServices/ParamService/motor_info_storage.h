@@ -62,10 +62,18 @@ extern "C"
  *   Bank2: 0x08040000-0x0804FFFF (64KB)   ← 双Bank地址不连续，中间为空洞
  *   存储区起始 0x0804F000（=Bank2基址 + 0xF000 = Bank2末尾4KB），总大小 4KB，
  *   页大小 2KB（双Bank），2 个扇区 A/B 轮转磨损均衡。
- * @note 须在 Keil 链接脚本中将代码区限制在 0x0804F000 之前，避免代码覆盖存储区。*/
+ * ODrive(F405RG 1MB) 板在 dev_config_board.h 中覆盖为 Sector 11(0x080E0000, 128KB),
+ * 单扇区无磨损均衡。
+ * @note 须在 Keil 链接脚本中将代码区限制在存储区起始地址之前。*/
+#ifndef MOTORINFO_FLASH_START_ADDR
 #define MOTORINFO_FLASH_START_ADDR 0x0804F000U
+#endif
+#ifndef MOTORINFO_FLASH_TOTAL_SIZE
 #define MOTORINFO_FLASH_TOTAL_SIZE 0x00001000U /* 4KB */
+#endif
+#ifndef MOTORINFO_FLASH_PAGE_SIZE
 #define MOTORINFO_FLASH_PAGE_SIZE  2048U       /* 2KB，双Bank页大小 */
+#endif
 
 	/**
  * @brief  模块状态码枚举
