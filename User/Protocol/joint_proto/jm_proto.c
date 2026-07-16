@@ -544,7 +544,8 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	}
 
 	/* PID 理论估计 0xA0: 触发 autotune 计算 + 自动设 source=2 + reload。
-	 * ACK: 8字节 {status, fail_reason, ring_select_done, reserved[5]} */
+	 * ring_select 位掩码: bit0=电流 bit1=速度 bit2=位置 (可组合)
+	 * ACK: 8字节 {status, fail_reason, ring_mask_done, reserved[5]} */
 	if (cmd == JM_CMD_PID_AUTOTUNE)
 	{
 		uint8_t ring_select;

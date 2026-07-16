@@ -223,8 +223,8 @@ static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw
 		return JM_ERR_STATE_DENY;
 	}
 
-	/* ring_select 范围检查: 0~3 */
-	if (ring_select > 3)
+	/* ring_mask 范围检查: bit0=电流 bit1=速度 bit2=位置, 0=空选无效, >0x07=越界 */
+	if (ring_select == 0 || ring_select > 0x07)
 	{
 		if (out_fail_reason != NULL)
 		{
@@ -233,7 +233,7 @@ static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw
 		return JM_ERR_OUT_OF_RANGE;
 	}
 
-	/* 事务性计算并写入 ControlParam_t（按 ring_select 仅计算所选环）*/
+	/* 事务性计算并写入 ControlParam_t（按 ring_mask 仅计算所选环）*/
 	motor_info_t *info = motor_info_storage_get();
 	int ret = motor_pid_autotune_apply(info, ring_select, cur_bw, vel_bw, pos_bw);
 	if (ret != 0)
@@ -245,16 +245,16 @@ static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw
 		return JM_ERR_STATE_DENY;
 	}
 
-	/* 按 ring_select 自动设 source=AUTOTUNE */
-	if (ring_select == 0 || ring_select == 3)
+	/* 按 ring_mask 自动设 source=AUTOTUNE (位掩码: bit0=电流 bit1=速度 bit2=位置) */
+	if (ring_select & 0x01)
 	{
 		motor_pid_set_source(PID_RING_CURRENT, PID_SOURCE_AUTOTUNE);
 	}
-	if (ring_select == 1 || ring_select == 3)
+	if (ring_select & 0x02)
 	{
 		motor_pid_set_source(PID_RING_VELOCITY, PID_SOURCE_AUTOTUNE);
 	}
-	if (ring_select == 2 || ring_select == 3)
+	if (ring_select & 0x04)
 	{
 		motor_pid_set_source(PID_RING_POSITION, PID_SOURCE_AUTOTUNE);
 	}

@@ -122,18 +122,19 @@ int motor_pid_autotune_position(const motor_info_t *info, float bandwidth_hz,
 	return 0;
 }
 
-int motor_pid_autotune_apply(motor_info_t *info, uint8_t ring_select,
+int motor_pid_autotune_apply(motor_info_t *info, uint8_t ring_mask,
                              float current_bw_hz, float velocity_bw_hz, float position_bw_hz)
 {
 	if (info == NULL)
 		return -1;
-	if (ring_select > 3)
+	/* ring_mask 位掩码: bit0=电流 bit1=速度 bit2=位置, 0=空选无效, >0x07=越界 */
+	if (ring_mask == 0 || ring_mask > 0x07)
 		return -1;
 
 	autotune_result_t d, q, v, p;
-	bool do_cur = (ring_select == 0 || ring_select == 3);
-	bool do_vel = (ring_select == 1 || ring_select == 3);
-	bool do_pos = (ring_select == 2 || ring_select == 3);
+	bool do_cur = (ring_mask & 0x01) != 0;
+	bool do_vel = (ring_mask & 0x02) != 0;
+	bool do_pos = (ring_mask & 0x04) != 0;
 
 	/* 事务语义：先计算所选环，任一失败则不写入 */
 	if (do_cur)
