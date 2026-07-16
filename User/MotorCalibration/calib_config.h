@@ -5,15 +5,9 @@
 
 /* ===================== 标定集中配置 =====================
  * 所有标定可调参数（电压/时间/采样数）集中于此。
- * 各 level 模块 #include 引用，避免魔法数散落。
- * 修改参数只需改本文件，无需动算法源码。
- *
  * 时间相关 TICK 数约定：控制环频率 10kHz（dt=100us），
- * 秒数 × 10000 得到 TICK。若控制环频率改动，
- * 仅需修改下面的 CALIB_TICKS_PER_SEC 宏。
  *
  * 所有测试电压与时间均从 motor_profile.h 的 MOTOR_* 参数派生，
- * 切换电机型号时自动适配，无需手动调整本文件。
  */
 
 #define CALIB_TICKS_PER_SEC 10000.0f
@@ -21,9 +15,17 @@
 /* 电机时间常数 τ = Ld/R（秒），用于派生标定时间参数 */
 #define MOTOR_TAU_S (MOTOR_LD / MOTOR_R)
 
-/* 标定测试电流基准 = 峰值电流 × 0.14（14% 堵转，安全裕度）
- * 所有"施加电压产生电流"类标定均以此为电流目标 */
-#define CALIB_CFG_TEST_CURRENT_A (MOTOR_PEAK_CURRENT * 0.14f)
+/* 标定测试电流基准 = min(峰值电流 × 0.3, 电源限流安全值)
+ * 所有"施加电压产生电流"类标定均以此为电流目标
+ *
+ * 示例:
+ *   5010电机(R=0.12Ω, Ipeak=20A): min(6A, 1.5A)=1.5A, V=0.18V
+ *   GM4820H(R=3.6Ω, Ipeak=3.7A):  min(1.11A, 1.5A)=1.11A, V=4V */
+#define CALIB_CFG_MAX_TEST_CURRENT_A 1.5f
+#define CALIB_CFG_TEST_CURRENT_A \
+	((MOTOR_PEAK_CURRENT * 0.3f) < CALIB_CFG_MAX_TEST_CURRENT_A \
+	 ? (MOTOR_PEAK_CURRENT * 0.3f) \
+	 : CALIB_CFG_MAX_TEST_CURRENT_A)
 
 /* ===================== L1 驱动硬件底层参数（预留）===================== */
 #define CALIB_CFG_L1_ADC_OFFSET_SAMPLES 1000 /* ADC偏置采样次数（取平均）*/
@@ -31,12 +33,7 @@
 
 /* ===================== L2 电机电气身份参数（从 MOTOR_* 派生）===================== */
 
-/* R 辨识（两点差分法 R = ΔV/Δid）
- * 命令电压经死区/MOSFET-Rds/体二极管压降后，实际相压 < 命令值，且这些损耗
- * 近似为"恒定压降 V_loss"。单点 R=V/id 把命令值当实际值，会把 R 系统性抬高。
- * 两点法在两个不同电流点各测稳态 (V,id)，R=(V2-V1)/(id2-id1)，相减即抵消 V_loss，
- * 得到不受命令电压绝对精度影响的斜率。高档 V2 保持原测试电压，低档 V1 取其 40%。
- * 稳态等待 = 750τ（充分稳定）*/
+/* R 辨识：R=(V2-V1)/(id2-id1)  死区效应会使 R 偏大, 但两点差分可部分抵消*/
 #define CALIB_CFG_L2_R_TEST_VOLTAGE_V    (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)   /* 高档 V2 */
 #define CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.4f) /* 低档 V1 */
 #define CALIB_CFG_L2_R_TEST_TIME_S       (MOTOR_TAU_S * 750.0f)
@@ -75,10 +72,7 @@
 
 /* 极对数辨识：开环强制电角度扫描法
  * 施加 ud 锁定转子跟随"强制电角度"，匀速扫过 N 个完整电周期，
- *   pole_pairs = 命令电角度变化(N·2π，精确已知) / 实测机械角变化
- * 分子是我方开环命令值（独立、精确），分母是编码器实测机械角，两者独立可测。
- * 【禁止】用 motor_param.ele_radian 反推——该量 = 机械角×已配置极对数，
- *   是循环自证的派生量，最好情况只把配置值还回来，测不出真实极对数。*/
+ *   pole_pairs = 命令电角度变化(N·2π，精确已知) / 实测机械角变化*/
 #define CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
 #define CALIB_CFG_L2_POLE_PAIRS_ALIGN_S     1.0f /* 对齐 d 轴等待(s)，让转子锁到 theta=0 */
 #define CALIB_CFG_L2_POLE_PAIRS_ALIGN_TICKS (uint32_t)(CALIB_CFG_L2_POLE_PAIRS_ALIGN_S * CALIB_TICKS_PER_SEC)
@@ -106,11 +100,14 @@
 #define CALIB_CFG_MAX_VOLTAGE_MAG_V    5.0f  /* 标定施加电压幅值上限(√(ud²+uq²))，防止烧管子 */
 
 /* ===================== 结果合理性范围（calib_validate.h 用）=====================
- * 从 motor_profile.h 的 MOTOR_* 参数派生，容差 ±50%。
+ * 从 motor_profile.h 的 MOTOR_* 参数派生。
  * 切换电机型号时自动适配，无需手动调整。
- * 拦截短路/断路/异常值，兼顾误测拦截与误触发规避。*/
-#define CALIB_CFG_R_MIN_OHM      (MOTOR_R * 0.1f)    /* R 下限 = 标称×0.2 */
-#define CALIB_CFG_R_MAX_OHM      (MOTOR_R * 10.0f)   /* R 上限 = 标称×3.0 */
+ * 拦截短路/断路/异常值，兼顾误测拦截与误触发规避。
+ *
+ * R 范围宽(0.01~50Ω): 低电阻电机(如 5010 R=0.12Ω)死区非线性使两点法
+ * 结果可能偏离标称值数倍, 过窄范围会误拦。宽范围仅拦截明显异常(短路<0.01/断路>50)。*/
+#define CALIB_CFG_R_MIN_OHM      0.01f               /* R 下限: 10mΩ(防短路判 0) */
+#define CALIB_CFG_R_MAX_OHM      50.0f               /* R 上限: 50Ω(防断路判 ∞) */
 #define CALIB_CFG_LD_MIN_H       (MOTOR_LD * 0.2f)   /* Ld 下限 */
 #define CALIB_CFG_LD_MAX_H       (MOTOR_LD * 3.0f)   /* Ld 上限 */
 #define CALIB_CFG_LQ_MIN_H       (MOTOR_LQ * 0.2f)   /* Lq 下限 */

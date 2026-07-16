@@ -37,6 +37,11 @@ static struct
 	float prev_mech_deg;        /* 极对数扫描：上一 tick 机械角原始读数(deg，用于差分)*/
 	float test_voltage;         /* 本次施加的测试电压（R/Ld/Lq/flux 算结果时用）*/
 	float r_id_low;             /* R 两点差分法：低电压档稳态 id 均值（高档采样时暂存）*/
+	/* R 标定诊断字段(调试器观察用): 区分 step 4 失败是 id≈0 还是 d_id≈0 */
+	float r_id_high;            /* 高档采样 id 均值 */
+	float r_d_id;               /* d_id = id_high - id_low */
+	float r_d_v;                /* d_v = V2 - V1 */
+	float r_result;             /* R 计算结果(失败时为 0) */
 } s_l2;
 
 /* ===================== R 辨识（两点差分法 R = ΔV/Δid）=====================
@@ -80,7 +85,9 @@ static calib_state_e poll_resistance(void)
 			m->foc.clarke(&m->foc); /* 刷新 i_alphaBeta（内部调 current_callback）*/
 			m->foc.park(&m->foc);   /* 刷新 i_dq */
 			float id = m->foc.i_dq.d;
-			if (!isfinite(id) || id < 0.001f)
+			/* 用绝对值检查: 电流方向可能因板级(DRV8301 vs INA199B1)或 ADC 通道
+			 * 极性不同而反转, 只要 |id| 足够大即说明电机有响应 */
+			if (!isfinite(id) || fabsf(id) < 0.001f)
 			{
 				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
 				calib_hw_exit(&s_l2.session);
@@ -113,7 +120,7 @@ static calib_state_e poll_resistance(void)
 			m->foc.clarke(&m->foc);
 			m->foc.park(&m->foc);
 			float id = m->foc.i_dq.d;
-			if (!isfinite(id) || id < 0.001f)
+			if (!isfinite(id) || fabsf(id) < 0.001f)
 			{
 				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
 				calib_hw_exit(&s_l2.session);
@@ -126,14 +133,19 @@ static calib_state_e poll_resistance(void)
 			float id_high = calib_step_average(&s_l2.step);
 			float d_id = id_high - s_l2.r_id_low;
 			float d_v = CALIB_CFG_L2_R_TEST_VOLTAGE_V - CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V;
+			/* 诊断: 记录高档 id / d_id / d_v 供调试器观察 */
+			s_l2.r_id_high = id_high;
+			s_l2.r_d_id = d_id;
+			s_l2.r_d_v = d_v;
 			/* Δid 过小则差分放大噪声，判为异常 */
-			if (!isfinite(d_id) || d_id < 0.001f)
+			if (!isfinite(d_id) || fabsf(d_id) < 0.001f)
 			{
 				calib_mgr_set_fail_reason(CALIB_FAIL_SAMPLE_ABNORMAL);
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
 			float R = d_v / d_id;
+			s_l2.r_result = R;
 			if (!calib_validate_r(R))
 			{
 				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
