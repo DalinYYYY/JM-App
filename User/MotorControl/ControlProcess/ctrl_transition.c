@@ -90,9 +90,9 @@ void ref_smooth_cfg_init_defaults(ref_smooth_cfg_t *cfg)
 	cfg->voltage_thresh = 1.0f;
 	cfg->duty_thresh = 0.1f;
 	/* 速率模式默认启用（>0 即生效），覆盖 smooth_duration */
-	cfg->pos_rate = 50.0f;		/* 50 rad/s：5 rad 突变 → 0.1s 过渡 */
-	cfg->vel_rate = 500.0f;		/* 500 rad/s²：50 rad/s 突变 → 0.1s 过渡 */
-	cfg->torque_rate = 20.0f;	/* 20 N·m/s */
+	cfg->pos_rate = 100.0f;     /* 50 rad/s：5 rad 突变 → 0.1s 过渡 */
+	cfg->vel_rate = 500.0f;     /* 500 rad/s²：50 rad/s 突变 → 0.1s 过渡 */
+	cfg->torque_rate = 20.0f;   /* 20 N·m/s */
 	cfg->current_rate = 100.0f; /* 100 A/s */
 }
 
@@ -108,9 +108,9 @@ static float ref_smooth_absf(float v)
  *          所有 rate 都 <= 0 时返回 0，由调用方回退到 smooth_duration。
  */
 static uint32_t ref_smooth_calc_duration_by_rate(const motor_ref_t *raw,
-												 const motor_ref_t *prev,
-												 const ref_smooth_cfg_t *cfg,
-												 float dt)
+                                                 const motor_ref_t *prev,
+                                                 const ref_smooth_cfg_t *cfg,
+                                                 float dt)
 {
 	if (dt <= 0.0f)
 		return 0;
@@ -174,11 +174,11 @@ static bool ref_smooth_run_state_enabled(run_state_e s)
 }
 
 bool transition_ref_smooth_check(transition_t *trans,
-								 run_state_e run_state,
-								 const motor_ref_t *raw_ref,
-								 const motor_ref_t *prev_ref,
-								 const ref_smooth_cfg_t *cfg,
-								 float dt)
+                                 run_state_e run_state,
+                                 const motor_ref_t *raw_ref,
+                                 const motor_ref_t *prev_ref,
+                                 const ref_smooth_cfg_t *cfg,
+                                 float dt)
 {
 	/* 总开关关闭：完全跳过 */
 	if (!cfg->enable)
@@ -221,8 +221,7 @@ bool transition_ref_smooth_check(transition_t *trans,
 				exceed = true;
 			break;
 		case REF_CTRL_CURRENT:
-			if (ref_smooth_absf(raw_ref->id - prev_ref->id) > cfg->current_thresh ||
-				ref_smooth_absf(raw_ref->iq - prev_ref->iq) > cfg->current_thresh)
+			if (ref_smooth_absf(raw_ref->id - prev_ref->id) > cfg->current_thresh || ref_smooth_absf(raw_ref->iq - prev_ref->iq) > cfg->current_thresh)
 				exceed = true;
 			break;
 		default:

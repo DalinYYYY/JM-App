@@ -38,10 +38,10 @@ typedef enum
 #define CALIB_L7_ENABLE_L1_CURRENT_SENSOR 0 /* L1.3 电流传感器标定 */
 #define CALIB_L7_ENABLE_L2_PHASE_SEQ      1 /* L2.1 相序识别 */
 #define CALIB_L7_ENABLE_L2_POLE_PAIRS     1 /* L2.2 极对数辨识 */
-#define CALIB_L7_ENABLE_L2_RESISTANCE     1 /* L2.3 R 相电阻 (Ld/Lq/flux 前置) */
-#define CALIB_L7_ENABLE_L2_INDUCTANCE_D   1 /* L2.4 Ld */
-#define CALIB_L7_ENABLE_L2_INDUCTANCE_Q   1 /* L2.5 Lq */
-#define CALIB_L7_ENABLE_L2_FLUX_LINKAGE   1 /* L2.6 flux (需电机转动) */
+#define CALIB_L7_ENABLE_L2_RESISTANCE     0 /* L2.3 R 相电阻 (Ld/Lq/flux 前置) */
+#define CALIB_L7_ENABLE_L2_INDUCTANCE_D   0 /* L2.4 Ld */
+#define CALIB_L7_ENABLE_L2_INDUCTANCE_Q   0 /* L2.5 Lq */
+#define CALIB_L7_ENABLE_L2_FLUX_LINKAGE   0 /* L2.6 flux (需电机转动) */
 #define CALIB_L7_ENABLE_L3_ZERO_OFFSET    1 /* L3.1 编码器零位 */
 #define CALIB_L7_ENABLE_L3_DIRECTION      1 /* L3.2 编码器方向 */
 #define CALIB_L7_ENABLE_L4_KT             0 /* L4.1 力矩常数 */

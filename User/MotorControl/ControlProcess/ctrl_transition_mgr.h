@@ -21,6 +21,7 @@ typedef struct
 	ref_smooth_cfg_t smooth_cfg; /* 同模式渐变配置（完全内聚） */
 	run_state_e target_run_state; /* 模式切换过渡的目标 run_state */
 	float dt;					/* 控制周期(s)，默认 100µs，供 rate 模式算 duration，运行期可改 */
+	bool stop_pending;			/* STOP 延迟过渡标志：过渡完成后才真正切 READY */
 } transition_mgr_t;
 
 /**
@@ -49,6 +50,18 @@ void transition_mgr_on_mode_switch(transition_mgr_t *mgr,
 								   run_state_e new_state,
 								   uint32_t trans_count,
 								   const motor_ref_t *cur_ref);
+
+/**
+ * @brief STOP 命令延迟过渡：保持当前模式，目标渐变到零，完成后自动切 READY
+ * @details 不立即切 top_fsm，而是把 cmd 目标清零（POSITION 类停在当前 ref 位置），
+ *          设 stop_pending，让 transition_mgr_step 的 ref_smooth 引擎渐变到零。
+ *          渐变完成后由 step 自动调 top_fsm_switch(READY)。
+ *          ESTOP/FAULT 触发 on_top_fsm_change 时立即中止 stop_pending。
+ * @param mgr 管理器指针
+ * @param sys 系统状态（读 run_state/ref，写 cmd）
+ * @return true 已启动停机过渡（延迟切 READY）；false 模式不支持（调用方应直接切 READY）
+ */
+bool transition_mgr_on_stop(transition_mgr_t *mgr, system_state_t *sys);
 
 /**
  * @brief 每拍步进（替代 motor_control_loop 的 if/else 分支 + 同模式渐变逻辑）

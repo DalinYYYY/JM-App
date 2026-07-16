@@ -97,7 +97,7 @@
 /* ===================== 全局健壮性参数 ===================== */
 #define CALIB_CFG_GLOBAL_TIMEOUT_S     30.0f /* 单次标定全局超时(s)，防止电机卡转挂死 */
 #define CALIB_CFG_GLOBAL_TIMEOUT_TICKS (uint32_t)(CALIB_CFG_GLOBAL_TIMEOUT_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_MAX_VOLTAGE_MAG_V    5.0f  /* 标定施加电压幅值上限(√(ud²+uq²))，防止烧管子 */
+#define CALIB_CFG_MAX_VOLTAGE_MAG_V    7.0f  /* 标定施加电压幅值上限(√(ud²+uq²)) */
 
 /* ===================== 结果合理性范围（calib_validate.h 用）=====================
  * 从 motor_profile.h 的 MOTOR_* 参数派生。

@@ -220,8 +220,8 @@ static void publish_motion(motor_motion_t *mo, const motion_param_t *mp, multitu
 	mo->single_turn_rad = mt->last_single_rad;
 	mo->multiturn = mt->get_turns(mt);
 	mo->position_rad = mt->get_position(mt);
-	mo->velocity_rad_s = mp->slide_rad_s;
-	mo->velocity_filt = mp->slide_rad_s;
+	mo->velocity_rad_s = mp->rad_s;       /* 原始速度(DIFF=差分, LSQ/PLL=观测输出) */
+	mo->velocity_filt = mp->slide_rad_s;  /* 滤波后速度(DIFF=滑窗, LSQ/PLL=同原始) */
 	mo->accel_rad_s2 = mp->acceleration;
 }
 
