@@ -26,7 +26,9 @@
 #if defined(USE_DEV_POWER_MONITOR)
 #define PM_VREF          (3.3f)
 #define PM_RESOLUTION    (4096.0f)
-#define PM_VBUS_RATIO    (11.0f) /* 板级分压网络 11:1 */
+#ifndef PM_VBUS_RATIO
+#define PM_VBUS_RATIO    (11.0f) /* 板级分压网络 11:1 (SFOC 默认) */
+#endif
 #define PM_IBUS_RATIO    (2.0f)  /* 1/(gain*shunt) = 1/(50*0.01) */
 #define PM_IBUS_OFFSET_V (1.65f) /* INA199B1 REF=VREF/2, 零电流偏置电压 */
 #define PM_TEMP_RATIO    (10.0f)
@@ -46,19 +48,28 @@
 
 #if defined(USE_DEV_HALF_BRIDGE)
 /* CC4 比较匹配触发 ADC 注入组: 中心对齐下采样点落在波峰后约 (ARR-CCR)*5.88ns
- * 8480 距波峰(ARR=8500)约 118ns, 贴近波峰(纹波中点/离开关边沿最远); 留余量避免峰值临界漏触发 */
+ * 8480 距波峰(ARR=8500)约 118ns, 贴近波峰(纹波中点/离开关边沿最远); 留余量避免峰值临界漏触发
+ * @note F4 TIM1 Period=8400, 需在 dev_config_board.h 中 #undef+#define 覆盖为 8380, 否则 CCR>ARR 导致 ADC 永不触发 */
+#ifndef HALF_BRIDGE_ADC_TRIG_CCR
 #define HALF_BRIDGE_ADC_TRIG_CCR (8480u)
+#endif
 #endif
 
 #if defined(USE_DEV_PHASE_CURRENT)
+#ifndef PHASE_CURRENT_GAIN
 #define PHASE_CURRENT_GAIN       (50.0f)
+#endif
+#ifndef PHASE_CURRENT_SHUNT
 #define PHASE_CURRENT_SHUNT      (0.01f)
+#endif
 #define PHASE_CURRENT_VREF       (3.3f)
 #define PHASE_CURRENT_RESOLUTION (4096.0f)
 #define PHASE_CURRENT_LPF_ALPHA  (0.9f)
 /* INA199B1 REF 标称 1.65V (VREF/2), 对应 ADC = 1.65/3.3 * 4096 = 2048
  * 仅作为校准前的兜底默认值; 启动时 cur_loop_calibrate_offset 会用实测均值覆盖 */
+#ifndef PHASE_CURRENT_ZERO_ADC
 #define PHASE_CURRENT_ZERO_ADC (2048u)
+#endif
 #endif
 
 #if defined(USE_DEV_COMMUN_VESC)
