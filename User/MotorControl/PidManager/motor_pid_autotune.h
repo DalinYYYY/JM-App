@@ -60,16 +60,18 @@ int motor_pid_autotune_position(const motor_info_t *info, float bandwidth_hz,
                                 autotune_result_t *out);
 
 /**
- * @brief  事务性应用：计算三环并写入 ControlParam_t
+ * @brief  事务性应用：按 ring_select 计算指定环并写入 ControlParam_t
  * @param  info          motor_info 指针（可写，理论值写入 control 段）
+ * @param  ring_select   环选择: 0=电流环 1=速度环 2=位置环 3=全部三环
  * @param  current_bw_hz 电流环带宽 (Hz)，≤0 用默认
  * @param  velocity_bw_hz 速度环带宽 (Hz)，≤0 用默认
  * @param  position_bw_hz 位置环带宽 (Hz)，≤0 用默认
  * @retval 0=成功, -1=参数无效, -2=辨识数据未就绪
- * @note   事务语义：任一环计算失败则全部不写入，返回错误码。
+ * @note   事务语义：所选环中任一计算失败则全部不写入，返回错误码。
+ *         未选中的环不计算、不校验、不写入，保留 ControlParam_t 原值。
  *         写入后需调用 motor_pid_reload() 生效，由上位机显式发 0xEA 固化。
  */
-int motor_pid_autotune_apply(motor_info_t *info, float current_bw_hz,
-                             float velocity_bw_hz, float position_bw_hz);
+int motor_pid_autotune_apply(motor_info_t *info, uint8_t ring_select,
+                             float current_bw_hz, float velocity_bw_hz, float position_bw_hz);
 
 #endif /* __MOTOR_PID_AUTOTUNE_H__ */

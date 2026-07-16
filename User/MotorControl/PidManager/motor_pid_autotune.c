@@ -5,6 +5,7 @@
  */
 #include "motor_pid_autotune.h"
 #include <stddef.h>
+#include <stdbool.h>
 #include <math.h>
 
 #ifndef M_PI
@@ -19,15 +20,15 @@
 /**
  * @brief 检查辨识数据是否就绪
  * @return true=就绪, false=未就绪
+ * @note 不依赖 is_calibrated 整体标志, 与 motor_profile_apply_info 的
+ *       逐字段零值 fallback 设计一致: 启动时未标定字段已被默认值填充,
+ *       此处只校验字段有效性(R/Ld 非零)。部分标定或纯默认值均可工作。
  */
 static int check_calib_ready(const motor_info_t *info)
 {
 	if (info == NULL)
 		return 0;
-	/* is_calibrated 标志位检查 */
-	if (info->blocks.motor_calib.is_calibrated != 1U)
-		return 0;
-	/* R/L 非默认值检查（默认值极小，辨识后应有有效值） */
+	/* R/Ld 有效性检查（启动时 motor_profile_apply_info 已用默认值填充零值字段） */
 	float r = info->blocks.motor_calib.phase_resistance;
 	float ld = info->blocks.motor_calib.phase_inductance_d;
 	if (r < 0.001f || ld < 0.00001f)
@@ -121,38 +122,59 @@ int motor_pid_autotune_position(const motor_info_t *info, float bandwidth_hz,
 	return 0;
 }
 
-int motor_pid_autotune_apply(motor_info_t *info, float current_bw_hz,
-                             float velocity_bw_hz, float position_bw_hz)
+int motor_pid_autotune_apply(motor_info_t *info, uint8_t ring_select,
+                             float current_bw_hz, float velocity_bw_hz, float position_bw_hz)
 {
 	if (info == NULL)
 		return -1;
+	if (ring_select > 3)
+		return -1;
 
 	autotune_result_t d, q, v, p;
+	bool do_cur = (ring_select == 0 || ring_select == 3);
+	bool do_vel = (ring_select == 1 || ring_select == 3);
+	bool do_pos = (ring_select == 2 || ring_select == 3);
 
-	/* 事务语义：先计算全部环，任一失败则不写入 */
-	int ret = motor_pid_autotune_current(info, current_bw_hz, &d, &q);
-	if (ret != 0)
-		return ret;
+	/* 事务语义：先计算所选环，任一失败则不写入 */
+	if (do_cur)
+	{
+		int ret = motor_pid_autotune_current(info, current_bw_hz, &d, &q);
+		if (ret != 0)
+			return ret;
+	}
+	if (do_vel)
+	{
+		int ret = motor_pid_autotune_velocity(info, velocity_bw_hz, &v);
+		if (ret != 0)
+			return ret;
+	}
+	if (do_pos)
+	{
+		int ret = motor_pid_autotune_position(info, position_bw_hz, &p);
+		if (ret != 0)
+			return ret;
+	}
 
-	ret = motor_pid_autotune_velocity(info, velocity_bw_hz, &v);
-	if (ret != 0)
-		return ret;
-
-	ret = motor_pid_autotune_position(info, position_bw_hz, &p);
-	if (ret != 0)
-		return ret;
-
-	/* 全部成功，事务提交：写入 ControlParam_t */
+	/* 全部所选环成功，事务提交：写入 ControlParam_t（未选环保留原值）*/
 	ControlParam_t *ctl = &info->blocks.control;
-	ctl->kp_ld = d.kp;
-	ctl->ki_ld = d.ki;
-	ctl->kp_lq = q.kp;
-	ctl->ki_lq = q.ki;
-	ctl->integral_limit = q.integral_limit;
-	ctl->kp_s = v.kp;
-	ctl->ki_s = v.ki;
-	ctl->speed_integral_limit = v.integral_limit;
-	ctl->kp_p = p.kp;
+	if (do_cur)
+	{
+		ctl->kp_ld = d.kp;
+		ctl->ki_ld = d.ki;
+		ctl->kp_lq = q.kp;
+		ctl->ki_lq = q.ki;
+		ctl->integral_limit = q.integral_limit;
+	}
+	if (do_vel)
+	{
+		ctl->kp_s = v.kp;
+		ctl->ki_s = v.ki;
+		ctl->speed_integral_limit = v.integral_limit;
+	}
+	if (do_pos)
+	{
+		ctl->kp_p = p.kp;
+	}
 
 	return 0;
 }

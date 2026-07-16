@@ -233,9 +233,9 @@ static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw
 		return JM_ERR_OUT_OF_RANGE;
 	}
 
-	/* 事务性计算并写入 ControlParam_t */
+	/* 事务性计算并写入 ControlParam_t（按 ring_select 仅计算所选环）*/
 	motor_info_t *info = motor_info_storage_get();
-	int ret = motor_pid_autotune_apply(info, cur_bw, vel_bw, pos_bw);
+	int ret = motor_pid_autotune_apply(info, ring_select, cur_bw, vel_bw, pos_bw);
 	if (ret != 0)
 	{
 		if (out_fail_reason != NULL)
