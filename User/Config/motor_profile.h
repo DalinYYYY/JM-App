@@ -20,9 +20,10 @@
  */
 
 /* ===================== 电机型号选择（修改此行切换）===================== */
-#define MOTOR_PROFILE_GM4820H 1
-#define MOTOR_PROFILE_DEMO    2 /* 示例占位，演示多型号切换 */
-#define MOTOR_PROFILE         MOTOR_PROFILE_GM4820H
+#define MOTOR_PROFILE_GM4820H  1
+#define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
+#define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
+#define MOTOR_PROFILE          MOTOR_PROFILE_GM4820H
 
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
@@ -45,6 +46,33 @@
 #define MOTOR_RATED_TORQUE    0.2f    /* 额定转矩(Nm) PDF */
 #define MOTOR_PEAK_TORQUE     0.5f    /* 峰值转矩(Nm) */
 #define MOTOR_INERTIA         1e-5f   /* 转子惯量(kg·m²) 估算 */
+
+#elif MOTOR_PROFILE == MOTOR_PROFILE_5010_360
+/* MKS 5010 360KV 无刷云台电机（参数来源：厂家规格书）
+ * 结构 12N14P / WYE / SPMSM（表贴式，Ld≈Lq）
+ * 厂家参数: R=120mΩ, L=50μH, Imax=20A, Pmax=300W, 极对数=7, DC12~24V
+ * 派生计算:
+ *   磁链 flux = 60/(2π·KV·pp) = 60/(2π·360·7) ≈ 3.79e-5 Wb
+ *   转矩常数 KT = 1.5·pp·flux ≈ 0.398e-3 Nm/A（注: KV法反算磁链对低KV大电机偏小，
+ *                实际应以堵转转矩实测为准；此值仅用于首次上电）
+ *   反电动势常数 KE = flux·pp ≈ 2.65e-4 V/(rad/s)
+ *   时间常数 τ = L/R = 50μH/0.12Ω ≈ 0.42ms */
+#define MOTOR_NAME            "MKS5010_360KV"
+#define MOTOR_R               0.12f     /* 相电阻(Ω) 厂家: 120mΩ */
+#define MOTOR_LD              50e-6f    /* d轴电感(H) 厂家: 50μH */
+#define MOTOR_LQ              50e-6f    /* q轴电感(H) SPMSM: Ld≈Lq */
+#define MOTOR_FLUX            3.79e-5f  /* 磁链(Wb) KV=360反算: 60/(2π·360·7) */
+#define MOTOR_KT              0.398e-3f /* 转矩常数(Nm/A) = 1.5·pp·flux */
+#define MOTOR_KE              2.65e-4f  /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      7         /* 极对数 厂家: 7 (12N14P) */
+#define MOTOR_RATED_CURRENT   2.0f      /* 额定电流(A) 保守取 Imax/2 */
+#define MOTOR_PEAK_CURRENT    6.0f      /* 峰值电流(A) 厂家: 20A */
+#define MOTOR_MAX_SPEED       150.0f    /* 最大转速(rad/s) ~1432RPM(24V/360KV) */
+#define MOTOR_RATED_VOLTAGE   12.0f     /* 额定电压(V) 厂家: DC12~24V, 取上限 */
+#define MOTOR_RATED_SPEED_RPM 1432.0f   /* 额定转速(rpm) ≈ 24V×360KV */
+#define MOTOR_RATED_TORQUE    0.08f     /* 额定转矩(Nm) 估算: KT×Irated ≈ 4mNm(偏小,待实测) */
+#define MOTOR_PEAK_TORQUE     0.2f      /* 峰值转矩(Nm) 估算 */
+#define MOTOR_INERTIA         5e-6f     /* 转子惯量(kg·m²) 估算: 5010尺寸 */
 
 #elif MOTOR_PROFILE == MOTOR_PROFILE_DEMO
 /* 示例：演示如何添加第二个电机型号（占位，非真实参数）*/
@@ -84,7 +112,7 @@ void motor_profile_apply_info(void *cfg);
 /* profile 配置版本号：修改 MOTOR_PROFILE 宏切换电机型号时递增此版本号，
  * 用于上电时检测 Flash 中存储的参数是否对应当前固件的 profile。
  * 版本不匹配时触发重新初始化（init + apply_default + save）。*/
-#define MOTOR_PROFILE_CONFIG_VERSION 1U
+#define MOTOR_PROFILE_CONFIG_VERSION 2U
 
 void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上电用 */
 
