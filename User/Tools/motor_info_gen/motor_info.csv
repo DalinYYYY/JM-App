@@ -12,7 +12,7 @@ phase_resistance,相电阻,MotorCalibParam,RW,float,0.1,0.001,50,ohm,0x0080,20,�
 phase_inductance_d,d轴相电感,MotorCalibParam,RW,float,0.0001,0.000001,0.1,H,0x0080,21,标定值 电流环Kp=ωc·Ld依赖此值
 phase_inductance_q,q轴相电感,MotorCalibParam,RW,float,0.00012,0.000001,0.1,H,0x0080,22,标定值 IPMSM的Lq一般略大于Ld
 flux_linkage,永磁体磁链,MotorCalibParam,RW,float,0.001,0.00001,1,Wb,0x0080,23,标定值 反电势法辨识
-torque_constant,转矩常数,MotorCalibParam,RW,float,0.1,0.001,50,Nm/A,0x0080,24,标定值 速度环Kp=J·ωc/Kt依赖此值
+torque_constant,转矩常数,MotorCalibParam,RW,float,0.1,0.00001,50,Nm/A,0x0080,24,标定值 速度环Kp=J·ωc/Kt依赖此值
 rotor_inertia,转子惯量,MotorCalibParam,RW,float,0.00001,0.0000001,1,kg·m²,0x0080,25,标定值 速度环Kp/Ki依赖此值
 friction_coulomb,库仑摩擦力矩,MotorCalibParam,RW,float,0,0,500,Nm,0x0080,26,标定值 L5摩擦辨识
 friction_viscous,粘滞摩擦系数,MotorCalibParam,RW,float,0,0,100,Nm/(rad/s),0x0080,27,标定值 L5摩擦辨识

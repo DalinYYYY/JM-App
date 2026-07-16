@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.h
  * @brief   MotorInfo 配置参数 API 接口（1024B 整块空间）
- * @date    2026-07-09
+ * @date    2026-07-15
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -26,7 +26,7 @@ extern "C"
 #endif
 
 /* ===== 自动生成元信息 ===== */
-#define MOTOR_INFO_GEN_DATE      "2026-07-09"
+#define MOTOR_INFO_GEN_DATE      "2026-07-15"
 #define MOTOR_INFO_PARAM_COUNT   85
 #define MOTOR_INFO_VERSION_MAJOR 1
 #define MOTOR_INFO_VERSION_MINOR 0

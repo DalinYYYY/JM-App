@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.c
  * @brief   MotorInfo 配置参数 API 实现
- * @date    2026-07-09
+ * @date    2026-07-15
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -177,7 +177,7 @@ int motor_info_validate(const motor_info_t *cfg)
 		return 22; /* phase_inductance_q */
 	if (cfg->blocks.motor_calib.flux_linkage < 0.00001f || cfg->blocks.motor_calib.flux_linkage > 1.0f)
 		return 23; /* flux_linkage */
-	if (cfg->blocks.motor_calib.torque_constant < 0.001f || cfg->blocks.motor_calib.torque_constant > 50.0f)
+	if (cfg->blocks.motor_calib.torque_constant < 0.00001f || cfg->blocks.motor_calib.torque_constant > 50.0f)
 		return 24; /* torque_constant */
 	if (cfg->blocks.motor_calib.rotor_inertia < 0.0000001f || cfg->blocks.motor_calib.rotor_inertia > 1.0f)
 		return 25; /* rotor_inertia */
@@ -654,7 +654,7 @@ int motor_info_set_torque_constant(motor_info_t *cfg, float value)
 {
 	if (cfg == NULL)
 		return -EINVAL;
-	if (value < 0.001f || value > 50.0f)
+	if (value < 0.00001f || value > 50.0f)
 		return -EINVAL; /* 越界 */
 	cfg->blocks.motor_calib.torque_constant = value;
 	return 0;
