@@ -23,26 +23,31 @@
 
 dev_power_monitor_t dev_power_monitor;
 
-/* 启动规则组DMA: 统计各ADC通道数→逐ADC校准→逐ADC启动DMA */
+/* 启动规则组DMA: 统计各ADC通道数→分配DMA rank→逐ADC校准→逐ADC启动DMA
+ * 合成源通道(PM_IBUS_SOURCE=1时的PM_IBUS)无ADC配置, 跳过不参与DMA */
 static int dev_power_monitor_start(struct dev_power_monitor *pobj)
 {
 	assert_report(pobj != NULL);
 	int status = DEV_EOK;
 	memset(pobj->adc_nbr, 0, sizeof(pobj->adc_nbr));
+	memset(pobj->ch_rank, 0xFF, sizeof(pobj->ch_rank));
 
-	/* 统计每个ADC上的规则通道数, 同时逐通道校准其ADC */
+	/* 统计每个ADC上的规则通道数, 同时为每个有效通道分配DMA rank
+	 * rank = 该通道在其ADC上已统计的通道序号(0~N-1), 与DMA序列顺序一致
+	 * 无ADC配置的通道(id<=DRV_ADC_INIT或id>=DRV_ADC_MAX)标记0xFF跳过 */
 	for (int i = 0; i < PM_CH_MAX; i++)
 	{
 		adcNumber_e id = power_monitor_list[i].id;
 		if (id > DRV_ADC_INIT && id < DRV_ADC_MAX)
 		{
+			pobj->ch_rank[i] = pobj->adc_nbr[id]; /* 分配当前rank */
 			pobj->adc_nbr[id]++;
+			drv_adc_calibration_start(id);
 		}
 		else
 		{
-			assert_report(0); /* 配置表ADC编号非法 */
+			/* 合成源或未配置通道: ch_rank 保持 0xFF, 不校准不启动DMA */
 		}
-		drv_adc_calibration_start(id);
 	}
 
 	/* 逐ADC启动DMA(仅启动有通道的ADC) */
@@ -112,7 +117,9 @@ static void dev_power_monitor_update(struct dev_power_monitor *pobj)
 static float dev_power_monitor_get_vbus(struct dev_power_monitor *pobj)
 {
 	assert_report(pobj != NULL);
-	pobj->vbus = pobj->voltage[DRV_ADC_1][PM_VBUS] * PM_VBUS_RATIO;
+	uint8_t rank = pobj->ch_rank[PM_VBUS];
+	assert_report(rank != 0xFFU); /* VBUS 必须有硬件ADC通道 */
+	pobj->vbus = pobj->voltage[DRV_ADC_1][rank] * PM_VBUS_RATIO;
 	return pobj->vbus;
 }
 
@@ -125,7 +132,9 @@ static float dev_power_monitor_get_ibus(struct dev_power_monitor *pobj)
 	return pobj->ibus;
 #else
 	/* HW_ADC 源: INA199B1 双向检测, 零电流时输出 VREF/2, 需减去偏置再乘比例 */
-	pobj->ibus = -((pobj->voltage[DRV_ADC_1][PM_IBUS] - pobj->ibus_offset) * PM_IBUS_RATIO);
+	uint8_t rank = pobj->ch_rank[PM_IBUS];
+	assert_report(rank != 0xFFU); /* IBUS 必须有硬件ADC通道 */
+	pobj->ibus = -((pobj->voltage[DRV_ADC_1][rank] - pobj->ibus_offset) * PM_IBUS_RATIO);
 	return pobj->ibus;
 #endif
 }
@@ -153,7 +162,7 @@ void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic,
 	/* 一阶低通滤波, 抑制小电流时三相采样噪声叠加导致的波动
 	 * 硬件 INA199B1 自带 RC 滤波, 合成方法无对应物, 这里数字补偿 */
 	dev_power_monitor.ibus = PM_IBUS_LPF_ALPHA * ibus_raw
-	                       + (1.0f - PM_IBUS_LPF_ALPHA) * dev_power_monitor.ibus;
+	                         + (1.0f - PM_IBUS_LPF_ALPHA) * dev_power_monitor.ibus;
 }
 #endif
 

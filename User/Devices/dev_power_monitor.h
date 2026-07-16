@@ -66,6 +66,8 @@ extern "C"
 	/**
 	 * @brief 电源监控设备对象
 	 * @param  adc_nbr                : 每个ADC上的规则通道数(start统计)
+	 * @param  ch_rank                : 各逻辑通道在其ADC的DMA序列中的rank(start分配)
+	 *                                   有效通道=0~N-1, 无ADC配置(合成源)=0xFF
 	 * @param  raw                    : 各ADC的DMA原始缓冲
 	 * @param  channel_nbr            : 规则组总通道数
 	 * @param  adc                    : 各通道平均后的ADC值
@@ -85,6 +87,7 @@ extern "C"
 	typedef struct dev_power_monitor
 	{
 		uint8_t adc_nbr[DRV_ADC_MAX];
+		uint8_t ch_rank[PM_CH_MAX];
 		uint32_t raw[DRV_ADC_MAX][PM_SAMPLE_NBRS];
 		uint8_t channel_nbr;
 		uint32_t adc[DRV_ADC_MAX][PM_CH_NBRS];
