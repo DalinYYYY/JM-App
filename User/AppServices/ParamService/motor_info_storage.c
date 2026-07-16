@@ -112,10 +112,11 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 	if (!pobj->inited)
 		return MOTOR_INFO_STORAGE_ERR_INIT;
 
-	/* 1. 保存前范围校验（透传 motor_info_validate 返回的越界 param_id，>0）
-     *    当前业务允许越界数据落盘（host 可写任意值），故不阻断；
-     *    保留校验仅用于未来策略切换（如需阻断则 if (vrc > 0) return vrc;） */
-	(void)motor_info_validate(cfg);
+	/* 1. 保存前必须通过范围校验。若允许无效数据落盘，本次 save
+	 *    虽会成功，但下次上电必然在 motorinfo_verify() 中失败并重走默认路径。 */
+	int vrc = motor_info_validate(cfg);
+	if (vrc != 0)
+		return (motor_info_storage_status_t)vrc;
 
 	/* 2. 拷贝到栈上临时副本,原地计算 CRC32
      *    （避免嵌套调用 motorinfo_crc32_compute 再开 1024B 栈导致栈溢出） */
@@ -126,7 +127,16 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 
 	/* 3. 通过 dev_flash 写入(内部轮转扇区+磨损均衡，关中断约 10-30ms) */
 	int rc = pobj->flash_dev.flash_write(&pobj->flash_dev, 0, (u64 *)&tmp, MOTORINFO_LEN_U64);
-	return (rc == DEV_EOK) ? MOTOR_INFO_STORAGE_OK : MOTOR_INFO_STORAGE_ERR_FLASH;
+	if (rc != DEV_EOK)
+		return MOTOR_INFO_STORAGE_ERR_FLASH;
+
+	/* 4. 保存后立即从 Flash 回读并走与上电完全相同的校验链。
+	 *    这能在当次 save 就区分“擦写失败”与“数据校验失败”。 */
+	rc = pobj->flash_dev.flash_read(&pobj->flash_dev, 0, (u64 *)&tmp, MOTORINFO_LEN_U64);
+	if (rc != DEV_EOK)
+		return MOTOR_INFO_STORAGE_ERR_FLASH;
+
+	return motorinfo_verify(&tmp);
 }
 
 /**
@@ -200,10 +210,14 @@ motor_info_storage_status_t motor_info_storage_init(void)
 			motor_profile_apply_info_default(&pobj->motor_info);
 
 			/* B3. 回写 Flash（下次上电走路径A，直接 load）
-			 *     保存失败不阻断启动（内存数据已正确） */
+			 *     保存失败不阻断启动（内存数据已正确），但输出错误便于排查 */
 			if (pobj->inited)
 			{
-				(void)motorinfo_ops_save(pobj, &pobj->motor_info);
+				motor_info_storage_status_t sr = motorinfo_ops_save(pobj, &pobj->motor_info);
+				if (sr != MOTOR_INFO_STORAGE_OK)
+				{
+					/* save 失败: Flash 擦写异常, 下次上电仍走路径B */
+				}
 			}
 		}
 
