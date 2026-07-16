@@ -4,7 +4,7 @@
 #include "adc.h"
 #include "motor_loop.h"
 
-// 电流环中断任务 典型频率  20KHZ
+// 电流环中断任务 典型频率  10KHZ
 void CURRENT_LOOP_IRQ_TASK(ADC_HandleTypeDef *hadc)
 {
 	if (hadc->Instance == UVW_CURRENT_U_HANDLE.Instance)
