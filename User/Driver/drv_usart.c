@@ -431,4 +431,35 @@ void usart_idle_test(void)
 	}
 }
 
+/**
+ * @brief       UART 错误回调(覆盖 HAL weak 实现)
+ * @note        本回调针对 F4 HAL DMA bug 修复:
+ *              F4 HAL 在 DMA 模式下遇到 ORE/NE/FE 错误时会调用 UART_EndRxTransfer
+ *              永久禁用 DMAR 位并中止 DMA RX stream, 导致接收彻底瘫痪。
+ *              G4 HAL 的 __HAL_UART_CLEAR_IDLEFLAG 写 ICR 不读 DR, 错误概率极低,
+ *              本回调在 G4 上虽会执行但属冗余保护, 不影响功能。
+ *              (DMA 此时已被 HAL 停止, 读 DR 不再与 DMA 竞争, 安全)
+ * @sa          项目记忆 2026-07-15: F4 HAL __HAL_UART_CLEAR_IDLEFLAG 读 SR+DR 引发 ORE
+ * @sa          drv_usart.c 第 23 行: HAL 头由 main.h 自动适配各板
+ */
+void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart)
+{
+	usartNumber_e i;
+	for (i = DRV_UART1; i < DRV_UART_NUMBER_MAX; i++)
+	{
+		if (s_uart_map[i] == huart && dam_rx[i].p != NULL && dam_rx[i].max > 0)
+		{
+			/* 清错误标志(F4: 读SR+DR, 此时 DMA 已停, 安全) */
+			__HAL_UART_CLEAR_IDLEFLAG(huart);
+			/* 停止并重启 DMA 接收 */
+			HAL_UART_DMAStop(huart);
+			HAL_UART_Receive_DMA(huart, dam_rx[i].p, dam_rx[i].max);
+			__HAL_UART_ENABLE_IT(huart, UART_IT_IDLE);
+			dam_rx[i].last_error = -(int)(huart->ErrorCode);
+			huart->ErrorCode = HAL_UART_ERROR_NONE;
+			break;
+		}
+	}
+}
+
 #endif /* USE_USART_DRIVER */
