@@ -299,6 +299,10 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 		return;
 	}
 
+	/* ---- STOP 延迟过渡期间：拒绝其他命令（ESTOP 已上面处理）---- */
+	if (sys->trans_mgr.stop_pending)
+		return;
+
 	/* ---- 故障态：仅响应清除故障 ---- */
 	if (sys->top_state == TOP_FSM_FAULT)
 	{
@@ -342,11 +346,19 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 			return;
 
 		case CONTROL_MODE_STOP:
-			// 停止运行：RUN → READY（保持使能）
+			/* 停止运行：RUN → READY（保持使能）
+			 * 支持停机过渡的模式：启动延迟过渡，保持当前模式减速到零，完成后自动切 READY
+			 * 不支持的模式（MIT/HOLD/直控）：立即切 READY */
 			if (sys->top_state == TOP_FSM_RUN)
-				top_fsm_switch(sys, TOP_FSM_READY);
-			if (sys->top_state == TOP_FSM_READY)
+			{
 				sys->ctrl_mode = cmd;
+				if (!transition_mgr_on_stop(&sys->trans_mgr, sys))
+					top_fsm_switch(sys, TOP_FSM_READY);
+			}
+			else if (sys->top_state == TOP_FSM_READY)
+			{
+				sys->ctrl_mode = cmd;
+			}
 			return;
 
 		case CONTROL_MODE_ENTER_BOOTLOADER:
