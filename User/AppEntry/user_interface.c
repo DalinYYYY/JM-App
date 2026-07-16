@@ -22,11 +22,18 @@
 #include "dev_dwt_counter.h"
 #include "dev_power_monitor.h"
 #include "dev_commun_uart.h"
+#if defined(USE_DEV_DRV8301)
+#include "dev_drv8301.h"
+#endif
 #include "motor_info_storage.h"
 #include "motor_loop.h"
 #include "motor_loop_config.h"
 #include "runtime_param.h"
-#include "tim.h" // TODO: 避免直接依赖具体外设头，改为抽象接口（如 timer.h），或通过 control_irq.c 传入时钟频率等参数实现解耦
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER == 0u)
+/* 虚拟电机模式: 依赖 htim2/htim5 触发周期中断
+ * (真实电机模式 MOTOR_LOOP_ENABLE_DEV_DRIVER==1 由 ADC 注入中断驱动, 不需要 tim.h) */
+#include "tim.h"
+#endif
 
 static void hardware_init(void)
 {
@@ -40,6 +47,16 @@ static void hardware_init(void)
 	 * 须在 motor_loop_init 之前启动规则组 DMA(独立于注入组, 不依赖 TIM1 触发) */
 	dev_power_monitor_init(&dev_power_monitor);
 	(void)dev_power_monitor.start(&dev_power_monitor);
+
+#if defined(USE_DEV_DRV8301)
+	/* DRV8301 SPI 寄存器配置(须在 motor_loop_init/dev_motor_enable 之前)
+	 * CTRL1=0x003C: GAIN=40V/V(D2:D1=10b), DC_CAL=0(正常模式), OCTW=111(默认保护)
+	 *   注: DRV8301 上电默认 DC_CAL=1(校准模式), SO1/SO2 输出固定电压, 电流采样恒为0,
+	 *       必须通过 SPI 写入 CTRL1 清除 DC_CAL 位才能正常采样电流。
+	 * CTRL2=0x0006: GATE_CURRENT=3.0A(D2:D1=11b), 6PWM mode(D7=0), OCP=current limit(D5:D4=00) */
+	dev_drv8301_init(&g_dev_drv8301, DRV8301_ID_1);
+	g_dev_drv8301.init(&g_dev_drv8301);
+#endif
 
 	/* 初始化电机三环控制（dev_motor + 状态机 + 级联控制）
      * 电流环频率由 ADC 注入转换中断决定，此处传入实际中断频率 */

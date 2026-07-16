@@ -40,6 +40,11 @@ static int dev_phase_current_start(struct dev_adc_injected *pobj)
 	/* step 1: 遍历配置表, 同一ADC内按出现次序分配rank1~rankN */
 	for (int i = 0; i < ADCX_INX_INJECTED_MAX; i++)
 	{
+#if defined(DRV8301_TWO_PHASE_CURRENT)
+		/* 2-shunt: 跳过合成相, 不为其分配注入序列rank(占位通道不参与ADC转换) */
+		if (i == DRV8301_TWO_PHASE_SYNTH_PHASE)
+			continue;
+#endif
 		adcNumber_e id = phase_current_list[i].id;
 		assert_report(id > DRV_ADC_INIT && id < DRV_ADC_MAX);
 
@@ -67,9 +72,30 @@ static int dev_phase_current_start(struct dev_adc_injected *pobj)
 static void dev_phase_current_get_value(struct dev_adc_injected *pobj)
 {
 	assert_report(pobj != NULL);
+#if defined(DRV8301_TWO_PHASE_CURRENT)
+	/* 2-shunt: 仅读实测两相, 合成相由基尔霍夫定律计算(不读占位通道).
+	 * DRV8301_TWO_PHASE_SYNTH_PHASE 指定合成相: 0=IA 1=IB 2=IC (预处理阶段枚举不可见, 用数值) */
+#if (DRV8301_TWO_PHASE_SYNTH_PHASE == 0) /* IA 合成: 读 IB, IC */
+	pobj->adc.b = drv_adc_injected_get_value(pobj->src[ADCX_IB].id, pobj->src[ADCX_IB].rank);
+	pobj->adc.c = drv_adc_injected_get_value(pobj->src[ADCX_IC].id, pobj->src[ADCX_IC].rank);
+	pobj->adc.a = -(pobj->adc.b + pobj->adc.c);
+#elif (DRV8301_TWO_PHASE_SYNTH_PHASE == 1) /* IB 合成: 读 IA, IC */
+	pobj->adc.a = drv_adc_injected_get_value(pobj->src[ADCX_IA].id, pobj->src[ADCX_IA].rank);
+	pobj->adc.c = drv_adc_injected_get_value(pobj->src[ADCX_IC].id, pobj->src[ADCX_IC].rank);
+	pobj->adc.b = -(pobj->adc.a + pobj->adc.c);
+#elif (DRV8301_TWO_PHASE_SYNTH_PHASE == 2) /* IC 合成: 读 IA, IB */
+	pobj->adc.a = drv_adc_injected_get_value(pobj->src[ADCX_IA].id, pobj->src[ADCX_IA].rank);
+	pobj->adc.b = drv_adc_injected_get_value(pobj->src[ADCX_IB].id, pobj->src[ADCX_IB].rank);
+	pobj->adc.c = -(pobj->adc.a + pobj->adc.b);
+#else
+#error "DRV8301_TWO_PHASE_SYNTH_PHASE must be 0(IA), 1(IB) or 2(IC)"
+#endif
+#else
+	/* 3-shunt: 三相全实测 (SFOC 等板) */
 	pobj->adc.a = drv_adc_injected_get_value(pobj->src[ADCX_IA].id, pobj->src[ADCX_IA].rank);
 	pobj->adc.b = drv_adc_injected_get_value(pobj->src[ADCX_IB].id, pobj->src[ADCX_IB].rank);
 	pobj->adc.c = drv_adc_injected_get_value(pobj->src[ADCX_IC].id, pobj->src[ADCX_IC].rank);
+#endif
 }
 
 /* 原始ADC值去偏置后转为采样电压(V) */

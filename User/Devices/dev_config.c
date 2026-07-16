@@ -8,6 +8,7 @@
 #include "dev_led.h"
 #include "dev_mt6701.h"
 #include "dev_mt6835.h"
+#include "dev_drv8301.h"
 #include "dev_half_bridge.h"
 #include "dev_eeprom.h"
 #include "dev_power_monitor.h"
