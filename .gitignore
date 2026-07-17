@@ -33,3 +33,7 @@ MDK-ARM/JointMotorApp
 JLinkLog.txt
 *.dbgconf
 
+.trae
+.agents
+.claude
+.uploads
