@@ -336,7 +336,7 @@ static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type, const uint8_
 	/* 检查对应环是否处于 DEBUG 模式 */
 	pid_ring_e src_ring;
 	if (ring <= 1)
-		src_ring = PID_RING_CURRENT;      /* D轴/Q轴 → 电流环 */
+		src_ring = PID_RING_CURRENT; /* D轴/Q轴 → 电流环 */
 	else if (ring == 2)
 		src_ring = PID_RING_VELOCITY;
 	else
@@ -440,7 +440,7 @@ typedef struct
 		(uint16_t)(offsetof(motor_param_t, grp) + offsetof(subtype, field)), \
 		(uint8_t)(ptype), (uint8_t)PT_SZ(ptype)}
 
-/* 索引即 param_id(0~82), 顺序严格对齐 joint_motor_param_index.csv */
+/* 索引即 param_id(0~85), 顺序严格对齐 joint_motor_param_index.csv */
 static const param_desc_t s_param_tbl[MOTOR_PARAM_PARAM_COUNT] = {
 	/* 0~1 实例标识 */
 	PARAM_ENT(motor_instance, motor_instance_t, motor_id, JM_PT_U8),
@@ -502,7 +502,10 @@ static const param_desc_t s_param_tbl[MOTOR_PARAM_PARAM_COUNT] = {
 	PARAM_ENT(current_loop, current_loop_t, current_filter_alpha, JM_PT_F32),
 	PARAM_ENT(current_loop, current_loop_t, d_feedforward_gain, JM_PT_F32),
 	PARAM_ENT(current_loop, current_loop_t, q_feedforward_gain, JM_PT_F32),
-	/* 53~68 位置速度环 */
+	PARAM_ENT(current_loop, current_loop_t, decouple_algo, JM_PT_U8),
+	PARAM_ENT(current_loop, current_loop_t, bemf_ff_enable, JM_PT_U8),
+	PARAM_ENT(current_loop, current_loop_t, deadtime_comp_enable, JM_PT_U8),
+	/* 57~72 位置速度环 */
 	PARAM_ENT(position_loop, position_loop_t, speed_kp, JM_PT_F32),
 	PARAM_ENT(position_loop, position_loop_t, speed_ki, JM_PT_F32),
 	PARAM_ENT(position_loop, position_loop_t, speed_integral_limit, JM_PT_F32),
@@ -519,15 +522,15 @@ static const param_desc_t s_param_tbl[MOTOR_PARAM_PARAM_COUNT] = {
 	PARAM_ENT(position_loop, position_loop_t, speed_bandwidth_hz, JM_PT_F32),
 	PARAM_ENT(position_loop, position_loop_t, speed_filter_alpha, JM_PT_F32),
 	PARAM_ENT(position_loop, position_loop_t, position_bandwidth_hz, JM_PT_F32),
-	/* 69~71 阻抗控制 */
+	/* 72~74 阻抗控制 */
 	PARAM_ENT(impedance_ctrl, impedance_ctrl_t, impedance_kp, JM_PT_F32),
 	PARAM_ENT(impedance_ctrl, impedance_ctrl_t, impedance_kd, JM_PT_F32),
 	PARAM_ENT(impedance_ctrl, impedance_ctrl_t, iq_max, JM_PT_F32),
-	/* 72~74 热模型 */
+	/* 75~77 热模型 */
 	PARAM_ENT(thermal_model, thermal_model_t, thermal_resistance, JM_PT_F32),
 	PARAM_ENT(thermal_model, thermal_model_t, thermal_time_const, JM_PT_F32),
 	PARAM_ENT(thermal_model, thermal_model_t, derating_temp_start, JM_PT_F32),
-	/* 75~82 保护 */
+	/* 78~85 保护 */
 	PARAM_ENT(protection_param, protection_param_t, protect_over_current, JM_PT_F32),
 	PARAM_ENT(protection_param, protection_param_t, protect_over_voltage, JM_PT_F32),
 	PARAM_ENT(protection_param, protection_param_t, protect_under_voltage, JM_PT_F32),
