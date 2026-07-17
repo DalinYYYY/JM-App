@@ -1,10 +1,10 @@
 /**
  * @file    motor_param.c
  * @brief   关节电机配置参数API实现
- * @date    2026-06-12
+ * @date    2026-07-17
  *
  * @warning 【自动生成文件，请勿手动修改】
- *          本文件由脚本 generate_config_header_v9.py 根据配置表自动生成，
+ *          本文件由脚本 motor_param_generate_v9.py 根据配置表自动生成，
  *          任何手动改动都会在下次运行脚本时被覆盖。
  *          如需修改参数定义，请编辑源 CSV 配置表后重新生成。
  */
@@ -30,18 +30,18 @@ static const motor_param_t g_default_config =
 							 .flux = 0.001f,
 							 .kt = 0.1f,
 							 .pole_pairs = 7,
-							 .rated_current = 0.6f,
-							 .peak_current = 1.50f,
-							 .max_speed = 2000.0f,
+							 .rated_current = 5.0f,
+							 .peak_current = 15.0f,
+							 .max_speed = 300.0f,
 							 .dead_time_ns = 500.0f,
-							 .rated_voltage = 12.0f,
-							 .rated_speed_rpm = 1000.0f,
+							 .rated_voltage = 48.0f,
+							 .rated_speed_rpm = 3000.0f,
 							 .rated_torque = 2.0f,
 							 .peak_torque = 6.0f,
 							 .inertia = 1e-05f,
 							 .ke = 0.01f,
-							 .pwm_freq_hz = 10000,
-							 .foc_freq_hz = 10000,
+							 .pwm_freq_hz = 20000,
+							 .foc_freq_hz = 20000,
 							 },
 		.gearbox_param =
 			{
@@ -54,7 +54,7 @@ static const motor_param_t g_default_config =
 			{
 							 .enc_lines = 4000,
 							 .enc_direction = 1,
-							 .enc_offset = 43.77f,  /* deg */
+							 .enc_offset = 0.0f,
 							 .elec_angle_bias = 0.0f,
 							 .pos_filter_alpha = 0.1f,
 							 .enc_type = 0,
@@ -82,7 +82,7 @@ static const motor_param_t g_default_config =
 							 .current_ki_d = 10.0f,
 							 .current_kp_q = 0.5f,
 							 .current_ki_q = 10.0f,
-							 .current_integral_limit = 12.0f,
+							 .current_integral_limit = 10.0f,
 							 .decoupling_gain = 1.0f,
 							 .deadtime_comp_v = 0.0f,
 							 .pwm_max_duty = 0.9f,
@@ -90,6 +90,9 @@ static const motor_param_t g_default_config =
 							 .current_filter_alpha = 0.1f,
 							 .d_feedforward_gain = 1.0f,
 							 .q_feedforward_gain = 1.0f,
+							 .decouple_algo = 1,
+							 .bemf_ff_enable = 1,
+							 .deadtime_comp_enable = 0,
 							 },
 		.position_loop =
 			{
@@ -252,66 +255,72 @@ int motor_param_validate(const motor_param_t *cfg)
 		return 52;
 	if (cfg->current_loop.q_feedforward_gain < 0.0f || cfg->current_loop.q_feedforward_gain > 2.0f)
 		return 53;
-	if (cfg->position_loop.speed_kp < 0.0f || cfg->position_loop.speed_kp > 100.0f)
+	if (cfg->current_loop.decouple_algo > (uint8_t)2)
 		return 54;
-	if (cfg->position_loop.speed_ki < 0.0f || cfg->position_loop.speed_ki > 1000.0f)
+	if (cfg->current_loop.bemf_ff_enable > (uint8_t)1)
 		return 55;
-	if (cfg->position_loop.speed_integral_limit < 0.0f || cfg->position_loop.speed_integral_limit > 100.0f)
+	if (cfg->current_loop.deadtime_comp_enable > (uint8_t)1)
 		return 56;
-	if (cfg->position_loop.velocity_ff_gain < 0.0f || cfg->position_loop.velocity_ff_gain > 1.0f)
+	if (cfg->position_loop.speed_kp < 0.0f || cfg->position_loop.speed_kp > 100.0f)
 		return 57;
-	if (cfg->position_loop.accel_ff_gain < 0.0f || cfg->position_loop.accel_ff_gain > 1.0f)
+	if (cfg->position_loop.speed_ki < 0.0f || cfg->position_loop.speed_ki > 1000.0f)
 		return 58;
-	if (cfg->position_loop.position_kp < 0.0f || cfg->position_loop.position_kp > 1000.0f)
+	if (cfg->position_loop.speed_integral_limit < 0.0f || cfg->position_loop.speed_integral_limit > 100.0f)
 		return 59;
-	if (cfg->position_loop.position_integral_limit < 0.0f || cfg->position_loop.position_integral_limit > 100.0f)
+	if (cfg->position_loop.velocity_ff_gain < 0.0f || cfg->position_loop.velocity_ff_gain > 1.0f)
 		return 60;
-	if (cfg->position_loop.friction_coulomb < 0.0f || cfg->position_loop.friction_coulomb > 100.0f)
+	if (cfg->position_loop.accel_ff_gain < 0.0f || cfg->position_loop.accel_ff_gain > 1.0f)
 		return 61;
-	if (cfg->position_loop.friction_viscous < 0.0f || cfg->position_loop.friction_viscous > 10.0f)
+	if (cfg->position_loop.position_kp < 0.0f || cfg->position_loop.position_kp > 1000.0f)
 		return 62;
-	if (cfg->position_loop.notch_freq_hz < 10.0f || cfg->position_loop.notch_freq_hz > 1000.0f)
+	if (cfg->position_loop.position_integral_limit < 0.0f || cfg->position_loop.position_integral_limit > 100.0f)
 		return 63;
-	if (cfg->position_loop.notch_width_hz < 1.0f || cfg->position_loop.notch_width_hz > 100.0f)
+	if (cfg->position_loop.friction_coulomb < 0.0f || cfg->position_loop.friction_coulomb > 100.0f)
 		return 64;
-	if (cfg->position_loop.notch_depth_db < 10.0f || cfg->position_loop.notch_depth_db > 100.0f)
+	if (cfg->position_loop.friction_viscous < 0.0f || cfg->position_loop.friction_viscous > 10.0f)
 		return 65;
-	if (cfg->position_loop.notch_enable > (uint8_t)1)
+	if (cfg->position_loop.notch_freq_hz < 10.0f || cfg->position_loop.notch_freq_hz > 1000.0f)
 		return 66;
-	if (cfg->position_loop.speed_bandwidth_hz < 10.0f || cfg->position_loop.speed_bandwidth_hz > 1000.0f)
+	if (cfg->position_loop.notch_width_hz < 1.0f || cfg->position_loop.notch_width_hz > 100.0f)
 		return 67;
-	if (cfg->position_loop.speed_filter_alpha < 0.0f || cfg->position_loop.speed_filter_alpha > 1.0f)
+	if (cfg->position_loop.notch_depth_db < 10.0f || cfg->position_loop.notch_depth_db > 100.0f)
 		return 68;
-	if (cfg->position_loop.position_bandwidth_hz < 1.0f || cfg->position_loop.position_bandwidth_hz > 200.0f)
+	if (cfg->position_loop.notch_enable > (uint8_t)1)
 		return 69;
-	if (cfg->impedance_ctrl.impedance_kp < 0.0f || cfg->impedance_ctrl.impedance_kp > 1000.0f)
+	if (cfg->position_loop.speed_bandwidth_hz < 10.0f || cfg->position_loop.speed_bandwidth_hz > 1000.0f)
 		return 70;
-	if (cfg->impedance_ctrl.impedance_kd < 0.0f || cfg->impedance_ctrl.impedance_kd > 100.0f)
+	if (cfg->position_loop.speed_filter_alpha < 0.0f || cfg->position_loop.speed_filter_alpha > 1.0f)
 		return 71;
-	if (cfg->impedance_ctrl.iq_max < 0.0f || cfg->impedance_ctrl.iq_max > 100.0f)
+	if (cfg->position_loop.position_bandwidth_hz < 1.0f || cfg->position_loop.position_bandwidth_hz > 200.0f)
 		return 72;
-	if (cfg->thermal_model.thermal_resistance < 0.1f || cfg->thermal_model.thermal_resistance > 10.0f)
+	if (cfg->impedance_ctrl.impedance_kp < 0.0f || cfg->impedance_ctrl.impedance_kp > 1000.0f)
 		return 73;
-	if (cfg->thermal_model.thermal_time_const < 1.0f || cfg->thermal_model.thermal_time_const > 600.0f)
+	if (cfg->impedance_ctrl.impedance_kd < 0.0f || cfg->impedance_ctrl.impedance_kd > 100.0f)
 		return 74;
-	if (cfg->thermal_model.derating_temp_start < 40.0f || cfg->thermal_model.derating_temp_start > 100.0f)
+	if (cfg->impedance_ctrl.iq_max < 0.0f || cfg->impedance_ctrl.iq_max > 100.0f)
 		return 75;
-	if (cfg->protection_param.protect_over_current < 1.0f || cfg->protection_param.protect_over_current > 200.0f)
+	if (cfg->thermal_model.thermal_resistance < 0.1f || cfg->thermal_model.thermal_resistance > 10.0f)
 		return 76;
-	if (cfg->protection_param.protect_over_voltage < 20.0f || cfg->protection_param.protect_over_voltage > 100.0f)
+	if (cfg->thermal_model.thermal_time_const < 1.0f || cfg->thermal_model.thermal_time_const > 600.0f)
 		return 77;
-	if (cfg->protection_param.protect_under_voltage < 5.0f || cfg->protection_param.protect_under_voltage > 30.0f)
+	if (cfg->thermal_model.derating_temp_start < 40.0f || cfg->thermal_model.derating_temp_start > 100.0f)
 		return 78;
-	if (cfg->protection_param.protect_over_speed < 10.0f || cfg->protection_param.protect_over_speed > 2000.0f)
+	if (cfg->protection_param.protect_over_current < 1.0f || cfg->protection_param.protect_over_current > 200.0f)
 		return 79;
-	if (cfg->protection_param.protect_over_temp < 50.0f || cfg->protection_param.protect_over_temp > 120.0f)
+	if (cfg->protection_param.protect_over_voltage < 20.0f || cfg->protection_param.protect_over_voltage > 100.0f)
 		return 80;
-	if (cfg->protection_param.protect_under_temp < -40.0f || cfg->protection_param.protect_under_temp > 0.0f)
+	if (cfg->protection_param.protect_under_voltage < 5.0f || cfg->protection_param.protect_under_voltage > 30.0f)
 		return 81;
-	if (cfg->protection_param.protect_pos_error < (int32_t)100 || cfg->protection_param.protect_pos_error > (int32_t)100000)
+	if (cfg->protection_param.protect_over_speed < 10.0f || cfg->protection_param.protect_over_speed > 2000.0f)
 		return 82;
-	if (cfg->protection_param.protect_enable_mask > (uint32_t)4294967295)
+	if (cfg->protection_param.protect_over_temp < 50.0f || cfg->protection_param.protect_over_temp > 120.0f)
 		return 83;
+	if (cfg->protection_param.protect_under_temp < -40.0f || cfg->protection_param.protect_under_temp > 0.0f)
+		return 84;
+	if (cfg->protection_param.protect_pos_error < (int32_t)100 || cfg->protection_param.protect_pos_error > (int32_t)100000)
+		return 85;
+	if (cfg->protection_param.protect_enable_mask > (uint32_t)4294967295)
+		return 86;
 
 	return 0;
 }
@@ -355,7 +364,7 @@ void motor_param_print(const motor_param_t *cfg)
 	printf("\n--- Encoder Parameters ---\n");
 	printf("enc_lines: %u CPR\n", (unsigned)cfg->encoder_param.enc_lines);
 	printf("enc_direction: %d\n", (int)cfg->encoder_param.enc_direction);
-	printf("enc_offset: %.4f deg\n", cfg->encoder_param.enc_offset);
+	printf("enc_offset: %f deg\n", cfg->encoder_param.enc_offset);
 	printf("elec_angle_bias: %f rad\n", cfg->encoder_param.elec_angle_bias);
 	printf("pos_filter_alpha: %f\n", cfg->encoder_param.pos_filter_alpha);
 	printf("enc_type: %u\n", (unsigned)cfg->encoder_param.enc_type);
@@ -388,6 +397,9 @@ void motor_param_print(const motor_param_t *cfg)
 	printf("current_filter_alpha: %f\n", cfg->current_loop.current_filter_alpha);
 	printf("d_feedforward_gain: %f\n", cfg->current_loop.d_feedforward_gain);
 	printf("q_feedforward_gain: %f\n", cfg->current_loop.q_feedforward_gain);
+	printf("decouple_algo: %u\n", (unsigned)cfg->current_loop.decouple_algo);
+	printf("bemf_ff_enable: %u\n", (unsigned)cfg->current_loop.bemf_ff_enable);
+	printf("deadtime_comp_enable: %u\n", (unsigned)cfg->current_loop.deadtime_comp_enable);
 
 	printf("\n--- Position/Velocity Loop ---\n");
 	printf("speed_kp: %f A/(rad/s)\n", cfg->position_loop.speed_kp);
@@ -1325,6 +1337,57 @@ int motor_param_set_q_feedforward_gain(motor_param_t *cfg, float value)
 		return -EINVAL;
 
 	cfg->current_loop.q_feedforward_gain = value;
+	return 0;
+}
+
+uint8_t motor_param_get_decouple_algo(const motor_param_t *cfg)
+{
+	return cfg->current_loop.decouple_algo;
+}
+
+int motor_param_set_decouple_algo(motor_param_t *cfg, uint8_t value)
+{
+	if (cfg == NULL)
+		return -EINVAL;
+
+	if (value > (uint8_t)2)
+		return -EINVAL;
+
+	cfg->current_loop.decouple_algo = value;
+	return 0;
+}
+
+uint8_t motor_param_get_bemf_ff_enable(const motor_param_t *cfg)
+{
+	return cfg->current_loop.bemf_ff_enable;
+}
+
+int motor_param_set_bemf_ff_enable(motor_param_t *cfg, uint8_t value)
+{
+	if (cfg == NULL)
+		return -EINVAL;
+
+	if (value > (uint8_t)1)
+		return -EINVAL;
+
+	cfg->current_loop.bemf_ff_enable = value;
+	return 0;
+}
+
+uint8_t motor_param_get_deadtime_comp_enable(const motor_param_t *cfg)
+{
+	return cfg->current_loop.deadtime_comp_enable;
+}
+
+int motor_param_set_deadtime_comp_enable(motor_param_t *cfg, uint8_t value)
+{
+	if (cfg == NULL)
+		return -EINVAL;
+
+	if (value > (uint8_t)1)
+		return -EINVAL;
+
+	cfg->current_loop.deadtime_comp_enable = value;
 	return 0;
 }
 

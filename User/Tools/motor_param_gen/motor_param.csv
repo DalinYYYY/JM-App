@@ -52,33 +52,36 @@ id,param_name,description,group,access,data_type,array_size,default_value,unit,m
 51,current_filter_alpha,电流采样滤波系数,CurrentLoop,RW,float,1,0.1,,0,1,电流采样低通滤波系数
 52,d_feedforward_gain,d轴前馈增益,CurrentLoop,RW,float,1,1,,0,2,d轴电压前馈补偿
 53,q_feedforward_gain,q轴前馈增益,CurrentLoop,RW,float,1,1,,0,2,q轴电压前馈补偿
-54,speed_kp,速度环比例增益,PositionLoop,RW,float,1,0.1,A/(rad/s),0,100,
-55,speed_ki,速度环积分增益,PositionLoop,RW,float,1,1,A/rad,0,1000,
-56,speed_integral_limit,速度环积分限幅,PositionLoop,RW,float,1,10,A,0,100,
-57,velocity_ff_gain,速度前馈增益,PositionLoop,RW,float,1,1,,0,1,
-58,accel_ff_gain,加速度前馈增益,PositionLoop,RW,float,1,0,,0,1,
-59,position_kp,位置环比例增益,PositionLoop,RW,float,1,10,Hz,0,1000,
-60,position_integral_limit,位置环积分限幅,PositionLoop,RW,float,1,0,rad,0,100,
-61,friction_coulomb,库仑摩擦力矩,PositionLoop,RW,float,1,0,Nm,0,100,
-62,friction_viscous,粘滞摩擦系数,PositionLoop,RW,float,1,0,Nm/(rad/s),0,10,
-63,notch_freq_hz,陷波滤波器频率,PositionLoop,RW,float,1,200,Hz,10,1000,
-64,notch_width_hz,陷波滤波器带宽,PositionLoop,RW,float,1,20,Hz,1,100,
-65,notch_depth_db,陷波滤波器深度,PositionLoop,RW,float,1,40,dB,10,100,
-66,notch_enable,陷波滤波器使能,PositionLoop,RW,uint8_t,1,0,,0,1,"0=禁用, 1=启用"
-67,speed_bandwidth_hz,速度环带宽,PositionLoop,RW,float,1,100,Hz,10,1000,速度环闭环带宽
-68,speed_filter_alpha,速度滤波系数,PositionLoop,RW,float,1,0.05,,0,1,速度观测低通滤波系数
-69,position_bandwidth_hz,位置环带宽,PositionLoop,RW,float,1,20,Hz,1,200,位置环闭环带宽
-70,impedance_kp,阻抗控制位置刚度,ImpedanceControl,RW,float,1,10,Nm/rad,0,1000,
-71,impedance_kd,阻抗控制速度阻尼,ImpedanceControl,RW,float,1,0.1,Nm/(rad/s),0,100,
-72,iq_max,最大输出电流,ImpedanceControl,RW,float,1,10,A,0,100,
-73,thermal_resistance,电机热阻,ThermalConfig,RW,float,1,1,K/W,0.1,10,绕组到环境的热阻
-74,thermal_time_const,热时间常数,ThermalConfig,RW,float,1,60,s,1,600,绕组热时间常数
-75,derating_temp_start,降额起始温度,ThermalConfig,RW,float,1,70,C,40,100,开始电流降额的温度
-76,protect_over_current,过流保护阈值,Protection,RW,float,1,20,A,1,200,
-77,protect_over_voltage,过压保护阈值,Protection,RW,float,1,58,V,20,100,
-78,protect_under_voltage,欠压保护阈值,Protection,RW,float,1,15,V,5,30,
-79,protect_over_speed,过速保护阈值,Protection,RW,float,1,400,rad/s,10,2000,
-80,protect_over_temp,过温保护阈值,Protection,RW,float,1,85,C,50,120,
-81,protect_under_temp,欠温保护阈值,Protection,RW,float,1,-20,C,-40,0,
-82,protect_pos_error,位置跟随误差限制,Protection,RW,int32_t,1,1000,counts,100,100000,
-83,protect_enable_mask,保护使能掩码,Protection,RW,uint32_t,1,4.294967295e+09,,0,4.294967295e+09,"bit0=过流, bit1=过压, 依此类推"
+54,decouple_algo,交叉解耦算法,CurrentLoop,RW,uint8_t,1,1,,0,2,0:NONE 1:FEEDFORWARD 2:FEEDBACK
+55,bemf_ff_enable,反电势前馈使能,CurrentLoop,RW,uint8_t,1,1,,0,1,0:禁用 1:启用
+56,deadtime_comp_enable,死区补偿使能,CurrentLoop,RW,uint8_t,1,0,,0,1,0:禁用 1:启用
+57,speed_kp,速度环比例增益,PositionLoop,RW,float,1,0.1,A/(rad/s),0,100,
+58,speed_ki,速度环积分增益,PositionLoop,RW,float,1,1,A/rad,0,1000,
+59,speed_integral_limit,速度环积分限幅,PositionLoop,RW,float,1,10,A,0,100,
+60,velocity_ff_gain,速度前馈增益,PositionLoop,RW,float,1,1,,0,1,
+61,accel_ff_gain,加速度前馈增益,PositionLoop,RW,float,1,0,,0,1,
+62,position_kp,位置环比例增益,PositionLoop,RW,float,1,10,Hz,0,1000,
+63,position_integral_limit,位置环积分限幅,PositionLoop,RW,float,1,0,rad,0,100,
+64,friction_coulomb,库仑摩擦力矩,PositionLoop,RW,float,1,0,Nm,0,100,
+65,friction_viscous,粘滞摩擦系数,PositionLoop,RW,float,1,0,Nm/(rad/s),0,10,
+66,notch_freq_hz,陷波滤波器频率,PositionLoop,RW,float,1,200,Hz,10,1000,
+67,notch_width_hz,陷波滤波器带宽,PositionLoop,RW,float,1,20,Hz,1,100,
+68,notch_depth_db,陷波滤波器深度,PositionLoop,RW,float,1,40,dB,10,100,
+69,notch_enable,陷波滤波器使能,PositionLoop,RW,uint8_t,1,0,,0,1,"0=禁用, 1=启用"
+70,speed_bandwidth_hz,速度环带宽,PositionLoop,RW,float,1,100,Hz,10,1000,速度环闭环带宽
+71,speed_filter_alpha,速度滤波系数,PositionLoop,RW,float,1,0.05,,0,1,速度观测低通滤波系数
+72,position_bandwidth_hz,位置环带宽,PositionLoop,RW,float,1,20,Hz,1,200,位置环闭环带宽
+73,impedance_kp,阻抗控制位置刚度,ImpedanceControl,RW,float,1,10,Nm/rad,0,1000,
+74,impedance_kd,阻抗控制速度阻尼,ImpedanceControl,RW,float,1,0.1,Nm/(rad/s),0,100,
+75,iq_max,最大输出电流,ImpedanceControl,RW,float,1,10,A,0,100,
+76,thermal_resistance,电机热阻,ThermalConfig,RW,float,1,1,K/W,0.1,10,绕组到环境的热阻
+77,thermal_time_const,热时间常数,ThermalConfig,RW,float,1,60,s,1,600,绕组热时间常数
+78,derating_temp_start,降额起始温度,ThermalConfig,RW,float,1,70,C,40,100,开始电流降额的温度
+79,protect_over_current,过流保护阈值,Protection,RW,float,1,20,A,1,200,
+80,protect_over_voltage,过压保护阈值,Protection,RW,float,1,58,V,20,100,
+81,protect_under_voltage,欠压保护阈值,Protection,RW,float,1,15,V,5,30,
+82,protect_over_speed,过速保护阈值,Protection,RW,float,1,400,rad/s,10,2000,
+83,protect_over_temp,过温保护阈值,Protection,RW,float,1,85,C,50,120,
+84,protect_under_temp,欠温保护阈值,Protection,RW,float,1,-20,C,-40,0,
+85,protect_pos_error,位置跟随误差限制,Protection,RW,int32_t,1,1000,counts,100,100000,
+86,protect_enable_mask,保护使能掩码,Protection,RW,uint32_t,1,4.294967295e+09,,0,4.294967295e+09,"bit0=过流, bit1=过压, 依此类推"

@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.c
  * @brief   MotorInfo 配置参数 API 实现
- * @date    2026-07-15
+ * @date    2026-07-17
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -108,6 +108,9 @@ int motor_info_init(motor_info_t *cfg)
 	cfg->blocks.control.position_filter_alpha = 0.1f;
 	cfg->blocks.control.position_filter_enable = 0U;
 	cfg->blocks.control.following_error_limit = 1000.0f;
+	cfg->blocks.control.decouple_algo = 1U;
+	cfg->blocks.control.bemf_ff_enable = 1U;
+	cfg->blocks.control.deadtime_comp_enable = 1U;
 	cfg->blocks.control.pid_source_mask = 0U;
 
 	/* ---- 保护与通信参数 ---- */
@@ -279,6 +282,12 @@ int motor_info_validate(const motor_info_t *cfg)
 		return 84;  /* position_filter_enable */
 	if (cfg->blocks.control.following_error_limit < 0.0f || cfg->blocks.control.following_error_limit > 1000000.0f)
 		return 85;  /* following_error_limit */
+	if (cfg->blocks.control.decouple_algo > (uint32_t)2)
+		return 86;  /* decouple_algo */
+	if (cfg->blocks.control.bemf_ff_enable > (uint32_t)1)
+		return 87;  /* bemf_ff_enable */
+	if (cfg->blocks.control.deadtime_comp_enable > (uint32_t)1)
+		return 88;  /* deadtime_comp_enable */
 	if (cfg->blocks.control.pid_source_mask > (uint32_t)4294967295)
 		return 127; /* pid_source_mask */
 
@@ -413,6 +422,9 @@ void motor_info_print(const motor_info_t *cfg)
 	printf("position_filter_alpha: %f\n", cfg->blocks.control.position_filter_alpha);
 	printf("position_filter_enable: %u\n", (unsigned)cfg->blocks.control.position_filter_enable);
 	printf("following_error_limit: %f P\n", cfg->blocks.control.following_error_limit);
+	printf("decouple_algo: %u\n", (unsigned)cfg->blocks.control.decouple_algo);
+	printf("bemf_ff_enable: %u\n", (unsigned)cfg->blocks.control.bemf_ff_enable);
+	printf("deadtime_comp_enable: %u\n", (unsigned)cfg->blocks.control.deadtime_comp_enable);
 	printf("pid_source_mask: %u\n", (unsigned)cfg->blocks.control.pid_source_mask);
 
 	printf("\n--- Protection & Comm Parameters ---\n");
@@ -1386,6 +1398,51 @@ int motor_info_set_following_error_limit(motor_info_t *cfg, float value)
 	return 0;
 }
 
+uint32_t motor_info_get_decouple_algo(const motor_info_t *cfg)
+{
+	return cfg->blocks.control.decouple_algo;
+}
+
+int motor_info_set_decouple_algo(motor_info_t *cfg, uint32_t value)
+{
+	if (cfg == NULL)
+		return -EINVAL;
+	if (value > (uint32_t)2)
+		return -EINVAL; /* 越界 */
+	cfg->blocks.control.decouple_algo = value;
+	return 0;
+}
+
+uint32_t motor_info_get_bemf_ff_enable(const motor_info_t *cfg)
+{
+	return cfg->blocks.control.bemf_ff_enable;
+}
+
+int motor_info_set_bemf_ff_enable(motor_info_t *cfg, uint32_t value)
+{
+	if (cfg == NULL)
+		return -EINVAL;
+	if (value > (uint32_t)1)
+		return -EINVAL; /* 越界 */
+	cfg->blocks.control.bemf_ff_enable = value;
+	return 0;
+}
+
+uint32_t motor_info_get_deadtime_comp_enable(const motor_info_t *cfg)
+{
+	return cfg->blocks.control.deadtime_comp_enable;
+}
+
+int motor_info_set_deadtime_comp_enable(motor_info_t *cfg, uint32_t value)
+{
+	if (cfg == NULL)
+		return -EINVAL;
+	if (value > (uint32_t)1)
+		return -EINVAL; /* 越界 */
+	cfg->blocks.control.deadtime_comp_enable = value;
+	return 0;
+}
+
 uint32_t motor_info_get_pid_source_mask(const motor_info_t *cfg)
 {
 	return cfg->blocks.control.pid_source_mask;
@@ -2245,6 +2302,30 @@ int motor_info_dispatch_read(uint16_t pid, const motor_info_t *cfg, uint8_t out4
 			*out_len = 4;
 			return 0;
 		}
+		case 86:
+		{ /* decouple_algo (uint32_t) */
+			uint32_t v = motor_info_get_decouple_algo(cfg);
+			memcpy(out4, &v, 4);
+			*out_type = 4;
+			*out_len = 4;
+			return 0;
+		}
+		case 87:
+		{ /* bemf_ff_enable (uint32_t) */
+			uint32_t v = motor_info_get_bemf_ff_enable(cfg);
+			memcpy(out4, &v, 4);
+			*out_type = 4;
+			*out_len = 4;
+			return 0;
+		}
+		case 88:
+		{ /* deadtime_comp_enable (uint32_t) */
+			uint32_t v = motor_info_get_deadtime_comp_enable(cfg);
+			memcpy(out4, &v, 4);
+			*out_type = 4;
+			*out_len = 4;
+			return 0;
+		}
 		case 127:
 		{ /* pid_source_mask (uint32_t) */
 			uint32_t v = motor_info_get_pid_source_mask(cfg);
@@ -2873,6 +2954,27 @@ int motor_info_dispatch_write(uint16_t pid, motor_info_t *cfg, const uint8_t in4
 			float v;
 			memcpy(&v, in4, 4);
 			int rc = motor_info_set_following_error_limit(cfg, v);
+			return (rc == 0) ? 0 : -2;
+		}
+		case 86:
+		{ /* decouple_algo (uint32_t) */
+			uint32_t v;
+			memcpy(&v, in4, 4);
+			int rc = motor_info_set_decouple_algo(cfg, v);
+			return (rc == 0) ? 0 : -2;
+		}
+		case 87:
+		{ /* bemf_ff_enable (uint32_t) */
+			uint32_t v;
+			memcpy(&v, in4, 4);
+			int rc = motor_info_set_bemf_ff_enable(cfg, v);
+			return (rc == 0) ? 0 : -2;
+		}
+		case 88:
+		{ /* deadtime_comp_enable (uint32_t) */
+			uint32_t v;
+			memcpy(&v, in4, 4);
+			int rc = motor_info_set_deadtime_comp_enable(cfg, v);
 			return (rc == 0) ? 0 : -2;
 		}
 		case 127:

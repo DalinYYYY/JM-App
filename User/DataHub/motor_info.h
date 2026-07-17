@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.h
  * @brief   MotorInfo 配置参数 API 接口（1024B 整块空间）
- * @date    2026-07-15
+ * @date    2026-07-17
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -26,8 +26,8 @@ extern "C"
 #endif
 
 /* ===== 自动生成元信息 ===== */
-#define MOTOR_INFO_GEN_DATE      "2026-07-15"
-#define MOTOR_INFO_PARAM_COUNT   85
+#define MOTOR_INFO_GEN_DATE      "2026-07-17"
+#define MOTOR_INFO_PARAM_COUNT   88
 #define MOTOR_INFO_VERSION_MAJOR 1
 #define MOTOR_INFO_VERSION_MINOR 0
 
@@ -137,7 +137,7 @@ extern "C"
 
 	/**
  * @brief   控制参数（三环PID+前馈+滤波）
- * @details 块大小 320B，已用 92B，预留 228B
+ * @details 块大小 320B，已用 104B，预留 216B
  */
 	typedef struct __ALIGNED_4
 	{
@@ -163,8 +163,11 @@ extern "C"
 		float position_filter_alpha;     /* 位置滤波系数  [一阶低通滤波系数] */
 		uint32_t position_filter_enable; /* 位置滤波使能  [0:禁用 1:启用] */
 		float following_error_limit;     /* 跟随误差限制 (P)  [位置跟随误差保护阈值 调试期建议放大] */
+		uint32_t decouple_algo;          /* 交叉解耦算法  [0:NONE 1:FEEDFORWARD 2:FEEDBACK] */
+		uint32_t bemf_ff_enable;         /* 反电势前馈使能  [0:禁用 1:启用] */
+		uint32_t deadtime_comp_enable;   /* 死区补偿使能  [0:禁用 1:启用] */
 		uint32_t pid_source_mask;        /* PID来源位掩码  [bit[3:0]=电流环 bit[7:4]=速度环 bit[11:8]=位置环 0=默认 1=Flash 2=理论估计] */
-		uint32_t reserved[57];           /* 预留 228B */
+		uint32_t reserved[54];           /* 预留 216B */
 	} ControlParam_t;
 
 	/**
@@ -1126,6 +1129,48 @@ extern "C"
  * @return  0=成功, -EINVAL=空指针或越界
  */
 	int motor_info_set_following_error_limit(motor_info_t *cfg, float value);
+
+	/**
+ * @brief   读取 交叉解耦算法
+ * @param   cfg 参数区指针
+ * @return  交叉解耦算法
+ */
+	uint32_t motor_info_get_decouple_algo(const motor_info_t *cfg);
+	/**
+ * @brief   设置 交叉解耦算法
+ * @param   cfg 参数区指针
+ * @param   value 要设置的值
+ * @return  0=成功, -EINVAL=空指针或越界
+ */
+	int motor_info_set_decouple_algo(motor_info_t *cfg, uint32_t value);
+
+	/**
+ * @brief   读取 反电势前馈使能
+ * @param   cfg 参数区指针
+ * @return  反电势前馈使能
+ */
+	uint32_t motor_info_get_bemf_ff_enable(const motor_info_t *cfg);
+	/**
+ * @brief   设置 反电势前馈使能
+ * @param   cfg 参数区指针
+ * @param   value 要设置的值
+ * @return  0=成功, -EINVAL=空指针或越界
+ */
+	int motor_info_set_bemf_ff_enable(motor_info_t *cfg, uint32_t value);
+
+	/**
+ * @brief   读取 死区补偿使能
+ * @param   cfg 参数区指针
+ * @return  死区补偿使能
+ */
+	uint32_t motor_info_get_deadtime_comp_enable(const motor_info_t *cfg);
+	/**
+ * @brief   设置 死区补偿使能
+ * @param   cfg 参数区指针
+ * @param   value 要设置的值
+ * @return  0=成功, -EINVAL=空指针或越界
+ */
+	int motor_info_set_deadtime_comp_enable(motor_info_t *cfg, uint32_t value);
 
 	/**
  * @brief   读取 PID来源位掩码
