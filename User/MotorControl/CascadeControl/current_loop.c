@@ -22,13 +22,26 @@
 #include "dev_power_monitor.h" /* 真实电机：SVPWM 归一化用 Vbus */
 #endif
 
-void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, float dt)
+void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, motor_param_t *param, float dt)
 {
 	cl->motor = motor;
+	cl->param = param;
 	cl->dt = dt;
 
 	motor_pid_profile_init_state(&cl->pid_id);
 	motor_pid_profile_init_state(&cl->pid_iq);
+
+	cur_loop_set_decoupling_config(cl); /* 从 param 构建初始解耦配置 */
+}
+
+void cur_loop_set_decoupling_config(cur_loop_t *cl)
+{
+	if (cl == NULL || cl->param == NULL)
+		return;
+	/* 将 motor_param 的 3 个字段映射为 foc_decoupling_config_t */
+	cl->decoupling.algo = (foc_decouple_algo_e)cl->param->current_loop.decouple_algo;
+	cl->decoupling.bemf_ff_enable = (cl->param->current_loop.bemf_ff_enable != 0);
+	cl->decoupling.deadtime_comp_enable = (cl->param->current_loop.deadtime_comp_enable != 0);
 }
 
 void cur_loop_reset(cur_loop_t *cl)
@@ -104,15 +117,40 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	else
 	{
 		/* 电流闭环 PI（CURRENT / TORQUE / VELOCITY / POSITION）*/
+		/* 每拍从 param 同步解耦配置，确保 0xE1/0xE7 修改立即生效（3 字段赋值，开销可忽略）*/
+		cur_loop_set_decoupling_config(cl);
+
 		ud = motor_pid_profile_calculate(&cl->pid_id, MOTOR_PID_PROFILE_CURRENT_D, out->id_ref, m->foc.i_dq.d, cl->dt);
 		uq = motor_pid_profile_calculate(&cl->pid_iq, MOTOR_PID_PROFILE_CURRENT_Q, out->iq_ref, m->foc.i_dq.q, cl->dt);
+
+		/* 提前取 Vbus：解耦死区补偿自动计算 + SVPWM 归一化共用，避免重复读取 */
+#if MOTOR_LOOP_ENABLE_DEV_DRIVER
+		float vbus = dev_power_monitor.vbus;
+		if (vbus < 1.0f)
+			vbus = 1.0f; /* 保护：Vbus 未就绪时避免除零 */
+#else
+		float vbus = 12.0f; /* 虚拟电机标称电压 */
+#endif
+
+		/* === DQ 解耦补偿（V 域，PI 输出之后、Vbus 归一化之前）=== */
+		foc_decoupling_in_t din = {
+			.ud_pi = ud,
+			.uq_pi = uq,
+			.id = m->foc.i_dq.d,
+			.iq = m->foc.i_dq.q,
+			.id_ref = out->id_ref,
+			.iq_ref = out->iq_ref,
+			.omega_mech = m->motor_param.slide_rad_s, /* PLL 滤波后机械角速度 */
+			.vbus = vbus, /* 死区补偿自动计算用 */
+		};
+		foc_decoupling_out_t dout;
+		foc_decoupling_run(&din, &dout, &cl->decoupling, cl->param);
+		ud = dout.ud;
+		uq = dout.uq;
 #if MOTOR_LOOP_ENABLE_DEV_DRIVER
 		/* 真实电机 SVPWM 归一化：PI 输出为电压值（伏特），SVPWM 期望占空比（0~1），
 		 * 须除以 Vbus 转换。与 OPEN_LOOP 分支、calib_hw.c 保持一致。
 		 * Vbus 由 dev_power_monitor 在 task 层 100ms 周期更新。 */
-		float vbus = dev_power_monitor.vbus;
-		if (vbus < 1.0f)
-			vbus = 1.0f; /* 保护：Vbus 未就绪时避免除零 */
 		ud /= vbus;
 		uq /= vbus;
 #endif

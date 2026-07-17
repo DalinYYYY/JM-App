@@ -27,6 +27,8 @@
 #include "dev_motor_select.h"
 #include "motor_control.h"   /* for motor_ref_t */
 #include "cascade_control.h" /* for cascade_out_t */
+#include "motor_param.h"
+#include "foc_decoupling.h"
 
 /**
  * @brief 电流环控制器
@@ -35,6 +37,8 @@
 typedef struct
 {
 	dev_motor_t *motor; // 关联的底层电机设备
+	motor_param_t *param; // 电机参数（解耦算法依赖 R/L/flux/pole_pairs）
+	foc_decoupling_config_t decoupling; // 解耦运行时配置（由 param 构建）
 
 	pid_state_t pid_id; // d轴电流环 PID 运行状态
 	pid_state_t pid_iq; // q轴电流环 PID 运行状态
@@ -46,9 +50,10 @@ typedef struct
  * @brief 初始化电流环
  * @param cl 电流环控制器指针
  * @param motor 底层电机设备指针
+ * @param param 电机参数指针（解耦算法依赖）
  * @param dt 电流环控制周期(s)
  */
-void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, float dt);
+void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, motor_param_t *param, float dt);
 
 /**
  * @brief 复位电流环 PID 状态
@@ -74,5 +79,12 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
  * @param cl 电流环控制器指针
  */
 void cur_loop_calibrate_offset(cur_loop_t *cl);
+
+/**
+ * @brief 设置解耦运行时配置（由 motor_param 字段构建）
+ * @param cl 电流环控制器指针
+ * @note  在 motor_param 的 decouple_algo/bemf_ff_enable/deadtime_comp_enable 变更后调用
+ */
+void cur_loop_set_decoupling_config(cur_loop_t *cl);
 
 #endif /* __CURRENT_LOOP_H__ */

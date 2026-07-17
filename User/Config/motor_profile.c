@@ -129,4 +129,9 @@ void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
 	param->encoder_param.enc_direction = (int8_t)c->enc_direction;
 	param->encoder_param.enc_offset = c->enc_offset;
 	param->encoder_param.elec_angle_bias = c->elec_angle_bias;
+
+	/* 解耦配置：始终同步（默认值已在 motor_info_init 中设置，不依赖 is_calibrated）*/
+	param->current_loop.decouple_algo = (uint8_t)motor_info_get_decouple_algo(info);
+	param->current_loop.bemf_ff_enable = (uint8_t)motor_info_get_bemf_ff_enable(info);
+	param->current_loop.deadtime_comp_enable = (uint8_t)motor_info_get_deadtime_comp_enable(info);
 }

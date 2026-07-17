@@ -115,7 +115,7 @@ void motor_loop_init(float current_freq_hz)
 
 	// 级联外环（位置/速度）与电流环
 	cascade_control_init(&m->cascade, param, dt_position, dt_velocity);
-	cur_loop_init(&m->current, &m->motor, dt_current);
+	cur_loop_init(&m->current, &m->motor, param, dt_current);
 
 	// 注入组先使能(ADC 注入组 + JEOC 中断), 但转换由 TIM1_CC4 硬件触发,
 	// 必须等 half_bridge.start 启动 TIM1 后才会有转换, JDR 才有有效值。
