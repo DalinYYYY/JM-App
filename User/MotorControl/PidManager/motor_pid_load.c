@@ -211,7 +211,11 @@ void motor_pid_load_boot(motor_param_t *param, const motor_info_t *info)
 void motor_pid_reload(void)
 {
 	motor_param_t *param = &usr.motor_param[M1];
+#if defined(USE_DEV_FLASH)
 	const motor_info_t *info = motor_info_storage_get();
+#else
+	const motor_info_t *info = NULL; /* 未启用 Flash 存储,传 NULL(motor_pid_load 内部判空返回) */
+#endif
 
 	/* 按 source 独立加载三环 PID 到 motor_param_t */
 	motor_pid_load(param, info);

@@ -234,7 +234,11 @@ static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw
 	}
 
 	/* 事务性计算并写入 ControlParam_t（按 ring_mask 仅计算所选环）*/
+#if defined(USE_DEV_FLASH)
 	motor_info_t *info = motor_info_storage_get();
+#else
+	motor_info_t *info = NULL; /* 未启用 Flash 存储: autotune 无法获取辨识参数, 返回参数无效 */
+#endif
 	int ret = motor_pid_autotune_apply(info, ring_select, cur_bw, vel_bw, pos_bw);
 	if (ret != 0)
 	{
@@ -292,10 +296,13 @@ static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 	 * DEBUG 不持久化: 重启自动回 DEFAULT/FLASH/AUTOTUNE */
 	if (source != (uint8_t)PID_SOURCE_DEBUG)
 	{
+#if defined(USE_DEV_FLASH)
 		motor_info_t *info = motor_info_storage_get();
 		uint32_t mask = info->blocks.control.pid_source_mask;
 		mask = pid_source_to_mask(mask, (pid_ring_e)ring_select, (pid_source_e)source);
 		info->blocks.control.pid_source_mask = mask;
+#endif
+		/* 未启用 Flash: source 切换仅影响 RAM 中的运行期 profile, 不持久化 */
 	}
 
 	/* 立即 reload 生效 */
@@ -831,7 +838,10 @@ uint8_t jm_app_can_baudrate(void)
 
 /* motor_info 持久化: 弱实现仅做范围校验, 不落 Flash。
  * 接入 Flash 驱动后在驱动层提供同名强符号覆盖(类比 jm_app_param_storage_save)。
- * 返回值类型 motor_info_storage_status_t：0=成功, >0=越界 param_id, <0=系统错误。*/
+ * 返回值类型 motor_info_storage_status_t：0=成功, >0=越界 param_id, <0=系统错误。
+ * 未启用 USE_DEV_FLASH 时本弱符号不编译: 0xE6-0xEB 整组命令在 ops 表中置 NULL,
+ * jm_proto_dispatch 已对 ops->motor_info_xxx 做 NULL 检查并返回 NACK(UNSUPPORT)。*/
+#if defined(USE_DEV_FLASH)
 #if defined(__GNUC__) || defined(__clang__)
 __attribute__((weak))
 #elif defined(__CC_ARM) || defined(__ARMCC_VERSION)
@@ -841,6 +851,7 @@ motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *c
 {
 	return (motor_info_storage_status_t)motor_info_validate(cfg); /* 0=全部通过, 否则首个越界 param_id(>0) */
 }
+#endif /* USE_DEV_FLASH */
 
 /* dispatch 返回码 -> jm_err_e */
 static jm_err_e mi_dispatch_to_err(int rc)
@@ -859,6 +870,11 @@ static jm_err_e mi_dispatch_to_err(int rc)
 			return JM_ERR_FLASH;
 	}
 }
+
+/* ---- 0xE6-0xEB motor_info 命令组: 仅在启用 USE_DEV_FLASH 时提供实现,
+ *      未启用时本组函数不编译, s_app_ops 表对应字段置 NULL,
+ *      jm_proto_dispatch 对 ops->motor_info_xxx 已做 NULL 检查并返回 NACK。---- */
+#if defined(USE_DEV_FLASH)
 
 /* ---- 0xE6 读单个电机配置 ---- */
 static jm_err_e app_motor_info_read(uint16_t param_id, uint8_t *value4,
@@ -984,6 +1000,8 @@ static jm_err_e app_motor_info_reset(uint16_t param_id)
 	}
 }
 
+#endif /* USE_DEV_FLASH */
+
 /* ============================================================================
  *  回调集单例
  * ==========================================================================*/
@@ -1002,13 +1020,15 @@ static const jm_proto_ops_t s_app_ops = {
 	.param_write_bulk = app_param_write_bulk,
 	.set_can_id = app_set_can_id,
 	.set_baudrate = app_set_baudrate,
-	/* 电机配置(motor_info) 0xE6-0xEB */
+	/* 电机配置(motor_info) 0xE6-0xEB (未启用 USE_DEV_FLASH 时置 NULL, 命令返回 NACK) */
+#if defined(USE_DEV_FLASH)
 	.motor_info_read = app_motor_info_read,
 	.motor_info_write = app_motor_info_write,
 	.motor_info_save = app_motor_info_save,
 	.motor_info_read_bulk = app_motor_info_read_bulk,
 	.motor_info_write_bulk = app_motor_info_write_bulk,
 	.motor_info_reset = app_motor_info_reset,
+#endif
 	/* PID 管理 0xA0~0xA6 */
 	.pid_autotune = app_pid_autotune,
 	.pid_source_set = app_pid_source_set,

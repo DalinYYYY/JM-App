@@ -70,6 +70,7 @@ void motor_loop_init(float current_freq_hz)
 	motor_profile_apply_param(param); /* 用 motor_profile.h 的 MOTOR_* 覆盖电气身份字段 */
 
 	/* Flash 标定参数同步到运行期 motor_param_t*/
+#if defined(USE_DEV_FLASH)
 	motor_profile_sync_to_param(param, motor_info_storage_get());
 
 	/* 上电启动加载：Flash ControlParam 范围检查 → autotune 理论估计 → default 三级回退
@@ -78,6 +79,11 @@ void motor_loop_init(float current_freq_hz)
 	/* Flash 保存的 source 覆盖自动回退结果（用户曾显式选择的环）*/
 	motor_pid_load_source_from_flash(motor_info_storage_get());
 	motor_pid_load(param, motor_info_storage_get()); /* 按 source 重新加载 */
+#else
+	/* 未启用 Flash 存储: 用 motor_param 默认值 + motor_profile 覆盖, 不加载 Flash 标定参数 */
+	motor_pid_load_boot(param, NULL);
+	motor_pid_load(param, NULL);
+#endif
 
 	// 各环控制周期：电流环由中断频率决定，外环按分频系数派生
 	float dt_current = 1.0f / current_freq_hz;

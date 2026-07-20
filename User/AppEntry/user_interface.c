@@ -41,7 +41,9 @@ static void hardware_init(void)
 	dev_dwt_counter_init();
 
 	/* 初始化 motor_info Flash 存储服务（须在 motor_loop_init 之前） */
+#if defined(USE_DEV_FLASH)
 	motor_info_storage_init();
+#endif
 
 	/* 电源监控(规则组ADC+DMA): 初始化并启动, 供 vbus/ibus 遥测与 SVPWM 归一化使用
 	 * 须在 motor_loop_init 之前启动规则组 DMA(独立于注入组, 不依赖 TIM1 触发) */
@@ -68,7 +70,11 @@ static void hardware_init(void)
 	 * s_motor_loop 经 getter 绑定，避免直接访问伪私有变量。 */
 	usr.p_dwt_timer          = &dwt_timer;
 	usr.p_motor_loop         = motor_loop_get();
+#if defined(USE_DEV_FLASH)
 	usr.p_motor_info_storage = &g_motor_info_storage;
+#else
+	usr.p_motor_info_storage = NULL;
+#endif
 	usr.p_dev_power_monitor  = &dev_power_monitor;
 	usr.p_dev_commun_uart    = &dev_commun_uart;
 }

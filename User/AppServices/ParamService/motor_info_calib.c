@@ -116,4 +116,22 @@ int motor_info_calib_reset(void)
 	return 0;
 }
 
+#else /* !USE_DEV_FLASH */
+
+/* ===== 未启用 Flash 存储的 stub 实现 =====
+ * V1 等未启用 USE_DEV_FLASH 的板级配置: 无 motor_info_t 全局实例, 标定结果
+ * 仅写入运行期 motor_param_t(由 calib_level*.c 直接调用 motor_param_set_*),
+ * 不持久化到 Flash。本组 stub 返回 0(成功)使标定流程继续, 实际不保存任何数据。
+ * 上位机 0xEA 命令在 jm_proto_ops.c 中已被 #if 屏蔽, 不会触发保存。*/
+int motor_info_calib_submit_r(float r)                 { (void)r; return 0; }
+int motor_info_calib_submit_ld(float ld)               { (void)ld; return 0; }
+int motor_info_calib_submit_lq(float lq)               { (void)lq; return 0; }
+int motor_info_calib_submit_flux(float flux)           { (void)flux; return 0; }
+int motor_info_calib_submit_pole_pairs(uint32_t pp)    { (void)pp; return 0; }
+int motor_info_calib_submit_enc_zero(float bias, float off, int32_t dir)
+{ (void)bias; (void)off; (void)dir; return 0; }
+int motor_info_calib_submit_enc_direction(int32_t dir) { (void)dir; return 0; }
+int motor_info_calib_mark_calibrated(void)             { return 0; }
+int motor_info_calib_reset(void)                       { return 0; }
+
 #endif /* USE_DEV_FLASH */
