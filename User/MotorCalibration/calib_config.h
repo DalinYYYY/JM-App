@@ -15,6 +15,24 @@
 /* 电机时间常数 τ = Ld/R（秒），用于派生标定时间参数 */
 #define MOTOR_TAU_S (MOTOR_LD / MOTOR_R)
 
+/* ===================== 电机分档识别（通用性核心）=====================
+ * 根据 MOTOR_R 自动判断电机类型，切换标定策略。
+ * 低阻电机(R<0.5Ω): 用交流注入法辨识 R/Ld，提高测试电流
+ * 高阻电机(R≥0.5Ω): 用 DC 两点差分法辨识 R，标准测试电流 */
+#define CALIB_LOW_R_THRESHOLD  0.5f
+#define CALIB_IS_LOW_R         (MOTOR_R < CALIB_LOW_R_THRESHOLD)
+
+/* 低阻电机测试电流提高：峰值电流 × 0.5（受 CALIB_CFG_MAX_TEST_CURRENT_A 限制）
+ * 低阻电机需要更大电流才能产生可测电压（V=I×R，R 小则 V 小）*/
+#define CALIB_CFG_TEST_CURRENT_LOW_R_A \
+	((MOTOR_PEAK_CURRENT * 0.5f) < CALIB_CFG_MAX_TEST_CURRENT_A \
+	 ? (MOTOR_PEAK_CURRENT * 0.5f) \
+	 : CALIB_CFG_MAX_TEST_CURRENT_A)
+
+/* 实际测试电流：低阻电机用大电流，高阻电机用标准电流 */
+#define CALIB_CFG_TEST_CURRENT_ACTUAL_A \
+	(CALIB_IS_LOW_R ? CALIB_CFG_TEST_CURRENT_LOW_R_A : CALIB_CFG_TEST_CURRENT_A)
+
 /* 标定测试电流基准 = min(峰值电流 × 0.3, 电源限流安全值)
  * 所有"施加电压产生电流"类标定均以此为电流目标
  *
@@ -34,34 +52,79 @@
 /* ===================== L2 电机电气身份参数（从 MOTOR_* 派生）===================== */
 
 /* R 辨识：R=(V2-V1)/(id2-id1)  死区效应会使 R 偏大, 但两点差分可部分抵消*/
-#define CALIB_CFG_L2_R_TEST_VOLTAGE_V    (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)   /* 高档 V2 */
-#define CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.4f) /* 低档 V1 */
+#define CALIB_CFG_L2_R_TEST_VOLTAGE_V    (CALIB_CFG_TEST_CURRENT_ACTUAL_A * MOTOR_R) /* 高档 V2 */
+/* V_dt 估计值：无标定时用 0.5V 保守估计（典型死区+MOSFET-Rds压降）*/
+#define CALIB_CFG_L2_R_V_DT_ESTIMATE_V   0.5f
+/* V1 低档：max(V_R×0.4, V_dt_estimate×2)，确保 V1 > 死区压降
+ * 低阻电机 V_R 很小（如 5010: 0.18V），若 V1<V_dt 则低档电流被死区主导 */
+#define CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V \
+	((CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.4f) > (CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 2.0f) \
+	 ? (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.4f) \
+	 : (CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 2.0f)) /* 低档 V1 */
 #define CALIB_CFG_L2_R_TEST_TIME_S       (MOTOR_TAU_S * 750.0f)
 #define CALIB_CFG_L2_R_TEST_TICKS        (uint32_t)(CALIB_CFG_L2_R_TEST_TIME_S * CALIB_TICKS_PER_SEC)
 #define CALIB_CFG_L2_R_SAMPLE_COUNT      500 /* 每档稳态采样次数 */
 
 /* Ld 辨识（d 轴阶跃响应）
  * 阶跃电压 = R 测试电压 × 1.3（需更高电压产生 di/dt）
- * 暂态窗口 = 2.25τ（末端 di/dt 仍远 > 阈值，避免尾部噪声）*/
+ * 暂态窗口 = 3.0τ（扩展窗口确保低感电机有足够采样点）*/
 #define CALIB_CFG_L2_LD_TEST_VOLTAGE_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 1.3f)
-#define CALIB_CFG_L2_LD_TEST_TIME_S    (MOTOR_TAU_S * 2.25f)
+#define CALIB_CFG_L2_LD_TEST_TIME_S    (MOTOR_TAU_S * 3.0f)
 #define CALIB_CFG_L2_LD_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_LD_TEST_TIME_S * CALIB_TICKS_PER_SEC)
 #define CALIB_CFG_L2_LD_SAMPLE_COUNT   30 /* 暂态采样点数 */
+#define CALIB_CFG_L2_LD_SKIP_TICKS     2u  /* 阶跃后跳过前 2 拍（数值噪声）*/
 
 /* Lq 辨识（q 轴阶跃响应）—— 与 Ld 对称 */
 #define CALIB_CFG_L2_LQ_TEST_VOLTAGE_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 1.3f)
-#define CALIB_CFG_L2_LQ_TEST_TIME_S    (MOTOR_TAU_S * 2.25f)
+#define CALIB_CFG_L2_LQ_TEST_TIME_S    (MOTOR_TAU_S * 3.0f)
 #define CALIB_CFG_L2_LQ_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_LQ_TEST_TIME_S * CALIB_TICKS_PER_SEC)
 #define CALIB_CFG_L2_LQ_SAMPLE_COUNT   30 /* 暂态采样点数 */
+#define CALIB_CFG_L2_LQ_SKIP_TICKS     2u  /* 阶跃后跳过前 2 拍 */
 
 /* flux 辨识（反电势法）
- * 驱动电压 = R 压降 + 反电势 = 测试电流×R + flux×pp×目标转速
- * 目标机械转速取 10 rad/s（保守，确保 back-EMF 可测）*/
-#define CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S 10.0f
-#define CALIB_CFG_L2_FLUX_SPIN_VOLTAGE_V     (CALIB_CFG_TEST_CURRENT_A * MOTOR_R + MOTOR_FLUX * MOTOR_POLE_PAIRS * CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S)
+ * 目标转速自适应：目标反电势 = max(V_dt×3, 0.5V)，确保信噪比充足
+ * 反推转速 omega = V_target / (flux × pp)，低 flux 电机自动提速 */
+#define CALIB_CFG_L2_FLUX_TARGET_BEMF_V \
+	((CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 3.0f) > 0.5f \
+	 ? (CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 3.0f) \
+	 : 0.5f)
+#define CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S \
+	(CALIB_CFG_L2_FLUX_TARGET_BEMF_V / (MOTOR_FLUX * MOTOR_POLE_PAIRS))
+/* 限幅：转速不超过电机最大转速的 0.3 倍，也不低于 5 rad/s */
+#define CALIB_CFG_L2_FLUX_TARGET_SPEED_CLAMPED_RAD_S \
+	(CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S > (MOTOR_MAX_SPEED * 0.3f) \
+	 ? (MOTOR_MAX_SPEED * 0.3f) \
+	 : (CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S < 5.0f \
+	    ? 5.0f \
+	    : CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S))
+#define CALIB_CFG_L2_FLUX_SPIN_VOLTAGE_V \
+	(CALIB_CFG_TEST_CURRENT_ACTUAL_A * MOTOR_R + \
+	 MOTOR_FLUX * MOTOR_POLE_PAIRS * CALIB_CFG_L2_FLUX_TARGET_SPEED_CLAMPED_RAD_S)
 #define CALIB_CFG_L2_FLUX_SPIN_TIME_S        2.0f /* 稳速转动时间(s)，让滤波收敛 */
 #define CALIB_CFG_L2_FLUX_SPIN_TICKS         (uint32_t)(CALIB_CFG_L2_FLUX_SPIN_TIME_S * CALIB_TICKS_PER_SEC)
 #define CALIB_CFG_L2_FLUX_SAMPLE_COUNT       200  /* 稳态采样次数 */
+/* flux 稳速判断：最近 N 个采样转速方差/均值 < 阈值则认为稳速 */
+#define CALIB_CFG_L2_FLUX_SPEED_STABLE_WINDOW  50u
+#define CALIB_CFG_L2_FLUX_SPEED_STABLE_RATIO   0.05f  /* 方差/均值 < 5% */
+#define CALIB_CFG_L2_FLUX_OMEGA_E_MIN_RAD_S    5.0f   /* 电气角速度下限 */
+
+/* ===================== 交流注入法参数（低阻电机 R/Ld 辨识）=====================
+ * 在 d 轴施加 ud = U_dc + U_ac·sin(2π·f·t)，采样 id，相敏检测分离：
+ *   同相分量 → R = U_ac·cos(φ) / I_ac
+ *   正交分量 → Ld = U_ac·sin(φ) / (ω·I_ac)
+ * 频率选择：f = 0.3/(2π·τ)，时间常数特征频率的 0.3 倍
+ *   保证 ω·Ld 与 R 可比，相敏检测灵敏度最优 */
+#define CALIB_CFG_AC_INJECT_FREQ_HZ \
+	(0.3f / (2.0f * 3.14159265f * MOTOR_TAU_S))
+#define CALIB_CFG_AC_INJECT_AMP_V    (CALIB_CFG_TEST_CURRENT_ACTUAL_A * MOTOR_R * 0.5f)
+#define CALIB_CFG_AC_INJECT_DC_V     (CALIB_CFG_TEST_CURRENT_ACTUAL_A * MOTOR_R)
+/* 预热时间：10×τ，让暂态衰减完毕 */
+#define CALIB_CFG_AC_INJECT_WARMUP_TICKS  (uint32_t)(MOTOR_TAU_S * 10.0f * CALIB_TICKS_PER_SEC)
+/* 采样周期数：采 5 个完整交流周期 */
+#define CALIB_CFG_AC_INJECT_CYCLES        5u
+#define CALIB_CFG_AC_INJECT_TOTAL_TICKS \
+	(uint32_t)((float)CALIB_CFG_AC_INJECT_CYCLES / CALIB_CFG_AC_INJECT_FREQ_HZ * CALIB_TICKS_PER_SEC)
+#define CALIB_CFG_AC_INJECT_SAMPLE_COUNT  200
 
 /* 相序识别：对齐/步进电压 = 测试电流 × R */
 #define CALIB_CFG_L2_PHASE_SEQ_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
@@ -104,10 +167,15 @@
  * 切换电机型号时自动适配，无需手动调整。
  * 拦截短路/断路/异常值，兼顾误测拦截与误触发规避。
  *
- * R 范围宽(0.01~50Ω): 低电阻电机(如 5010 R=0.12Ω)死区非线性使两点法
- * 结果可能偏离标称值数倍, 过窄范围会误拦。宽范围仅拦截明显异常(短路<0.01/断路>50)。*/
-#define CALIB_CFG_R_MIN_OHM      0.01f               /* R 下限: 10mΩ(防短路判 0) */
-#define CALIB_CFG_R_MAX_OHM      50.0f               /* R 上限: 50Ω(防断路判 ∞) */
+ * R 范围按标称值派生：0.2×R ~ 5×R，兼顾误差容忍与异常拦截
+ * 切换电机型号时自动适配，无需手动调整。*/
+#define CALIB_CFG_R_MIN_OHM      (MOTOR_R * 0.2f)    /* R 下限: 标称值的 0.2 倍 */
+#define CALIB_CFG_R_MAX_OHM      (MOTOR_R * 5.0f)    /* R 上限: 标称值的 5 倍 */
+/* 安全下限：不低于 10mΩ（防短路判 0）*/
+#define CALIB_CFG_R_MIN_OHM_SAFE 0.01f
+#define CALIB_CFG_R_MIN_OHM_FINAL \
+	(CALIB_CFG_R_MIN_OHM > CALIB_CFG_R_MIN_OHM_SAFE \
+	 ? CALIB_CFG_R_MIN_OHM : CALIB_CFG_R_MIN_OHM_SAFE)
 #define CALIB_CFG_LD_MIN_H       (MOTOR_LD * 0.2f)   /* Ld 下限 */
 #define CALIB_CFG_LD_MAX_H       (MOTOR_LD * 3.0f)   /* Ld 上限 */
 #define CALIB_CFG_LQ_MIN_H       (MOTOR_LQ * 0.2f)   /* Lq 下限 */

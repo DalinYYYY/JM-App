@@ -14,7 +14,7 @@
 /* R 相电阻(Ω) */
 static inline bool calib_validate_r(float r)
 {
-	return isfinite(r) && r >= CALIB_CFG_R_MIN_OHM && r <= CALIB_CFG_R_MAX_OHM;
+	return isfinite(r) && r >= CALIB_CFG_R_MIN_OHM_FINAL && r <= CALIB_CFG_R_MAX_OHM;
 }
 
 /* Ld d轴电感(H) */
