@@ -313,13 +313,21 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			e = ops->motor_info_save();
 			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
 		/* 电机配置恢复默认 0xEB: {param_id:u16=0xFFFF全部} -> ACK{status:u8} */
-		case JM_CMD_MOTOR_INFO_RESET:
-			if (len < 2)
-				return reply_nack(p, cmd, JM_ERR_LENGTH);
-			if (ops == NULL || ops->motor_info_reset == NULL)
-				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
-			e = ops->motor_info_reset(jm_rd_u16(pl));
-			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+	case JM_CMD_MOTOR_INFO_RESET:
+		if (len < 2)
+			return reply_nack(p, cmd, JM_ERR_LENGTH);
+		if (ops == NULL || ops->motor_info_reset == NULL)
+			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+		e = ops->motor_info_reset(jm_rd_u16(pl));
+		return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+	/* 重新标定复位 0xEC: 无载荷 -> ACK{status:u8}
+	 * 清除 is_calibrated + 编码器字段，保留电气字段和限幅字段。
+	 * 仅清 RAM，需随后发 0xEA 固化。*/
+	case JM_CMD_MOTOR_INFO_RECALIB_RESET:
+		if (ops == NULL || ops->motor_info_recalib_reset == NULL)
+			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+		e = ops->motor_info_recalib_reset();
+		return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
 		default:
 			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 	}
@@ -462,7 +470,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		return handle_dev(proto, cmd);
 	}
 	/* 参数读写 0xE0~0xEF */
-	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_MOTOR_INFO_RESET)
+	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_MOTOR_INFO_RECALIB_RESET)
 	{
 		return handle_param(proto, cmd, payload, len);
 	}

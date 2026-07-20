@@ -126,6 +126,10 @@ extern "C"
 		/* 恢复默认(CMD 0xEB): param_id=0xFFFF 表示全部恢复默认。可为 NULL(回 NACK)。*/
 		jm_err_e (*motor_info_reset)(uint16_t param_id);
 
+		/* 重新标定复位(CMD 0xEC): 清除 is_calibrated + 编码器字段，保留电气字段和限幅字段。
+		 * 仅清 RAM，不自动落盘，需随后发 0xEA 固化。可为 NULL(回 NACK)。*/
+		jm_err_e (*motor_info_recalib_reset)(void);
+
 		/* 设置本机 CAN 地址(CMD 0xF0): new_id 范围 1~127, 需由实现层持久化。
 		 * 协议层在成功后同步更新 proto->motor_id; CAN 滤波地址重启后由绑定层重新加载生效。
 		 * 可为 NULL(回 NACK)。*/

@@ -35,6 +35,7 @@
 #include "motor_loop.h"         /* motor_loop_get / motor_loop_set_cmd */
 #include "motor_info.h"         /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
 #include "motor_info_storage.h" /* motor_info_storage_get: 获取全局 motor_info 句柄 */
+#include "motor_info_calib.h"   /* motor_info_calib_reset_for_recalibration: 0xEC 命令实现 */
 #include "calib_mgr.h"          /* 标定管理器 start/poll/abort/get_status */
 #include "motor_pid_autotune.h" /* motor_pid_autotune_apply: 零极点对消法理论估计 */
 #include "motor_pid_load.h"     /* motor_pid_set_source / motor_pid_reload: 三环独立 source */
@@ -1000,6 +1001,17 @@ static jm_err_e app_motor_info_reset(uint16_t param_id)
 	}
 }
 
+/* ---- 0xEC 清除标定状态以便重新标定（保留电机本体参数）----
+ * 清除 is_calibrated + 编码器字段（enc_offset/elec_angle_bias/enc_direction），
+ * 保留电气字段和限幅字段。仅清 RAM，不自动落盘，上位机需随后发 0xEA 固化。*/
+static jm_err_e app_motor_info_recalib_reset(void)
+{
+	int rc = motor_info_calib_reset_for_recalibration();
+	if (rc != 0)
+		return JM_ERR_FLASH;
+	return JM_ERR_OK;
+}
+
 #endif /* USE_DEV_FLASH */
 
 /* ============================================================================
@@ -1028,6 +1040,7 @@ static const jm_proto_ops_t s_app_ops = {
 	.motor_info_read_bulk = app_motor_info_read_bulk,
 	.motor_info_write_bulk = app_motor_info_write_bulk,
 	.motor_info_reset = app_motor_info_reset,
+	.motor_info_recalib_reset = app_motor_info_recalib_reset,
 #endif
 	/* PID 管理 0xA0~0xA6 */
 	.pid_autotune = app_pid_autotune,
