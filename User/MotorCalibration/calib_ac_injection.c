@@ -6,6 +6,7 @@
 #include "arm_math.h" /* arm_cos_f32 / arm_sin_f32 */
 #include "calib_ac_injection.h"
 #include "calib_config.h"
+#include "calib_config_runtime.h" /* 运行期派生参数 */
 #include "calib_hw.h"
 #include "dev_motor.h" /* struct dev_motor 完整定义，m->foc.clarke 等 */
 
@@ -16,12 +17,12 @@
 void calib_ac_injection_init(calib_ac_injection_t *ctx, calib_hw_session_t *session)
 {
 	ctx->session = session;
-	ctx->ud_dc = CALIB_CFG_AC_INJECT_DC_V;
-	ctx->ud_ac = CALIB_CFG_AC_INJECT_AMP_V;
-	ctx->freq_hz = CALIB_CFG_AC_INJECT_FREQ_HZ;
+	ctx->ud_dc = calib_cfg_ac_inject_dc_v();
+	ctx->ud_ac = calib_cfg_ac_inject_amp_v();
+	ctx->freq_hz = calib_cfg_ac_inject_freq_hz();
 	ctx->tick = 0;
-	ctx->warmup_ticks = CALIB_CFG_AC_INJECT_WARMUP_TICKS;
-	ctx->total_ticks = ctx->warmup_ticks + CALIB_CFG_AC_INJECT_TOTAL_TICKS;
+	ctx->warmup_ticks = calib_cfg_ac_inject_warmup_ticks();
+	ctx->total_ticks = ctx->warmup_ticks + calib_cfg_ac_inject_total_ticks();
 	ctx->sum_id_cos = 0.0f;
 	ctx->sum_id_sin = 0.0f;
 	ctx->id_dc_est = 0.0f;

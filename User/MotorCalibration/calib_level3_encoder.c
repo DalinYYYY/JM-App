@@ -15,6 +15,7 @@
  */
 #include "calib_types.h"
 #include "calib_config.h"
+#include "calib_config_runtime.h" /* 运行期派生参数 */
 #include "calib_mgr.h"
 #include "calib_hw.h"
 #include "dev_motor.h" /* 通过 dev_motor_t.encoder 抽象层访问编码器，不直接依赖具体芯片 */
@@ -34,7 +35,7 @@ static struct
 
 /* ===================== 零位标定状态机 =====================
  * STEP 0: 初始化，施加 ud 电压（电角度强制为0），转子开始对齐
- * STEP 1: 等待转子稳定对齐（CALIB_CFG_L3_ALIGN_TICKS 个周期）
+ * STEP 1: 等待转子稳定对齐（calib_cfg_l3_align_ticks() 个周期）
  * STEP 2: 多次采样编码器原始角度取平均
  * STEP 3: 写入 offset 到抽象编码器层和 encoder_param，撤销电压，完成
  * ========================================================== */
@@ -47,24 +48,24 @@ static calib_state_e poll_zero_offset(void)
 	{
 		case 0: /* 施加 d 轴对齐电压 */
 			calib_hw_enter(&s_l3.session, m);
-			calib_hw_apply_voltage(&s_l3.session, CALIB_CFG_L3_ALIGN_VOLTAGE_V, 0.0f, 0.0f);
+			calib_hw_apply_voltage(&s_l3.session, calib_cfg_l3_align_voltage_v(), 0.0f, 0.0f);
 			calib_mgr_set_step(0);
 			calib_step_next(&s_l3.step, 1);
 			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 等待转子稳定对齐 */
-			calib_hw_apply_voltage(&s_l3.session, CALIB_CFG_L3_ALIGN_VOLTAGE_V, 0.0f, 0.0f);
-			if (calib_step_wait(&s_l3.step, CALIB_CFG_L3_ALIGN_TICKS))
+			calib_hw_apply_voltage(&s_l3.session, calib_cfg_l3_align_voltage_v(), 0.0f, 0.0f);
+			if (calib_step_wait(&s_l3.step, calib_cfg_l3_align_ticks()))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l3.step, 2);
 			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
 		case 2: /* 多次采样编码器原始角度 */
-			calib_hw_apply_voltage(&s_l3.session, CALIB_CFG_L3_ALIGN_VOLTAGE_V, 0.0f, 0.0f);
+			calib_hw_apply_voltage(&s_l3.session, calib_cfg_l3_align_voltage_v(), 0.0f, 0.0f);
 			calib_step_accumulate(&s_l3.step, calib_hw_get_encoder_raw_deg(m));
-			if (s_l3.step.sample_cnt < CALIB_CFG_L3_SAMPLE_COUNT)
+			if (s_l3.step.sample_cnt < calib_cfg_l3_sample_count())
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l3.step, 3);
 			calib_mgr_set_step(3);
@@ -103,7 +104,7 @@ static calib_state_e poll_zero_offset(void)
 
 /* ===================== 方向标定状态机 =====================
  * STEP 0: 确保零位已标定，施加正向 uq 电压（电角度=0）
- * STEP 1: 持续施加 uq，等待 CALIB_CFG_L3_DIR_TICKS 个周期让电机转动
+ * STEP 1: 持续施加 uq，等待 calib_cfg_l3_dir_ticks() 个周期让电机转动
  * STEP 2: 采样角度变化方向，判定 CW/CCW
  * STEP 3: 写入 direction，撤销电压，完成
  *
@@ -121,15 +122,15 @@ static calib_state_e poll_direction(void)
 			calib_hw_enter(&s_l3.session, m);
 			/* 电角度=0 时 uq>0 产生正向力矩（q轴超前d轴90°，即α轴方向）*/
 			s_l3.dir_start_angle = calib_hw_get_encoder_mech_angle(m);
-			calib_hw_apply_voltage(&s_l3.session, 0.0f, CALIB_CFG_L3_DIR_VOLTAGE_V, 0.0f);
+			calib_hw_apply_voltage(&s_l3.session, 0.0f, calib_cfg_l3_dir_voltage_v(), 0.0f);
 			calib_mgr_set_step(0);
 			calib_step_next(&s_l3.step, 1);
 			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
 		case 1: /* 持续施加 uq，等待电机转动 */
-			calib_hw_apply_voltage(&s_l3.session, 0.0f, CALIB_CFG_L3_DIR_VOLTAGE_V, 0.0f);
-			if (calib_step_wait(&s_l3.step, CALIB_CFG_L3_DIR_TICKS))
+			calib_hw_apply_voltage(&s_l3.session, 0.0f, calib_cfg_l3_dir_voltage_v(), 0.0f);
+			if (calib_step_wait(&s_l3.step, calib_cfg_l3_dir_ticks()))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l3.step, 2);
 			calib_mgr_set_step(2);

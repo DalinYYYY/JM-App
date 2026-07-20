@@ -7,6 +7,7 @@
 #include <math.h>
 #include "calib_types.h"
 #include "calib_config.h"
+#include "calib_config_runtime.h" /* 运行期派生参数 */
 #include "calib_mgr.h"
 #include "calib_hw.h"
 #include "dev_motor.h"
@@ -49,9 +50,9 @@ static calib_state_e poll_deadtime_comp(void)
 
 	/* 三档测试电压：低/中/高，均产生正向 id */
 	const float v_table[3] = {
-		CALIB_CFG_L2_R_TEST_VOLTAGE_LO_V,
-		CALIB_CFG_L2_R_TEST_VOLTAGE_V * 0.7f,
-		CALIB_CFG_L2_R_TEST_VOLTAGE_V,
+		calib_cfg_l2_r_test_voltage_lo_v(),
+		calib_cfg_l2_r_test_voltage_v() * 0.7f,
+		calib_cfg_l2_r_test_voltage_v(),
 	};
 
 	switch (s_l5.step.cur)
@@ -72,7 +73,7 @@ static calib_state_e poll_deadtime_comp(void)
 		case 3: /* 等待稳态 */
 		case 5: /* 等待稳态 */
 			calib_hw_apply_voltage(&s_l5.session, s_l5.test_voltage, 0.0f, 0.0f);
-			if (calib_step_wait(&s_l5.step, CALIB_CFG_L2_R_TEST_TICKS))
+			if (calib_step_wait(&s_l5.step, calib_cfg_l2_r_test_ticks()))
 				return CALIB_STATE_RUNNING;
 			/* 进入采样步 */
 			s_l5.sum_id = 0.0f;
@@ -97,7 +98,7 @@ static calib_state_e poll_deadtime_comp(void)
 			}
 			s_l5.sum_id += id;
 			s_l5.sample_cnt++;
-			if (s_l5.sample_cnt < CALIB_CFG_L2_R_SAMPLE_COUNT)
+			if (s_l5.sample_cnt < calib_cfg_l2_r_sample_count())
 				return CALIB_STATE_RUNNING;
 
 			/* 记录 (id, ud) 数据点 */
