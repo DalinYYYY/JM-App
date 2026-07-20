@@ -4,15 +4,21 @@
 #include "motor_param.h" /* motor_param_t：sync_to_param 参数类型 */
 #include "motor_info.h"  /* motor_info_t：sync_to_param 参数类型 */
 
-/* ===================== 电机参数配置文件（唯一真相源）=====================
- * 所有电机电气身份参数集中于此。三个消费方通过 #include 引用：
- *   - User/DataHub/motor_param.c         （控制环运行时默认值）
- *   - User/DataHub/motor_info.c          （协议持久化参数默认值）
- *   - User/MotorCalibration/calib_config.h（标定结果合理性范围）
+/* ===================== 电机参数配置文件（首次上电 fallback 默认值）=====================
+ * 本文件提供电机电气身份参数的编译期默认值，仅在以下场景使用：
+ *   1. 首次上电（Flash 无有效数据）：apply_info_default() 用 MOTOR_* 宏初始化 motor_info
+ *   2. 未启用 USE_DEV_FLASH 的板（V1 等）：calib_config_runtime.c 回退到 MOTOR_* 编译期值
+ *   3. motor_param_init 后的 apply_param()：写入运行期 motor_param_t 默认值
  *
- * 切换电机型号：修改下面的 MOTOR_PROFILE 宏定义为对应的型号编号。
- * 新增电机型号：在下面追加 #define MOTOR_PROFILE_XXX N，并补一个
- *               #elif 分支填写该型号的全部 MOTOR_* 参数。
+ * 切换电机型号（启用 Flash 的板）：
+ *   上位机通过 0xE7 命令批量写入 motor_info.blocks.motor_calib 字段，0xEA 固化到 Flash。
+ *   标定算法通过 calib_config_runtime.h 读取 motor_info 派生标定参数，无需重编译固件。
+ *   修改本文件的 MOTOR_PROFILE 宏仅影响首次上电的 fallback 默认值。
+ *
+ * 三个消费方：
+ *   - User/DataHub/motor_param.c           （控制环运行时默认值）
+ *   - User/DataHub/motor_info.c            （协议持久化参数默认值）
+ *   - User/MotorCalibration/calib_config_runtime.c（运行期派生标定参数的 fallback）
  *
  * 说明：本文件只含电机电气身份参数（换电机时变的量）。
  *       板级参数（pwm_freq/enc_lines/dead_time）、减速器、PID 增益
@@ -109,10 +115,16 @@
 void motor_profile_apply_param(void *cfg);
 void motor_profile_apply_info(void *cfg);
 
-/* profile 配置版本号：修改 MOTOR_PROFILE 宏切换电机型号时递增此版本号，
- * 用于上电时检测 Flash 中存储的参数是否对应当前固件的 profile。
- * 版本不匹配时触发重新初始化（init + apply_default + save）。*/
-#define MOTOR_PROFILE_CONFIG_VERSION 2U
+/* profile 配置版本号：仅当 motor_info_t 结构体字段增删时递增此版本号，
+ * 用于上电时检测 Flash 中存储的参数布局是否对应当前固件。
+ * 版本不匹配时触发重新初始化（init + apply_default + save）。
+ * 切换电机型号不再递增此版本号（型号切换通过 0xE7 写入 motor_info 实现）。
+ *
+ * 版本历史：
+ *   v1: 初始版本
+ *   v2: 增加 pid_flash_valid_magic 字段
+ *   v3: MotorCalibParam 段增加 peak_current/max_speed 字段（Index 43/44）*/
+#define MOTOR_PROFILE_CONFIG_VERSION 3U
 
 void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上电用 */
 

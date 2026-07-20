@@ -70,6 +70,10 @@ void motor_profile_apply_info(void *cfg)
 		p->blocks.motor_calib.torque_constant = MOTOR_KT;
 	if (p->blocks.motor_calib.rotor_inertia == 0.0f)
 		p->blocks.motor_calib.rotor_inertia = MOTOR_INERTIA;
+	if (p->blocks.motor_calib.peak_current == 0.0f)
+		p->blocks.motor_calib.peak_current = MOTOR_PEAK_CURRENT;
+	if (p->blocks.motor_calib.max_speed == 0.0f)
+		p->blocks.motor_calib.max_speed = MOTOR_MAX_SPEED;
 	/* enc_direction: 0 视为未标定，默认 CW(1) */
 	if (p->blocks.motor_calib.enc_direction == 0)
 		p->blocks.motor_calib.enc_direction = 1;
@@ -98,6 +102,8 @@ void motor_profile_apply_info_default(void *cfg)
 	p->blocks.motor_calib.flux_linkage = MOTOR_FLUX;
 	p->blocks.motor_calib.torque_constant = MOTOR_KT;
 	p->blocks.motor_calib.rotor_inertia = MOTOR_INERTIA;
+	p->blocks.motor_calib.peak_current = MOTOR_PEAK_CURRENT;
+	p->blocks.motor_calib.max_speed = MOTOR_MAX_SPEED;
 	p->blocks.motor_calib.enc_direction = 1; /* 默认 CW(正向) */
 
 	/* 同时设置 config_version，标记当前 profile 版本 */
@@ -122,6 +128,8 @@ void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
 		param->motor_base.flux = c->flux_linkage;
 		param->motor_base.kt = c->torque_constant;
 		param->motor_base.inertia = c->rotor_inertia;
+		param->motor_base.peak_current = c->peak_current;
+		param->motor_base.max_speed = c->max_speed;
 	}
 
 	/* 编码器参数：始终同步（apply_info 已对 enc_direction 做零值 fallback=1；
