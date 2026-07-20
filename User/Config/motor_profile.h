@@ -23,7 +23,7 @@
 #define MOTOR_PROFILE_GM4820H  1
 #define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
 #define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
-#define MOTOR_PROFILE          MOTOR_PROFILE_GM4820H
+#define MOTOR_PROFILE          MOTOR_PROFILE_5010_360
 
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
