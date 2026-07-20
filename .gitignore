@@ -37,3 +37,7 @@ JLinkLog.txt
 .agents
 .claude
 .uploads
+
+# V1 板级编译产物与构建日志
+Board/V1/MDK-ARM/JointMotorApp/
+build_log.txt
