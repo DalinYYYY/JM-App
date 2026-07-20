@@ -458,6 +458,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\User\AppServices\ParamService\jm_host_commun.c</FilePath>
             </File>
+            <File>
+              <FileName>motor_info_calib.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\ParamService\motor_info_calib.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -648,6 +653,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorCalibration\calib_hw.c</FilePath>
             </File>
+            <File>
+              <FileName>calib_ac_injection.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_ac_injection.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -668,6 +678,11 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorAlgorithms\multiturn_counter.c</FilePath>
             </File>
+            <File>
+              <FileName>foc_decoupling.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorAlgorithms\foc_decoupling.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -682,6 +697,11 @@
               <FileName>runtime_param.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\DataHub\runtime_param.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_info.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\DataHub\motor_info.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -737,6 +757,11 @@
               <FileName>dev_commun_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\Devices\dev_commun_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_encoder_mt6701.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_encoder_mt6701.c</FilePath>
             </File>
           </Files>
         </Group>
