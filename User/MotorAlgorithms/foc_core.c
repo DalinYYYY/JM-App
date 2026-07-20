@@ -70,7 +70,6 @@ static void clarke_transfer(struct foc *pobj)
   */
 static void park_transfer(struct foc *pobj)
 {
-	static float prev_id, prev_iq;
 	pobj->Theta = pobj->ele_radian_callback(); // 获取当前电角度
 
 											   /* park变换 */
@@ -87,12 +86,20 @@ static void park_transfer(struct foc *pobj)
 	pobj->i_dq.q = -pobj->i_alphaBeta.alpha * pobj->foc_sin + pobj->i_alphaBeta.beta * pobj->foc_cos;
 #endif // IQ_MATH_ENABLE
 
-	/* 滤波 */
-	pobj->i_dq.d = _lpfilter(0.8F, pobj->i_dq.d, prev_id);
-	pobj->i_dq.q = _lpfilter(0.8F, pobj->i_dq.q, prev_iq);
-
-	prev_id = pobj->i_dq.d;
-	prev_iq = pobj->i_dq.q;
+	if (pobj->calib_raw_mode)
+	{
+		/* 标定模式：旁路 LPF，直接输出原始 id/iq，消除滤波对阶跃响应的延迟污染 */
+		pobj->calib_prev_id = pobj->i_dq.d;
+		pobj->calib_prev_iq = pobj->i_dq.q;
+	}
+	else
+	{
+		/* 正常模式：LPF(α=0.8) 滤波 */
+		pobj->i_dq.d = _lpfilter(0.8F, pobj->i_dq.d, pobj->calib_prev_id);
+		pobj->i_dq.q = _lpfilter(0.8F, pobj->i_dq.q, pobj->calib_prev_iq);
+		pobj->calib_prev_id = pobj->i_dq.d;
+		pobj->calib_prev_iq = pobj->i_dq.q;
+	}
 }
 
 /*

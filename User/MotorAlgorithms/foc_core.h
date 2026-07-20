@@ -109,6 +109,13 @@ typedef struct foc
 	void (*inverse_park)(struct foc *pobj);
 	void (*pfsvpwm)(struct foc *pobj);
 	void (*set_udq)(struct foc *pobj, float ud, float uq);
+
+	/* 标定旁路 LPF 标志：=1 时 park_transfer 不做低通滤波，直接输出原始 id/iq
+	 * 用于 L2 标定期间消除 LPF(α=0.8) 对阶跃响应的延迟污染。
+	 * calib_hw_enter 时置 1，calib_hw_exit 时清 0。*/
+	uint8_t calib_raw_mode;
+	float calib_prev_id; /* 标定期间的 id 滤波状态（替代原 static prev_id）*/
+	float calib_prev_iq; /* 标定期间的 iq 滤波状态（替代原 static prev_iq）*/
 } foc_t;
 
 void foc_init(foc_t *pobj, focCurrent_t (*current_cb)(void), float (*ele_radian_cb)(void));
