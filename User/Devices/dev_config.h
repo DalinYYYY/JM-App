@@ -64,21 +64,20 @@
 /* 板级必填参数校验（漏配直接报错，指明在哪个板文件补填）                 */
 /* ===================================================================== */
 
-/* 母线电流来源选择:
- *   0 = 硬件 ADC 采样
- *   1 = 三相电流 + SVPWM 占空比合成 (新板子无母线电流检测)
- * 合成公式: Ibus = da*Ia + db*Ib + dc*Ic (功率守恒推导) */
+/* 电源监控通道数与分压比:
+ *   PM_CH_MAX     : 规则组通道数(VBUS+IBUS+NTC等), 由板级配置表决定
+ *   PM_VBUS_RATIO : 母线电压分压比(供配置表 scale 字段引用, 避免魔数)
+ *   PM_IBUS_RATIO : 母线电流硬件采样比例(仅 IBUS_HW 类型需要, 供 scale 字段引用)
+ * 换算参数已挪入配置表 type/scale/offset 字段, 不再用 PM_IBUS_SOURCE 宏分散判断 */
 #if defined(USE_DEV_POWER_MONITOR)
+#ifndef PM_CH_MAX
+#error "PM_CH_MAX (规则组通道数) must be defined in dev_config_board.h"
+#endif
+#if PM_CH_MAX < 1
+#error "PM_CH_MAX must be >= 1"
+#endif
 #ifndef PM_VBUS_RATIO
 #error "PM_VBUS_RATIO (母线电压分压比) must be defined in dev_config_board.h"
-#endif
-#ifndef PM_IBUS_SOURCE
-#error "PM_IBUS_SOURCE (母线电流来源 0=硬件/1=合成) must be defined in dev_config_board.h"
-#endif
-#if (PM_IBUS_SOURCE == 0)
-#ifndef PM_IBUS_RATIO
-#error "PM_IBUS_RATIO (1/(gain*shunt), 硬件采样时必填) must be defined in dev_config_board.h"
-#endif
 #endif
 #endif
 
