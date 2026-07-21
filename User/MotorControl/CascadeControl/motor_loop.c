@@ -20,8 +20,8 @@
 #include "motor_param.h"        /* motor_param_init 加载默认电机参数 */
 #include "motor_profile.h"      /* motor_profile_apply_param / sync_to_param */
 #include "motor_info_storage.h" /* motor_info_storage_get：Flash 加载的标定参数 */
-#if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR) && (PM_IBUS_SOURCE == 1)
-#include "dev_power_monitor.h"  /* 母线电流合成: SYNTH 源时 ISR 调用 */
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR)
+#include "dev_power_monitor.h"  /* 母线电流合成: 配置表检测 SYNTH 通道时 ISR 调用 */
 #endif
 
 #define MOTOR_LOOP_DEG_TO_RAD (0.01745329252f) /* π/180 */
@@ -343,10 +343,13 @@ void motor_loop_isr(void)
 	// step5: 电流环（基频）——传入完整 ref，内部按 ctrl_type 分流
 	cur_loop_run(&m->current, &m->sys.motor.ref, &m->out);
 
-#if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR) && (PM_IBUS_SOURCE == 1)
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR)
 	/* step6: 合成母线电流 (SYNTH 源, 10kHz 高频)
+	 * 仅板级配置了 PM_CH_IBUS_SYNTH 通道时执行; SFOC 板配置 IBUS_HW 不执行
 	 * 仅 RUN 态执行: CALIB/IDLE 态 PWM 未真正驱动电机, ibus 保持上次值
-	 * 公式: Ibus = da*Ia + db*Ib + dc*Ic (功率守恒推导) */
+	 * 公式: Ibus = da*Ia + db*Ib + dc*Ic (功率守恒推导)
+	 * has_channel 检测 const 配置表, 编译器可常量折叠, 运行期无开销 */
+	if (dev_power_monitor_has_channel(PM_CH_IBUS_SYNTH))
 	{
 		const foc_t *foc = &m->motor.foc;
 		const dev_phase_current_t *pc = &m->motor.phase_current;

@@ -30,15 +30,9 @@ void power_monitor_update(void)
 	 * vbus 字段供 SVPWM 归一化(calib_hw)使用 */
 	dev_power_monitor.update(&dev_power_monitor);
 	(void)dev_power_monitor.get_vbus(&dev_power_monitor);
-
-	/* 母线电流读取:
-	 * - HW_ADC 源 (PM_IBUS_SOURCE=0): 任务层调用 get_ibus 现场采样解算
-	 * - SYNTH 源 (PM_IBUS_SOURCE=1): 由 motor_loop_isr 10kHz 高频合成写入 pobj->ibus,
-	 *   此处不调用 get_ibus (避免 HW_ADC 分支覆盖合成值), 直接读缓存
-	 * 注: 预处理阶段枚举不可见, 用数值 0 与 dev_config.h 的 PM_IBUS_SOURCE 默认值对齐 */
-#if (PM_IBUS_SOURCE == 0)
+	/* 母线电流读取: 驱动层按配置表 type 路由
+	 * - IBUS_HW: 现场采样解算; IBUS_SYNTH: 仅返回 motor_loop_isr 写入的缓存值 */
 	(void)dev_power_monitor.get_ibus(&dev_power_monitor);
-#endif
 
 	/* 同步电源监控到电机实时参数(usr.motor_state.power)
 	 * 任务层直接写 usr, 与中断 publish_power_thermal 解耦, 100ms 足够遥测 */
