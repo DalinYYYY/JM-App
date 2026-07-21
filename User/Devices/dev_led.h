@@ -36,6 +36,7 @@ extern "C"
 	typedef enum
 	{
 		LED_ID_1 = 0,
+		LED_ID_2,
 		LED_ID_MAX,
 	} led_id_e;
 
@@ -66,6 +67,9 @@ extern "C"
 	} dev_led_t;
 
 	void dev_led_init(dev_led_t *pobj, led_id_e id);
+
+	/* 获取 LED 对象指针（按 ID，用于上层模块访问对象池） */
+	dev_led_t *dev_led_get(led_id_e id);
 
 #endif /* USE_DEV_LED */
 

@@ -25,6 +25,9 @@
 #if defined(USE_DEV_DRV8301)
 #include "dev_drv8301.h"
 #endif
+#if defined(USE_DEV_LED)
+#include "led_manager.h"
+#endif
 #include "motor_info_storage.h"
 #include "motor_loop.h"
 #include "motor_loop_config.h"
@@ -63,6 +66,12 @@ static void hardware_init(void)
 	/* 初始化电机三环控制（dev_motor + 状态机 + 级联控制）
      * 电流环频率由 ADC 注入转换中断决定，此处传入实际中断频率 */
 	motor_loop_init(10000.0f);
+
+#if defined(USE_DEV_LED)
+	/* LED 状态指示初始化（LED1红=故障, LED2绿=运行状态）
+	 * 须在 motor_loop_init 之后调用, 依赖状态机实例就绪 */
+	led_manager_init();
+#endif
 
 	/* 调试映射指针绑定：指向已存在的全局变量地址（不复制数据）
 	 * 须在上述各 init 完成后绑定，此时对象地址与内容均已就绪，

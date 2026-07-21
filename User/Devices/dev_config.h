@@ -118,5 +118,4 @@
 #error "MOTORINFO_FLASH_START_ADDR must be 4-byte aligned"
 #endif
 #endif
-
 #endif /* __DEV_CONFIG_H__ */

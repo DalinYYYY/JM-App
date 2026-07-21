@@ -24,6 +24,10 @@
 #include "thread_config.h"
 #include "vofa.h"
 #include "user_interface.h"
+#include "dev_config.h"
+#if defined(USE_DEV_LED)
+#include "led_manager.h"
+#endif
 
 void display_thread(void const *argument)
 {
@@ -34,6 +38,12 @@ void display_thread(void const *argument)
 	{
 
 		drv_rtos_delay_ms(THREAD_DELAY_DISPLAY);
+
+#if defined(USE_DEV_LED)
+		/* LED 状态指示周期更新（10ms 周期, 由状态机驱动 LED1/LED2 行为） */
+		led_manager_update();
+#endif
+
 		/* 任务计数 */
 		usr.sys.task_cnt.display_cnt++;
 	}
