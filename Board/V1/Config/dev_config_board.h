@@ -14,7 +14,8 @@
 #define USE_DEV_DWT_COUNTER   /* DWT 周期计数器 (性能剖析) */
 #define USE_DEV_COMMUN_UART   /* 上位机 UART 通信 */
 #define USE_DEV_LED           /* LED 状态指示 (LED1红=PC14 故障, LED2绿=PC15 运行状态) */
-/* 不启用: USE_DEV_AS5047 / USE_DEV_DRV8301 / USE_DEV_RGB_LED (V1 用单色 LED) / USE_DEV_FLASH */
+#define USE_DEV_FLASH         /* Flash 参数存储 (Bank2 末尾 4KB, 供 0xE6-0xEB 命令组) */
+/* 不启用: USE_DEV_AS5047 / USE_DEV_DRV8301 / USE_DEV_RGB_LED (V1 用单色 LED) */
 
 /* ===== 2. 编码器型号 =====
  * V1 板 MT6835 为主编码器接 SPI1, MT6701 为副编码器备料接 SPI3 */
@@ -45,7 +46,14 @@
  * V1: VBUS + IBUS_SYNTH + NTC1(TEMP_DRIVER) + NTC2(TEMP_MOTOR) = 4 通道 */
 #define PM_CH_MAX (4)
 
-/* ===== 8. Flash 存储 =====
- * V1 未启用 USE_DEV_FLASH, 无需定义 MOTORINFO_FLASH_* */
+/* ===== 8. Flash 存储: Bank2 末尾 (0x0804F000, 4KB) =====
+ * G474CETx 双 Bank Flash (512KB, 每 Bank 256KB), Bank2 末尾 4KB 区域存储 motor_info
+ * Bank1: 0x08000000-0x0803FFFF (256KB, 代码区, 链接脚本 LR_IROM1=0x80000)
+ * Bank2: 0x08040000-0x0807FFFF (256KB, 末尾4KB为参数存储区)
+ * 注: 与 SFOC 板共用 0x0804F000 地址, 便于三板存储区布局统一
+ *     链接脚本 stm32g474xx_flash.sct 已限制代码区为 0x80000(512KB), 不覆盖参数区 */
+#define MOTORINFO_FLASH_START_ADDR 0x0804F000U
+#define MOTORINFO_FLASH_TOTAL_SIZE 0x00001000U /* 4KB */
+#define MOTORINFO_FLASH_PAGE_SIZE 2048U        /* 2KB, G4 双 Bank 页大小 */
 
 #endif /* __DEV_CONFIG_BOARD_V1_H__ */

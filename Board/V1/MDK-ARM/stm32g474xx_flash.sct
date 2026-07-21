@@ -1,4 +1,4 @@
-LR_IROM1 0x8000000 0x00080000  {  ; load_region size_region
+LR_IROM1 0x8000000 0x00080000  {  ; load_region size_region (代码区限制在0x0804F000前, 避免覆盖参数存储区)
   ER_IROM1 0x8000000 0x00080000  {  ; load address = excetion address
    *.o (RESET, +First)
    *(InRoot$$Sections)

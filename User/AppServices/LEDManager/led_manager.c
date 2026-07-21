@@ -25,10 +25,10 @@
 /* LED 行为类型 */
 typedef enum
 {
-	LED_ACT_OFF = 0,		/* 常灭 */
-	LED_ACT_ON,				/* 常亮 */
-	LED_ACT_BLINK_SLOW,		/* 慢闪 1000ms */
-	LED_ACT_BLINK_FAST,		/* 快闪 200ms */
+	LED_ACT_OFF = 0,    /* 常灭 */
+	LED_ACT_ON,         /* 常亮 */
+	LED_ACT_BLINK_SLOW, /* 慢闪 1000ms */
+	LED_ACT_BLINK_FAST, /* 快闪 200ms */
 } led_action_e;
 
 /* ==================================================================== */
@@ -38,10 +38,10 @@ static led_action_e map_fault_led(top_fsm_e state)
 {
 	switch (state)
 	{
-		case TOP_FSM_FAULT:			return LED_ACT_ON;
-		case TOP_FSM_SAFETY:		return LED_ACT_BLINK_FAST;
-		case TOP_FSM_BOOTLOADER:	return LED_ACT_BLINK_FAST;
-		default:					return LED_ACT_OFF;
+		case TOP_FSM_FAULT: return LED_ACT_ON;
+		case TOP_FSM_SAFETY: return LED_ACT_BLINK_FAST;
+		case TOP_FSM_BOOTLOADER: return LED_ACT_BLINK_FAST;
+		default: return LED_ACT_OFF;
 	}
 }
 
@@ -49,13 +49,14 @@ static led_action_e map_status_led(top_fsm_e state)
 {
 	switch (state)
 	{
-		case TOP_FSM_INIT:			return LED_ACT_BLINK_SLOW;
-		case TOP_FSM_READY:			return LED_ACT_BLINK_SLOW;
-		case TOP_FSM_RUN:			return LED_ACT_ON;
-		case TOP_FSM_CALIB:			return LED_ACT_BLINK_FAST;
-		case TOP_FSM_CONFIG:		return LED_ACT_BLINK_SLOW;
-		case TOP_FSM_BOOTLOADER:	return LED_ACT_BLINK_FAST;
-		default:					return LED_ACT_OFF;  /* IDLE / SAFETY / FAULT */
+		case TOP_FSM_INIT: return LED_ACT_BLINK_SLOW;
+		case TOP_FSM_IDLE: return LED_ACT_BLINK_SLOW;
+		case TOP_FSM_READY: return LED_ACT_BLINK_SLOW;
+		case TOP_FSM_RUN: return LED_ACT_ON;
+		case TOP_FSM_CALIB: return LED_ACT_BLINK_FAST;
+		case TOP_FSM_CONFIG: return LED_ACT_BLINK_SLOW;
+		case TOP_FSM_BOOTLOADER: return LED_ACT_BLINK_FAST;
+		default: return LED_ACT_OFF; /* IDLE / SAFETY / FAULT */
 	}
 }
 
