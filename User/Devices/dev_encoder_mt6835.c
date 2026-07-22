@@ -9,7 +9,7 @@
 #include <string.h>
 #include "assert_report.h"
 
-static dev_mt6835_t s_mt6835[MT6835_ID_MAX];
+dev_mt6835_t s_mt6835[MT6835_ID_MAX];
 
 /* ---- MT6835 → 抽象编码器 适配函数 ---- */
 
@@ -40,14 +40,14 @@ static float encoder_mt6835_get_offset(struct dev_encoder *enc)
 static void encoder_mt6835_set_dir(struct dev_encoder *enc, int8_t dir)
 {
     dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
-    /* MT6835 约定：running_dir > 1 表示反向，适配到 -1/1 */
-    chip->set_dir(chip, (dir < 0) ? 2 : 1);
+    /* MT6835 约定: 1=CW(正向), -1=CCW(反向), 与项目其他编码器一致 */
+    chip->set_dir(chip, (dir < 0) ? -1 : 1);
 }
 
 static int8_t encoder_mt6835_get_dir(struct dev_encoder *enc)
 {
     dev_mt6835_t *chip = (dev_mt6835_t *)enc->ctx;
-    return (chip->running_dir > 1) ? -1 : 1;
+    return (chip->running_dir < 0) ? -1 : 1;
 }
 
 static float encoder_mt6835_get_raw_deg(struct dev_encoder *enc)
