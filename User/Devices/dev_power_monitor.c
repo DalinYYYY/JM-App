@@ -59,34 +59,34 @@ static void pm_convert_channel(struct dev_power_monitor *pobj, int idx)
 
 	switch (cfg->type)
 	{
-	case PM_CH_VBUS:
-		/* 母线电压: 采样电压 * 分压比 */
-		pobj->vbus = voltage * cfg->scale;
-		break;
-	case PM_CH_IBUS_HW:
-		/* INA199B1 双向: 零电流输出 VREF/2, 流入电机为正需取反 */
-		pobj->ibus = -(voltage - pobj->ibus_offset) * cfg->scale;
-		break;
-	case PM_CH_IBUS_SYNTH:
-		/* 合成源: 由 motor_loop_isr 调用 synthesize_ibus 写入, 此处不动 */
-		break;
-	case PM_CH_TEMP_DRIVER:
-		/* NTC 占位: 硬件采样已启动, 计算逻辑待实现(Beta公式或查表法) */
-		pobj->temp_driver = 0.0f;
-		break;
-	case PM_CH_TEMP_MOTOR:
-		pobj->temp_motor = 0.0f;
-		break;
-	case PM_CH_TEMP_MCU:
-		pobj->temp_mcu = 0.0f;
-		break;
-	case PM_CH_ENPR:
-		/* 使能信号: 返回原始电压, 调用方按阈值判断 */
-		pobj->enpr = voltage;
-		break;
-	default:
-		/* PM_CH_UNUSED 等: 不处理 */
-		break;
+		case PM_CH_VBUS:
+			/* 母线电压: 采样电压 * 分压比 */
+			pobj->vbus = voltage * cfg->scale;
+			break;
+		case PM_CH_IBUS_HW:
+			/* INA199B1 双向: 零电流输出 VREF/2, 流入电机为正需取反 */
+			pobj->ibus = -(voltage - pobj->ibus_offset) * cfg->scale;
+			break;
+		case PM_CH_IBUS_SYNTH:
+			/* 合成源: 由 motor_loop_isr 调用 synthesize_ibus 写入, 此处不动 */
+			break;
+		case PM_CH_TEMP_DRIVER:
+			/* NTC 占位: 硬件采样已启动, 计算逻辑待实现(Beta公式或查表法) */
+			pobj->temp_driver = 0.0f;
+			break;
+		case PM_CH_TEMP_MOTOR:
+			pobj->temp_motor = 0.0f;
+			break;
+		case PM_CH_TEMP_MCU:
+			pobj->temp_mcu = 0.0f;
+			break;
+		case PM_CH_ENPR:
+			/* 使能信号: 返回原始电压, 调用方按阈值判断 */
+			pobj->enpr = voltage;
+			break;
+		default:
+			/* PM_CH_UNUSED 等: 不处理 */
+			break;
 	}
 }
 
@@ -191,7 +191,7 @@ static float dev_power_monitor_get_vbus(struct dev_power_monitor *pobj)
 	int idx = pm_find_channel(PM_CH_VBUS);
 	if (idx < 0)
 	{
-		return pobj->vbus; /* 板级未配置 VBUS, 返回默认值(0) */
+		return pobj->vbus;         /* 板级未配置 VBUS, 返回默认值(0) */
 	}
 	pm_convert_channel(pobj, idx); /* 现场换算(供 HW_ADC 源实时刷新) */
 	return pobj->vbus;
