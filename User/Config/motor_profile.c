@@ -117,20 +117,21 @@ void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
 
 	const MotorCalibParam_t *c = &info->blocks.motor_calib;
 
-	/* 电气参数：仅当 is_calibrated==1 时用 Flash 标定值覆盖 profile 默认值
-	 * （apply_param 已写入 profile 默认值，此处按标定状态决定是否覆盖）*/
-	if (c->is_calibrated == 1U)
-	{
-		param->motor_base.pole_pairs = (uint8_t)c->pole_pairs;
-		param->motor_base.r = c->phase_resistance;
-		param->motor_base.ld = c->phase_inductance_d;
-		param->motor_base.lq = c->phase_inductance_q;
-		param->motor_base.flux = c->flux_linkage;
-		param->motor_base.kt = c->torque_constant;
-		param->motor_base.inertia = c->rotor_inertia;
-		param->motor_base.peak_current = c->peak_current;
-		param->motor_base.max_speed = c->max_speed;
-	}
+	/* 电气参数：始终从 motor_info 同步到运行期，不再受 is_calibrated 门控。
+	 * 【关键修复】原逻辑仅 is_calibrated==1 才同步，导致上位机 0xE7/0xEA 写入的
+	 * RS03 参数(pole_pairs=21 等)存进 Flash 后，因未跑 L7 全流程(is_calibrated=0)
+	 * 而不被同步，运行期保留 profile 默认值(pole_pairs=7)。
+	 * motor_info 的电气字段要么是 Flash 标定值，要么是 apply_info 已做的逐字段
+	 * 零值 fallback(profile 默认值)，两者都是有效值，无需 is_calibrated 门控。*/
+	param->motor_base.pole_pairs = (uint8_t)c->pole_pairs;
+	param->motor_base.r = c->phase_resistance;
+	param->motor_base.ld = c->phase_inductance_d;
+	param->motor_base.lq = c->phase_inductance_q;
+	param->motor_base.flux = c->flux_linkage;
+	param->motor_base.kt = c->torque_constant;
+	param->motor_base.inertia = c->rotor_inertia;
+	param->motor_base.peak_current = c->peak_current;
+	param->motor_base.max_speed = c->max_speed;
 
 	/* 编码器参数：始终同步（apply_info 已对 enc_direction 做零值 fallback=1；
 	 * enc_offset/elec_angle_bias 保留 0 表示需标定，控制环据此判断未标定状态）*/

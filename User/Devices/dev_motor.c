@@ -119,9 +119,19 @@ void dev_motor_init(dev_motor_t *pobj,
 	/* 通过抽象层从已标定参数加载编码器零位和方向
 	 * （启动时 Flash 参数已加载到 usr.motor_param，统一 -1/1 方向约定）*/
 	{
-		const encoder_param_t *enc_cfg = &usr.motor_param[(motor_num_e)id].encoder_param;
+		const motor_param_t *mp = &usr.motor_param[(motor_num_e)id];
+		const encoder_param_t *enc_cfg = &mp->encoder_param;
 		pobj->encoder.set_offset(&pobj->encoder, enc_cfg->enc_offset);
 		pobj->encoder.set_dir(&pobj->encoder, enc_cfg->enc_direction);
+		/* 极对数从已标定/Flash 参数加载，替代 dev_motor_get_poles() 的硬编码 7。
+		 * motor_loop_init 已先执行 motor_profile_apply_param + sync_to_param，
+		 * 故此处 motor_base.pole_pairs 为标定值(或 profile 默认值兜底)。
+		 * 【关键修复】FOC 电角度 = 机械角 × poles(motion_param.c)。此前 poles 恒为 7，
+		 * 与真实极对数(如 RS03=21)不符：转子一动，FOC 电角度按 7 倍算、真实按 21 倍走，
+		 * 比例失配导致开环施加 UQ 有电流却无有效力矩。与 dev_motor_virtual 的 poles
+		 * 同步逻辑对称(dev_motor_virtual.c:281)。*/
+		if (mp->motor_base.pole_pairs != 0u)
+			pobj->poles = mp->motor_base.pole_pairs;
 	}
 
 	// 初始化角度转化器（仅角度/速度，不含多圈）
