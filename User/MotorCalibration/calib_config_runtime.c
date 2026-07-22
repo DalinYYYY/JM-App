@@ -9,8 +9,8 @@
  *          未启用: 从 MOTOR_* 编译期宏构造静态实例返回（V1 等板回退行为）
  */
 #include "calib_config_runtime.h"
-#include "calib_config.h"     /* CALIB_TICKS_PER_SEC, CALIB_LOW_R_THRESHOLD 等 */
-#include "motor_profile.h"    /* MOTOR_* 宏（fallback 路径用） */
+#include "calib_config.h"  /* CALIB_TICKS_PER_SEC, CALIB_LOW_R_THRESHOLD 等 */
+#include "motor_profile.h" /* MOTOR_* 宏（fallback 路径用） */
 
 #if defined(USE_DEV_FLASH)
 #include "motor_info_storage.h"
@@ -36,8 +36,8 @@ const calib_motor_ident_t *calib_motor_ident_get(void)
 		ident.lq = c->phase_inductance_q;
 		ident.flux = c->flux_linkage;
 		ident.pole_pairs = c->pole_pairs;
-		ident.peak_current = c->peak_current;   /* 从 motor_info 读取（Index 43）*/
-		ident.max_speed = c->max_speed;         /* 从 motor_info 读取（Index 44）*/
+		ident.peak_current = c->peak_current; /* 从 motor_info 读取（Index 43）*/
+		ident.max_speed = c->max_speed;       /* 从 motor_info 读取（Index 44）*/
 		return &ident;
 	}
 	/* motor_info 不可用时回退到编译期值（不应发生，仅防御性处理）*/
@@ -74,6 +74,15 @@ float calib_test_current_a(void)
 {
 	const calib_motor_ident_t *id = calib_motor_ident_get();
 	float cur = id->peak_current * 0.3f;
+	/* 低阻电机(R<0.5Ω): 突破 1.5A 默认上限, 用 6A 保证足够对齐力矩
+	 * RS03: R=0.1Ω, test_current=6A, 但 6A×0.1=0.6V < 3.0V 保底
+	 *       实际标定电压由 CALIB_CFG_MIN_CALIB_VOLTAGE_V=3.0V 主导
+	 *       3.0V - 死区0.5V = 2.5V 实际绕组电压, 电流 25A, 力矩 5.0Nm(电机端)
+	 * 普通电机: 保持原 1.5A 上限不变 */
+	if (calib_is_low_r())
+	{
+		return (cur < CALIB_CFG_ALIGN_CURRENT_MAX_A) ? cur : CALIB_CFG_ALIGN_CURRENT_MAX_A;
+	}
 	return (cur < CALIB_CFG_MAX_TEST_CURRENT_A) ? cur : CALIB_CFG_MAX_TEST_CURRENT_A;
 }
 
@@ -83,7 +92,8 @@ float calib_test_current_actual_a(void)
 	{
 		const calib_motor_ident_t *id = calib_motor_ident_get();
 		float cur = id->peak_current * 0.5f;
-		return (cur < CALIB_CFG_MAX_TEST_CURRENT_A) ? cur : CALIB_CFG_MAX_TEST_CURRENT_A;
+		/* 低阻电机对齐电流上限与 test_current 一致(3A), 避免 actual 与 test 脱节 */
+		return (cur < CALIB_CFG_ALIGN_CURRENT_MAX_A) ? cur : CALIB_CFG_ALIGN_CURRENT_MAX_A;
 	}
 	return calib_test_current_a();
 }
@@ -159,8 +169,8 @@ float calib_cfg_l2_flux_target_speed_clamped_rad_s(void)
 {
 	const calib_motor_ident_t *id = calib_motor_ident_get();
 	float v_target = (CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 3.0f > 0.5f)
-	                   ? CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 3.0f
-	                   : 0.5f;
+	                     ? CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 3.0f
+	                     : 0.5f;
 	float speed = v_target / (id->flux * (float)id->pole_pairs);
 	float max_clamp = id->max_speed * 0.3f;
 	if (speed > max_clamp)
@@ -174,7 +184,7 @@ float calib_cfg_l2_flux_spin_voltage_v(void)
 {
 	const calib_motor_ident_t *id = calib_motor_ident_get();
 	return calib_test_current_actual_a() * id->r
-	     + id->flux * (float)id->pole_pairs * calib_cfg_l2_flux_target_speed_clamped_rad_s();
+	       + id->flux * (float)id->pole_pairs * calib_cfg_l2_flux_target_speed_clamped_rad_s();
 }
 
 uint32_t calib_cfg_l2_flux_spin_ticks(void)
@@ -243,7 +253,9 @@ uint32_t calib_cfg_ac_inject_sample_count(void)
 /* ===================== L2 相序 ===================== */
 float calib_cfg_l2_phase_seq_voltage_v(void)
 {
-	return calib_test_current_a() * calib_motor_ident_get()->r;
+	/* 最小电压保底: 确保相序标定有足够力矩拖动转子 */
+	float v = calib_test_current_a() * calib_motor_ident_get()->r;
+	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
 }
 
 uint32_t calib_cfg_l2_phase_seq_align_ticks(void)
@@ -259,7 +271,10 @@ uint32_t calib_cfg_l2_phase_seq_step_ticks(void)
 /* ===================== L2 极对数 ===================== */
 float calib_cfg_l2_pole_pairs_voltage_v(void)
 {
-	return calib_test_current_a() * calib_motor_ident_get()->r;
+	/* 最小电压保底: R 估算偏小时确保足够电流拖动转子
+	 * R 标定不用保底(两点差分法需精确电压), 极对数/零位/方向可用保底 */
+	float v = calib_test_current_a() * calib_motor_ident_get()->r;
+	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
 }
 
 uint32_t calib_cfg_l2_pole_pairs_align_ticks(void)
@@ -274,13 +289,21 @@ float calib_cfg_l2_pole_pairs_dtheta_rad(void)
 
 float calib_cfg_l2_pole_pairs_target_rad(void)
 {
-	return 2.0f * PI * (float)CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES;
+	const calib_motor_ident_t *id = calib_motor_ident_get();
+	uint16_t cycles = (uint16_t)id->pole_pairs;
+	if (cycles < CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES)
+	{
+		cycles = CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES; /* 最少 8 电周期(小极对数电机) */
+	}
+	return 2.0f * PI * (float)cycles;
 }
 
 /* ===================== L3 编码器 ===================== */
 float calib_cfg_l3_align_voltage_v(void)
 {
-	return calib_test_current_a() * calib_motor_ident_get()->r;
+	/* 最小电压保底: 确保零位对齐/方向标定有足够力矩拖动转子 */
+	float v = calib_test_current_a() * calib_motor_ident_get()->r;
+	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
 }
 
 uint32_t calib_cfg_l3_align_ticks(void)
@@ -295,7 +318,12 @@ uint32_t calib_cfg_l3_sample_count(void)
 
 float calib_cfg_l3_dir_voltage_v(void)
 {
-	return calib_test_current_a() * calib_motor_ident_get()->r * 0.7f;
+	/* 最小电压保底: 确保方向标定有足够力矩拖动转子
+	 * 方向标定用 uq 施加力矩, 需克服静摩擦+齿槽转矩
+	 * 无保底时 6A×0.1×0.7=0.42V < 死区0.5V, 电流仅0.06A, 电机不转
+	 * 保底3.0V: 3.0V-死区0.5V=2.5V, 电流25A, 力矩充足 */
+	float v = calib_test_current_a() * calib_motor_ident_get()->r * 0.7f;
+	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
 }
 
 uint32_t calib_cfg_l3_dir_ticks(void)

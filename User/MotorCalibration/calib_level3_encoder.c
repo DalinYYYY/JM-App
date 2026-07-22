@@ -10,8 +10,9 @@
  *   稳定后读取编码器原始角度作为 offset（机械零点对应的编码器读数）。
  *
  * @par 方向标定原理
- *   施加正向 uq 电压（电角度=0 时产生正向力矩），观测编码器角度变化方向。
- *   角度增大→CW（正向），角度减小→CCW（反向）。
+ *   先用 ud 电压对齐转子到电角度 0 位置（消除转子初始位置随机性），
+ *   再施加正向 uq 电压（此时 cos(δ)≈1，产生确定性正向力矩），
+ *   观测编码器角度变化方向。角度增大→CW（正向），角度减小→CCW（反向）。
  */
 #include "calib_types.h"
 #include "calib_config.h"
@@ -48,6 +49,12 @@ static calib_state_e poll_zero_offset(void)
 	{
 		case 0: /* 施加 d 轴对齐电压 */
 			calib_hw_enter(&s_l3.session, m);
+			/* 临时设为正向(1)，确保零位采样(case 2 读 raw_deg)不含 running_dir 反转。
+			 * 与方向标定同源隐患：若上次标定残留 running_dir=-1，dev_mt6835_get_raw 会
+			 * 反转 raw，导致 offset 在"反转坐标系"下采样、却在"正向坐标系"下使用 →
+			 * offset 标错(仅重复标定时触发，首次上电默认 running_dir=1 不触发)。
+			 * case 3 会显式重置为 CW(1)，方向由后续方向标定确定。*/
+			m->encoder.set_dir(&m->encoder, 1);
 			calib_hw_apply_voltage(&s_l3.session, calib_cfg_l3_align_voltage_v(), 0.0f, 0.0f);
 			calib_mgr_set_step(0);
 			calib_step_next(&s_l3.step, 1);
@@ -103,13 +110,15 @@ static calib_state_e poll_zero_offset(void)
 }
 
 /* ===================== 方向标定状态机 =====================
- * STEP 0: 确保零位已标定，施加正向 uq 电压（电角度=0）
- * STEP 1: 持续施加 uq，等待 calib_cfg_l3_dir_ticks() 个周期让电机转动
- * STEP 2: 采样角度变化方向，判定 CW/CCW
- * STEP 3: 写入 direction，撤销电压，完成
+ * STEP 0: 施加 ud 对齐电压，把转子拉到电角度 0 位置
+ * STEP 1: 等待转子稳定对齐（align_ticks=2s）
+ * STEP 2: 记录对齐后起始角度，切换为 uq 电压
+ * STEP 3: 持续施加 uq，等待 dir_ticks 个周期让电机转动
+ * STEP 4: 采样角度变化方向，判定 CW/CCW，写入 direction，撤销电压，完成
  *
  * @note 方向标定前提：零位已标定（offset 已写入）。
  *       若未标定，先执行零位标定再执行方向标定。
+ *       预对齐步骤消除转子初始位置随机性，避免 cos(δ) 符号随机导致方向结果不稳定。
  * ================================================================== */
 static calib_state_e poll_direction(void)
 {
@@ -118,25 +127,43 @@ static calib_state_e poll_direction(void)
 
 	switch (s_l3.step.cur)
 	{
-		case 0: /* 施加正向 uq 电压，记录起始角度 */
+		case 0: /* 施加 ud 对齐电压，把转子拉到电角度 0 位置 */
 			calib_hw_enter(&s_l3.session, m);
-			/* 电角度=0 时 uq>0 产生正向力矩（q轴超前d轴90°，即α轴方向）*/
-			s_l3.dir_start_angle = calib_hw_get_encoder_mech_angle(m);
-			calib_hw_apply_voltage(&s_l3.session, 0.0f, calib_cfg_l3_dir_voltage_v(), 0.0f);
+			/* 临时设为正向(1), 确保角度读数不含 running_dir 反转。
+			 * 否则若上次标定结果为 -1, raw 会被反转, delta 符号随之反转,
+			 * 导致方向标定结果交替正负(-1→+1→-1→...)。
+			 * 标定完成后 case 4 会设置正确的 enc_dir */
+			m->encoder.set_dir(&m->encoder, 1);
+			calib_hw_apply_voltage(&s_l3.session, calib_cfg_l3_align_voltage_v(), 0.0f, 0.0f);
 			calib_mgr_set_step(0);
 			calib_step_next(&s_l3.step, 1);
 			calib_mgr_set_step(1);
 			return CALIB_STATE_RUNNING;
 
-		case 1: /* 持续施加 uq，等待电机转动 */
-			calib_hw_apply_voltage(&s_l3.session, 0.0f, calib_cfg_l3_dir_voltage_v(), 0.0f);
-			if (calib_step_wait(&s_l3.step, calib_cfg_l3_dir_ticks()))
+		case 1: /* 等待转子稳定对齐（复用 align_ticks=2s）*/
+			calib_hw_apply_voltage(&s_l3.session, calib_cfg_l3_align_voltage_v(), 0.0f, 0.0f);
+			if (calib_step_wait(&s_l3.step, calib_cfg_l3_align_ticks()))
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l3.step, 2);
 			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
-		case 2: /* 采样当前角度，判定方向 */
+		case 2: /* 记录对齐后起始角度，切换为 uq 电压 */
+			s_l3.dir_start_angle = calib_hw_get_encoder_mech_angle(m);
+			calib_hw_apply_voltage(&s_l3.session, 0.0f, calib_cfg_l3_dir_voltage_v(), 0.0f);
+			calib_step_next(&s_l3.step, 3);
+			calib_mgr_set_step(3);
+			return CALIB_STATE_RUNNING;
+
+		case 3: /* 持续施加 uq，等待电机转动 */
+			calib_hw_apply_voltage(&s_l3.session, 0.0f, calib_cfg_l3_dir_voltage_v(), 0.0f);
+			if (calib_step_wait(&s_l3.step, calib_cfg_l3_dir_ticks()))
+				return CALIB_STATE_RUNNING;
+			calib_step_next(&s_l3.step, 4);
+			calib_mgr_set_step(4);
+			return CALIB_STATE_RUNNING;
+
+		case 4: /* 采样当前角度，判定方向 */
 		{
 			float end_angle = calib_hw_get_encoder_mech_angle(m);
 			float delta = end_angle - s_l3.dir_start_angle;
@@ -147,9 +174,9 @@ static calib_state_e poll_direction(void)
 				delta += 360.0f;
 
 			int8_t enc_dir;
-			if (delta > 1.0f)       /* 角度增大 → 正向 CW */
+			if (delta > 0.5f)       /* 角度增大 → 正向 CW */
 				enc_dir = 1;
-			else if (delta < -1.0f) /* 角度减小 → 反向 CCW */
+			else if (delta < -0.5f) /* 角度减小 → 反向 CCW */
 				enc_dir = -1;
 			else                    /* 角度几乎无变化，可能电机未转动 */
 			{
@@ -169,16 +196,11 @@ static calib_state_e poll_direction(void)
 			/* 写入 motor_param_t（持久化） */
 			motor_param_set_enc_direction(io->param, enc_dir);
 			(void)motor_info_calib_submit_enc_direction(enc_dir);
-			calib_step_next(&s_l3.step, 3);
-			calib_mgr_set_step(3);
-			return CALIB_STATE_RUNNING;
-		}
-
-		case 3: /* 撤销电压，完成 */
 			calib_hw_exit(&s_l3.session);
 			calib_mgr_mark_done(CALIB_LEVEL3_ENCODER, CALIB_L3_DIRECTION);
 			calib_step_reset(&s_l3.step);
 			return CALIB_STATE_DONE;
+		}
 
 		default:
 			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
