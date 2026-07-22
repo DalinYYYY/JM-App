@@ -34,7 +34,7 @@
 
 /* ===== 5. 母线电压分压 =====
  * V1 分压网络 */
-#define PM_VBUS_RATIO (24.70588f)
+#define PM_VBUS_RATIO (15.70588f)
 
 /* ===== 6. 母线电流来源 =====
  * V1 无独立 IBUS 采样硬件 , 使用三相电流 + SVPWM 占空比合成
@@ -54,6 +54,6 @@
  *     链接脚本 stm32g474xx_flash.sct 已限制代码区为 0x80000(512KB), 不覆盖参数区 */
 #define MOTORINFO_FLASH_START_ADDR 0x0804F000U
 #define MOTORINFO_FLASH_TOTAL_SIZE 0x00001000U /* 4KB */
-#define MOTORINFO_FLASH_PAGE_SIZE 2048U        /* 2KB, G4 双 Bank 页大小 */
+#define MOTORINFO_FLASH_PAGE_SIZE  2048U       /* 2KB, G4 双 Bank 页大小 */
 
-#endif /* __DEV_CONFIG_BOARD_V1_H__ */
+#endif                                         /* __DEV_CONFIG_BOARD_V1_H__ */

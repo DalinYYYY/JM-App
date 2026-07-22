@@ -73,7 +73,7 @@ void calib_hw_apply_voltage(calib_hw_session_t *s, float ud, float uq, float the
 	 * 会被当作占空比（>>1.0）触发过调制限幅，实际电压幅值失真且随角度
 	 * 非线性波动，导致开环标定（极对数/R/Ld/Lq/flux）结果错误。
 	 * 虚拟电机直接用 ud/uq 推进物理模型（不走 SVPWM），不归一化。
-	 * Vbus 由 dev_power_monitor 在 task 层 100ms 周期更新, 标定时已就绪。*/
+	 * Vbus 由 dev_power_monitor 在 task 层 20ms 周期更新, 标定时已就绪。*/
 	float vbus = dev_power_monitor.vbus;
 	if (vbus < 1.0f)
 		vbus = 1.0f; /* 保护：Vbus 未就绪时避免除零，标称 Vbus >= 12V */

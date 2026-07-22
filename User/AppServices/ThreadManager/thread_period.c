@@ -26,7 +26,7 @@
 
 void power_monitor_update(void)
 {
-	/* 电源监控刷新(100ms 周期, 母线电压变化缓慢足够)
+	/* 电源监控刷新(20ms 周期, THREAD_DELAY_PERIOD=20)
 	 * vbus 字段供 SVPWM 归一化(calib_hw)使用 */
 	dev_power_monitor.update(&dev_power_monitor);
 	(void)dev_power_monitor.get_vbus(&dev_power_monitor);
