@@ -21,16 +21,17 @@
  * V1 板 MT6835 为主编码器接 SPI1, MT6701 为副编码器备料接 SPI3 */
 #define DEV_MOTOR_ENCODER_TYPE DEV_MOTOR_ENCODER_MT6835
 
-/* ===== 3. PWM 时基 (TIM1 中心对齐) =====
- * HALF_BRIDGE_PWM_PERIOD 必须与 Board/V1/Src/tim.c htim1.Init.Period 一致
- * G4 默认 ARR=8500, CCR 取 ARR-20 */
-#define HALF_BRIDGE_PWM_PERIOD   (8500u)
-#define HALF_BRIDGE_ADC_TRIG_CCR (HALF_BRIDGE_PWM_PERIOD - 20u)
+/* ===== 3. PWM 时基 (TIM1 中心对齐) =====*/
+#define HALF_BRIDGE_PWM_PERIOD (8500u)
+// TODO: 目前V1版硬件因为原理图设计问题（PWM HL 高度接反了），导致采样的时机反向
+#define HALF_BRIDGE_ADC_TRIG_CCR (200u) /* 谷底前 ~1.18µs 采样(下管导通窗口), 见上 */
 
 /* ===== 4. 相电流采样链路 (外置 INA240A2 运放, GAIN=50V/V, 采样电阻 1mΩ) =====
  * V1 用外置 INA240A2 运放 (U26/U27/U28),采样电阻 R33/R34/R35 = 1mΩ (0.001Ω) */
 #define PHASE_CURRENT_GAIN  (50.0f)
 #define PHASE_CURRENT_SHUNT (0.001f)
+/* V1 板 INA240 输入极性与电流约定相反, 软件取反修正 */
+#define PHASE_CURRENT_POLARITY (1.0f)
 
 /* ===== 5. 母线电压分压 =====
  * V1 分压网络 */

@@ -53,10 +53,13 @@ void MX_ADC1_Init(void)
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
-  /* 规则组连续转换 + DMA连续请求: 配合 DMA_CIRCULAR 持续刷新 raw 缓冲,
-   * 否则 HAL_ADC_Start_DMA 后只转换一次, vbus 读到的是首次采样值不更新。
-   * 注入组(TIM1 CC4 触发电流采样)优先级高于规则组, 不受连续转换影响。*/
-  hadc1.Init.ContinuousConvMode = ENABLE;
+  /* 规则组(vbus/NTC)与注入组(相电流)共用 ADC1。
+   * ContinuousConvMode 必须为 DISABLE: 若开连续转换, 规则组会持续霸占 ADC,
+   * 打乱注入组(TIM1 CC4 波峰触发)的采样时序, 导致相电流读到随机相位噪声。
+   * DISABLE 后规则组仅在被触发时转换一轮, 两次触发之间 ADC 空闲, 不干扰注入组。
+   * DMAContinuousRequests 保持 ENABLE + DMA_CIRCULAR: 每次软件重触发的采样都写入
+   * 循环缓冲。vbus 刷新由 period_thread 每 20ms 软触发一次(见 power_monitor_update)。*/
+  hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;

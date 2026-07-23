@@ -50,6 +50,11 @@
 #ifndef PHASE_CURRENT_ZERO_ADC
 #define PHASE_CURRENT_ZERO_ADC (2048u)
 #endif
+/* 电流采样极性: +1.0=正向, -1.0=反向(采样电阻/运放输入方向与约定相反时使用)
+ * 板级根据 INA240 IN+/IN- 与采样电阻焊接方向决定是否覆盖为 -1.0f */
+#ifndef PHASE_CURRENT_POLARITY
+#define PHASE_CURRENT_POLARITY (1.0f)
+#endif
 #endif
 
 #if defined(USE_DEV_COMMUN_VESC)

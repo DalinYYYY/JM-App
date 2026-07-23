@@ -112,7 +112,7 @@ static void dev_phase_current_get_voltage(struct dev_adc_injected *pobj)
 static dev_current_f3axis_t dev_adc_get_current(struct dev_adc_injected *pobj)
 {
 	dev_current_f3axis_t current;
-	float k = 1.0f / (pobj->gain * pobj->shunt_resistor); /* V→A 换算系数 */
+	float k = PHASE_CURRENT_POLARITY / (pobj->gain * pobj->shunt_resistor); /* V→A 换算系数(含极性) */
 
 	assert_report(pobj != NULL);
 	current.a = pobj->voltage.a * k;
