@@ -27,6 +27,7 @@
 #include "drv_rtos.h"
 #include "dev_commun_uart.h"
 #include "jm_proto_ops.h" /* 传输无关业务回调集(串口/CAN 共用) + 遥测订阅状态 */
+#include "motor_loop.h"   /* motor_loop_t: 调试通道通过 p_motor_loop 读 ADC 原始值 */
 
 /* ---------------- 同步遥测周期状态 ----------------
  * 约束沿用: packer 单全局 send_buffer + 无发送忙查询, 故每个上报节拍只发一帧。
@@ -163,6 +164,33 @@ static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 	dev->report(dev, JM_CMD_TELEMETRY, o, n);
 }
 
+/* ---------------- 调试通道绑定 ----------------*/
+/* [诊断] 电角度换相核对: 开环电压 Ud=0/Uq>0 时 Id/Iq 低频反相大摆动。
+ * poles=20 已确认正确, 故疑点在 d轴对齐(enc_offset)或编码器方向(enc_direction)。
+ * 重点判读 ch4(enc_dir):
+ *   本架构 offset 在标定时强制 dir=+1 采样, 若真实 enc_dir=-1, 运行时 get_raw 反转 raw,
+ *   offset 在"正向坐标系"标、"反向坐标系"用 → 机械零点错位 → d轴对齐失效 → Id/Iq大摆动。
+ *   (calib_level3_encoder.c 已注释此隐患) 若 ch4=-1 且 Id 大 → 高度怀疑此错位, 需重标零位。
+ * 判读:
+ *   ch3(poles)=20; ch4(enc_dir)=±1; ch5(ele_deg)匀速转线性锯齿0~360;
+ *   ch6(mech_deg)一圈内 ele 循环 poles 次; ch7(enc_offset)标定机械零位(deg)。
+ * 核对完恢复电流/dq 遥测。*/
+static void jm_host_commun_update_debug(void)
+{
+	const foc_t *fc = &usr.p_motor_loop->motor.foc;
+	const motion_param_t *mp = &usr.p_motor_loop->motor.motor_param;
+	const motor_param_t *param = &usr.motor_param[M1];
+
+	jm_dbg[0] = (float)fc->i_dq.d;                         /* Id */
+	jm_dbg[1] = (float)fc->i_dq.q;                         /* Iq */
+	jm_dbg[2] = (float)fc->Theta;                          /* park 用电角度(rad) */
+	jm_dbg[3] = (float)mp->poles;                          /* 生效极对数(应=20) */
+	jm_dbg[4] = (float)param->encoder_param.enc_direction; /* 编码器方向 ±1 (重点!) */
+	jm_dbg[5] = (float)mp->ele_angle;                      /* 电角度(deg) */
+	jm_dbg[6] = (float)mp->mechanical_angle;               /* 机械角(deg) */
+	jm_dbg[7] = (float)param->encoder_param.enc_offset;    /* 编码器机械零位偏移(deg) */
+}
+
 /* ---------------- 对外接口 ---------------- */
 
 void jm_host_commun_init(void)
@@ -210,6 +238,9 @@ void jm_host_commun_wait(uint32_t timeout_ms)
 void jm_host_commun_process(void)
 {
 	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
+
+	/* 刷新调试通道: 从 motor_state 快照填充 jm_dbg[] */
+	jm_host_commun_update_debug();
 
 	/* 取空闲突发数据喂协议栈, 自动完成命令分发与应答 */
 	dev_commun_uart.poll(&dev_commun_uart);

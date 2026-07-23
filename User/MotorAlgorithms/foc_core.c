@@ -43,19 +43,19 @@ static void clarke_transfer(struct foc *pobj)
 	pobj->current = pobj->current_callback(); /* 获取当前三相电流 */
 
 	/* 两相重构: 丢弃占空比最大(低侧窗口最窄)相, 由其余两相重构 */
-	float da = pobj->svpwm.ta, db = pobj->svpwm.tb, dc = pobj->svpwm.tc;
-	if (da >= db && da >= dc)
-	{
-		pobj->current.ia = -(pobj->current.ib + pobj->current.ic);
-	}
-	else if (db >= da && db >= dc)
-	{
-		pobj->current.ib = -(pobj->current.ia + pobj->current.ic);
-	}
-	else
-	{
-		pobj->current.ic = -(pobj->current.ia + pobj->current.ib);
-	}
+	// float da = pobj->svpwm.ta, db = pobj->svpwm.tb, dc = pobj->svpwm.tc;
+	// if (da >= db && da >= dc)
+	// {
+	// 	pobj->current.ia = -(pobj->current.ib + pobj->current.ic);
+	// }
+	// else if (db >= da && db >= dc)
+	// {
+	// 	pobj->current.ib = -(pobj->current.ia + pobj->current.ic);
+	// }
+	// else
+	// {
+	// 	pobj->current.ic = -(pobj->current.ia + pobj->current.ib);
+	// }
 
 	// 等幅值Clarke变换公式
 	pobj->i_alphaBeta.alpha = (2.0f / 3.0f) * (pobj->current.ia - 0.5f * pobj->current.ib - 0.5f * pobj->current.ic);
