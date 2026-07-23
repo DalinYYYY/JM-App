@@ -130,6 +130,31 @@ static int dev_power_monitor_start(struct dev_power_monitor *pobj)
 	return status;
 }
 
+/* 重新触发规则组转换: 规则组为单次转换(ContinuousConvMode=DISABLE),
+ * HAL_ADC_Start_DMA 后转一轮即停, 须每周期由 period_thread 重新软触发才能刷新 vbus/NTC。
+ *
+ * 关键: 这里只调 drv_adc_start(HAL_ADC_Start, 纯软触发规则组), 绝不用 stop_dma。
+ *   - 规则组与注入组(相电流)共用 ADC1;
+ *   - HAL_ADC_Start_DMA 已在 init 阶段置好 DMAEN 并启动 DMA循环, 此后 DMAEN 一直有效;
+ *   - HAL_ADC_Start 只置 ADSTART 触发规则组一轮转换, 不 disable ADC、不碰注入组 JADSTART,
+ *     采样结果仍经已挂载的 DMA 写入 raw 缓冲;
+ *   - 反例: HAL_ADC_Stop_DMA 会 ADC_ConversionStop(REGULAR_INJECTED) + ADC_Disable,
+ *     每周期会连注入组一起停并关整个 ADC1, 周期性打断相电流采样, 严禁使用。*/
+static int dev_power_monitor_restart(struct dev_power_monitor *pobj)
+{
+	assert_report(pobj != NULL);
+	int status = DEV_EOK;
+
+	for (adcNumber_e id = DRV_ADC_1; id < DRV_ADC_MAX; id++)
+	{
+		if (pobj->adc_nbr[id] != 0)
+		{
+			status |= drv_adc_start(id); /* 纯规则组软触发, 不停 DMA/不 disable ADC */
+		}
+	}
+	return status;
+}
+
 /* 从DMA缓冲读取各通道ADC值(支持每通道PM_AVERAGE_LPF倍平均) */
 static void dev_power_monitor_get_value(struct dev_power_monitor *pobj)
 {
@@ -312,6 +337,7 @@ void dev_power_monitor_init(dev_power_monitor_t *pobj)
 	pobj->ibus_offset = (idx_ibus >= 0) ? power_monitor_list[idx_ibus].offset : PM_IBUS_OFFSET_V;
 
 	pobj->start = dev_power_monitor_start;
+	pobj->restart = dev_power_monitor_restart;
 	pobj->update = dev_power_monitor_update;
 	pobj->get_vbus = dev_power_monitor_get_vbus;
 	pobj->get_ibus = dev_power_monitor_get_ibus;

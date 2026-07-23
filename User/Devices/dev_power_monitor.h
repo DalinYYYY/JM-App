@@ -124,6 +124,7 @@ extern "C"
 
 		/* public */
 		int (*start)(struct dev_power_monitor *pobj);
+		int (*restart)(struct dev_power_monitor *pobj);
 		void (*update)(struct dev_power_monitor *pobj);
 		float (*get_vbus)(struct dev_power_monitor *pobj);
 		float (*get_ibus)(struct dev_power_monitor *pobj);

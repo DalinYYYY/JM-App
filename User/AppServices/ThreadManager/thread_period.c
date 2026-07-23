@@ -27,8 +27,12 @@
 void power_monitor_update(void)
 {
 	/* 电源监控刷新(20ms 周期, THREAD_DELAY_PERIOD=20)
-	 * vbus 字段供 SVPWM 归一化(calib_hw)使用 */
+	 * vbus 字段供 SVPWM 归一化(calib_hw)使用。
+	 * 规则组为单次转换(不干扰共用 ADC1 的相电流注入组), 转一轮即停,
+	 * 时序: 先 update 读上一周期已完成的采样, 再 restart 触发下一周期转换,
+	 * 20ms 周期远大于 ADC 转换耗时(<100µs), 下一周期读时数据必已就绪, 无需忙等。*/
 	dev_power_monitor.update(&dev_power_monitor);
+	dev_power_monitor.restart(&dev_power_monitor);
 	(void)dev_power_monitor.get_vbus(&dev_power_monitor);
 	/* 母线电流读取: 驱动层按配置表 type 路由
 	 * - IBUS_HW: 现场采样解算; IBUS_SYNTH: 仅返回 motor_loop_isr 写入的缓存值 */
