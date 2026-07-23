@@ -319,7 +319,23 @@ void motor_loop_isr(void)
 		return;
 	}
 
-	// 非运行态：外环复位，电流环以 IDLE 直通模式输出零 PWM
+	// READY 态：采样三相电流 + FOC 变换(Clarke/Park)，但 PWM 输出零
+	// 下管全导通(CCR=0)，三相绕组接GND，无电位差，电流为零，电机不转动
+	if (m->sys.top_state == TOP_FSM_READY)
+	{
+		cascade_control_reset(&m->cascade);
+		cur_loop_reset(&m->current);
+		m->out.id_ref = 0.0f;
+		m->out.iq_ref = 0.0f;
+
+		m->motor.phase_current.update(&m->motor.phase_current);
+		m->motor.foc.clarke(&m->motor.foc);
+		m->motor.foc.park(&m->motor.foc);
+		m->motor.half_bridge.set_3pwm(&m->motor.half_bridge, 0, 0, 0);
+		return;
+	}
+
+	// 其他非运行态（IDLE/FAULT/SAFETY）：外环复位，PWM 置零
 	if (m->sys.top_state != TOP_FSM_RUN)
 	{
 		cascade_control_reset(&m->cascade);
