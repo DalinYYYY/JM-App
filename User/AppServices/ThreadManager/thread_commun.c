@@ -22,18 +22,9 @@
 #include "runtime_param.h"
 #include "thread_config.h"
 #include "thread_commun.h"
-#include "vofa.h"
 #include "main.h"
 #include "dev_commun_vesc.h"
 #include "jm_host_commun.h"
-
-void vofa_update(void)
-{
-#define VOFA_MAX 10
-	float vofa_buf[VOFA_MAX] = {0.0F};
-
-	vofa_upload((uint8_t *)vofa_buf, VOFA_MAX * 4);
-}
 
 #if defined(USE_DEV_COMMUN_VESC)
 #define RAD_TO_DEG (57.2957795f) /* 弧度转角度 (180/π) */
@@ -71,8 +62,6 @@ void commun_thread(void const *argument)
 
 	for (;;)
 	{
-		// vofa_update();
-
 #if defined(USE_DEV_COMMUN_VESC)
 		/* 取空闲突发数据喂协议栈, 自动完成识别握手与实时值回复 */
 		dev_commun_vesc.poll(&dev_commun_vesc);

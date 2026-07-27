@@ -141,11 +141,11 @@ extern "C"
 
 		/* PID 理论估计(CMD 0xA0): 基于辨识参数计算三环PID写入ControlParam_t,
 		 * 自动设 source=AUTOTUNE 并 reload。仅IDLE态可执行。
-		 * ring_select: 0=电流环 1=速度环 2=位置环 3=全部三环
+		 * ring_mask: 位掩码 bit0=电流环 bit1=速度环 bit2=位置环(可组合, 如0x05=电流+位置)
 		 * cur_bw/vel_bw/pos_bw: 各环带宽Hz, <=0用推荐默认值
 		 * out_fail_reason: 失败原因输出(0=无,1=辨识未就绪,2=非IDLE态,3=参数无效)
 		 * 返回 JM_ERR_OK 成功, 其余失败。可为 NULL(回 NACK)。*/
-		jm_err_e (*pid_autotune)(uint8_t ring_select, float cur_bw, float vel_bw, float pos_bw,
+		jm_err_e (*pid_autotune)(uint8_t ring_mask, float cur_bw, float vel_bw, float pos_bw,
 		                         uint8_t *out_fail_reason);
 
 		/* PID 来源切换(CMD 0xA1): 独立设置某环参数来源, 立即 reload。仅IDLE态可执行。

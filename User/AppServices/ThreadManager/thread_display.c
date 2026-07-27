@@ -22,7 +22,6 @@
 #include "runtime_param.h"
 #include "thread_display.h"
 #include "thread_config.h"
-#include "vofa.h"
 #include "user_interface.h"
 #include "dev_config.h"
 #if defined(USE_DEV_LED)

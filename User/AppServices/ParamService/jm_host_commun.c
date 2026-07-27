@@ -178,17 +178,18 @@ static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 static void jm_host_commun_update_debug(void)
 {
 	const foc_t *fc = &usr.p_motor_loop->motor.foc;
+	const motor_loop_t *ml = usr.p_motor_loop;
 	const motion_param_t *mp = &usr.p_motor_loop->motor.motor_param;
 	const motor_param_t *param = &usr.motor_param[M1];
 
-	jm_dbg[0] = (float)fc->i_dq.d;                         /* Id */
-	jm_dbg[1] = (float)fc->i_dq.q;                         /* Iq */
-	jm_dbg[2] = (float)fc->Theta;                          /* park 用电角度(rad) */
-	jm_dbg[3] = (float)mp->poles;                          /* 生效极对数(应=20) */
-	jm_dbg[4] = (float)param->encoder_param.enc_direction; /* 编码器方向 ±1 (重点!) */
-	jm_dbg[5] = (float)mp->ele_angle;                      /* 电角度(deg) */
-	jm_dbg[6] = (float)mp->mechanical_angle;               /* 机械角(deg) */
-	jm_dbg[7] = (float)param->encoder_param.enc_offset;    /* 编码器机械零位偏移(deg) */
+	jm_dbg[0] = (float)ml->out.id_ref;                  /* d轴电流参考(A) */
+	jm_dbg[1] = (float)ml->out.iq_ref;                  /* q轴电流参考(A) */
+	jm_dbg[2] = 0.0f;                                   /* 保留 */
+	jm_dbg[3] = (float)fc->i_dq.d;                      /* Id */
+	jm_dbg[4] = (float)fc->i_dq.q;                      /* Iq */
+	jm_dbg[5] = (float)fc->Theta;                       /* park 用电角度(rad) */
+	jm_dbg[6] = (float)mp->mechanical_angle;            /* 机械角(deg) */
+	jm_dbg[7] = (float)param->encoder_param.enc_offset; /* 编码器机械零位偏移(deg) */
 }
 
 /* ---------------- 对外接口 ---------------- */
