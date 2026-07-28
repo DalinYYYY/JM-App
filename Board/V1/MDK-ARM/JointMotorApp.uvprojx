@@ -484,6 +484,11 @@
               <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
             </File>
             <File>
+              <FileName>jm_proto_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto_can.c</FilePath>
+            </File>
+            <File>
               <FileName>jm_proto.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto.c</FilePath>
@@ -772,6 +777,11 @@
               <FileName>dev_commun_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\Devices\dev_commun_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_commun_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_commun_can.c</FilePath>
             </File>
             <File>
               <FileName>dev_encoder_mt6701.c</FileName>
