@@ -175,6 +175,10 @@ extern "C"
 	{
 		const jm_proto_ops_t *ops; /* 业务回调 */
 		uint8_t motor_id;          /* 本机地址(CAN用; 串口可忽略) */
+		/* 异步命令序列号: 0=同步命令(无 seq), 1~255=异步命令递增循环。
+		 * 由 jm_proto_async_alloc_seq() 分配; PENDING 即时 NACK 与最终 ACK/NACK 携带同一 seq。
+		 * 上位机据此匹配请求与最终应答, 防止应答丢失导致重试重复执行(如 Flash 擦写)。*/
+		uint8_t async_seq;
 		/* 应答输出缓冲(由 dispatch 填充, 调用方取走发送) */
 		uint8_t reply[1 + JM_PAYLOAD_MAX]; /* reply[0]=CMD, 其后为载荷 */
 		uint16_t reply_len;                /* 含CMD的总长度; 0 表示无需应答 */
@@ -222,6 +226,18 @@ extern "C"
 		jm_wr_u32(p, v.u);
 	}
 
+	/* ---------------- 载荷长度校验规范 ----------------
+	 * dispatch 内部统一用 JM_CHECK_LEN 宏(jm_proto.c 内定义, 因依赖 static reply_nack)
+	 * 应用层 ops 回调中需自行校验 len, 不足时返回 JM_ERR_LENGTH, dispatch 会自动转 NACK。
+	 * 严禁用裸 if(len<x) return ERR_LENGTH 而不回 NACK, 否则上位机收不到应答误以为丢帧。 */
+
+	/* ---------------- 字段演进四铁律(编码规范) ----------------
+	 * 1. 新增字段必须追加到结构体末尾, 禁止中间插入或重排已有字段顺序
+	 * 2. 已有字段的语义和类型不可变更; 若需变更, 必须新增命令码或新增字段
+	 * 3. 新增字段必须有"默认值"(0 或合理初值), 老固件读到新命令的扩展部分自动忽略
+	 * 4. 命令码一旦定义并发布不可重用; 已废弃命令码标记 reserved, 不可重新分配
+	 * 例外: 协议主版本号(MAJOR)递增时允许破坏性变更, 但需同步更新 JM_PROTO_VERSION_MAJOR */
+
 	/* ---------------- 核心接口 ---------------- */
 
 	/**
@@ -242,6 +258,65 @@ extern "C"
 	 *         reply_len>0 时调用方需把 reply 经各自传输层发回。
 	 */
 	jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payload, uint16_t len);
+
+	/* ---------------- 异步命令序列号机制 ----------------
+	 * 异步命令双时序协议:
+	 *   1. 收到命令立即校验, 失败 -> 即时 NACK(err_code, seq=0)
+	 *   2. 校验通过, 排队异步执行 -> 即时 NACK(PENDING, seq=N)
+	 *   3. 异步任务完成 -> 最终 ACK(seq=N) 或 NACK(err_code, seq=N)
+	 * seq 由 jm_proto_async_alloc_seq() 分配, 1~255 循环(0 保留给同步命令)。
+	 * 上位机通过 seq 匹配 PENDING 与最终应答; 若最终应答丢失, 重试时下位机 seq 已递增,
+	 * 上位机可据此识别"上次已执行"避免重复 Flash 擦写。
+	 *
+	 * 开发期简化: 仅引入 seq 基础设施 + API, 不强制所有耗时命令改异步。
+	 *   - 标定命令(0x90~0x96): 已是异步(切 CALIB 态由状态机 poll), 暂不回 PENDING,
+	 *     保留同步 ACK + 0x97 进度查询机制。
+	 *   - Flash 保存(0xE4/0xEA): 开发期通信负载低, 暂保持同步执行;
+	 *     量产期若性能问题再改异步 flag + PENDING。
+	 *   - 预留命令(0x80~0x82/0xCC~0xCF): 回 NACK(NOT_SUPPORTED, seq=0)。 */
+
+	/**
+	 * @brief  分配新的异步序列号 (1~255 循环, 0 保留给同步命令)
+	 * @param  proto  实例
+	 * @return 新 seq (1~255); 同时写入 proto->async_seq
+	 * @note   线程安全: 仅在通信线程上下文调用; ISR 中不可调用。
+	 *         典型用法: ops 回调排队异步任务时调用, 把返回 seq 存入异步上下文,
+	 *         最终应答时携带同一 seq。
+	 */
+	uint8_t jm_proto_async_alloc_seq(jm_proto_t *proto);
+
+	/**
+	 * @brief  组织异步命令的即时 PENDING 应答 (NACK with err_code=PENDING + seq)
+	 * @param  proto  实例
+	 * @param  cmd    原命令码
+	 * @param  seq    异步序列号(由 jm_proto_async_alloc_seq 分配)
+	 * @return JM_ERR_PENDING (同时填充 proto->reply)
+	 * @note   应答格式: [0xFE][cmd][0x0B][seq] (4B)
+	 */
+	jm_err_e jm_proto_reply_pending(jm_proto_t *proto, uint8_t cmd, uint8_t seq);
+
+	/**
+	 * @brief  组织异步命令的最终 ACK (携带 seq, 由通信线程在异步任务完成后调用)
+	 * @param  proto    实例
+	 * @param  cmd      原命令码
+	 * @param  status   状态字节(0=成功, 其余由命令定义; 写入 ACK 载荷首字节)
+	 * @param  seq      异步序列号(与 PENDING 携带的 seq 一致)
+	 * @return JM_ERR_OK (同时填充 proto->reply)
+	 * @note   应答格式: [cmd][seq][status] (3B); 调用方需主动发送 proto->reply。
+	 *         与同步 ACK(2B: [cmd][status]) 区别: 异步 ACK 多 1 字节 seq。
+	 */
+	jm_err_e jm_proto_reply_ack_async(jm_proto_t *proto, uint8_t cmd, uint8_t status, uint8_t seq);
+
+	/**
+	 * @brief  组织异步命令的最终 NACK (携带 seq, 由通信线程在异步任务完成后调用)
+	 * @param  proto    实例
+	 * @param  cmd      原命令码
+	 * @param  err      错误码(具体失败原因)
+	 * @param  seq      异步序列号(与 PENDING 携带的 seq 一致)
+	 * @return err (同时填充 proto->reply)
+	 * @note   应答格式: [0xFE][cmd][err_code][seq] (4B); 与同步 NACK(3B, seq=0) 区别: 多 1 字节 seq。
+	 */
+	jm_err_e jm_proto_reply_nack_async(jm_proto_t *proto, uint8_t cmd, jm_err_e err, uint8_t seq);
 
 #ifdef __cplusplus
 }

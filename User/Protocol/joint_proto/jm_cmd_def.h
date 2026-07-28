@@ -3,7 +3,7 @@
  * @brief       关节电机通信命令码定义(忠实转写 joint_motor_command_list.csv)
  *
  * @author      Dalin (dalinyy@163.com)
- * @version     1.0
+ * @version     1.1
  * @date        2026-06-18
  *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
@@ -11,18 +11,51 @@
  * @par 修改日志:
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
- * | 2026-06-18 | 1.0  | Dalin  | 初始创建   |
+ * | 2026-06-18 | 1.0  | Dalin  | 初始创建 |
+ * | 2026-07-27 | 1.1  | Dalin  | 协议版本号 + 命令码保留区 + 预留 0x80/0x81/0x82 同步触发, 0xCC~0xCF OTA |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        CMD 0x00~0xB8 段数值与 state_define.h 的 ctrl_mode_e 一致,
  *              固件可直接把 CMD 当控制模式分发。串口/CAN 共用同一套 CMD。
+ * @note        命令码保留区分组（编码前固化）:
+ *              0x00~0x0F 系统控制 | 0x10~0x2F 运动控制 | 0x30~0x4F 高级力控
+ *              0x50~0x6F 轨迹同步 | 0x70~0x7F 特殊应用与测试 | 0x80~0x8F 多电机同步(预留)
+ *              0x90~0xAF 校准+PID | 0xB0~0xBF 系统诊断 | 0xC0~0xCF 反馈查询+OTA预留
+ *              0xD0~0xDF 设备信息 | 0xE0~0xEF 参数读写 | 0xF0~0xFE CAN管理 | 0xFF 保留
  */
 #ifndef __JM_CMD_DEF_H__
 #define __JM_CMD_DEF_H__
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C"
 {
+#endif
+
+	/* ===================== 协议版本号 ===================== */
+	/* 主版本: 不兼容变更(命令码重排/载荷语义改); 次版本: 兼容追加(新命令/新字段);
+	 * 补丁: bug 修复。0xD0 READ_DEV_INFO 应答(FD 模式)携带此版本号。 */
+#define JM_PROTO_VERSION_MAJOR  1
+#define JM_PROTO_VERSION_MINOR  1   /* 1.1: 新增命令码保留区 + 预留同步/OTA 命令码 */
+#define JM_PROTO_VERSION_PATCH  0
+#define JM_PROTO_VERSION  ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
+
+	/* ===================== feature_flags 位定义 =====================
+	 * 0xD0 READ_DEV_INFO 应答(28B 扩展格式)携带的特性位图(u16), 上位机据此自适应。
+	 * bit0=CAN_FD 支持 | bit1=AUTH 鉴权启用 | bit2=AUTOTUNE 自整定 | bit3=BODE_SWEEP 扫频
+	 * bit4=DUAL_CHANNEL_ARB 双通道仲裁 | bit5=CAN_LOSS_TIMER 通信中断降级 | bit6-7=reserved */
+#define JM_FEAT_CAN_FD         (1u << 0)
+#define JM_FEAT_AUTH           (1u << 1)
+#define JM_FEAT_AUTOTUNE       (1u << 2)
+#define JM_FEAT_BODE_SWEEP     (1u << 3)
+#define JM_FEAT_DUAL_ARB       (1u << 4)
+#define JM_FEAT_CAN_LOSS_TIMER (1u << 5)
+
+#if defined(USE_CAN_FD_MODE) && (USE_CAN_FD_MODE == 1)
+#define JM_FEATURE_FLAGS_LO  (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
+#else
+#define JM_FEATURE_FLAGS_LO  (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
 #endif
 
 	/* ===================== 命令码 CMD ===================== */
@@ -81,7 +114,7 @@ extern "C"
 		JM_CMD_ELECTRONIC_GEAR = 0x5C,
 		JM_CMD_ELECTRONIC_CAM = 0x5D,
 
-		/* 特殊应用与测试 0x70~0x8F */
+		/* 特殊应用与测试 0x70~0x7F */
 		JM_CMD_STEP_DIR = 0x70,
 		JM_CMD_ANALOG_INPUT = 0x71,
 		JM_CMD_PWM_INPUT = 0x72,
@@ -94,6 +127,15 @@ extern "C"
 		JM_CMD_TEST_INERTIA = 0x79,
 		JM_CMD_TEST_CURRENT_LOOP = 0x7A,
 		JM_CMD_TEST_VELOCITY_LOOP = 0x7B,
+
+		/* 多电机同步触发预留 0x80~0x8F (仅定义命令码, 不实现 handler, 回 NACK(NOT_SUPPORTED))
+		 *   0x80 SYNC: CANopen-style 周期同步帧
+		 *   0x81 PRESET_AND_TRIGGER: 预存指令不执行
+		 *   0x82 TRIGGER: 广播触发同步执行
+		 * 注: 0x12/0x13 已被 TORQUE/MIT 占用, 故同步触发改到 0x80 段预留 */
+		JM_CMD_SYNC = 0x80,                /* 预留: 周期同步帧 */
+		JM_CMD_PRESET_AND_TRIGGER = 0x81,  /* 预留: 预存指令不执行 */
+		JM_CMD_TRIGGER = 0x82,             /* 预留: 广播触发同步执行 */
 
 		/* 校准 0x90~0xAF: 类别命令+子命令模式
 	 * 0x90-0x96: payload[0]=子模式ID, 进入CALIB态并启动标定
@@ -132,7 +174,7 @@ extern "C"
 		JM_CMD_HIGH_SPEED_DAQ = 0xB7,
 		JM_CMD_SINGLE_STEP = 0xB8,
 
-		/* 反馈查询 0xC0~0xCF */
+		/* 反馈查询 0xC0~0xCB (已用), 0xCC~0xCF OTA 预留 (仅定义不实现) */
 		JM_CMD_READ_FEEDBACK = 0xC0, /* 主实时反馈 */
 		JM_CMD_READ_STATE = 0xC1,    /* 电机状态机 */
 		JM_CMD_READ_PHASE_CURRENT = 0xC2,
@@ -145,6 +187,12 @@ extern "C"
 		JM_CMD_READ_DEBUG = 0xC9,    /* 通用调试通道: float[] 任意挂载量, 免改协议加观测点 */
 		JM_CMD_TELEMETRY = 0xCA,     /* 周期遥测帧(下位机->上位机, 无应答): mask(u16) + 按位序拼接所选数据组 */
 		JM_CMD_SET_TELEMETRY = 0xCB, /* 遥控开关(上位机->下位机): enable(u8)+mask(u16)[+period_ms(u16)], 回单次ACK */
+		/* OTA 预留: 仅定义命令码, 不实现 handler, 回 NACK(NOT_SUPPORTED)
+		 * 注: 0xB0~0xB3 已被系统诊断占用, 故 OTA 改到 0xCC~0xCF 预留 */
+		JM_CMD_OTA_START  = 0xCC,    /* 预留: 固件升级启动 */
+		JM_CMD_OTA_DATA   = 0xCD,    /* 预留: 固件数据分块 */
+		JM_CMD_OTA_END    = 0xCE,    /* 预留: 固件升级结束 */
+		JM_CMD_OTA_RESUME = 0xCF,    /* 预留: 断点续传查询 */
 
 		/* 设备信息 0xD0~0xDF */
 		JM_CMD_READ_DEV_INFO = 0xD0,
@@ -194,20 +242,42 @@ extern "C"
 		JM_TLM_DEBUG = (1u << 9),     /* jm_dbg[JM_DBG_CH](f32)   N*4B */
 	} jm_telemetry_bit_e;
 
-	/* ===================== 错误码(NACK 的 err_code) ===================== */
+	/* ===================== 错误码(NACK 的 err_code) =====================
+	 * NACK 载荷格式: [0xFE][orig_cmd][err_code][seq] (4B)
+	 *   - orig_cmd: 触发 NACK 的原命令码
+	 *   - err_code: 见下表
+	 *   - seq: 异步命令的序列号, 同步命令填 0
+	 * 异步命令双时序协议:
+	 *   - 即时 NACK: 收到命令立即校验失败时返回 (err_code + seq=0)
+	 *   - 最终 ACK/NACK: 异步任务完成后返回 (err_code=OK/具体错误 + seq=递增)
+	 * 0x01 UNSUPPORTED 与 0x13 NOT_SUPPORTED 的区别:
+	 *   - 0x01: 命令码区间不识别(老固件收到新命令, 整个 CMD 段未实现)
+	 *   - 0x13: 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC, 有意留空) */
 	typedef enum
 	{
-		JM_ERR_OK = 0x00,           /* 成功(用ACK,不发NACK) */
-		JM_ERR_UNSUPPORTED = 0x01,  /* CMD不支持 */
-		JM_ERR_OUT_OF_RANGE = 0x02, /* 参数越界 */
-		JM_ERR_STATE_DENY = 0x03,   /* 状态不允许 */
-		JM_ERR_BAD_PARAM_ID = 0x04, /* param_id无效 */
-		JM_ERR_CRC = 0x05,          /* 校验错误 */
-		JM_ERR_LENGTH = 0x06,       /* 长度错误 */
-		JM_ERR_READ_ONLY = 0x07,    /* 只读参数不可写 */
-		JM_ERR_FLASH = 0x08,        /* Flash读写失败 */
-		JM_ERR_FAULT_STATE = 0x09,  /* 故障态需先清障 */
-		JM_ERR_CALIB_BUSY = 0x0A,   /* 校准未完成/校准中 */
+		JM_ERR_OK = 0x00,              /* 成功(用ACK,不发NACK) */
+		JM_ERR_UNSUPPORTED = 0x01,     /* CMD不支持(命令码区间不识别) */
+		JM_ERR_OUT_OF_RANGE = 0x02,    /* 参数越界 */
+		JM_ERR_STATE_DENY = 0x03,      /* 状态不允许 */
+		JM_ERR_BAD_PARAM_ID = 0x04,    /* param_id无效 */
+		JM_ERR_CRC = 0x05,             /* 校验错误 */
+		JM_ERR_LENGTH = 0x06,          /* 长度错误 */
+		JM_ERR_READ_ONLY = 0x07,       /* 只读参数不可写 */
+		JM_ERR_FLASH = 0x08,           /* Flash读写失败(通用) */
+		JM_ERR_FAULT_STATE = 0x09,     /* 故障态需先清障 */
+		JM_ERR_CALIB_BUSY = 0x0A,      /* 校准未完成/校准中 */
+		/* 新增 0x0B~0x0F */
+		JM_ERR_PENDING = 0x0B,         /* 异步已排队, 即时 NACK 携带 seq */
+		JM_ERR_BUSY = 0x0C,            /* 忙(双通道主控被占用) */
+		JM_ERR_UNAUTHORIZED = 0x0D,    /* 鉴权失败(令牌不匹配) */
+		JM_ERR_RATE_LIMIT = 0x0E,      /* 速率限制(命令频率超限) */
+		JM_ERR_NOT_FOUND = 0x0F,       /* 未找到(资源/文件/记录不存在) */
+		/* 新增 0x10~0x12 (Flash 详细错误码) */
+		JM_ERR_FLASH_ERASE = 0x10,     /* Flash 擦除失败 */
+		JM_ERR_FLASH_WRITE = 0x11,     /* Flash 写入失败 */
+		JM_ERR_FLASH_VERIFY = 0x12,    /* Flash 校验失败(读回不匹配) */
+		/* 新增 0x13 (预留命令专用) */
+		JM_ERR_NOT_SUPPORTED = 0x13,   /* 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC) */
 	} jm_err_e;
 
 	/* ===================== 参数类型码(0xE0读应答的 type 字段) ===================== */

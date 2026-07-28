@@ -255,7 +255,19 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame)
 	 * 即 data[0] 为控制字。为避免与单帧载荷歧义, 多帧仅对"已知大载荷CMD"启用。*/
 
 	/* 已知需要多帧的大载荷命令(与CSV"CAN需分包"一致) */
-	uint8_t is_multi = (cmd == JM_CMD_PARAM_READ_BULK || cmd == JM_CMD_PARAM_WRITE_BULK || cmd == JM_CMD_READ_DEV_INFO || cmd == JM_CMD_ADMITTANCE || cmd == JM_CMD_FORCE_POSITION_HYBRID || cmd == JM_CMD_VARIABLE_IMPEDANCE || cmd == JM_CMD_PVT || cmd == JM_CMD_CUBIC_SPLINE || cmd == JM_CMD_TRAPEZOIDAL_TRAJ || cmd == JM_CMD_S_CURVE_TRAJ || cmd == JM_CMD_TEST_SWEEP_FREQ);
+	uint8_t is_multi = (cmd == JM_CMD_PARAM_READ_BULK
+		|| cmd == JM_CMD_PARAM_WRITE_BULK
+		|| cmd == JM_CMD_PARAM_WRITE           /* 0xE1 写 char[16] 时 18B */
+		|| cmd == JM_CMD_ADMITTANCE
+		|| cmd == JM_CMD_FORCE_POSITION_HYBRID
+		|| cmd == JM_CMD_VARIABLE_IMPEDANCE
+		|| cmd == JM_CMD_PVT
+		|| cmd == JM_CMD_CUBIC_SPLINE
+		|| cmd == JM_CMD_TRAPEZOIDAL_TRAJ
+		|| cmd == JM_CMD_S_CURVE_TRAJ
+		|| cmd == JM_CMD_TEST_SWEEP_FREQ
+		|| cmd == JM_CMD_PID_AUTOTUNE          /* 0xA0 请求 13B */
+		|| cmd == JM_CMD_MOTOR_INFO_WRITE_BULK); /* 0xE9 CSV 已标注 */
 
 	if (!is_multi)
 	{

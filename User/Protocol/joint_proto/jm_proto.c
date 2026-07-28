@@ -35,10 +35,21 @@ static void reply_set(jm_proto_t *p, uint8_t cmd, const uint8_t *body, uint16_t 
 	p->reply_len = (uint16_t)(1 + body_len);
 }
 
-/* 组织 NACK 应答: [0xFE][失败的cmd][err_code] */
+/* 载荷长度校验宏 (内部使用, 依赖 static reply_nack)
+ * 用法: if (JM_CHECK_LEN(len, 8, cmd, p)) return err; 或直接 JM_CHECK_LEN(len, 8, cmd, p);
+ * 长度不足时回 NACK(LENGTH) 并返回 err (err 已是 reply_nack 的返回值) */
+#define JM_CHECK_LEN(len_var, expected_min, cmd_var, p_var) \
+	do { \
+		if ((len_var) < (expected_min)) { \
+			return reply_nack((p_var), (cmd_var), JM_ERR_LENGTH); \
+		} \
+	} while (0)
+
+/* 组织 NACK 应答: [0xFE][失败的cmd][err_code][seq] (4B 格式)
+ * seq: 异步命令的序列号, 同步命令填 0 */
 static jm_err_e reply_nack(jm_proto_t *p, uint8_t cmd, jm_err_e err)
 {
-	uint8_t body[2] = {cmd, (uint8_t)err};
+	uint8_t body[3] = {cmd, (uint8_t)err, 0u}; /* seq=0 (同步命令) */
 	reply_set(p, JM_CMD_NACK, body, sizeof(body));
 	return err;
 }
@@ -78,6 +89,47 @@ void jm_proto_init(jm_proto_t *proto, const jm_proto_ops_t *ops, uint8_t motor_i
 	memset(proto, 0, sizeof(*proto));
 	proto->ops = ops;
 	proto->motor_id = motor_id;
+	/* async_seq 初始为 0(同步命令); 首次 alloc 返回 1 */
+}
+
+/* ===================== 异步命令序列号机制 ===================== */
+jm_err_e jm_proto_reply_nack_async(jm_proto_t *p, uint8_t cmd, jm_err_e err, uint8_t seq)
+{
+	uint8_t body[3] = {cmd, (uint8_t)err, seq}; /* [orig_cmd][err_code][seq] */
+	reply_set(p, JM_CMD_NACK, body, sizeof(body));
+	return err;
+}
+
+jm_err_e jm_proto_reply_pending(jm_proto_t *p, uint8_t cmd, uint8_t seq)
+{
+	/* PENDING 即时应答 = NACK with err_code=PENDING + seq */
+	return jm_proto_reply_nack_async(p, cmd, JM_ERR_PENDING, seq);
+}
+
+jm_err_e jm_proto_reply_ack_async(jm_proto_t *p, uint8_t cmd, uint8_t status, uint8_t seq)
+{
+	/* 异步最终 ACK 载荷: [seq][status] (2B), 加上 reply[0]=cmd 共 3B
+	 * 与同步 ACK(2B: [cmd][status]) 区别: 多 1 字节 seq, 上位机据此匹配 PENDING */
+	uint8_t body[2] = {seq, status};
+	reply_set(p, cmd, body, sizeof(body));
+	return JM_ERR_OK;
+}
+
+uint8_t jm_proto_async_alloc_seq(jm_proto_t *proto)
+{
+	uint8_t seq;
+	if (proto == NULL)
+	{
+		return 0;
+	}
+	/* 1~255 循环递增; 0 保留给同步命令 */
+	seq = (uint8_t)(proto->async_seq + 1u);
+	if (seq == 0u)
+	{
+		seq = 1u;
+	}
+	proto->async_seq = seq;
+	return seq;
 }
 
 /* ---- 反馈查询类 0xC0~0xC8 ---- */
@@ -333,7 +385,14 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 	}
 }
 
-/* ---- 设备信息类 0xD0~0xD2 ---- */
+/* ---- 设备信息类 0xD0~0xD2 ----
+ * 0xD0 READ_DEV_INFO 应答格式 (向后兼容追加, 协议层不依赖板级宏):
+ *   原始格式 (20B, 老上位机): [0-3]hw [4-7]fw [8-19]uid[12]
+ *   扩展格式 (28B, 新上位机): 追加 [20]motor_id_default [21]proto_major [22]proto_minor
+ *                                  [23]feat_lo [24]feat_hi [25-27]reserved
+ * 协议层始终返回 28B 扩展格式; 老上位机读前 20B 即可, 后 8B 自动忽略。
+ * JM_FEATURE_FLAGS_LO 在 jm_cmd_def.h 中根据 USE_CAN_FD_MODE 编译期决定,
+ * 若板级未启用 FD, bit0(CAN_FD)=0, 上位机据此关闭 FD 模式适配。 */
 static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 {
 	const jm_proto_ops_t *ops = p->ops;
@@ -341,7 +400,7 @@ static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 	{
 		case JM_CMD_READ_DEV_INFO:
 		{
-			uint8_t o[20];
+			uint8_t o[28];
 			uint32_t hw = 0, fw = 0;
 			uint8_t uid[12] = {0};
 			if (ops == NULL || ops->get_dev_info == NULL)
@@ -351,7 +410,16 @@ static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 			jm_wr_u32(&o[0], hw);
 			jm_wr_u32(&o[4], fw);
 			memcpy(&o[8], uid, 12);
-			reply_set(p, cmd, o, 20);
+			/* 扩展字段 (motor_id_default + proto_version + feature_flags) */
+			o[20] = p->motor_id;
+			o[21] = JM_PROTO_VERSION_MAJOR;
+			o[22] = JM_PROTO_VERSION_MINOR;
+			o[23] = (uint8_t)(JM_FEATURE_FLAGS_LO & 0xFF);
+			o[24] = (uint8_t)((JM_FEATURE_FLAGS_LO >> 8) & 0xFF);
+			o[25] = 0; /* reserved */
+			o[26] = 0;
+			o[27] = 0;
+			reply_set(p, cmd, o, 28); /* 始终 28B (向后兼容追加) */
 			return JM_ERR_OK;
 		}
 		case JM_CMD_READ_DEV_NAME:
@@ -674,6 +742,17 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		memcpy(&body[2], value4, 4);
 		reply_set(proto, cmd, body, 6);
 		return JM_ERR_OK;
+	}
+
+	/* 预留命令拦截: 0x80~0x82(多电机同步) / 0xCC~0xCF(OTA)
+	 * 这些命令码已定义但当前固件未实现 handler, 统一回 NACK(NOT_SUPPORTED, seq=0)。
+	 * 区别于 UNSUPPORTED(0x01, 命令码区间不识别): NOT_SUPPORTED 表示命令码已知但未实现,
+	 * 上位机据此区分"老固件不识别新命令"与"新固件预留未实现"。*/
+	if (cmd == JM_CMD_SYNC || cmd == JM_CMD_PRESET_AND_TRIGGER || cmd == JM_CMD_TRIGGER ||
+	    cmd == JM_CMD_OTA_START || cmd == JM_CMD_OTA_DATA ||
+	    cmd == JM_CMD_OTA_END || cmd == JM_CMD_OTA_RESUME)
+	{
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
 	}
 
 	/* 其余 0x00~0xB8 控制/校准/诊断类: 统一交给 set_mode 回调,
