@@ -3,7 +3,7 @@
  * @brief       CAN/FDCAN驱动接口，封装收发与接收回调，跨F4(CAN)/G4·H7(FDCAN)统一
  *
  * @author      Dalin (dalinyy@163.com)
- * @version     1.0
+ * @version     1.1
  * @date        2026-06-16
  *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
@@ -12,6 +12,7 @@
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
  * | 2026-06-16 | 1.0  | Dalin  | 初始创建   |
+ * | 2026-07-27 | 1.1  | Dalin  | FIFO循环读+错误回调+TxFull+FD模式+双过滤器+诊断字段 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        CAN初始化由CubeMX的MX_xxCAN_Init完成，此层封装运行期收发
@@ -47,6 +48,7 @@ typedef enum
  * @param  ide                   : 0标准帧，1扩展帧
  * @param  rtr                   : 0数据帧，1远程帧
  * @param  len                   : 数据长度(经典CAN 0~8，FD 0~64)
+ * @param  is_fd                 : 0=经典帧, 1=FD帧(决定FDFormat/BRS, 仅G4/H7有效)
  * @param  data                  : 数据缓冲区
  */
 typedef struct
@@ -55,6 +57,7 @@ typedef struct
 	uint8_t ide;
 	uint8_t rtr;
 	uint8_t len;
+	uint8_t is_fd; /* FD 帧标识(由 drv_can_send/recv 根据 USE_CAN_FD_MODE 和长度自动设置) */
 	uint8_t data[64];
 } drvCanMsg_t;
 
@@ -74,11 +77,47 @@ typedef struct
 } drvCanFilter_t;
 
 /**
+ * @brief 双过滤器配置(单播+广播同时接收, 仅FDCAN支持双过滤器, 经典CAN退化为单过滤器)
+ *   过滤器0: 精确匹配本机单播地址(id=unicast_id, mask=0x7FF或0x1FFFFFFF)
+ *   过滤器1: 精确匹配广播地址(id=broadcast_id, mask=0x7FF或0x1FFFFFFF)
+ *   两个过滤器都路由到 FIFO0, 上层无需区分来源。
+ * @param  unicast_id            : 单播验收ID
+ * @param  broadcast_id          : 广播验收ID
+ * @param  ide                   : 0标准帧, 1扩展帧
+ */
+typedef struct
+{
+	uint32_t unicast_id;
+	uint32_t broadcast_id;
+	uint8_t ide;
+} drvCanDualFilter_t;
+
+/**
  * @brief CAN接收回调函数类型
  * @param  can                   : CAN编号
  * @param  msg                   : 接收到的报文
  */
 typedef void (*can_rx_callback_t)(canNumber_e can, drvCanMsg_t *msg);
+
+/**
+ * @brief CAN错误回调函数类型(Bus-Off/错误被动等)
+ * @param  can                   : CAN编号
+ * @param  error_type            : 错误类型(0=Bus-Off恢复完成, 1=错误被动, 2=警告, 3=其他)
+ */
+typedef void (*can_err_callback_t)(canNumber_e can, uint8_t error_type);
+
+/**
+ * @brief CAN诊断统计(运行期累计, 上层可读取用于总线负载/通信质量监控)
+ */
+typedef struct
+{
+	uint32_t rx_frame_count;     /* 接收帧数(累计) */
+	uint32_t tx_frame_count;     /* 发送帧数(累计) */
+	uint32_t rx_overflow_count;  /* FIFO溢出次数(读取出错或来不及处理) */
+	uint32_t tx_fail_count;      /* 发送失败次数(TxFIFO满或总线错误) */
+	uint32_t busoff_count;       /* Bus-Off 恢复次数 */
+	uint32_t error_passive_count;/* 进入错误被动次数 */
+} drvCanDiag_t;
 
 /**
  * @brief       初始化CAN(配置过滤器、启动、使能接收中断)
@@ -89,17 +128,26 @@ typedef void (*can_rx_callback_t)(canNumber_e can, drvCanMsg_t *msg);
 int drv_can_init(canNumber_e can, drvCanFilter_t *filter);
 
 /**
+ * @brief       初始化CAN并配置双过滤器(单播+广播, 仅FDCAN有效)
+ *               经典CAN退化为单过滤器(仅配置 unicast_id, 广播由掩码放宽或上层过滤)
+ * @param        can               : CAN编号
+ * @param        dual_filter       : 双过滤器配置
+ * @return       : DRV_EOK成功，DRV_ERROR失败
+ */
+int drv_can_init_dual_filter(canNumber_e can, drvCanDualFilter_t *dual_filter);
+
+/**
  * @brief       发送一帧CAN报文
  * @param        can               : CAN编号
- * @param        msg               : 待发送报文
- * @return       : DRV_EOK成功，DRV_ERROR失败
+ * @param        msg               : 待发送报文(msg->is_fd 决定 FD 格式)
+ * @return       : DRV_EOK成功，DRV_ERROR失败(TxFIFO满也返回失败)
  */
 int drv_can_send(canNumber_e can, drvCanMsg_t *msg);
 
 /**
  * @brief       接收一帧CAN报文(从FIFO0读取)
  * @param        can               : CAN编号
- * @param        msg               : 输出报文
+ * @param        msg               : 输出报文(msg->is_fd 标识 FD 帧)
  * @return       : DRV_EOK成功，DRV_ERROR失败
  */
 int drv_can_recv(canNumber_e can, drvCanMsg_t *msg);
@@ -112,5 +160,21 @@ int drv_can_recv(canNumber_e can, drvCanMsg_t *msg);
  */
 int drv_can_register_rx_callback(canNumber_e can, can_rx_callback_t callback);
 
+/**
+ * @brief       注册错误回调(Bus-Off恢复/错误被动等事件)
+ * @param        can               : CAN编号
+ * @param        callback          : 回调函数, NULL取消注册
+ * @return       : DRV_EOK成功，DRV_ERROR失败
+ */
+int drv_can_register_err_callback(canNumber_e can, can_err_callback_t callback);
+
+/**
+ * @brief       获取诊断统计(复制到调用方, 线程安全: 内部关中断)
+ * @param        can               : CAN编号
+ * @param        diag              : 输出诊断数据
+ * @return       : DRV_EOK成功，DRV_ERROR失败
+ */
+int drv_can_get_diag(canNumber_e can, drvCanDiag_t *diag);
+
 #endif /* USE_CAN_DRIVER */
-#endif /* __DRV_CAN_H */
+#endif /* __DRV_CAN_H__ */

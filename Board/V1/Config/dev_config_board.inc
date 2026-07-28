@@ -57,6 +57,22 @@ const dev_commun_uart_config_t commun_uart_list[JM_UART_COMM_ID_MAX] = {
 };
 #endif
 
+#if defined(USE_DEV_COMMUN_CAN)
+/* §V3 CAN 配置表: V1 板使用 FDCAN1 + CA-IS2062A 收发器
+ * - ide=1 扩展帧: 因 CAN ID = (CMD<<8)|motor_id, 最大 0xFFFF, 超出 11 位标准帧(0x7FF)
+ * - use_fd=1: 启用 FD 模式(收发仍走 8 字节单帧/多帧, FD 长帧暂未启用)
+ * - motor_id=1: 本机默认地址(可由 0xD0/0xD1 命令在线修改) */
+const dev_commun_can_config_t commun_can_list[JM_CAN_COMM_ID_MAX] = {
+    [JM_CAN_COMM_ID_1] = {
+        .name = "JM_CAN_1",
+        .can = DRV_CAN1,
+        .motor_id = MOTOR_ID_DEFAULT,
+        .ide = 1,
+        .use_fd = USE_CAN_FD_MODE,
+    },
+};
+#endif
+
 #if defined(USE_DEV_LED)
 /* LED 配置表: V1 板 LED1(红)=PC14 故障指示, LED2(绿)=PC15 运行状态指示
  * 极性 LED_ACTIVE_HIGH: 阳极经 1kΩ 限流电阻接 MCU, 阴极接 GND, 高电平点亮 */

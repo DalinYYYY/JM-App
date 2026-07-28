@@ -56,7 +56,7 @@
 
 // <c1>
 // ENABLE DRIVER ---> CAN
-//#define USE_CAN_DRIVER
+#define USE_CAN_DRIVER
 // </c>
 
 // <c1>
