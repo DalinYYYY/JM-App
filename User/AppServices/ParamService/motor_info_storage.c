@@ -109,9 +109,15 @@ static motor_info_storage_status_t motorinfo_ops_load(struct motor_info_storage 
  * @details 使用静态缓冲计算 CRC32 → dev_flash->flash_write 轮转扇区+磨损均衡写入
  *          → 回读走与上电相同校验链。
  *          全程零栈上大块分配(避免 1024B motor_info_t 嵌套栈占用触发 MemManage)。
+ * @note   Flash 写入失败重试: 最多 3 次重试, 每次重试前重新计算 CRC32。
+ *         重试全部失败后返回 ERR_FLASH_WRITE; 回读校验失败返回 ERR_FLASH_VERIFY。
+ *         重试间隔约 1ms(给 Flash 控制器恢复时间), 总最坏耗时约 90ms(3*30ms)。
  */
 static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage *pobj, const motor_info_t *cfg)
 {
+	/* 最大重试次数 */
+	#define MOTOR_INFO_SAVE_MAX_RETRY  3u
+
 	if (cfg == NULL)
 		return MOTOR_INFO_STORAGE_ERR_ARG;
 	if (!pobj->inited)
@@ -123,26 +129,51 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 	if (vrc != 0)
 		return (motor_info_storage_status_t)vrc;
 
-	/* 2. 拷贝到静态缓冲,原地计算 CRC32
-	 *    （复用 s_crc_tmp 避免栈上 1024B 分配, 与 motorinfo_crc32_compute 共享缓冲） */
-	memcpy(&s_crc_tmp, cfg, PARAM_AREA_SIZE);
-	s_crc_tmp.blocks.header.crc32 = 0U;
-	s_crc_tmp.blocks.header.crc32 = utils_crc32c(s_crc_tmp.raw, PARAM_AREA_SIZE);
+	/* 重试循环: 擦写失败时重试, 校验失败不重试(数据本身有问题) */
+	for (uint8_t attempt = 0u; attempt < MOTOR_INFO_SAVE_MAX_RETRY; attempt++)
+	{
+		/* 2. 拷贝到静态缓冲,原地计算 CRC32
+		 *    （复用 s_crc_tmp 避免栈上 1024B 分配, 与 motorinfo_crc32_compute 共享缓冲） */
+		memcpy(&s_crc_tmp, cfg, PARAM_AREA_SIZE);
+		s_crc_tmp.blocks.header.crc32 = 0U;
+		s_crc_tmp.blocks.header.crc32 = utils_crc32c(s_crc_tmp.raw, PARAM_AREA_SIZE);
 
-	/* 3. 通过 dev_flash 写入(内部轮转扇区+磨损均衡，关中断约 10-30ms) */
-	int rc = pobj->flash_dev.flash_write(&pobj->flash_dev, 0, (u64 *)&s_crc_tmp, MOTORINFO_LEN_U64);
-	if (rc != DEV_EOK)
-		return MOTOR_INFO_STORAGE_ERR_FLASH;
+		/* 3. 通过 dev_flash 写入(内部轮转扇区+磨损均衡，关中断约 10-30ms) */
+		int rc = pobj->flash_dev.flash_write(&pobj->flash_dev, 0, (u64 *)&s_crc_tmp, MOTORINFO_LEN_U64);
+		if (rc != DEV_EOK)
+		{
+			/* 擦写失败: 重试(最后一次失败则返回 ERR_FLASH_WRITE) */
+			if (attempt + 1u < MOTOR_INFO_SAVE_MAX_RETRY)
+			{
+				/* 重试间隔: 给 Flash 控制器恢复时间, 避免连续失败 */
+				for (volatile uint32_t d = 0u; d < 1000u * SystemCoreClock / 1000000u; d++) { }
+				continue;
+			}
+			return MOTOR_INFO_STORAGE_ERR_FLASH_WRITE; /* 详细错误码 */
+		}
 
-	/* 4. 保存后立即从 Flash 回读并走与上电完全相同的校验链。
-	 *    这能在当次 save 就区分“擦写失败”与“数据校验失败”。
-	 *    回读复用 s_crc_tmp, motorinfo_verify 内部调 motorinfo_crc32_compute 也用 s_crc_tmp,
-	 *    两次拷贝隔离了原始 cfg 与回读数据, 不会污染校验结果。*/
-	rc = pobj->flash_dev.flash_read(&pobj->flash_dev, 0, (u64 *)&s_crc_tmp, MOTORINFO_LEN_U64);
-	if (rc != DEV_EOK)
-		return MOTOR_INFO_STORAGE_ERR_FLASH;
+		/* 4. 保存后立即从 Flash 回读并走与上电完全相同的校验链。
+		 *    这能在当次 save 就区分“擦写失败”与“数据校验失败”。
+		 *    回读复用 s_crc_tmp, motorinfo_verify 内部调 motorinfo_crc32_compute 也用 s_crc_tmp,
+		 *    两次拷贝隔离了原始 cfg 与回读数据, 不会污染校验结果。*/
+		rc = pobj->flash_dev.flash_read(&pobj->flash_dev, 0, (u64 *)&s_crc_tmp, MOTORINFO_LEN_U64);
+		if (rc != DEV_EOK)
+		{
+			/* 回读失败: 视为校验失败, 不重试(可能 Flash 硬件损坏) */
+			return MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY; /* 详细错误码 */
+		}
 
-	return motorinfo_verify(&s_crc_tmp);
+		motor_info_storage_status_t vret = motorinfo_verify(&s_crc_tmp);
+		if (vret == MOTOR_INFO_STORAGE_OK)
+		{
+			return MOTOR_INFO_STORAGE_OK; /* 成功 */
+		}
+		/* 校验失败: 不重试(数据本身有问题, 重试也不会改善) */
+		return MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY; /* 详细错误码 */
+	}
+
+	/* 理论上不会到达这里(for 循环内必有 return) */
+	return MOTOR_INFO_STORAGE_ERR_FLASH_WRITE;
 }
 
 /**

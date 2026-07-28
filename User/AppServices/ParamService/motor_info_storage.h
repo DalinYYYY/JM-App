@@ -96,9 +96,12 @@ extern "C"
 		/* 注: >3 区间预留给 motor_info_validate 透传的 param_id (save 路径) */
 
 		/* ===== 系统错误 (<0)：致命，调用方不应继续使用 ===== */
-		MOTOR_INFO_STORAGE_ERR_ARG = -1,   /* 空指针/非法参数 */
-		MOTOR_INFO_STORAGE_ERR_FLASH = -2, /* Flash 读/写失败 */
-		MOTOR_INFO_STORAGE_ERR_INIT = -3,  /* 服务未初始化 */
+		MOTOR_INFO_STORAGE_ERR_ARG = -1,    /* 空指针/非法参数 */
+		MOTOR_INFO_STORAGE_ERR_FLASH = -2,  /* Flash 读/写失败(通用, 兼容旧代码) */
+		MOTOR_INFO_STORAGE_ERR_INIT = -3,   /* 服务未初始化 */
+		/* 详细 Flash 错误码(供 0xEA 应答区分擦写/校验失败) */
+		MOTOR_INFO_STORAGE_ERR_FLASH_WRITE = -4,  /* Flash 擦写失败(3 次重试后仍失败) */
+		MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY = -5, /* Flash 回读校验失败(CRC/范围不匹配) */
 	} motor_info_storage_status_t;
 
 	/* ===== 设备对象前置声明（供 ops 函数指针类型引用） ===== */
