@@ -16,5 +16,6 @@
 #include "dev_motor_phase_current.h"
 #include "dev_commun_vesc.h"
 #include "dev_commun_uart.h"
+#include "dev_commun_can.h"
 
 #include JM_BOARD_DEV_CONFIG_INC
