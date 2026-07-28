@@ -60,6 +60,11 @@ void commun_thread(void const *argument)
 	jm_host_commun_init();
 #endif
 
+#if defined(USE_DEV_COMMUN_CAN)
+	/* 关节电机上位机 CAN/CAN-FD 通信(joint_proto): 与 UART 并存, 业务回调共用 */
+	jm_host_commun_can_init();
+#endif
+
 	for (;;)
 	{
 #if defined(USE_DEV_COMMUN_VESC)
@@ -70,6 +75,11 @@ void commun_thread(void const *argument)
 #if defined(USE_DEV_COMMUN_UART)
 		/* 上位机通信周期处理: 命令分发应答 + 遥控使能时按订阅周期推送遥测帧(无应答) */
 		jm_host_commun_process();
+#endif
+
+#if defined(USE_DEV_COMMUN_CAN)
+		/* CAN 通信周期处理: 诊断刷新 + 通信中断降级检查 */
+		jm_host_commun_can_process();
 #endif
 
 		usr.sys.task_cnt.commun_cnt++;

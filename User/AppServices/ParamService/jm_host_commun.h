@@ -19,7 +19,7 @@
 #define __JM_HOST_COMMUN_H__
 
 #include "dev_config.h"
-#if defined(USE_DEV_COMMUN_UART)
+#if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
 
 #include <stdint.h>
 
@@ -28,6 +28,7 @@ extern "C"
 {
 #endif
 
+#if defined(USE_DEV_COMMUN_UART)
 	/**
 	 * @brief 初始化关节电机上位机串口通信(UART+DMA空闲中断)
 	 * @note  内部完成: 设备 init → 注入 joint_proto 业务回调 → 启动不定长接收。
@@ -53,10 +54,29 @@ extern "C"
 	 * @param timeout_ms 最大等待时间，超时后用于维持遥测周期处理。
 	 */
 	void jm_host_commun_wait(uint32_t timeout_ms);
+#endif /* USE_DEV_COMMUN_UART */
+
+#if defined(USE_DEV_COMMUN_CAN)
+	/**
+	 * @brief 初始化关节电机上位机 CAN/CAN-FD 通信
+	 * @note  内部完成: 设备 init → 注入 joint_proto 业务回调 → 启动 CAN(过滤器+中断)。
+	 *        须在通信线程进入主循环前调用一次。与 UART 路径相互独立, 可并存。
+	 *        业务回调(jm_proto_ops_t)与 UART 共用同一份, 两路传输行为一致。
+	 */
+	void jm_host_commun_can_init(void);
+
+	/**
+	 * @brief CAN 通信周期处理(在通信线程主循环每拍调用)
+	 * @note  CAN 接收在 ISR 中直接 feed 协议层(零拷贝), 本函数仅做:
+	 *        - 诊断统计刷新(poll);
+	 *        - 通信中断降级检查(超 500ms 无帧则通知应用切 IDLE)。
+	 */
+	void jm_host_commun_can_process(void);
+#endif /* USE_DEV_COMMUN_CAN */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* USE_DEV_COMMUN_UART */
+#endif /* USE_DEV_COMMUN_UART || USE_DEV_COMMUN_CAN */
 #endif /* __JM_HOST_COMMUN_H__ */
