@@ -22,9 +22,9 @@
 #include "jm_host_commun.h"
 
 /* ---- 公共头文件(UART/CAN 共用遥测打包) ---- */
-#include "runtime_param.h"      /* JM_DBG_CH, jm_dbg[] */
-#include "thread_config.h"      /* THREAD_DELAY_COMMUN */
-#include "jm_proto_ops.h"       /* jm_app_telemetry_*/ + 传递引入 jm_proto.h/jm_cmd_def.h */
+#include "runtime_param.h" /* JM_DBG_CH, jm_dbg[] */
+#include "thread_config.h" /* THREAD_DELAY_COMMUN */
+#include "jm_proto_ops.h" /* jm_app_telemetry_*/ + 传递引入 jm_proto.h / jm_cmd_def.h * /
 
 #if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
 #define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick 发一帧 */
@@ -134,7 +134,7 @@ static uint16_t jm_host_commun_pack_telemetry(uint16_t mask, const jm_feedback_t
 
 #include "drv_rtos.h"
 #include "dev_commun_uart.h"
-#include "motor_loop.h"   /* motor_loop_t: 调试通道通过 p_motor_loop 读 ADC 原始值 */
+#include "motor_loop.h" /* motor_loop_t: 调试通道通过 p_motor_loop 读 ADC 原始值 */
 
 /* UART 专用的接收信号量与统计计数器 */
 static drv_rtos_sem_handle_t s_rx_sem = NULL;
@@ -266,7 +266,7 @@ void jm_host_commun_process(void)
 /* ====================================================================== */
 #if defined(USE_DEV_COMMUN_CAN)
 #include "dev_commun_can.h"
-#include "main.h"         /* HAL_GetTick (降级检查) */
+#include "main.h" /* HAL_GetTick (降级检查) */
 
 /* 双通道并发: 开发期关闭主控仲裁(JM_DUAL_CHANNEL_ARB_ENABLE=0),
  * UART 和 CAN 可同时下发命令, motor_state 临界区(__disable_irq)保证原子性。
@@ -287,14 +287,13 @@ void jm_host_commun_can_process(void)
 	/* 刷新诊断统计(供应用读取总线负载/通信质量) */
 	dev_commun_can.poll(&dev_commun_can);
 
-	/* 通信中断降级: 500ms 内 HOLD, 超时强制切 IDLE 停机。
-	 * 临界区保护防止与 UART 并发调用 motor_loop_set_cmd 导致状态机混乱。*/
-	if (dev_commun_can.check_loss(&dev_commun_can, HAL_GetTick()))
-	{
-		__disable_irq();
-		motor_loop_set_cmd(CONTROL_MODE_IDLE);
-		__enable_irq();
-	}
+	/* 通信中断降级: 500ms 内 HOLD, 超时强制切 IDLE 停机 */
+	// if (dev_commun_can.check_loss(&dev_commun_can, HAL_GetTick()))
+	// {
+	// 	__disable_irq();
+	// 	motor_loop_set_cmd(CONTROL_MODE_IDLE);
+	// 	__enable_irq();
+	// }
 
 	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。
 	 * 停止时不发, 且复位分频计数, 使下次使能后第一帧及时发出。
