@@ -220,7 +220,8 @@ extern "C"
 		JM_CMD_SET_CAN_ID = 0xF0,
 		JM_CMD_SET_BAUDRATE = 0xF1,
 		JM_CMD_BROADCAST_SYNC = 0xF2,
-		JM_CMD_NACK = 0xFE, /* 错误应答 */
+		JM_CMD_SET_FD_MODE = 0xF3, /* CAN FD模式切换: enable(u8) → ACK(enable+cap) */
+		JM_CMD_NACK = 0xFE,        /* 错误应答 */
 	} jm_cmd_e;
 
 	/* ===================== 同步遥测分组位掩码(0xCA/0xCB 共用) =====================

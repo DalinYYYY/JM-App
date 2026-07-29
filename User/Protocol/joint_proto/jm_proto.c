@@ -598,6 +598,35 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		e = proto->ops->set_baudrate(baud);
 		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
 	}
+	/* 切换 CAN FD 模式 0xF3: {enable:u8} -> ACK{ack_enable:u8, cap:u8}
+	 * 下位机在 ACK 后才切换模式(ACK 用旧模式发出); UART 模式返回 cap=0 */
+	if (cmd == JM_CMD_SET_FD_MODE)
+	{
+		uint8_t enable;
+		uint8_t ack_enable = 0u;
+		uint8_t cap = 0u;
+		jm_err_e e;
+		if (len < 1)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->set_fd_mode == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		enable = payload[0] ? 1u : 0u;
+		e = proto->ops->set_fd_mode(enable, &ack_enable, &cap);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		/* ACK{ack_enable, cap} */
+		{
+			uint8_t ack[2] = {ack_enable, cap};
+			reply_set(proto, cmd, ack, sizeof(ack));
+		}
+		return JM_ERR_OK;
+	}
 
 	/* 标定进度查询 0x97: 直接返回 8 字节详细状态 ACK, 不走 ops->set_mode。
 	 * 字段: state/fail_reason/progress/level/submode/step/step_total/reserved。

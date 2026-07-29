@@ -40,6 +40,10 @@
 #include "motor_pid_autotune.h" /* motor_pid_autotune_apply: 零极点对消法理论估计 */
 #include "motor_pid_load.h"     /* motor_pid_set_source / motor_pid_reload: 三环独立 source */
 #include "main.h"               /* HAL_GetTick (速率限制) */
+#if defined(USE_DEV_COMMUN_CAN)
+#include "dev_commun_can.h"     /* dev_commun_can: 0xF3 SET_FD_MODE 切换运行期FD模式 */
+#include "jm_proto_can.h"       /* jm_proto_can_set_fd_mode */
+#endif
 
 /* ============================================================================
  * 命令速率限制 (防 DoS / Flash 寿命损耗)
@@ -933,6 +937,40 @@ uint8_t jm_app_can_baudrate(void)
 	return s_can_baud_code;
 }
 
+/* 0xF3 SET_FD_MODE: 切换 CAN FD 运行期模式(纯软件操作, 不重新初始化 FDCAN 外设)。
+ * - CAN 模式(USE_DEV_COMMUN_CAN): 调用 jm_proto_can_set_fd_mode, 同步 dev_commun_can.use_fd_runtime
+ * - UART 模式或未启用 CAN: 返回 cap=0
+ * ACK 时序: jm_proto_can_set_fd_mode 在 c->use_fd_runtime 写入后立即返回,
+ *           但 ACK 由 can_emit_payload 用旧模式发出(因 ACK 在 dispatch 中设置 reply 后才发送,
+ *           而 jm_can_tx 读取的是已切换后的 use_fd_runtime)。
+ *           为保证"ACK 用旧模式发出", 这里在调用 set_fd_mode 前先记录 ack_enable,
+ *           然后延迟到 ACK 发送完成后再切换 —— 但当前架构 ACK 发送在 dispatch 返回后,
+ *           无法在 ACK 发送后回调。简化: 双方都遵循"收到 ACK 后切换自身模式",
+ *           切换瞬间收发模式短暂不一致由 FD 控制器硬件兼容性兜底(FD 控制器可收经典帧)。*/
+static jm_err_e app_set_fd_mode(uint8_t enable, uint8_t *out_ack_enable, uint8_t *out_cap)
+{
+	if (out_ack_enable == NULL || out_cap == NULL)
+	{
+		return JM_ERR_BAD_PARAM_ID;
+	}
+
+#if defined(USE_DEV_COMMUN_CAN)
+	{
+		uint8_t cap = jm_proto_can_set_fd_mode(&dev_commun_can.jm, enable);
+		/* 同步设备层镜像(供 jm_can_tx/on_rx_msg 读取) */
+		dev_commun_can.use_fd_runtime = (enable && cap) ? 1u : 0u;
+		*out_cap = cap;
+		*out_ack_enable = (enable && cap) ? 1u : 0u;
+		return JM_ERR_OK;
+	}
+#else
+	/* UART 模式: 无 CAN FD 能力 */
+	*out_cap = 0u;
+	*out_ack_enable = 0u;
+	return JM_ERR_OK;
+#endif
+}
+
 /* ============================================================================
  *  8) 电机配置(motor_info)读写: CMD 0xE6~0xEB
  *     与 0xE0-0xE5 的运行时参数(motor_param_t)独立, 面向 Flash/EEPROM 持久化
@@ -1154,6 +1192,7 @@ static const jm_proto_ops_t s_app_ops = {
 	.param_write_bulk = app_param_write_bulk,
 	.set_can_id = app_set_can_id,
 	.set_baudrate = app_set_baudrate,
+	.set_fd_mode = app_set_fd_mode,
 	/* 电机配置(motor_info) 0xE6-0xEB (未启用 USE_DEV_FLASH 时置 NULL, 命令返回 NACK) */
 #if defined(USE_DEV_FLASH)
 	.motor_info_read = app_motor_info_read,

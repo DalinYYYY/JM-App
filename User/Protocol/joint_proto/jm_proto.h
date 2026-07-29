@@ -136,8 +136,14 @@ extern "C"
 		jm_err_e (*set_can_id)(uint8_t new_id);
 
 		/* 设置 CAN 波特率(CMD 0xF1): baud_code 0=1M 1=500K 2=250K 3=125K。
-		 * 重启后由 CAN 绑定层加载生效。可为 NULL(回 NACK)。*/
-		jm_err_e (*set_baudrate)(uint8_t baud_code);
+	 * 重启后由 CAN 绑定层加载生效。可为 NULL(回 NACK)。*/
+	jm_err_e (*set_baudrate)(uint8_t baud_code);
+
+	/* 切换 CAN FD 运行期模式(CMD 0xF3): enable 1=切FD长帧 0=切回经典。
+	 * out_ack_enable 输出当前实际模式(0=经典/1=FD), out_cap 输出硬件能力(0/1)。
+	 * UART 模式或不支持 FD 的板级配置应返回 cap=0。
+	 * 可为 NULL(回 NACK)。*/
+	jm_err_e (*set_fd_mode)(uint8_t enable, uint8_t *out_ack_enable, uint8_t *out_cap);
 
 		/* PID 理论估计(CMD 0xA0): 基于辨识参数计算三环PID写入ControlParam_t,
 		 * 自动设 source=AUTOTUNE 并 reload。仅IDLE态可执行。
