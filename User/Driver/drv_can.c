@@ -20,6 +20,7 @@
 #include "drv_can.h"
 #include "main.h"
 #include "mcu_compat.h"
+#include "drv_delay.h" /* drv_delay_us: TxFIFO 满时轮询等待 */
 #include <string.h>
 #include <stddef.h> /* offsetof */
 
@@ -268,11 +269,18 @@ int drv_can_send(canNumber_e can, drvCanMsg_t *msg)
 	if (msg->len > 8)
 		return DRV_ERROR;
 
-	/* TxFull 检测: 3 个邮箱全满时返回失败 */
-	if (HAL_CAN_GetTxMailboxesFreeLevel(handle) == 0u)
+	/* TxFull 等待: 3 个邮箱全满时轮询等待(最多 1ms), 避免多帧连续发送丢帧 */
 	{
-		diag_inc(can, DIAG_OFF(tx_fail_count));
-		return DRV_ERROR;
+		uint32_t wait = 0u;
+		while (HAL_CAN_GetTxMailboxesFreeLevel(handle) == 0u)
+		{
+			if (++wait > 100u) /* 100 * 10us = 1ms 超时 */
+			{
+				diag_inc(can, DIAG_OFF(tx_fail_count));
+				return DRV_ERROR;
+			}
+			drv_delay_us(10);
+		}
 	}
 
 	header.IDE = msg->ide ? CAN_ID_EXT : CAN_ID_STD;
@@ -311,11 +319,18 @@ int drv_can_send(canNumber_e can, drvCanMsg_t *msg)
 			return DRV_ERROR;
 	}
 
-	/* TxFull 检测: TxFIFO 满时返回失败 */
-	if (HAL_FDCAN_GetTxFifoFreeLevel(handle) == 0u)
+	/* TxFull 等待: TxFIFO 满时轮询等待(最多 1ms), 避免多帧连续发送丢帧 */
 	{
-		diag_inc(can, DIAG_OFF(tx_fail_count));
-		return DRV_ERROR;
+		uint32_t wait = 0u;
+		while (HAL_FDCAN_GetTxFifoFreeLevel(handle) == 0u)
+		{
+			if (++wait > 100u) /* 100 * 10us = 1ms 超时 */
+			{
+				diag_inc(can, DIAG_OFF(tx_fail_count));
+				return DRV_ERROR;
+			}
+			drv_delay_us(10);
+		}
 	}
 
 	header.Identifier = msg->id;
