@@ -110,4 +110,5 @@
 109,设置CAN_ID,0xF0,Host->Motor,CAN管理,{new_id:u8},ACK{new_id:u8},1,u8,1~127,0xF000|ID,nid[0],修改本机CAN地址需保存
 110,设置波特率,0xF1,Host->Motor,CAN管理,{baud_code:u8},ACK,1,u8,枚举,0xF100|ID,baud[0],0=1M 1=500K 2=250K 3=125K
 111,广播同步,0xF2,Host->All,CAN管理,无,无,0,-,-,0xF200|0x00,无,ID=0广播 所有电机同步执行缓存指令
-112,错误应答(NACK),0xFE,Motor->Host,通用,-,{cmd:u8;err_code:u8},2,小端,错误码,0xFE00|ID,cmd[0]err[1],任意命令失败时返回
+112,设置FD模式,0xF3,Host->Motor,CAN管理,{enable:u8},ACK{ack_enable:u8;cap:u8},1,u8,0/1,0xF300|ID,enable[0],运行期切换CAN FD模式;ack_enable=实际模式(0=经典/1=FD);cap=硬件能力0/1;上电默认经典;ACK用旧模式发出后才切换;UART返回cap=0
+113,错误应答(NACK),0xFE,Motor->Host,通用,-,{cmd:u8;err_code:u8},2,小端,错误码,0xFE00|ID,cmd[0]err[1],任意命令失败时返回
