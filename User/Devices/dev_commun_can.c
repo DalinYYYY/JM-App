@@ -46,20 +46,21 @@ static void jm_can_tx(const jm_can_frame_t *frame)
 {
 	drvCanMsg_t msg;
 	uint8_t use_fd;
+	uint8_t max_len;
 
 	if (s_active == NULL || frame == NULL)
 	{
 		return;
 	}
 
-	/* FD 模式选择: 仅当板级 use_fd=1 且 USE_CAN_FD_MODE=1 时启用 FD 帧 */
-	use_fd = s_active->use_fd;
+	/* 运行期 FD 模式优先: 由 0xF3 SET_FD_MODE 命令设置(与 jm_proto_can_t.use_fd_runtime 同步);
+	 * 板级 USE_CAN_FD_MODE=0 时强制经典(无 FD 硬件能力) */
+	use_fd = s_active->use_fd_runtime;
 #if !defined(USE_CAN_FD_MODE) || (USE_CAN_FD_MODE == 0)
 	use_fd = 0u;
 #endif
-	/* jm_can_frame_t.data 仅 8 字节, tx 路径上单帧最大 8 字节(经典帧);
-	 * FD 长帧发送需扩展 jm_can_frame_t, 开发期暂不支持 */
-	if (frame->len > 8u)
+	max_len = use_fd ? 64u : 8u;
+	if (frame->len > max_len)
 	{
 		s_active->tx_fail_count++;
 		s_active->last_error = -5;
@@ -172,33 +173,43 @@ static int dev_commun_can_start(struct dev_commun_can *pobj)
 static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e can, drvCanMsg_t *msg)
 {
 	jm_can_frame_t frame;
+	uint8_t use_fd;
+	uint8_t max_len;
+	uint32_t now_tick;
 
 	assert_report(pobj != NULL);
 	(void)can; /* 单实例时 can 与 pobj->can 一致, 多实例时由 s_active 路由 */
 	pobj->rx_irq_count++;
 
-	/* FD 长帧(>8 字节)开发期暂不支持, jm_can_frame_t.data 仅 8 字节 */
-	if (msg->len > 8u)
+	/* 长度守卫: 经典模式≤8B, FD模式≤64B; 超长帧丢弃 */
+	use_fd = pobj->use_fd_runtime;
+#if !defined(USE_CAN_FD_MODE) || (USE_CAN_FD_MODE == 0)
+	use_fd = 0u;
+#endif
+	max_len = use_fd ? 64u : 8u;
+	if (msg->len > max_len)
 	{
 		pobj->last_error = -6;
 		return;
 	}
 
-	/* 零拷贝: 仅复制必要的 8 字节数据 + ID, 不经 ring buffer */
+	/* 零拷贝: 仅复制必要字节 + ID, 不经 ring buffer */
 	frame.id = msg->id;
 	frame.len = msg->len;
+	frame.is_fd = msg->is_fd;
 	memset(frame.data, 0, sizeof(frame.data));
 	if (msg->len > 0u)
 	{
 		memcpy(frame.data, msg->data, msg->len);
 	}
 
-	/* 刷新最近接收 tick (ISR 上下文, HAL_GetTick 是原子读) */
-	pobj->last_rx_tick = HAL_GetTick();
+	/* 刷新最近接收 tick (ISR 上下文, HAL_GetTick 是原子读); 同时作为多帧重组超时基准 */
+	now_tick = HAL_GetTick();
+	pobj->last_rx_tick = now_tick;
 
 	/* 锁定当前实例, 保证协议层应答 tx 回调指向正确 CAN */
 	s_active = pobj;
-	jm_proto_can_feed(&pobj->jm, &frame);
+	jm_proto_can_feed(&pobj->jm, &frame, now_tick);
 }
 
 /* CAN 错误 ISR: drv_can 回调经 trampoline 进入, 仅记录统计, Bus-Off 恢复由 drv_can 内部处理 */
@@ -282,7 +293,8 @@ void dev_commun_can_init(dev_commun_can_t *pobj, jm_can_comm_id_e id)
 	pobj->motor_id = cfg->motor_id;
 	pobj->ide = cfg->ide;
 	pobj->use_fd = cfg->use_fd;
-	pobj->ops = NULL; /* 由应用 set_ops 注入 */
+	pobj->use_fd_runtime = 0u; /* 上电默认经典模式(兼容所有上位机硬件), 由 0xF3 命令切换 */
+	pobj->ops = NULL;          /* 由应用 set_ops 注入 */
 
 	pobj->init_count = 1;
 

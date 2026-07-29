@@ -84,7 +84,8 @@ extern "C"
 	 * @param  can                    : 所属 CAN 编号(私有)
 	 * @param  motor_id               : 本机地址(私有)
 	 * @param  ide                    : 帧类型(0标准/1扩展, 私有)
-	 * @param  use_fd                 : 是否启用 FD 帧(私有)
+	 * @param  use_fd                 : 是否启用 FD 帧(板级配置, 私有)
+	 * @param  use_fd_runtime         : 运行期 FD 模式(由 0xF3 命令切换, 私有, 默认0=经典)
 	 * @param  started                : 接收已启动标志(私有)
 	 * @param  last_rx_tick           : 最近收到 CAN 帧(含广播)的系统 tick ms
 	 * @param  last_error             : 最近一次错误码(<0=内部错误, >0=drv_can 返回)
@@ -104,7 +105,8 @@ extern "C"
 		canNumber_e can;
 		uint8_t motor_id;
 		uint8_t ide;
-		uint8_t use_fd;
+		uint8_t use_fd;          /* 板级配置(编译期) */
+		uint8_t use_fd_runtime;  /* 运行期模式(由 0xF3 命令切换, 默认0=经典) */
 		uint8_t started;
 
 		uint32_t last_rx_tick;  /* 通信中断降级计时基准 */
