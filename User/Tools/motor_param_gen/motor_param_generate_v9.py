@@ -394,6 +394,7 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
     L.append('#include <stdio.h>')
     L.append('#include <string.h>')
     L.append('#include <errno.h>')
+    L.append('#include <math.h>')
     L.append('')
 
     # 默认值常量
@@ -443,6 +444,8 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
             cond = range_check_expr(p['data_type'], p['min_value'], p['max_value'], lhs)
             if cond is None:
                 continue
+            if p['data_type'].strip().lower() == 'float':
+                cond = f'!isfinite({lhs}) || {cond}'
             L.append(f'    if ({cond}) return {int(p["id"])};')
     L.append('')
     L.append('    return 0;')
@@ -525,6 +528,8 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
                 L.append('    if (cfg == NULL) return -EINVAL;')
                 cond = range_check_expr(data_type, p['min_value'], p['max_value'], 'value')
                 if cond is not None:
+                    if data_type.strip().lower() == 'float':
+                        cond = f'!isfinite(value) || {cond}'
                     L.append('')
                     L.append(f'    if ({cond}) return -EINVAL;')
                 L.append('')
