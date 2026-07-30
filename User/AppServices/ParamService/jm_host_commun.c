@@ -24,7 +24,7 @@
 /* ---- 公共头文件(UART/CAN 共用遥测打包) ---- */
 #include "runtime_param.h" /* JM_DBG_CH, jm_dbg[] */
 #include "thread_config.h" /* THREAD_DELAY_COMMUN */
-#include "jm_proto_ops.h" /* jm_app_telemetry_*/ + 传递引入 jm_proto.h / jm_cmd_def.h * /
+#include "jm_proto_ops.h" /* Shared protocol operations and command definitions. */
 
 #if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
 #define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick 发一帧 */
@@ -287,13 +287,13 @@ void jm_host_commun_can_process(void)
 	/* 刷新诊断统计(供应用读取总线负载/通信质量) */
 	dev_commun_can.poll(&dev_commun_can);
 
-	/* 通信中断降级: 500ms 内 HOLD, 超时强制切 IDLE 停机 */
-	// if (dev_commun_can.check_loss(&dev_commun_can, HAL_GetTick()))
-	// {
-	// 	__disable_irq();
-	// 	motor_loop_set_cmd(CONTROL_MODE_IDLE);
-	// 	__enable_irq();
-	// }
+	/* CAN communication timeout: force IDLE after the configured interval. */
+	if (dev_commun_can.check_loss(&dev_commun_can, HAL_GetTick()))
+	{
+		__disable_irq();
+		motor_loop_set_cmd(CONTROL_MODE_IDLE);
+		__enable_irq();
+	}
 
 	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。
 	 * 停止时不发, 且复位分频计数, 使下次使能后第一帧及时发出。
