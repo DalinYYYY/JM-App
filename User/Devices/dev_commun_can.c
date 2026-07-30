@@ -169,12 +169,15 @@ static int dev_commun_can_start(struct dev_commun_can *pobj)
 	return DEV_EOK;
 }
 
-/* CAN 接收 ISR: drv_can 回调经 trampoline 进入, 把 drvCanMsg_t 转 jm_can_frame_t 喂协议层 (零拷贝) */
+/* CAN RX ISR: validate and enqueue only; protocol dispatch runs in poll(). */
 static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e can, drvCanMsg_t *msg)
 {
 	jm_can_frame_t frame;
 	uint8_t use_fd;
 	uint8_t max_len;
+	uint8_t head;
+	uint8_t next;
+	uint8_t dst;
 	uint32_t now_tick;
 
 	assert_report(pobj != NULL);
@@ -193,7 +196,16 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 		return;
 	}
 
-	/* 零拷贝: 仅复制必要字节 + ID, 不经 ring buffer */
+	/* The hardware filter currently accepts the whole protocol ID range. Ignore
+	 * traffic for other motors before it consumes queue space or refreshes this
+	 * motor's communication-loss watchdog. */
+	dst = JM_CAN_GET_MOTOR_ID(msg->id);
+	if (dst != pobj->motor_id && dst != JM_CAN_BROADCAST_ID)
+	{
+		return;
+	}
+
+	/* Copy the validated frame into the fixed-size ISR-to-thread queue. */
 	frame.id = msg->id;
 	frame.len = msg->len;
 	frame.is_fd = msg->is_fd;
@@ -208,8 +220,20 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 	pobj->last_rx_tick = now_tick;
 
 	/* 锁定当前实例, 保证协议层应答 tx 回调指向正确 CAN */
-	s_active = pobj;
-	jm_proto_can_feed(&pobj->jm, &frame, now_tick);
+	head = pobj->rx_queue_head;
+	next = (uint8_t)(head + 1u);
+	if (next >= DEV_COMMUN_CAN_RX_QUEUE_SIZE)
+		next = 0u;
+	if (next == pobj->rx_queue_tail)
+	{
+		pobj->rx_queue_overflow_count++;
+		pobj->last_error = -7;
+		return;
+	}
+	pobj->rx_queue[head].frame = frame;
+	pobj->rx_queue[head].tick = now_tick;
+	__DMB();
+	pobj->rx_queue_head = next;
 }
 
 /* CAN 错误 ISR: drv_can 回调经 trampoline 进入, 仅记录统计, Bus-Off 恢复由 drv_can 内部处理 */
@@ -224,6 +248,10 @@ static void dev_commun_can_on_err(struct dev_commun_can *pobj, canNumber_e can, 
 /* 主循环/线程周期调用: 诊断刷新 + 降级超时检查(由应用调用 check_loss) */
 static void dev_commun_can_poll(struct dev_commun_can *pobj)
 {
+	dev_commun_can_rx_item_t item;
+	uint8_t tail;
+	uint8_t next;
+
 	assert_report(pobj != NULL);
 	pobj->poll_count++;
 	if (!pobj->started)
@@ -234,6 +262,17 @@ static void dev_commun_can_poll(struct dev_commun_can *pobj)
 
 	/* 刷新 drv_can 诊断快照(供应用读取总线负载/通信质量) */
 	s_active = pobj;
+	while (pobj->rx_queue_tail != pobj->rx_queue_head)
+	{
+		tail = pobj->rx_queue_tail;
+		item = pobj->rx_queue[tail];
+		next = (uint8_t)(tail + 1u);
+		if (next >= DEV_COMMUN_CAN_RX_QUEUE_SIZE)
+			next = 0u;
+		__DMB();
+		pobj->rx_queue_tail = next;
+		jm_proto_can_feed(&pobj->jm, &item.frame, item.tick);
+	}
 	(void)drv_can_get_diag(pobj->can, &pobj->diag);
 }
 

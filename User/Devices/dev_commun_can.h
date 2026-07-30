@@ -78,6 +78,16 @@ extern "C"
 	/* 配置表定义在 dev_config.c */
 	extern const dev_commun_can_config_t commun_can_list[JM_CAN_COMM_ID_MAX];
 
+/* One maximum classic-CAN transfer needs ceil((JM_PAYLOAD_MAX + CRC16) / 7)
+ * frames. Keep one extra ring slot because head == tail denotes empty. */
+#define DEV_COMMUN_CAN_RX_QUEUE_SIZE 40u
+
+	typedef struct
+	{
+		jm_can_frame_t frame;
+		uint32_t tick;
+	} dev_commun_can_rx_item_t;
+
 	/**
 	 * @brief 关节电机 CAN 通信设备对象
 	 * @param  jm                     : joint_proto CAN 协议实例(私有, 须为首成员)
@@ -108,6 +118,9 @@ extern "C"
 		uint8_t use_fd;          /* 板级配置(编译期) */
 		uint8_t use_fd_runtime;  /* 运行期模式(由 0xF3 命令切换, 默认0=经典) */
 		uint8_t started;
+		volatile uint8_t rx_queue_head;
+		volatile uint8_t rx_queue_tail;
+		dev_commun_can_rx_item_t rx_queue[DEV_COMMUN_CAN_RX_QUEUE_SIZE];
 
 		uint32_t last_rx_tick;  /* 通信中断降级计时基准 */
 		int last_error;
@@ -121,6 +134,7 @@ extern "C"
 		uint32_t tx_count;
 		uint32_t tx_fail_count;
 		uint32_t rx_irq_count;
+		uint32_t rx_queue_overflow_count;
 		uint32_t err_irq_count;
 		uint32_t loss_timeout_count; /* 触发降级的次数 */
 		drvCanDiag_t diag;           /* drv_can 诊断快照 */
