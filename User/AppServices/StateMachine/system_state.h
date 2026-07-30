@@ -31,6 +31,18 @@
 /* 前向声明，避免 system_state.h 直接依赖 dev_motor.h */
 struct dev_motor;
 
+#define SYSTEM_PROTECT_OVER_CURRENT (1u << 0)
+#define SYSTEM_PROTECT_OVER_VOLTAGE (1u << 1)
+#define SYSTEM_PROTECT_UNDER_VOLTAGE (1u << 2)
+#define SYSTEM_PROTECT_OVER_TEMP    (1u << 3)
+#define SYSTEM_PROTECT_OVER_SPEED   (1u << 4)
+
+#define SYSTEM_FAULT_OVER_CURRENT   (1u << 0)
+#define SYSTEM_FAULT_OVER_VOLTAGE   (1u << 1)
+#define SYSTEM_FAULT_UNDER_VOLTAGE  (1u << 2)
+#define SYSTEM_FAULT_OVER_SPEED     (1u << 10)
+#define SYSTEM_FAULT_NUMERIC        (1u << 11)
+
 typedef struct system_state_s
 {
 	top_fsm_e top_state;		  /*!< 顶层有限状态机状态 */
@@ -39,6 +51,10 @@ typedef struct system_state_s
 	motor_ctrl_t motor;			  /*!< 电机控制核心上下文 */
 	transition_mgr_t trans_mgr; /*!< 过渡管理器（内含 transition_t + ref_smooth_cfg） */
 	calib_state_e calib_state;	/*!< 标定子状态（仅 CALIB 态有效）*/
+	uint32_t fault_latched;
+	uint16_t fault_count;
+	uint8_t last_fault_code;
+	uint8_t power_sample_valid;
 } system_state_t;
 
 /**

@@ -30,6 +30,66 @@
  */
 uint32_t g_run_state_trans_count = 1000;
 
+static int state_float_is_finite(float value)
+{
+	uint32_t bits;
+	memcpy(&bits, &value, sizeof(bits));
+	return (bits & 0x7F800000u) != 0x7F800000u;
+}
+
+static float state_absf(float value)
+{
+	return (value < 0.0f) ? -value : value;
+}
+
+static uint8_t state_first_fault(uint32_t mask)
+{
+	uint8_t bit;
+	for (bit = 0u; bit < 32u; bit++)
+	{
+		if ((mask & (1u << bit)) != 0u)
+			return bit;
+	}
+	return 0u;
+}
+
+static uint32_t state_active_faults(system_state_t *sys)
+{
+	const protection_param_t *p = &sys->motor.param->protection_param;
+	const motor_fb_t *fb = &sys->motor.fb;
+	uint32_t active = 0u;
+	uint32_t enable = p->protect_enable_mask;
+	float current_limit = p->protect_over_current;
+	float bus = fb->bus_voltage;
+
+	if (!state_float_is_finite(fb->id) || !state_float_is_finite(fb->iq) ||
+		!state_float_is_finite(fb->vel) || !state_float_is_finite(bus))
+		active |= SYSTEM_FAULT_NUMERIC;
+
+	if ((enable & SYSTEM_PROTECT_OVER_CURRENT) != 0u &&
+		state_float_is_finite(fb->id) && state_float_is_finite(fb->iq) &&
+		(fb->id * fb->id + fb->iq * fb->iq) > current_limit * current_limit)
+		active |= SYSTEM_FAULT_OVER_CURRENT;
+
+	if (state_float_is_finite(bus) && bus > 1.0f)
+		sys->power_sample_valid = 1u;
+	if (sys->power_sample_valid)
+	{
+		if ((enable & SYSTEM_PROTECT_OVER_VOLTAGE) != 0u &&
+			bus > p->protect_over_voltage)
+			active |= SYSTEM_FAULT_OVER_VOLTAGE;
+		if ((enable & SYSTEM_PROTECT_UNDER_VOLTAGE) != 0u &&
+			sys->top_state != TOP_FSM_IDLE && bus < p->protect_under_voltage)
+			active |= SYSTEM_FAULT_UNDER_VOLTAGE;
+	}
+
+	if ((enable & SYSTEM_PROTECT_OVER_SPEED) != 0u &&
+		state_float_is_finite(fb->vel) && state_absf(fb->vel) > p->protect_over_speed)
+		active |= SYSTEM_FAULT_OVER_SPEED;
+
+	return active;
+}
+
 /**
  * @brief 控制指令到运行状态的映射表
  * @details 上层运动控制指令（ctrl_mode_e）到底层运行状态（run_state_e）的映射。
@@ -274,8 +334,26 @@ void motor_control_loop(system_state_t *sys)
  */
 void fault_check(system_state_t *sys)
 {
-	(void)sys;
-	return;
+	uint32_t active;
+	uint32_t new_faults;
+
+	if (sys == NULL || sys->motor.param == NULL)
+		return;
+	active = state_active_faults(sys);
+	new_faults = active & ~sys->fault_latched;
+	sys->fault_code = active;
+	if (active == 0u)
+		return;
+
+	if (new_faults != 0u)
+	{
+		if (sys->fault_count != 0xFFFFu)
+			sys->fault_count++;
+		sys->last_fault_code = state_first_fault(new_faults);
+	}
+	sys->fault_latched |= active;
+	sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+	top_fsm_switch(sys, TOP_FSM_FAULT);
 }
 
 /**
@@ -308,8 +386,13 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
 		{
-			sys->ctrl_mode = cmd;
-			top_fsm_switch(sys, TOP_FSM_IDLE);
+			fault_check(sys);
+			if (sys->fault_code == 0u)
+			{
+				sys->fault_latched = 0u;
+				sys->ctrl_mode = cmd;
+				top_fsm_switch(sys, TOP_FSM_IDLE);
+			}
 		}
 		return;
 	}
@@ -319,8 +402,13 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
 		{
-			sys->ctrl_mode = cmd;
-			top_fsm_switch(sys, TOP_FSM_IDLE);
+			fault_check(sys);
+			if (sys->fault_code == 0u)
+			{
+				sys->fault_latched = 0u;
+				sys->ctrl_mode = cmd;
+				top_fsm_switch(sys, TOP_FSM_IDLE);
+			}
 		}
 		return;
 	}
