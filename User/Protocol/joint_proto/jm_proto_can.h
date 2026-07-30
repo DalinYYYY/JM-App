@@ -89,7 +89,7 @@ extern "C"
 		uint8_t use_fd_runtime; /* 运行期FD模式: 0=经典(默认), 1=FD(由0xF3命令切换) */
 
 		/* 多帧接收重组缓冲 */
-		uint8_t rx_buf[1 + JM_PAYLOAD_MAX]; /* 重组区: [0]=CMD, 其后载荷 */
+		uint8_t rx_buf[1 + JM_PAYLOAD_MAX + 2]; /* [0]=CMD, followed by payload and CRC16 */
 		uint16_t rx_len;                    /* 已重组字节数 */
 		uint8_t rx_cmd;                     /* 当前重组的CMD */
 		uint8_t rx_seq;                     /* 期望的下一分包序号 */

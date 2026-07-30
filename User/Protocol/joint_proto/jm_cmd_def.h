@@ -296,6 +296,9 @@ extern "C"
 
 	/* CAN 仲裁ID编解码: ID = (CMD<<8) | 电机ID */
 #define JM_CAN_MAKE_ID(cmd, motor_id) (((uint32_t)(cmd) << 8) | ((motor_id) & 0xFF))
+#define JM_CAN_MULTI_FLAG             (1u << 16)
+#define JM_CAN_MAKE_MULTI_ID(cmd, motor_id) (JM_CAN_MAKE_ID((cmd), (motor_id)) | JM_CAN_MULTI_FLAG)
+#define JM_CAN_IS_MULTI_ID(id)        (((id) & JM_CAN_MULTI_FLAG) != 0u)
 #define JM_CAN_GET_CMD(id)            ((uint8_t)(((id) >> 8) & 0xFF))
 #define JM_CAN_GET_MOTOR_ID(id)       ((uint8_t)((id) & 0xFF))
 #define JM_CAN_BROADCAST_ID           0x00 /* 电机ID=0 为广播地址 */

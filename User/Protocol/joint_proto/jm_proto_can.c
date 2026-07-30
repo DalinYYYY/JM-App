@@ -111,9 +111,26 @@ static inline uint8_t jm_can_single_max(const jm_proto_can_t *c)
 }
 
 /* 运行期多帧片段载荷: FD=63B, 经典=7B (留 1B 给控制字) */
-static inline uint8_t jm_can_seg_payload(const jm_proto_can_t *c)
+static uint8_t jm_can_fd_len_is_valid(uint16_t len)
 {
-	return c->use_fd_runtime ? JM_CAN_SEG_PAYLOAD_FD : JM_CAN_SEG_PAYLOAD_CLS;
+	return len <= 8u || len == 12u || len == 16u || len == 20u ||
+	       len == 24u || len == 32u || len == 48u || len == 64u;
+}
+
+static uint16_t jm_can_next_chunk(const jm_proto_can_t *c, uint16_t remaining)
+{
+	static const uint8_t fd_chunks[] = {63u, 47u, 31u, 23u, 19u, 15u, 11u, 7u, 6u, 5u, 4u, 3u, 2u, 1u};
+	uint8_t i;
+
+	if (!c->use_fd_runtime)
+		return (remaining > JM_CAN_SEG_PAYLOAD_CLS) ? JM_CAN_SEG_PAYLOAD_CLS : remaining;
+
+	for (i = 0u; i < sizeof(fd_chunks); i++)
+	{
+		if (remaining >= fd_chunks[i])
+			return fd_chunks[i];
+	}
+	return 0u;
 }
 
 uint8_t jm_proto_can_set_fd_mode(jm_proto_can_t *c, uint8_t enable)
@@ -159,13 +176,28 @@ static void can_send_raw(jm_proto_can_t *c, uint32_t id, const uint8_t *d, uint8
 }
 
 /* 发送一段已确定编码的载荷: <=single_max 单帧, 否则多帧分包(末帧追加 CRC16) */
+static void can_copy_stream(uint8_t *dst, const uint8_t *body, uint16_t len,
+	                         uint16_t crc, uint16_t offset, uint16_t count)
+{
+	uint16_t i;
+	for (i = 0; i < count; i++)
+	{
+		uint16_t pos = (uint16_t)(offset + i);
+		if (pos < len)
+			dst[i] = body[pos];
+		else if (pos == len)
+			dst[i] = (uint8_t)(crc & 0xFFu);
+		else
+			dst[i] = (uint8_t)(crc >> 8);
+	}
+}
+
 static void can_emit_payload(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint16_t len)
 {
 	uint32_t id = JM_CAN_MAKE_ID(cmd, c->motor_id);
 	uint8_t single_max = jm_can_single_max(c);
-	uint8_t seg_payload = jm_can_seg_payload(c);
 
-	if (len <= single_max)
+	if (len <= single_max && (!c->use_fd_runtime || jm_can_fd_len_is_valid(len)))
 	{
 		can_send_raw(c, id, body, (uint8_t)len);
 		return;
@@ -175,27 +207,23 @@ static void can_emit_payload(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body
 	 *       末帧末尾追加 2 字节 CRC16(小端, 覆盖整个载荷) */
 	uint16_t crc = crc16_calc((uint8_t *)body, (int)len);
 	uint16_t off = 0;
+	uint16_t total = (uint16_t)(len + 2u);
 	uint8_t seq = 0;
-	while (off < len)
+	id |= JM_CAN_MULTI_FLAG;
+	while (off < total)
 	{
 		uint8_t frame[64];
-		uint16_t chunk = (uint16_t)(len - off);
-		if (chunk > seg_payload)
-		{
-			chunk = seg_payload;
-		}
+		uint16_t chunk = jm_can_next_chunk(c, (uint16_t)(total - off));
 		frame[0] = (uint8_t)(seq & JM_CAN_SEG_SEQ_MASK);
-		if (off + chunk >= len)
+		if (off + chunk >= total)
 		{
 			frame[0] |= JM_CAN_SEG_LAST; /* 末帧 */
-			memcpy(&frame[1], &body[off], chunk);
-			frame[1 + chunk] = (uint8_t)(crc & 0xFF);
-			frame[2 + chunk] = (uint8_t)((crc >> 8) & 0xFF);
-			can_send_raw(c, id, frame, (uint8_t)(3 + chunk));
+			can_copy_stream(&frame[1], body, len, crc, off, chunk);
+			can_send_raw(c, id, frame, (uint8_t)(1u + chunk));
 		}
 		else
 		{
-			memcpy(&frame[1], &body[off], chunk);
+			can_copy_stream(&frame[1], body, len, crc, off, chunk);
 			can_send_raw(c, id, frame, (uint8_t)(1 + chunk));
 		}
 		off = (uint16_t)(off + chunk);
@@ -307,19 +335,7 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t 
 	/* 判断是否多帧分包: 载荷上限内的命令走单帧;
 	 * 多帧重组仅用于本层 can_emit_payload 产生的帧, 即 data[0] 为控制字。
 	 * 为避免与单帧载荷歧义, 多帧仅对"已知大载荷CMD"启用(与CSV"CAN需分包"一致)。*/
-	uint8_t is_multi = (cmd == JM_CMD_PARAM_READ_BULK
-		|| cmd == JM_CMD_PARAM_WRITE_BULK
-		|| cmd == JM_CMD_PARAM_WRITE           /* 0xE1 写 char[16] 时 18B */
-		|| cmd == JM_CMD_ADMITTANCE
-		|| cmd == JM_CMD_FORCE_POSITION_HYBRID
-		|| cmd == JM_CMD_VARIABLE_IMPEDANCE
-		|| cmd == JM_CMD_PVT
-		|| cmd == JM_CMD_CUBIC_SPLINE
-		|| cmd == JM_CMD_TRAPEZOIDAL_TRAJ
-		|| cmd == JM_CMD_S_CURVE_TRAJ
-		|| cmd == JM_CMD_TEST_SWEEP_FREQ
-		|| cmd == JM_CMD_PID_AUTOTUNE          /* 0xA0 请求 13B */
-		|| cmd == JM_CMD_MOTOR_INFO_WRITE_BULK); /* 0xE9 CSV 已标注 */
+	uint8_t is_multi = JM_CAN_IS_MULTI_ID(frame->id) ? 1u : 0u;
 
 	if (!is_multi)
 	{
