@@ -170,6 +170,7 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 {
 	motion_param_t *mp = &m->motor.motor_param;
 	multiturn_t *mt = &m->motor.multiturn;
+	const motor_state_t *st = &usr.motor_state[M1];
 
 	// 基于已刷新的机械角度解算速度/位置（不重复触发编码器采样）
 	// 虚拟模式下 update 指向物理模型实现，直接给出运动量
@@ -192,6 +193,7 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 	m->sys.motor.fb.vel = fb->vel;
 	m->sys.motor.fb.id = fb->id;
 	m->sys.motor.fb.iq = fb->iq;
+	m->sys.motor.fb.bus_voltage = st->power.v_bus;
 }
 
 /**
@@ -255,6 +257,10 @@ static void motor_loop_sync_state(motor_loop_t *m)
 	st->ctrl_mode = sys->ctrl_mode;
 	st->enable_motor = enabled;
 	st->enable_pwm = (sys->top_state == TOP_FSM_RUN);
+	st->fault.fault_mask = sys->fault_code;
+	st->fault.fault_latched = sys->fault_latched;
+	st->fault.error_count = sys->fault_count;
+	st->fault.last_fault_code = sys->last_fault_code;
 }
 
 /**
