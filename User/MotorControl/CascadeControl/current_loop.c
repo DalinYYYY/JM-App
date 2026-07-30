@@ -18,9 +18,28 @@
 #include "motor_pid_profile.h"
 #include "foc_core.h"
 #include "motor_loop_config.h"
+#include <string.h>
 #if MOTOR_LOOP_ENABLE_DEV_DRIVER
 #include "dev_power_monitor.h" /* 真实电机：SVPWM 归一化用 Vbus */
 #endif
+
+static int cur_float_is_finite(float value)
+{
+	uint32_t bits;
+	memcpy(&bits, &value, sizeof(bits));
+	return (bits & 0x7F800000u) != 0x7F800000u;
+}
+
+static uint32_t cur_pwm_compare(float duty)
+{
+	if (!cur_float_is_finite(duty))
+		return 0u;
+	if (duty <= 0.0f)
+		return 0u;
+	if (duty >= 1.0f)
+		return PWM_PERIOD;
+	return (uint32_t)(PWM_PERIOD * duty);
+}
 
 void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, motor_param_t *param, float dt)
 {
@@ -69,11 +88,17 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	if (ref->ctrl_type == REF_CTRL_DUTY)
 	{
 		float duty = ref->duty;
-		uint32_t ccr = (uint32_t)(PWM_PERIOD * (0.5f + 0.5f * duty));
+		if (!cur_float_is_finite(duty))
+		{
+			m->half_bridge.set_3pwm(&m->half_bridge, 0, 0, 0);
+			return;
+		}
+		if (duty < -1.0f) duty = -1.0f;
+		if (duty > 1.0f) duty = 1.0f;
+		uint32_t ccr = cur_pwm_compare(0.5f + 0.5f * duty);
 		m->half_bridge.set_3pwm(&m->half_bridge, ccr, ccr, ccr);
 		return;
 	}
-
 	/* IDLE：PWM 置零（安全失能输出）*/
 	if (ref->ctrl_type == REF_CTRL_IDLE)
 	{
@@ -157,6 +182,11 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	}
 
 	// step6: 设置 dq 电压并反 Park（dq → αβ）
+	if (!cur_float_is_finite(ud) || !cur_float_is_finite(uq))
+	{
+		m->half_bridge.set_3pwm(&m->half_bridge, 0, 0, 0);
+		return;
+	}
 	m->foc.set_udq(&m->foc, ud, uq);
 	m->foc.inverse_park(&m->foc);
 
@@ -164,8 +194,15 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	m->foc.pfsvpwm(&m->foc);
 
 	// step8: PWM 输出
+	if (!cur_float_is_finite(m->foc.svpwm.ta) ||
+		!cur_float_is_finite(m->foc.svpwm.tb) ||
+		!cur_float_is_finite(m->foc.svpwm.tc))
+	{
+		m->half_bridge.set_3pwm(&m->half_bridge, 0, 0, 0);
+		return;
+	}
 	m->half_bridge.set_3pwm(&m->half_bridge,
-	                        (uint32_t)(PWM_PERIOD * m->foc.svpwm.ta),
-	                        (uint32_t)(PWM_PERIOD * m->foc.svpwm.tb),
-	                        (uint32_t)(PWM_PERIOD * m->foc.svpwm.tc));
+		cur_pwm_compare(m->foc.svpwm.ta),
+		cur_pwm_compare(m->foc.svpwm.tb),
+		cur_pwm_compare(m->foc.svpwm.tc));
 }
