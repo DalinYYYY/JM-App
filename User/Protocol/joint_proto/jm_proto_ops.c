@@ -124,17 +124,65 @@ static motor_cmd_t *app_motor_cmd(void)
 	return &motor_loop_get()->sys.motor.cmd;
 }
 
+static int app_float_is_finite(float value)
+{
+	uint32_t bits;
+	memcpy(&bits, &value, sizeof(bits));
+	return (bits & 0x7F800000u) != 0x7F800000u;
+}
+
+static int app_mode_is_supported(uint8_t cmd)
+{
+	switch (cmd)
+	{
+		case JM_CMD_IDLE:
+		case JM_CMD_HOLD:
+		case JM_CMD_BRAKE:
+		case JM_CMD_ESTOP:
+		case JM_CMD_ENABLE:
+		case JM_CMD_DISABLE:
+		case JM_CMD_STOP:
+		case JM_CMD_OPEN_LOOP:
+		case JM_CMD_CURRENT:
+		case JM_CMD_TORQUE:
+		case JM_CMD_MIT:
+		case JM_CMD_VELOCITY:
+		case JM_CMD_POSITION:
+		case JM_CMD_POSITION_VELOCITY:
+		case JM_CMD_POSITION_TORQUE:
+		case JM_CMD_VELOCITY_TORQUE:
+		case JM_CMD_DUTY_CYCLE:
+		case JM_CMD_CALIB_LEVEL1:
+		case JM_CMD_CALIB_LEVEL2:
+		case JM_CMD_CALIB_LEVEL3:
+		case JM_CMD_CALIB_LEVEL4:
+		case JM_CMD_CALIB_LEVEL5:
+		case JM_CMD_CALIB_LEVEL6:
+		case JM_CMD_CALIB_LEVEL7:
+		case JM_CMD_CALIB_ABORT:
+		case JM_CMD_CLEAR_FAULT:
+			return 1;
+		default:
+			return 0;
+	}
+}
+
 static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 {
 	motor_cmd_t *mc = app_motor_cmd();
+	motor_cmd_t next;
 	jm_err_e ret = JM_ERR_OK;
 	uint32_t primask;
+
+	if (!app_mode_is_supported(cmd))
+		return JM_ERR_NOT_SUPPORTED;
 
 	/* 双通道临界区: 保护 motor_cmd 字段写入 + 状态机切换的原子性,
 	 * 防止 UART(通信线程) 和 CAN(ISR) 并发调用 app_set_mode 导致状态混乱。
 	 * 用 __get_PRIMASK/__set_PRIMASK 保持中断原有使能状态。*/
 	primask = __get_PRIMASK();
 	__disable_irq();
+	next = *mc;
 
 	switch (cmd)
 	{
@@ -151,16 +199,16 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		/* ---- 开环电压 {ud,uq}: 下游用 cmd.torque 作开环电压目标 ---- */
 		case JM_CMD_OPEN_LOOP:
 			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
-			mc->id = jm_rd_f32(&pl[0]);     /* ud(暂存, 预留) */
-			mc->torque = jm_rd_f32(&pl[4]); /* uq -> 开环电压 */
+			next.id = jm_rd_f32(&pl[0]);     /* ud(暂存, 预留) */
+			next.torque = jm_rd_f32(&pl[4]); /* uq -> 开环电压 */
 			break;
 
 		/* ---- 电流环 {id,iq} ---- */
 		case JM_CMD_CURRENT:
 		case JM_CMD_FIELD_WEAKENING:
 			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
-			mc->id = jm_rd_f32(&pl[0]);
-			mc->iq = jm_rd_f32(&pl[4]);
+			next.id = jm_rd_f32(&pl[0]);
+			next.iq = jm_rd_f32(&pl[4]);
 			break;
 
 		/* ---- 力矩环 {torque} ---- */
@@ -168,58 +216,58 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		case JM_CMD_FORCE_CONTROL:
 		case JM_CMD_CONSTANT_FORCE:
 			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
-			mc->torque = jm_rd_f32(&pl[0]);
+			next.torque = jm_rd_f32(&pl[0]);
 			break;
 
 		/* ---- MIT/阻抗 {pos,vel,kp,kd,tff}: CAN 层已解压成 5*f32 ---- */
 		case JM_CMD_MIT:
 		case JM_CMD_IMPEDANCE:
 			if (len < 20) { ret = JM_ERR_LENGTH; goto done; }
-			mc->pos = jm_rd_f32(&pl[0]);
-			mc->vel = jm_rd_f32(&pl[4]);
-			mc->kp = jm_rd_f32(&pl[8]);
-			mc->kd = jm_rd_f32(&pl[12]);
-			mc->torque_ff = jm_rd_f32(&pl[16]);
+			next.pos = jm_rd_f32(&pl[0]);
+			next.vel = jm_rd_f32(&pl[4]);
+			next.kp = jm_rd_f32(&pl[8]);
+			next.kd = jm_rd_f32(&pl[12]);
+			next.torque_ff = jm_rd_f32(&pl[16]);
 			break;
 
 		/* ---- 速度环 {vel} ---- */
 		case JM_CMD_VELOCITY:
 		case JM_CMD_SENSORLESS:
 			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
-			mc->vel = jm_rd_f32(&pl[0]);
+			next.vel = jm_rd_f32(&pl[0]);
 			break;
 
 		/* ---- 位置环 {pos} ---- */
 		case JM_CMD_POSITION:
 			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
-			mc->pos = jm_rd_f32(&pl[0]);
+			next.pos = jm_rd_f32(&pl[0]);
 			break;
 
 		/* ---- 位置+速度前馈 {pos,vel_ff} ---- */
 		case JM_CMD_POSITION_VELOCITY:
 			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
-			mc->pos = jm_rd_f32(&pl[0]);
-			mc->vel = jm_rd_f32(&pl[4]); /* 作速度前馈 */
+			next.pos = jm_rd_f32(&pl[0]);
+			next.vel = jm_rd_f32(&pl[4]); /* 作速度前馈 */
 			break;
 
 		/* ---- 位置+力矩限幅 {pos,tq_lim} ---- */
 		case JM_CMD_POSITION_TORQUE:
 			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
-			mc->pos = jm_rd_f32(&pl[0]);
-			mc->torque = jm_rd_f32(&pl[4]);
+			next.pos = jm_rd_f32(&pl[0]);
+			next.torque = jm_rd_f32(&pl[4]);
 			break;
 
 		/* ---- 速度+力矩限幅 {vel,tq_lim} ---- */
 		case JM_CMD_VELOCITY_TORQUE:
 			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
-			mc->vel = jm_rd_f32(&pl[0]);
-			mc->torque = jm_rd_f32(&pl[4]);
+			next.vel = jm_rd_f32(&pl[0]);
+			next.torque = jm_rd_f32(&pl[4]);
 			break;
 
 		/* ---- 占空比 {duty}: 下游用 cmd.torque 作占空比目标 ---- */
 		case JM_CMD_DUTY_CYCLE:
 			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
-			mc->torque = jm_rd_f32(&pl[0]);
+			next.torque = jm_rd_f32(&pl[0]);
 			break;
 
 			/* ---- 标定启动 0x90-0x96: payload[0]=子模式 ---- */
@@ -278,6 +326,16 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 			break;
 	}
 
+	if (!app_float_is_finite(next.pos) || !app_float_is_finite(next.vel) ||
+		!app_float_is_finite(next.torque) || !app_float_is_finite(next.id) ||
+		!app_float_is_finite(next.iq) || !app_float_is_finite(next.kp) ||
+		!app_float_is_finite(next.kd) || !app_float_is_finite(next.torque_ff) ||
+		!app_float_is_finite(next.vel_ff))
+	{
+		ret = JM_ERR_OUT_OF_RANGE;
+		goto done;
+	}
+	*mc = next;
 	motor_loop_set_cmd((ctrl_mode_e)cmd);
 	ret = JM_ERR_OK;
 
@@ -655,10 +713,27 @@ static jm_err_e app_param_read(uint16_t param_id, uint8_t *value,
 	return JM_ERR_OK;
 }
 
+static void app_param_snapshot(motor_param_t *shadow)
+{
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	memcpy(shadow, &usr.motor_param[M1], sizeof(*shadow));
+	__set_PRIMASK(primask);
+}
+
+static void app_param_commit(const motor_param_t *shadow)
+{
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	memcpy(&usr.motor_param[M1], shadow, sizeof(*shadow));
+	__set_PRIMASK(primask);
+}
+
 static jm_err_e app_param_write(uint16_t param_id, const uint8_t *value, uint8_t len)
 {
 	const param_desc_t *d;
-	uint8_t *base = (uint8_t *)&usr.motor_param[M1];
+	motor_param_t shadow;
+	uint8_t *base;
 
 	/* 速率限制: 0xE1 PARAM_WRITE 100ms 间隔 */
 	if (!JM_RATE_CHECK(&s_last_tick_param_write, JM_RATE_MIN_INTERVAL_PARAM_WRITE_MS))
@@ -673,6 +748,8 @@ static jm_err_e app_param_write(uint16_t param_id, const uint8_t *value, uint8_t
 		return JM_ERR_BAD_PARAM_ID;
 	}
 	d = &s_param_tbl[param_id];
+	app_param_snapshot(&shadow);
+	base = (uint8_t *)&shadow;
 	/* 字符串允许短于 16(截断存入), 其余类型长度须精确匹配 */
 	if (d->type == JM_PT_STR)
 	{
@@ -687,6 +764,9 @@ static jm_err_e app_param_write(uint16_t param_id, const uint8_t *value, uint8_t
 			return JM_ERR_LENGTH;
 		memcpy(base + d->offset, value, len);
 	}
+	if (motor_param_validate(&shadow) != 0)
+		return JM_ERR_OUT_OF_RANGE;
+	app_param_commit(&shadow);
 	return JM_ERR_OK;
 }
 
@@ -797,9 +877,15 @@ static jm_err_e app_param_read_bulk(uint16_t start_id, uint16_t count,
 static jm_err_e app_param_write_bulk(uint16_t start_id, uint16_t count,
                                      const uint8_t *values, uint16_t len)
 {
-	uint8_t *base = (uint8_t *)&usr.motor_param[M1];
+	motor_param_t shadow;
+	uint8_t *base;
 	uint16_t off = 0;
 	uint16_t i;
+
+	if (values == NULL && len != 0u)
+		return JM_ERR_LENGTH;
+	app_param_snapshot(&shadow);
+	base = (uint8_t *)&shadow;
 
 	for (i = 0; i < count; i++)
 	{
@@ -817,6 +903,11 @@ static jm_err_e app_param_write_bulk(uint16_t start_id, uint16_t count,
 		memcpy(base + d->offset, &values[off], d->size);
 		off += d->size;
 	}
+	if (off != len)
+		return JM_ERR_LENGTH;
+	if (motor_param_validate(&shadow) != 0)
+		return JM_ERR_OUT_OF_RANGE;
+	app_param_commit(&shadow);
 	return JM_ERR_OK;
 }
 
