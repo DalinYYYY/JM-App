@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <math.h>
 
 /* 默认值常量 */
 static const motor_param_t g_default_config =
@@ -153,107 +154,107 @@ int motor_param_validate(const motor_param_t *cfg)
 
 	if (cfg->motor_instance.motor_id > (uint8_t)31)
 		return 1;
-	if (cfg->motor_base.r < 0.001f || cfg->motor_base.r > 10.0f)
+	if (!isfinite(cfg->motor_base.r) || cfg->motor_base.r < 0.001f || cfg->motor_base.r > 10.0f)
 		return 3;
-	if (cfg->motor_base.ld < 1e-05f || cfg->motor_base.ld > 0.01f)
+	if (!isfinite(cfg->motor_base.ld) || cfg->motor_base.ld < 1e-05f || cfg->motor_base.ld > 0.01f)
 		return 4;
-	if (cfg->motor_base.lq < 1e-05f || cfg->motor_base.lq > 0.01f)
+	if (!isfinite(cfg->motor_base.lq) || cfg->motor_base.lq < 1e-05f || cfg->motor_base.lq > 0.01f)
 		return 5;
-	if (cfg->motor_base.flux < 0.0001f || cfg->motor_base.flux > 0.1f)
+	if (!isfinite(cfg->motor_base.flux) || cfg->motor_base.flux < 0.0001f || cfg->motor_base.flux > 0.1f)
 		return 6;
-	if (cfg->motor_base.kt < 0.01f || cfg->motor_base.kt > 10.0f)
+	if (!isfinite(cfg->motor_base.kt) || cfg->motor_base.kt < 0.01f || cfg->motor_base.kt > 10.0f)
 		return 7;
 	if (cfg->motor_base.pole_pairs < (uint8_t)1 || cfg->motor_base.pole_pairs > (uint8_t)64)
 		return 8;
-	if (cfg->motor_base.rated_current < 0.1f || cfg->motor_base.rated_current > 100.0f)
+	if (!isfinite(cfg->motor_base.rated_current) || cfg->motor_base.rated_current < 0.1f || cfg->motor_base.rated_current > 100.0f)
 		return 9;
-	if (cfg->motor_base.peak_current < 0.1f || cfg->motor_base.peak_current > 200.0f)
+	if (!isfinite(cfg->motor_base.peak_current) || cfg->motor_base.peak_current < 0.1f || cfg->motor_base.peak_current > 200.0f)
 		return 10;
-	if (cfg->motor_base.max_speed < 10.0f || cfg->motor_base.max_speed > 1000.0f)
+	if (!isfinite(cfg->motor_base.max_speed) || cfg->motor_base.max_speed < 10.0f || cfg->motor_base.max_speed > 1000.0f)
 		return 11;
-	if (cfg->motor_base.dead_time_ns < 100.0f || cfg->motor_base.dead_time_ns > 2000.0f)
+	if (!isfinite(cfg->motor_base.dead_time_ns) || cfg->motor_base.dead_time_ns < 100.0f || cfg->motor_base.dead_time_ns > 2000.0f)
 		return 12;
-	if (cfg->motor_base.rated_voltage < 12.0f || cfg->motor_base.rated_voltage > 100.0f)
+	if (!isfinite(cfg->motor_base.rated_voltage) || cfg->motor_base.rated_voltage < 12.0f || cfg->motor_base.rated_voltage > 100.0f)
 		return 13;
-	if (cfg->motor_base.rated_speed_rpm < 100.0f || cfg->motor_base.rated_speed_rpm > 20000.0f)
+	if (!isfinite(cfg->motor_base.rated_speed_rpm) || cfg->motor_base.rated_speed_rpm < 100.0f || cfg->motor_base.rated_speed_rpm > 20000.0f)
 		return 14;
-	if (cfg->motor_base.rated_torque < 0.1f || cfg->motor_base.rated_torque > 100.0f)
+	if (!isfinite(cfg->motor_base.rated_torque) || cfg->motor_base.rated_torque < 0.1f || cfg->motor_base.rated_torque > 100.0f)
 		return 15;
-	if (cfg->motor_base.peak_torque < 0.1f || cfg->motor_base.peak_torque > 300.0f)
+	if (!isfinite(cfg->motor_base.peak_torque) || cfg->motor_base.peak_torque < 0.1f || cfg->motor_base.peak_torque > 300.0f)
 		return 16;
-	if (cfg->motor_base.inertia < 1e-07f || cfg->motor_base.inertia > 0.01f)
+	if (!isfinite(cfg->motor_base.inertia) || cfg->motor_base.inertia < 1e-07f || cfg->motor_base.inertia > 0.01f)
 		return 17;
-	if (cfg->motor_base.ke < 0.001f || cfg->motor_base.ke > 1.0f)
+	if (!isfinite(cfg->motor_base.ke) || cfg->motor_base.ke < 0.001f || cfg->motor_base.ke > 1.0f)
 		return 18;
 	if (cfg->motor_base.pwm_freq_hz < (uint32_t)5000 || cfg->motor_base.pwm_freq_hz > (uint32_t)100000)
 		return 19;
 	if (cfg->motor_base.foc_freq_hz < (uint32_t)1000 || cfg->motor_base.foc_freq_hz > (uint32_t)100000)
 		return 20;
-	if (cfg->gearbox_param.gear_ratio < 1.0f || cfg->gearbox_param.gear_ratio > 1000.0f)
+	if (!isfinite(cfg->gearbox_param.gear_ratio) || cfg->gearbox_param.gear_ratio < 1.0f || cfg->gearbox_param.gear_ratio > 1000.0f)
 		return 21;
-	if (cfg->gearbox_param.gear_efficiency < 0.1f || cfg->gearbox_param.gear_efficiency > 1.0f)
+	if (!isfinite(cfg->gearbox_param.gear_efficiency) || cfg->gearbox_param.gear_efficiency < 0.1f || cfg->gearbox_param.gear_efficiency > 1.0f)
 		return 22;
-	if (cfg->gearbox_param.output_torque_const < 0.1f || cfg->gearbox_param.output_torque_const > 1000.0f)
+	if (!isfinite(cfg->gearbox_param.output_torque_const) || cfg->gearbox_param.output_torque_const < 0.1f || cfg->gearbox_param.output_torque_const > 1000.0f)
 		return 23;
-	if (cfg->gearbox_param.gear_backlash < 0.0f || cfg->gearbox_param.gear_backlash > 0.5f)
+	if (!isfinite(cfg->gearbox_param.gear_backlash) || cfg->gearbox_param.gear_backlash < 0.0f || cfg->gearbox_param.gear_backlash > 0.5f)
 		return 24;
 	if (cfg->encoder_param.enc_lines < (uint32_t)100 || cfg->encoder_param.enc_lines > (uint32_t)1000000)
 		return 25;
 	if (cfg->encoder_param.enc_direction < (int8_t)-1 || cfg->encoder_param.enc_direction > (int8_t)1)
 		return 26;
-	if (cfg->encoder_param.enc_offset < -360.0f || cfg->encoder_param.enc_offset > 360.0f)
+	if (!isfinite(cfg->encoder_param.enc_offset) || cfg->encoder_param.enc_offset < -360.0f || cfg->encoder_param.enc_offset > 360.0f)
 		return 27;
-	if (cfg->encoder_param.elec_angle_bias < -3.1416f || cfg->encoder_param.elec_angle_bias > 3.1416f)
+	if (!isfinite(cfg->encoder_param.elec_angle_bias) || cfg->encoder_param.elec_angle_bias < -3.1416f || cfg->encoder_param.elec_angle_bias > 3.1416f)
 		return 28;
-	if (cfg->encoder_param.pos_filter_alpha < 0.0f || cfg->encoder_param.pos_filter_alpha > 1.0f)
+	if (!isfinite(cfg->encoder_param.pos_filter_alpha) || cfg->encoder_param.pos_filter_alpha < 0.0f || cfg->encoder_param.pos_filter_alpha > 1.0f)
 		return 29;
 	if (cfg->encoder_param.enc_type > (uint8_t)10)
 		return 30;
 	if (cfg->encoder_param.enc_auto_calib > (uint8_t)1)
 		return 31;
-	if (cfg->encoder_param.speed_obs_gain < 1.0f || cfg->encoder_param.speed_obs_gain > 1000.0f)
+	if (!isfinite(cfg->encoder_param.speed_obs_gain) || cfg->encoder_param.speed_obs_gain < 1.0f || cfg->encoder_param.speed_obs_gain > 1000.0f)
 		return 32;
 	if (cfg->position_limit.multiturn_enable > (uint8_t)1)
 		return 33;
-	if (cfg->position_limit.pos_min_limit < -1000.0f || cfg->position_limit.pos_min_limit > 0.0f)
+	if (!isfinite(cfg->position_limit.pos_min_limit) || cfg->position_limit.pos_min_limit < -1000.0f || cfg->position_limit.pos_min_limit > 0.0f)
 		return 34;
-	if (cfg->position_limit.pos_max_limit < 0.0f || cfg->position_limit.pos_max_limit > 1000.0f)
+	if (!isfinite(cfg->position_limit.pos_max_limit) || cfg->position_limit.pos_max_limit < 0.0f || cfg->position_limit.pos_max_limit > 1000.0f)
 		return 35;
 	if (cfg->position_limit.limit_sw_enable > (uint8_t)1)
 		return 36;
 	if (cfg->homing_param.homing_method > (uint8_t)10)
 		return 37;
-	if (cfg->homing_param.homing_speed_fast < 0.1f || cfg->homing_param.homing_speed_fast > 50.0f)
+	if (!isfinite(cfg->homing_param.homing_speed_fast) || cfg->homing_param.homing_speed_fast < 0.1f || cfg->homing_param.homing_speed_fast > 50.0f)
 		return 38;
-	if (cfg->homing_param.homing_speed_slow < 0.01f || cfg->homing_param.homing_speed_slow > 5.0f)
+	if (!isfinite(cfg->homing_param.homing_speed_slow) || cfg->homing_param.homing_speed_slow < 0.01f || cfg->homing_param.homing_speed_slow > 5.0f)
 		return 39;
-	if (cfg->homing_param.homing_offset < -6.283f || cfg->homing_param.homing_offset > 6.283f)
+	if (!isfinite(cfg->homing_param.homing_offset) || cfg->homing_param.homing_offset < -6.283f || cfg->homing_param.homing_offset > 6.283f)
 		return 40;
-	if (cfg->homing_param.homing_current < 0.1f || cfg->homing_param.homing_current > 20.0f)
+	if (!isfinite(cfg->homing_param.homing_current) || cfg->homing_param.homing_current < 0.1f || cfg->homing_param.homing_current > 20.0f)
 		return 41;
-	if (cfg->current_loop.current_kp_d < 0.0f || cfg->current_loop.current_kp_d > 100.0f)
+	if (!isfinite(cfg->current_loop.current_kp_d) || cfg->current_loop.current_kp_d < 0.0f || cfg->current_loop.current_kp_d > 100.0f)
 		return 42;
-	if (cfg->current_loop.current_ki_d < 0.0f || cfg->current_loop.current_ki_d > 1000.0f)
+	if (!isfinite(cfg->current_loop.current_ki_d) || cfg->current_loop.current_ki_d < 0.0f || cfg->current_loop.current_ki_d > 1000.0f)
 		return 43;
-	if (cfg->current_loop.current_kp_q < 0.0f || cfg->current_loop.current_kp_q > 100.0f)
+	if (!isfinite(cfg->current_loop.current_kp_q) || cfg->current_loop.current_kp_q < 0.0f || cfg->current_loop.current_kp_q > 100.0f)
 		return 44;
-	if (cfg->current_loop.current_ki_q < 0.0f || cfg->current_loop.current_ki_q > 1000.0f)
+	if (!isfinite(cfg->current_loop.current_ki_q) || cfg->current_loop.current_ki_q < 0.0f || cfg->current_loop.current_ki_q > 1000.0f)
 		return 45;
-	if (cfg->current_loop.current_integral_limit < 0.0f || cfg->current_loop.current_integral_limit > 100.0f)
+	if (!isfinite(cfg->current_loop.current_integral_limit) || cfg->current_loop.current_integral_limit < 0.0f || cfg->current_loop.current_integral_limit > 100.0f)
 		return 46;
-	if (cfg->current_loop.decoupling_gain < 0.0f || cfg->current_loop.decoupling_gain > 1.0f)
+	if (!isfinite(cfg->current_loop.decoupling_gain) || cfg->current_loop.decoupling_gain < 0.0f || cfg->current_loop.decoupling_gain > 1.0f)
 		return 47;
-	if (cfg->current_loop.deadtime_comp_v < 0.0f || cfg->current_loop.deadtime_comp_v > 5.0f)
+	if (!isfinite(cfg->current_loop.deadtime_comp_v) || cfg->current_loop.deadtime_comp_v < 0.0f || cfg->current_loop.deadtime_comp_v > 5.0f)
 		return 48;
-	if (cfg->current_loop.pwm_max_duty < 0.5f || cfg->current_loop.pwm_max_duty > 0.95f)
+	if (!isfinite(cfg->current_loop.pwm_max_duty) || cfg->current_loop.pwm_max_duty < 0.5f || cfg->current_loop.pwm_max_duty > 0.95f)
 		return 49;
-	if (cfg->current_loop.current_bandwidth_hz < 100.0f || cfg->current_loop.current_bandwidth_hz > 5000.0f)
+	if (!isfinite(cfg->current_loop.current_bandwidth_hz) || cfg->current_loop.current_bandwidth_hz < 100.0f || cfg->current_loop.current_bandwidth_hz > 5000.0f)
 		return 50;
-	if (cfg->current_loop.current_filter_alpha < 0.0f || cfg->current_loop.current_filter_alpha > 1.0f)
+	if (!isfinite(cfg->current_loop.current_filter_alpha) || cfg->current_loop.current_filter_alpha < 0.0f || cfg->current_loop.current_filter_alpha > 1.0f)
 		return 51;
-	if (cfg->current_loop.d_feedforward_gain < 0.0f || cfg->current_loop.d_feedforward_gain > 2.0f)
+	if (!isfinite(cfg->current_loop.d_feedforward_gain) || cfg->current_loop.d_feedforward_gain < 0.0f || cfg->current_loop.d_feedforward_gain > 2.0f)
 		return 52;
-	if (cfg->current_loop.q_feedforward_gain < 0.0f || cfg->current_loop.q_feedforward_gain > 2.0f)
+	if (!isfinite(cfg->current_loop.q_feedforward_gain) || cfg->current_loop.q_feedforward_gain < 0.0f || cfg->current_loop.q_feedforward_gain > 2.0f)
 		return 53;
 	if (cfg->current_loop.decouple_algo > (uint8_t)2)
 		return 54;
@@ -261,61 +262,61 @@ int motor_param_validate(const motor_param_t *cfg)
 		return 55;
 	if (cfg->current_loop.deadtime_comp_enable > (uint8_t)1)
 		return 56;
-	if (cfg->position_loop.speed_kp < 0.0f || cfg->position_loop.speed_kp > 100.0f)
+	if (!isfinite(cfg->position_loop.speed_kp) || cfg->position_loop.speed_kp < 0.0f || cfg->position_loop.speed_kp > 100.0f)
 		return 57;
-	if (cfg->position_loop.speed_ki < 0.0f || cfg->position_loop.speed_ki > 1000.0f)
+	if (!isfinite(cfg->position_loop.speed_ki) || cfg->position_loop.speed_ki < 0.0f || cfg->position_loop.speed_ki > 1000.0f)
 		return 58;
-	if (cfg->position_loop.speed_integral_limit < 0.0f || cfg->position_loop.speed_integral_limit > 100.0f)
+	if (!isfinite(cfg->position_loop.speed_integral_limit) || cfg->position_loop.speed_integral_limit < 0.0f || cfg->position_loop.speed_integral_limit > 100.0f)
 		return 59;
-	if (cfg->position_loop.velocity_ff_gain < 0.0f || cfg->position_loop.velocity_ff_gain > 1.0f)
+	if (!isfinite(cfg->position_loop.velocity_ff_gain) || cfg->position_loop.velocity_ff_gain < 0.0f || cfg->position_loop.velocity_ff_gain > 1.0f)
 		return 60;
-	if (cfg->position_loop.accel_ff_gain < 0.0f || cfg->position_loop.accel_ff_gain > 1.0f)
+	if (!isfinite(cfg->position_loop.accel_ff_gain) || cfg->position_loop.accel_ff_gain < 0.0f || cfg->position_loop.accel_ff_gain > 1.0f)
 		return 61;
-	if (cfg->position_loop.position_kp < 0.0f || cfg->position_loop.position_kp > 1000.0f)
+	if (!isfinite(cfg->position_loop.position_kp) || cfg->position_loop.position_kp < 0.0f || cfg->position_loop.position_kp > 1000.0f)
 		return 62;
-	if (cfg->position_loop.position_integral_limit < 0.0f || cfg->position_loop.position_integral_limit > 100.0f)
+	if (!isfinite(cfg->position_loop.position_integral_limit) || cfg->position_loop.position_integral_limit < 0.0f || cfg->position_loop.position_integral_limit > 100.0f)
 		return 63;
-	if (cfg->position_loop.friction_coulomb < 0.0f || cfg->position_loop.friction_coulomb > 100.0f)
+	if (!isfinite(cfg->position_loop.friction_coulomb) || cfg->position_loop.friction_coulomb < 0.0f || cfg->position_loop.friction_coulomb > 100.0f)
 		return 64;
-	if (cfg->position_loop.friction_viscous < 0.0f || cfg->position_loop.friction_viscous > 10.0f)
+	if (!isfinite(cfg->position_loop.friction_viscous) || cfg->position_loop.friction_viscous < 0.0f || cfg->position_loop.friction_viscous > 10.0f)
 		return 65;
-	if (cfg->position_loop.notch_freq_hz < 10.0f || cfg->position_loop.notch_freq_hz > 1000.0f)
+	if (!isfinite(cfg->position_loop.notch_freq_hz) || cfg->position_loop.notch_freq_hz < 10.0f || cfg->position_loop.notch_freq_hz > 1000.0f)
 		return 66;
-	if (cfg->position_loop.notch_width_hz < 1.0f || cfg->position_loop.notch_width_hz > 100.0f)
+	if (!isfinite(cfg->position_loop.notch_width_hz) || cfg->position_loop.notch_width_hz < 1.0f || cfg->position_loop.notch_width_hz > 100.0f)
 		return 67;
-	if (cfg->position_loop.notch_depth_db < 10.0f || cfg->position_loop.notch_depth_db > 100.0f)
+	if (!isfinite(cfg->position_loop.notch_depth_db) || cfg->position_loop.notch_depth_db < 10.0f || cfg->position_loop.notch_depth_db > 100.0f)
 		return 68;
 	if (cfg->position_loop.notch_enable > (uint8_t)1)
 		return 69;
-	if (cfg->position_loop.speed_bandwidth_hz < 10.0f || cfg->position_loop.speed_bandwidth_hz > 1000.0f)
+	if (!isfinite(cfg->position_loop.speed_bandwidth_hz) || cfg->position_loop.speed_bandwidth_hz < 10.0f || cfg->position_loop.speed_bandwidth_hz > 1000.0f)
 		return 70;
-	if (cfg->position_loop.speed_filter_alpha < 0.0f || cfg->position_loop.speed_filter_alpha > 1.0f)
+	if (!isfinite(cfg->position_loop.speed_filter_alpha) || cfg->position_loop.speed_filter_alpha < 0.0f || cfg->position_loop.speed_filter_alpha > 1.0f)
 		return 71;
-	if (cfg->position_loop.position_bandwidth_hz < 1.0f || cfg->position_loop.position_bandwidth_hz > 200.0f)
+	if (!isfinite(cfg->position_loop.position_bandwidth_hz) || cfg->position_loop.position_bandwidth_hz < 1.0f || cfg->position_loop.position_bandwidth_hz > 200.0f)
 		return 72;
-	if (cfg->impedance_ctrl.impedance_kp < 0.0f || cfg->impedance_ctrl.impedance_kp > 1000.0f)
+	if (!isfinite(cfg->impedance_ctrl.impedance_kp) || cfg->impedance_ctrl.impedance_kp < 0.0f || cfg->impedance_ctrl.impedance_kp > 1000.0f)
 		return 73;
-	if (cfg->impedance_ctrl.impedance_kd < 0.0f || cfg->impedance_ctrl.impedance_kd > 100.0f)
+	if (!isfinite(cfg->impedance_ctrl.impedance_kd) || cfg->impedance_ctrl.impedance_kd < 0.0f || cfg->impedance_ctrl.impedance_kd > 100.0f)
 		return 74;
-	if (cfg->impedance_ctrl.iq_max < 0.0f || cfg->impedance_ctrl.iq_max > 100.0f)
+	if (!isfinite(cfg->impedance_ctrl.iq_max) || cfg->impedance_ctrl.iq_max < 0.0f || cfg->impedance_ctrl.iq_max > 100.0f)
 		return 75;
-	if (cfg->thermal_model.thermal_resistance < 0.1f || cfg->thermal_model.thermal_resistance > 10.0f)
+	if (!isfinite(cfg->thermal_model.thermal_resistance) || cfg->thermal_model.thermal_resistance < 0.1f || cfg->thermal_model.thermal_resistance > 10.0f)
 		return 76;
-	if (cfg->thermal_model.thermal_time_const < 1.0f || cfg->thermal_model.thermal_time_const > 600.0f)
+	if (!isfinite(cfg->thermal_model.thermal_time_const) || cfg->thermal_model.thermal_time_const < 1.0f || cfg->thermal_model.thermal_time_const > 600.0f)
 		return 77;
-	if (cfg->thermal_model.derating_temp_start < 40.0f || cfg->thermal_model.derating_temp_start > 100.0f)
+	if (!isfinite(cfg->thermal_model.derating_temp_start) || cfg->thermal_model.derating_temp_start < 40.0f || cfg->thermal_model.derating_temp_start > 100.0f)
 		return 78;
-	if (cfg->protection_param.protect_over_current < 1.0f || cfg->protection_param.protect_over_current > 200.0f)
+	if (!isfinite(cfg->protection_param.protect_over_current) || cfg->protection_param.protect_over_current < 1.0f || cfg->protection_param.protect_over_current > 200.0f)
 		return 79;
-	if (cfg->protection_param.protect_over_voltage < 20.0f || cfg->protection_param.protect_over_voltage > 100.0f)
+	if (!isfinite(cfg->protection_param.protect_over_voltage) || cfg->protection_param.protect_over_voltage < 20.0f || cfg->protection_param.protect_over_voltage > 100.0f)
 		return 80;
-	if (cfg->protection_param.protect_under_voltage < 5.0f || cfg->protection_param.protect_under_voltage > 30.0f)
+	if (!isfinite(cfg->protection_param.protect_under_voltage) || cfg->protection_param.protect_under_voltage < 5.0f || cfg->protection_param.protect_under_voltage > 30.0f)
 		return 81;
-	if (cfg->protection_param.protect_over_speed < 10.0f || cfg->protection_param.protect_over_speed > 2000.0f)
+	if (!isfinite(cfg->protection_param.protect_over_speed) || cfg->protection_param.protect_over_speed < 10.0f || cfg->protection_param.protect_over_speed > 2000.0f)
 		return 82;
-	if (cfg->protection_param.protect_over_temp < 50.0f || cfg->protection_param.protect_over_temp > 120.0f)
+	if (!isfinite(cfg->protection_param.protect_over_temp) || cfg->protection_param.protect_over_temp < 50.0f || cfg->protection_param.protect_over_temp > 120.0f)
 		return 83;
-	if (cfg->protection_param.protect_under_temp < -40.0f || cfg->protection_param.protect_under_temp > 0.0f)
+	if (!isfinite(cfg->protection_param.protect_under_temp) || cfg->protection_param.protect_under_temp < -40.0f || cfg->protection_param.protect_under_temp > 0.0f)
 		return 84;
 	if (cfg->protection_param.protect_pos_error < (int32_t)100 || cfg->protection_param.protect_pos_error > (int32_t)100000)
 		return 85;
@@ -483,7 +484,7 @@ int motor_param_set_r(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.001f || value > 10.0f)
+	if (!isfinite(value) || value < 0.001f || value > 10.0f)
 		return -EINVAL;
 
 	cfg->motor_base.r = value;
@@ -500,7 +501,7 @@ int motor_param_set_ld(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1e-05f || value > 0.01f)
+	if (!isfinite(value) || value < 1e-05f || value > 0.01f)
 		return -EINVAL;
 
 	cfg->motor_base.ld = value;
@@ -517,7 +518,7 @@ int motor_param_set_lq(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1e-05f || value > 0.01f)
+	if (!isfinite(value) || value < 1e-05f || value > 0.01f)
 		return -EINVAL;
 
 	cfg->motor_base.lq = value;
@@ -534,7 +535,7 @@ int motor_param_set_flux(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0001f || value > 0.1f)
+	if (!isfinite(value) || value < 0.0001f || value > 0.1f)
 		return -EINVAL;
 
 	cfg->motor_base.flux = value;
@@ -551,7 +552,7 @@ int motor_param_set_kt(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.01f || value > 10.0f)
+	if (!isfinite(value) || value < 0.01f || value > 10.0f)
 		return -EINVAL;
 
 	cfg->motor_base.kt = value;
@@ -585,7 +586,7 @@ int motor_param_set_rated_current(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 100.0f)
+	if (!isfinite(value) || value < 0.1f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->motor_base.rated_current = value;
@@ -602,7 +603,7 @@ int motor_param_set_peak_current(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 200.0f)
+	if (!isfinite(value) || value < 0.1f || value > 200.0f)
 		return -EINVAL;
 
 	cfg->motor_base.peak_current = value;
@@ -619,7 +620,7 @@ int motor_param_set_max_speed(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 10.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 10.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->motor_base.max_speed = value;
@@ -636,7 +637,7 @@ int motor_param_set_dead_time_ns(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 100.0f || value > 2000.0f)
+	if (!isfinite(value) || value < 100.0f || value > 2000.0f)
 		return -EINVAL;
 
 	cfg->motor_base.dead_time_ns = value;
@@ -653,7 +654,7 @@ int motor_param_set_rated_voltage(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 12.0f || value > 100.0f)
+	if (!isfinite(value) || value < 12.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->motor_base.rated_voltage = value;
@@ -670,7 +671,7 @@ int motor_param_set_rated_speed_rpm(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 100.0f || value > 20000.0f)
+	if (!isfinite(value) || value < 100.0f || value > 20000.0f)
 		return -EINVAL;
 
 	cfg->motor_base.rated_speed_rpm = value;
@@ -687,7 +688,7 @@ int motor_param_set_rated_torque(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 100.0f)
+	if (!isfinite(value) || value < 0.1f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->motor_base.rated_torque = value;
@@ -704,7 +705,7 @@ int motor_param_set_peak_torque(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 300.0f)
+	if (!isfinite(value) || value < 0.1f || value > 300.0f)
 		return -EINVAL;
 
 	cfg->motor_base.peak_torque = value;
@@ -721,7 +722,7 @@ int motor_param_set_inertia(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1e-07f || value > 0.01f)
+	if (!isfinite(value) || value < 1e-07f || value > 0.01f)
 		return -EINVAL;
 
 	cfg->motor_base.inertia = value;
@@ -738,7 +739,7 @@ int motor_param_set_ke(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.001f || value > 1.0f)
+	if (!isfinite(value) || value < 0.001f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->motor_base.ke = value;
@@ -789,7 +790,7 @@ int motor_param_set_gear_ratio(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 1.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->gearbox_param.gear_ratio = value;
@@ -806,7 +807,7 @@ int motor_param_set_gear_efficiency(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 1.0f)
+	if (!isfinite(value) || value < 0.1f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->gearbox_param.gear_efficiency = value;
@@ -823,7 +824,7 @@ int motor_param_set_output_torque_const(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 1000.0f)
+	if (!isfinite(value) || value < 0.1f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->gearbox_param.output_torque_const = value;
@@ -840,7 +841,7 @@ int motor_param_set_gear_backlash(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 0.5f)
+	if (!isfinite(value) || value < 0.0f || value > 0.5f)
 		return -EINVAL;
 
 	cfg->gearbox_param.gear_backlash = value;
@@ -891,7 +892,7 @@ int motor_param_set_enc_offset(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < -360.0f || value > 360.0f)
+	if (!isfinite(value) || value < -360.0f || value > 360.0f)
 		return -EINVAL;
 
 	cfg->encoder_param.enc_offset = value;
@@ -908,7 +909,7 @@ int motor_param_set_elec_angle_bias(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < -3.1416f || value > 3.1416f)
+	if (!isfinite(value) || value < -3.1416f || value > 3.1416f)
 		return -EINVAL;
 
 	cfg->encoder_param.elec_angle_bias = value;
@@ -925,7 +926,7 @@ int motor_param_set_pos_filter_alpha(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->encoder_param.pos_filter_alpha = value;
@@ -976,7 +977,7 @@ int motor_param_set_speed_obs_gain(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 1.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->encoder_param.speed_obs_gain = value;
@@ -1010,7 +1011,7 @@ int motor_param_set_pos_min_limit(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < -1000.0f || value > 0.0f)
+	if (!isfinite(value) || value < -1000.0f || value > 0.0f)
 		return -EINVAL;
 
 	cfg->position_limit.pos_min_limit = value;
@@ -1027,7 +1028,7 @@ int motor_param_set_pos_max_limit(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->position_limit.pos_max_limit = value;
@@ -1078,7 +1079,7 @@ int motor_param_set_homing_speed_fast(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 50.0f)
+	if (!isfinite(value) || value < 0.1f || value > 50.0f)
 		return -EINVAL;
 
 	cfg->homing_param.homing_speed_fast = value;
@@ -1095,7 +1096,7 @@ int motor_param_set_homing_speed_slow(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.01f || value > 5.0f)
+	if (!isfinite(value) || value < 0.01f || value > 5.0f)
 		return -EINVAL;
 
 	cfg->homing_param.homing_speed_slow = value;
@@ -1112,7 +1113,7 @@ int motor_param_set_homing_offset(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < -6.283f || value > 6.283f)
+	if (!isfinite(value) || value < -6.283f || value > 6.283f)
 		return -EINVAL;
 
 	cfg->homing_param.homing_offset = value;
@@ -1129,7 +1130,7 @@ int motor_param_set_homing_current(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 20.0f)
+	if (!isfinite(value) || value < 0.1f || value > 20.0f)
 		return -EINVAL;
 
 	cfg->homing_param.homing_current = value;
@@ -1146,7 +1147,7 @@ int motor_param_set_current_kp_d(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->current_loop.current_kp_d = value;
@@ -1163,7 +1164,7 @@ int motor_param_set_current_ki_d(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->current_loop.current_ki_d = value;
@@ -1180,7 +1181,7 @@ int motor_param_set_current_kp_q(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->current_loop.current_kp_q = value;
@@ -1197,7 +1198,7 @@ int motor_param_set_current_ki_q(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->current_loop.current_ki_q = value;
@@ -1214,7 +1215,7 @@ int motor_param_set_current_integral_limit(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->current_loop.current_integral_limit = value;
@@ -1231,7 +1232,7 @@ int motor_param_set_decoupling_gain(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->current_loop.decoupling_gain = value;
@@ -1248,7 +1249,7 @@ int motor_param_set_deadtime_comp_v(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 5.0f)
+	if (!isfinite(value) || value < 0.0f || value > 5.0f)
 		return -EINVAL;
 
 	cfg->current_loop.deadtime_comp_v = value;
@@ -1265,7 +1266,7 @@ int motor_param_set_pwm_max_duty(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.5f || value > 0.95f)
+	if (!isfinite(value) || value < 0.5f || value > 0.95f)
 		return -EINVAL;
 
 	cfg->current_loop.pwm_max_duty = value;
@@ -1282,7 +1283,7 @@ int motor_param_set_current_bandwidth_hz(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 100.0f || value > 5000.0f)
+	if (!isfinite(value) || value < 100.0f || value > 5000.0f)
 		return -EINVAL;
 
 	cfg->current_loop.current_bandwidth_hz = value;
@@ -1299,7 +1300,7 @@ int motor_param_set_current_filter_alpha(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->current_loop.current_filter_alpha = value;
@@ -1316,7 +1317,7 @@ int motor_param_set_d_feedforward_gain(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 2.0f)
+	if (!isfinite(value) || value < 0.0f || value > 2.0f)
 		return -EINVAL;
 
 	cfg->current_loop.d_feedforward_gain = value;
@@ -1333,7 +1334,7 @@ int motor_param_set_q_feedforward_gain(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 2.0f)
+	if (!isfinite(value) || value < 0.0f || value > 2.0f)
 		return -EINVAL;
 
 	cfg->current_loop.q_feedforward_gain = value;
@@ -1401,7 +1402,7 @@ int motor_param_set_speed_kp(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->position_loop.speed_kp = value;
@@ -1418,7 +1419,7 @@ int motor_param_set_speed_ki(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->position_loop.speed_ki = value;
@@ -1435,7 +1436,7 @@ int motor_param_set_speed_integral_limit(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->position_loop.speed_integral_limit = value;
@@ -1452,7 +1453,7 @@ int motor_param_set_velocity_ff_gain(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->position_loop.velocity_ff_gain = value;
@@ -1469,7 +1470,7 @@ int motor_param_set_accel_ff_gain(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->position_loop.accel_ff_gain = value;
@@ -1486,7 +1487,7 @@ int motor_param_set_position_kp(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->position_loop.position_kp = value;
@@ -1503,7 +1504,7 @@ int motor_param_set_position_integral_limit(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->position_loop.position_integral_limit = value;
@@ -1520,7 +1521,7 @@ int motor_param_set_friction_coulomb(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->position_loop.friction_coulomb = value;
@@ -1537,7 +1538,7 @@ int motor_param_set_friction_viscous(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 10.0f)
+	if (!isfinite(value) || value < 0.0f || value > 10.0f)
 		return -EINVAL;
 
 	cfg->position_loop.friction_viscous = value;
@@ -1554,7 +1555,7 @@ int motor_param_set_notch_freq_hz(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 10.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 10.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->position_loop.notch_freq_hz = value;
@@ -1571,7 +1572,7 @@ int motor_param_set_notch_width_hz(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1.0f || value > 100.0f)
+	if (!isfinite(value) || value < 1.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->position_loop.notch_width_hz = value;
@@ -1588,7 +1589,7 @@ int motor_param_set_notch_depth_db(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 10.0f || value > 100.0f)
+	if (!isfinite(value) || value < 10.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->position_loop.notch_depth_db = value;
@@ -1622,7 +1623,7 @@ int motor_param_set_speed_bandwidth_hz(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 10.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 10.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->position_loop.speed_bandwidth_hz = value;
@@ -1639,7 +1640,7 @@ int motor_param_set_speed_filter_alpha(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1.0f)
 		return -EINVAL;
 
 	cfg->position_loop.speed_filter_alpha = value;
@@ -1656,7 +1657,7 @@ int motor_param_set_position_bandwidth_hz(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1.0f || value > 200.0f)
+	if (!isfinite(value) || value < 1.0f || value > 200.0f)
 		return -EINVAL;
 
 	cfg->position_loop.position_bandwidth_hz = value;
@@ -1673,7 +1674,7 @@ int motor_param_set_impedance_kp(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 1000.0f)
+	if (!isfinite(value) || value < 0.0f || value > 1000.0f)
 		return -EINVAL;
 
 	cfg->impedance_ctrl.impedance_kp = value;
@@ -1690,7 +1691,7 @@ int motor_param_set_impedance_kd(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->impedance_ctrl.impedance_kd = value;
@@ -1707,7 +1708,7 @@ int motor_param_set_iq_max(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.0f || value > 100.0f)
+	if (!isfinite(value) || value < 0.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->impedance_ctrl.iq_max = value;
@@ -1724,7 +1725,7 @@ int motor_param_set_thermal_resistance(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 0.1f || value > 10.0f)
+	if (!isfinite(value) || value < 0.1f || value > 10.0f)
 		return -EINVAL;
 
 	cfg->thermal_model.thermal_resistance = value;
@@ -1741,7 +1742,7 @@ int motor_param_set_thermal_time_const(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1.0f || value > 600.0f)
+	if (!isfinite(value) || value < 1.0f || value > 600.0f)
 		return -EINVAL;
 
 	cfg->thermal_model.thermal_time_const = value;
@@ -1758,7 +1759,7 @@ int motor_param_set_derating_temp_start(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 40.0f || value > 100.0f)
+	if (!isfinite(value) || value < 40.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->thermal_model.derating_temp_start = value;
@@ -1775,7 +1776,7 @@ int motor_param_set_protect_over_current(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 1.0f || value > 200.0f)
+	if (!isfinite(value) || value < 1.0f || value > 200.0f)
 		return -EINVAL;
 
 	cfg->protection_param.protect_over_current = value;
@@ -1792,7 +1793,7 @@ int motor_param_set_protect_over_voltage(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 20.0f || value > 100.0f)
+	if (!isfinite(value) || value < 20.0f || value > 100.0f)
 		return -EINVAL;
 
 	cfg->protection_param.protect_over_voltage = value;
@@ -1809,7 +1810,7 @@ int motor_param_set_protect_under_voltage(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 5.0f || value > 30.0f)
+	if (!isfinite(value) || value < 5.0f || value > 30.0f)
 		return -EINVAL;
 
 	cfg->protection_param.protect_under_voltage = value;
@@ -1826,7 +1827,7 @@ int motor_param_set_protect_over_speed(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 10.0f || value > 2000.0f)
+	if (!isfinite(value) || value < 10.0f || value > 2000.0f)
 		return -EINVAL;
 
 	cfg->protection_param.protect_over_speed = value;
@@ -1843,7 +1844,7 @@ int motor_param_set_protect_over_temp(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < 50.0f || value > 120.0f)
+	if (!isfinite(value) || value < 50.0f || value > 120.0f)
 		return -EINVAL;
 
 	cfg->protection_param.protect_over_temp = value;
@@ -1860,7 +1861,7 @@ int motor_param_set_protect_under_temp(motor_param_t *cfg, float value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value < -40.0f || value > 0.0f)
+	if (!isfinite(value) || value < -40.0f || value > 0.0f)
 		return -EINVAL;
 
 	cfg->protection_param.protect_under_temp = value;
