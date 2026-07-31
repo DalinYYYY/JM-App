@@ -77,18 +77,20 @@ typedef struct
 } drvCanFilter_t;
 
 /**
- * @brief 双过滤器配置(单播+广播同时接收, 仅FDCAN支持双过滤器, 经典CAN退化为单过滤器)
- *   过滤器0: 精确匹配本机单播地址(id=unicast_id, mask=0x7FF或0x1FFFFFFF)
- *   过滤器1: 精确匹配广播地址(id=broadcast_id, mask=0x7FF或0x1FFFFFFF)
+ * @brief 双过滤器配置(单播+广播同时接收)
+ *   过滤器0: 按 mask 匹配本机单播地址
+ *   过滤器1: 按 mask 匹配广播地址
  *   两个过滤器都路由到 FIFO0, 上层无需区分来源。
  * @param  unicast_id            : 单播验收ID
  * @param  broadcast_id          : 广播验收ID
+ * @param  mask                  : 验收掩码(协议地址过滤使用0xFF, 仅比较低8位节点ID)
  * @param  ide                   : 0标准帧, 1扩展帧
  */
 typedef struct
 {
 	uint32_t unicast_id;
 	uint32_t broadcast_id;
+	uint32_t mask;
 	uint8_t ide;
 } drvCanDualFilter_t;
 
@@ -128,8 +130,8 @@ typedef struct
 int drv_can_init(canNumber_e can, drvCanFilter_t *filter);
 
 /**
- * @brief       初始化CAN并配置双过滤器(单播+广播, 仅FDCAN有效)
- *               经典CAN退化为单过滤器(仅配置 unicast_id, 广播由掩码放宽或上层过滤)
+ * @brief       初始化CAN并配置双掩码过滤器(单播+广播)
+ *               FDCAN 使用两个过滤器元素, 经典CAN使用两个 Filter Bank。
  * @param        can               : CAN编号
  * @param        dual_filter       : 双过滤器配置
  * @return       : DRV_EOK成功，DRV_ERROR失败

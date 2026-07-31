@@ -77,6 +77,35 @@ static inline void diag_inc(canNumber_e can, size_t field_offset)
 /* 字段偏移量宏, 避免重复 offsetof 计算 */
 #define DIAG_OFF(field)  offsetof(drvCanDiag_t, field)
 
+#if defined(JM_PERIPH_CAN_CLASSIC)
+/* 生成 bxCAN 32 位掩码过滤器。IDE/RTR 也参与比较, 只接受指定帧类型的数据帧。 */
+static void classic_filter_fill(CAN_FilterTypeDef *fcfg, uint32_t bank,
+                                uint32_t id, uint32_t mask, uint8_t ide)
+{
+	memset(fcfg, 0, sizeof(*fcfg));
+	if (ide)
+	{
+		fcfg->FilterIdHigh = (uint16_t)(id >> 13);
+		fcfg->FilterIdLow = (uint16_t)((id << 3) | CAN_ID_EXT | CAN_RTR_DATA);
+		fcfg->FilterMaskIdHigh = (uint16_t)(mask >> 13);
+		fcfg->FilterMaskIdLow = (uint16_t)((mask << 3) | CAN_ID_EXT | CAN_RTR_REMOTE);
+	}
+	else
+	{
+		fcfg->FilterIdHigh = (uint16_t)(id << 5);
+		fcfg->FilterIdLow = CAN_ID_STD | CAN_RTR_DATA;
+		fcfg->FilterMaskIdHigh = (uint16_t)(mask << 5);
+		fcfg->FilterMaskIdLow = CAN_ID_EXT | CAN_RTR_REMOTE;
+	}
+	fcfg->FilterFIFOAssignment = CAN_FILTER_FIFO0;
+	fcfg->FilterBank = bank;
+	fcfg->FilterMode = CAN_FILTERMODE_IDMASK;
+	fcfg->FilterScale = CAN_FILTERSCALE_32BIT;
+	fcfg->FilterActivation = CAN_FILTER_ENABLE;
+	fcfg->SlaveStartFilterBank = 14;
+}
+#endif
+
 #if defined(JM_PERIPH_CAN_FD)
 /* 数据长度(字节)转FDCAN DLC宏：经典CAN仅0~8，FD支持到64。
  * 本HAL中 FDCAN_DLC_BYTES_0~8 == 0~8，12/16/.../64 == 0x9~0xF */
@@ -181,7 +210,7 @@ int drv_can_init(canNumber_e can, drvCanFilter_t *filter)
 }
 
 /**
- * @brief       初始化CAN并配置双过滤器(单播+广播, 仅FDCAN有效)
+ * @brief       初始化CAN并配置双掩码过滤器(单播+广播)
  */
 int drv_can_init_dual_filter(canNumber_e can, drvCanDualFilter_t *dual_filter)
 {
@@ -190,25 +219,16 @@ int drv_can_init_dual_filter(canNumber_e can, drvCanDualFilter_t *dual_filter)
 		return DRV_ERROR;
 
 #if defined(JM_PERIPH_CAN_CLASSIC)
-	/* 经典CAN只有一组过滤器, 退化为单过滤器 + 掩码放宽同时接收单播和广播
-	 * 掩码 = unicast_id ^ broadcast_id 的差异位取反, 使两者都通过 */
 	CAN_HandleTypeDef *handle = (CAN_HandleTypeDef *)h;
 	CAN_FilterTypeDef fcfg = {0};
-	uint32_t diff = dual_filter->unicast_id ^ dual_filter->broadcast_id;
-	uint32_t mask = ~diff & (dual_filter->ide ? 0x1FFFFFFFu : 0x7FFu);
-	uint32_t id = dual_filter->unicast_id & mask;
+	uint32_t first_bank = (can == DRV_CAN2) ? 14u : 0u;
 
-	fcfg.FilterIdHigh = (uint16_t)(id >> 13);
-	fcfg.FilterIdLow = (uint16_t)(id << 3);
-	fcfg.FilterMaskIdHigh = (uint16_t)(mask >> 13);
-	fcfg.FilterMaskIdLow = (uint16_t)(mask << 3);
-	fcfg.FilterFIFOAssignment = CAN_FILTER_FIFO0;
-	fcfg.FilterBank = 0;
-	fcfg.FilterMode = CAN_FILTERMODE_IDMASK;
-	fcfg.FilterScale = CAN_FILTERSCALE_32BIT;
-	fcfg.FilterActivation = CAN_FILTER_ENABLE;
-	fcfg.SlaveStartFilterBank = 14;
-
+	classic_filter_fill(&fcfg, first_bank, dual_filter->unicast_id,
+	                    dual_filter->mask, dual_filter->ide);
+	if (HAL_CAN_ConfigFilter(handle, &fcfg) != HAL_OK)
+		return DRV_ERROR;
+	classic_filter_fill(&fcfg, first_bank + 1u, dual_filter->broadcast_id,
+	                    dual_filter->mask, dual_filter->ide);
 	if (HAL_CAN_ConfigFilter(handle, &fcfg) != HAL_OK)
 		return DRV_ERROR;
 	if (HAL_CAN_Start(handle) != HAL_OK)
@@ -222,20 +242,26 @@ int drv_can_init_dual_filter(canNumber_e can, drvCanDualFilter_t *dual_filter)
 	FDCAN_HandleTypeDef *handle = (FDCAN_HandleTypeDef *)h;
 	FDCAN_FilterTypeDef fcfg = {0};
 
-	/* 过滤器0: 单播 */
+	/* 未命中过滤器的帧和所有远程帧必须拒绝, 否则全局默认策略仍会收帧。 */
+	if (HAL_FDCAN_ConfigGlobalFilter(handle,
+	                                 FDCAN_REJECT, FDCAN_REJECT,
+	                                 FDCAN_REJECT_REMOTE, FDCAN_REJECT_REMOTE) != HAL_OK)
+		return DRV_ERROR;
+
+	/* 过滤器0: 单播节点ID */
 	fcfg.IdType = dual_filter->ide ? FDCAN_EXTENDED_ID : FDCAN_STANDARD_ID;
 	fcfg.FilterIndex = 0;
 	fcfg.FilterType = FDCAN_FILTER_MASK;
 	fcfg.FilterConfig = FDCAN_FILTER_TO_RXFIFO0;
 	fcfg.FilterID1 = dual_filter->unicast_id;
-	fcfg.FilterID2 = (dual_filter->ide ? 0x1FFFFFFFu : 0x7FFu); /* 精确匹配 */
+	fcfg.FilterID2 = dual_filter->mask;
 	if (HAL_FDCAN_ConfigFilter(handle, &fcfg) != HAL_OK)
 		return DRV_ERROR;
 
-	/* 过滤器1: 广播 */
+	/* 过滤器1: 广播节点ID */
 	fcfg.FilterIndex = 1;
 	fcfg.FilterID1 = dual_filter->broadcast_id;
-	fcfg.FilterID2 = (dual_filter->ide ? 0x1FFFFFFFu : 0x7FFu);
+	fcfg.FilterID2 = dual_filter->mask;
 	if (HAL_FDCAN_ConfigFilter(handle, &fcfg) != HAL_OK)
 		return DRV_ERROR;
 
