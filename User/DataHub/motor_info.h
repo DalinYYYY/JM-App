@@ -127,7 +127,7 @@ typedef struct __ALIGNED_4
 {
     float    device_zero                     ; /* 设备零度 (rad)  [机械零点位置 [DeviceParam段48-63 本表占用48-55]] */
     uint32_t device_time                     ; /* 设备生产日期  [YYYYMMDD格式] */
-    uint32_t can_id                          ; /* CAN节点ID  [11位标准ID] */
+    uint32_t can_id                          ; /* CAN节点ID  [1~127, 0保留为广播] */
     uint32_t can_baudrate                    ; /* CAN波特率 (bps) */
     float    can_timeout_s                   ; /* CAN通信超时 (s)  [0=禁用超时] */
     uint32_t can_fd_enable                   ; /* CAN FD使能  [0:传统CAN 1:CAN FD] */

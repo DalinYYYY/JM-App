@@ -191,7 +191,7 @@ int motor_info_validate(const motor_info_t *cfg)
     /* 设备参数（CAN/UART） */
     if (cfg->blocks.device.device_zero < -12.566f || cfg->blocks.device.device_zero > 12.566f) return 48;  /* device_zero */
     if (cfg->blocks.device.device_time > (uint32_t)99999999) return 49;  /* device_time */
-    if (cfg->blocks.device.can_id > (uint32_t)2047) return 50;  /* can_id */
+    if (cfg->blocks.device.can_id < (uint32_t)1 || cfg->blocks.device.can_id > (uint32_t)127) return 50;  /* can_id */
     if (cfg->blocks.device.can_baudrate < (uint32_t)10000 || cfg->blocks.device.can_baudrate > (uint32_t)8000000) return 51;  /* can_baudrate */
     if (cfg->blocks.device.can_timeout_s < 0.0f || cfg->blocks.device.can_timeout_s > 60.0f) return 52;  /* can_timeout_s */
     if (cfg->blocks.device.can_fd_enable > (uint32_t)1) return 53;  /* can_fd_enable */
@@ -855,7 +855,7 @@ uint32_t motor_info_get_can_id(const motor_info_t *cfg)
 int motor_info_set_can_id(motor_info_t *cfg, uint32_t value)
 {
     if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)2047) return -EINVAL;  /* 越界 */
+    if (value < (uint32_t)1 || value > (uint32_t)127) return -EINVAL;  /* 越界 */
     cfg->blocks.device.can_id = value;
     return 0;
 }

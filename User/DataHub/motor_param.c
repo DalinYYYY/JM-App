@@ -20,7 +20,7 @@ static const motor_param_t g_default_config =
 	{
 		.motor_instance =
 			{
-							 .motor_id = 0,
+							 .motor_id = 1,
 							 .motor_name = {0},
 							 },
 		.motor_base =
@@ -152,7 +152,7 @@ int motor_param_validate(const motor_param_t *cfg)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (cfg->motor_instance.motor_id > (uint8_t)31)
+	if (cfg->motor_instance.motor_id < (uint8_t)1 || cfg->motor_instance.motor_id > (uint8_t)127)
 		return 1;
 	if (!isfinite(cfg->motor_base.r) || cfg->motor_base.r < 0.001f || cfg->motor_base.r > 10.0f)
 		return 3;
@@ -453,7 +453,7 @@ int motor_param_set_motor_id(motor_param_t *cfg, uint8_t value)
 	if (cfg == NULL)
 		return -EINVAL;
 
-	if (value > (uint8_t)31)
+	if (value < (uint8_t)1 || value > (uint8_t)127)
 		return -EINVAL;
 
 	cfg->motor_instance.motor_id = value;
