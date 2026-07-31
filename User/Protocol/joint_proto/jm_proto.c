@@ -551,7 +551,8 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 		return JM_ERR_OK;
 	}
-	/* 设置 CAN_ID 0xF0: {new_id:u8} -> ACK{new_id:u8}; 范围 1~127, 需保存重启生效 */
+	/* 设置 CAN_ID 0xF0: {new_id:u8} -> ACK{new_id:u8,restart_required:u8}。
+	 * 回调原子写入 motor_info Flash。运行期地址保持不变, 重启后加载新地址。 */
 	if (cmd == JM_CMD_SET_CAN_ID)
 	{
 		uint8_t new_id;
@@ -574,8 +575,11 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		{
 			return reply_nack(proto, cmd, e);
 		}
-		proto->motor_id = new_id;             /* 同步 RAM 地址, CAN 滤波重启后生效 */
-		return reply_ack(proto, cmd, new_id); /* ACK{new_id:u8} */
+		{
+			uint8_t o[2] = {new_id, 1u};
+			reply_set(proto, cmd, o, sizeof(o));
+			return JM_ERR_OK;
+		}
 	}
 	/* 设置波特率 0xF1: {baud_code:u8} -> ACK; 0=1M 1=500K 2=250K 3=125K, 重启生效 */
 	if (cmd == JM_CMD_SET_BAUDRATE)

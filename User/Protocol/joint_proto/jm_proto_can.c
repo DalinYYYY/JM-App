@@ -265,7 +265,8 @@ void jm_proto_can_send(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint
 
 /* 对已重组好的(cmd + payload)做分发, 应答经CAN压缩/分包发回 */
 static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
-                                   const uint8_t *payload, uint16_t plen)
+                                   const uint8_t *payload, uint16_t plen,
+                                   uint8_t reply_enabled)
 {
 	uint8_t norm[20]; /* MIT归一化缓冲: 5*f32 */
 
@@ -286,8 +287,8 @@ static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
 
 	jm_proto_dispatch(&c->proto, cmd, payload, plen);
 
-	/* 广播(电机ID=0)不应答; 有应答则发回 */
-	if (c->proto.reply_len > 0)
+	/* 广播命令只执行不应答, 避免多节点同时发送造成总线冲突。 */
+	if (reply_enabled && c->proto.reply_len > 0)
 	{
 		uint8_t rcmd = c->proto.reply[0];
 		const uint8_t *rbody = (c->proto.reply_len > 1) ? &c->proto.reply[1] : NULL;
@@ -295,6 +296,12 @@ static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
 		/* 反馈类应答在CAN上压缩(can_emit_logical内部按rcmd处理) */
 		can_emit_logical(c, rcmd, rbody, rlen);
 	}
+}
+
+/* 广播仅开放不会修改持久化配置的全局安全命令。 */
+uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd)
+{
+	return (cmd == JM_CMD_BROADCAST_SYNC || cmd == JM_CMD_ESTOP) ? 1u : 0u;
 }
 
 /* 复位多帧重组状态 */
@@ -309,7 +316,7 @@ static void rx_reset(jm_proto_can_t *c)
 
 void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t now_tick)
 {
-	uint8_t cmd, dst;
+	uint8_t cmd, dst, is_broadcast;
 
 	if (c == NULL || frame == NULL)
 	{
@@ -321,6 +328,11 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t 
 
 	/* 地址过滤: 只收发给本机或广播(0)的帧 */
 	if (dst != c->motor_id && dst != JM_CAN_BROADCAST_ID)
+	{
+		return;
+	}
+	is_broadcast = (dst == JM_CAN_BROADCAST_ID) ? 1u : 0u;
+	if (is_broadcast && !jm_proto_can_broadcast_allowed(cmd))
 	{
 		return;
 	}
@@ -340,7 +352,13 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t 
 	if (!is_multi)
 	{
 		/* 单帧: data 即载荷 */
-		can_dispatch_and_reply(c, cmd, frame->data, frame->len);
+		can_dispatch_and_reply(c, cmd, frame->data, frame->len,
+		                       is_broadcast ? 0u : 1u);
+		return;
+	}
+	/* 白名单广播命令均为单帧。拒绝广播分包, 避免跨节点重组状态冲突。 */
+	if (is_broadcast)
+	{
 		return;
 	}
 
@@ -400,7 +418,8 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t 
 					return; /* CRC 校验失败, 丢弃 */
 				}
 				/* CRC 校验通过, 分发载荷(去除末2字节CRC) */
-				can_dispatch_and_reply(c, c->rx_cmd, &c->rx_buf[1], (uint16_t)(plen - 2u));
+				can_dispatch_and_reply(c, c->rx_cmd, &c->rx_buf[1],
+				                       (uint16_t)(plen - 2u), 1u);
 			}
 			rx_reset(c);
 		}

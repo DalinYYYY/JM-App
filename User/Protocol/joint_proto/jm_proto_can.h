@@ -121,6 +121,9 @@ extern "C"
 	 */
 	void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t now_tick);
 
+	/** @brief 广播命令白名单判断(当前仅 BROADCAST_SYNC 和 ESTOP)。 */
+	uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd);
+
 	/**
 	 * @brief  设置运行期 CAN FD 模式(由 0xF3 SET_FD_MODE 命令调用)
 	 *         纯软件层操作: 仅修改 use_fd_runtime 标志, 不重新初始化 FDCAN 外设。
