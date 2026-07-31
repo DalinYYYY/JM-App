@@ -24,7 +24,7 @@
 /* ---- 公共头文件(UART/CAN 共用遥测打包) ---- */
 #include "runtime_param.h" /* JM_DBG_CH, jm_dbg[] */
 #include "thread_config.h" /* THREAD_DELAY_COMMUN */
-#include "jm_proto_ops.h" /* Shared protocol operations and command definitions. */
+#include "jm_proto_ops.h"  /* Shared protocol operations and command definitions. */
 
 #if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
 #define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick 发一帧 */

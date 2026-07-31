@@ -223,13 +223,15 @@ F4 系列使用经典 CAN（`JM_PERIPH_CAN_CLASSIC`），不支持 FD，`USE_CAN
 
 ## 5. 地址过滤
 
-### 5.1 当前方案：宽掩码 + 软件过滤
+### 5.1 当前方案：双掩码硬件过滤
 
-开发期采用**宽掩码方案**接收所有 CAN 帧，硬件过滤器配置为 `NULL`（接收所有 ID），由协议层在软件中做地址过滤。此方案开发期调试友好，但所有帧都会触发 CPU 中断。
+启动时从 `motor_info.device.can_id` 读取节点地址，并配置本机与广播两个硬件过滤器。仲裁 ID 的低 8 位是节点地址，因此掩码只比较低 8 位，CMD 和多帧标志不参与匹配。
 
 ```c
-// dev_commun_can_start() 中
-drv_can_init(pobj->can, NULL);  // NULL = 接收所有 ID
+filter.unicast_id = pobj->motor_id;
+filter.broadcast_id = 0;
+filter.mask = 0xFF;
+drv_can_init_dual_filter(pobj->can, &filter);
 ```
 
 软件过滤由 `jm_proto_can_feed` 在入口处执行：
@@ -240,15 +242,17 @@ if (dst != c->motor_id && dst != JM_CAN_BROADCAST_ID)
     return;  // 非本机且非广播帧，丢弃
 ```
 
-### 5.2 量产期扩展：双过滤器硬件过滤
+### 5.2 驱动实现
 
-`drv_can_init_dual_filter` 接口已预留，量产期可启用以减负 CPU：
+`drv_can_init_dual_filter` 同时支持 FDCAN 和经典 CAN：
 
-- 过滤器 0：精确匹配本机地址 `(CMD << 8) | MOTOR_ID`，掩码 `0x1FFFFFFF`
-- 过滤器 1：精确匹配广播地址 `(CMD << 8) | 0x00`，掩码 `0x1FFFFFFF`
+- 过滤器 0：`ID=local_id, mask=0xFF`
+- 过滤器 1：`ID=0, mask=0xFF`
 - 两个过滤器都路由到 FIFO0，上层无需区分来源
+- FDCAN 全局拒绝未命中帧、标准帧和远程帧
+- 经典 CAN 使用两个独立 Filter Bank，并比较 IDE/RTR 位
 
-经典 CAN 退化为单过滤器（仅配置单播，广播由掩码放宽或上层过滤）。
+软件层继续校验本机/广播地址；广播仅开放 `BROADCAST_SYNC` 和 `ESTOP`，执行后不应答。
 
 ---
 
@@ -487,7 +491,7 @@ else:
 
 | 命令 | 码 | 说明 |
 |------|-----|------|
-| SET_CAN_ID | 0xF0 | 修改本机 CAN 地址（需保存） |
+| SET_CAN_ID | 0xF0 | 原子保存节点地址到 Flash，ACK 使用旧 ID，重启后生效 |
 | SET_BAUDRATE | 0xF1 | 设置波特率 (0=1M, 1=500K, 2=250K, 3=125K) |
 | BROADCAST_SYNC | 0xF2 | 广播同步（ID=0，所有电机同步执行） |
 | SET_FD_MODE | 0xF3 | 运行期切换 CAN FD 模式 |

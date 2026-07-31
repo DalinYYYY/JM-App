@@ -398,7 +398,7 @@ flowchart TB
 flowchart TB
     SW{"switch(cmd)"}
 
-    SW -->|0xF0<br/>SET_CAN_ID| F1["入: {new_id:u8}<br/>范围 1~127<br/>出: ACK{new_id:u8}<br/>副作用: proto->motor_id 更新"]
+    SW -->|0xF0<br/>SET_CAN_ID| F1["入: {new_id:u8}<br/>范围 1~127<br/>出: ACK{new_id,restart_required}<br/>原子保存 Flash"]
     SW -->|0xF1<br/>SET_BAUDRATE| F2["入: {baud_code:u8}<br/>0=1M 1=500K 2=250K 3=125K<br/>出: ACK{status:0}"]
     SW -->|0xF2<br/>BROADCAST_SYNC| F3["入: 任意载荷<br/>调 ops->set_mode(cmd, payload, len)<br/>不应答 (广播)"]
 ```
@@ -414,11 +414,11 @@ flowchart TB
     P1 --> L3{"new_id < 1 OR > 127?"} -->|是| N3["NACK OUT_OF_RANGE"]
     L3 -->|否| CALL["ops->set_can_id(new_id)"]
     CALL --> L4{"e != OK?"} -->|是| N4["NACK{cmd, e}"]
-    L4 -->|否| UPD["proto->motor_id = new_id<br/>(CAN 滤波重启后生效)"]
-    UPD --> ACK["ACK{new_id:u8}"]
+    L4 -->|否| SAVE["写 motor_info.device.can_id<br/>保存并回读校验"]
+    SAVE --> ACK["旧 ID 应答 ACK{new_id,1}<br/>运行期地址不变"]
 ```
 
-> 0xF2 广播同步是**唯一不应答**的命令：直接调 `ops->set_mode(cmd, payload, len)` 后返回 `JM_ERR_OK`，`reply_len` 保持 0。
+> CAN 广播仅允许 0xF2 BROADCAST_SYNC 和 0x03 ESTOP，两者均只执行不应答；其他广播命令在 CAN 绑定层直接丢弃。
 
 ---
 
@@ -680,7 +680,7 @@ sequenceDiagram
 | **MIT 命令载荷** | 5×f32 = 20B 原样 | 8B 压缩 → 解压为 5×f32 再 dispatch |
 | **0xC0 反馈应答** | 直接用 dispatch 写入的 22B 全精度 reply | 重新调 `get_feedback` + `jm_fb_pack` 压 8B |
 | **大载荷命令** | 单帧无限制（≤JM_PAYLOAD_MAX=256B） | >8B 自动多帧分包（7B/帧+控制字） |
-| **广播处理** | 不适用（点对点链路） | `motor_id=0` 不应答 |
+| **广播处理** | 不适用（点对点链路） | 仅 SYNC/ESTOP，执行但不应答 |
 | **dispatch 看到的载荷** | 原样 | MIT 已归一化，其余原样 |
 
 **CAN 0xC0 反馈应答的特殊处理**：
