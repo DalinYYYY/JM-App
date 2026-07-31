@@ -90,6 +90,8 @@ static void hardware_init(void)
 
 void user_init(void)
 {
+	/* 先初始化运行数据和 MCU UID，后续硬件/协议服务均依赖 usr。 */
+	user_data_init();
 	hardware_init();
 
 	/* 创建线程 */

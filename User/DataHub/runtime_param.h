@@ -239,7 +239,7 @@ typedef struct sys_data_
 	 * 指向已存在的全局变量（dwt_timer / s_motor_loop / g_motor_info_storage /
 	 * dev_power_monitor / dev_commun_uart），不持有数据、不复制数据，
 	 * 仅方便调试时通过 usr 一个变量统一观察。
-	 * 绑定在 user_data_init() 中完成；非 const 以便调试时强制设值。
+	 * 绑定在 user_init() 的硬件初始化阶段完成；非 const 以便调试时强制设值。
 	 * 访问示例: usr.p_dwt_timer->duration_us[0], usr.p_motor_loop->vel_cnt,
 	 *           usr.p_dev_power_monitor->vbus, usr.p_dev_commun_uart->tx_count
 	 */
