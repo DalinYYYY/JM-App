@@ -116,6 +116,11 @@ void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
 		return;
 
 	const MotorCalibParam_t *c = &info->blocks.motor_calib;
+	uint32_t can_id = motor_info_get_can_id(info);
+
+	/* 节点地址由 motor_info 持久化配置统一提供, motor_param 仅保留运行期镜像。 */
+	if (can_id >= 1u && can_id <= 127u)
+		param->motor_instance.motor_id = (uint8_t)can_id;
 
 	/* 电气参数：始终从 motor_info 同步到运行期，不再受 is_calibrated 门控。
 	 * 【关键修复】原逻辑仅 is_calibrated==1 才同步，导致上位机 0xE7/0xEA 写入的

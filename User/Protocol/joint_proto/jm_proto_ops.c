@@ -45,6 +45,11 @@
 #include "jm_proto_can.h"       /* jm_proto_can_set_fd_mode */
 #endif
 
+#if defined(USE_DEV_FLASH)
+/* 强实现位于 motor_info_storage.c, 本文件后部保留弱实现供无存储后端时覆盖。 */
+motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *cfg);
+#endif
+
 /* ============================================================================
  * 命令速率限制 (防 DoS / Flash 寿命损耗)
  *   对危险/高开销命令按类别设最小间隔, 超频返回 NACK(RATE_LIMIT)
@@ -995,22 +1000,45 @@ static jm_err_e app_get_debug(float *out, uint8_t *out_count, uint8_t max_count)
 
 /* ============================================================================
  *  7) CAN 管理: CMD 0xF0/0xF1  ->  set_can_id / set_baudrate
- *     两者均写入 RAM 配置, 持久化由主机显式发 0xE4 完成, 重启后由 CAN 绑定层加载生效。
+ *     CAN ID 原子写入 motor_info Flash, 由 CAN 绑定层在下次启动时加载。
  * ==========================================================================*/
 static uint8_t s_can_baud_code = 0u; /* 0=1M(默认) 1=500K 2=250K 3=125K */
 
 static jm_err_e app_set_can_id(uint8_t new_id)
 {
-	/* 速率限制: 0xF0 SET_CAN_ID 复用 PARAM_WRITE 间隔 (100ms) */
-	if (!JM_RATE_CHECK(&s_last_tick_param_write, JM_RATE_MIN_INTERVAL_PARAM_WRITE_MS))
+	/* Flash 写命令使用 1s 限流, 防止反复改地址损耗存储寿命。 */
+	if (!JM_RATE_CHECK(&s_last_tick_motor_info_s, JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS))
 		return JM_ERR_RATE_LIMIT;
 	/* 鉴权: 由 dispatch 层在 payload 前缀校验 (若启用), 本层不处理 */
 
-	/* 写入参数表 motor_id; 范围 1~127 已由 dispatch 校验。
-	 * CAN 滤波地址在绑定层初始化时读取, 故重启后生效。*/
-	return (motor_param_set_motor_id(&usr.motor_param[M1], new_id) == 0)
-	           ? JM_ERR_OK
-	           : JM_ERR_OUT_OF_RANGE;
+#if defined(USE_DEV_FLASH)
+	{
+		motor_info_t *cfg = motor_info_storage_get();
+		uint32_t old_id;
+		motor_info_storage_status_t rc;
+
+		if (cfg == NULL)
+			return JM_ERR_FLASH;
+		old_id = motor_info_get_can_id(cfg);
+		if (motor_info_set_can_id(cfg, new_id) != 0)
+			return JM_ERR_OUT_OF_RANGE;
+
+		rc = jm_app_motor_info_storage_save(cfg);
+		if (rc == MOTOR_INFO_STORAGE_OK)
+			return JM_ERR_OK;
+
+		/* 保存失败时恢复运行期配置; CAN 协议和硬件过滤器始终保持旧地址。 */
+		(void)motor_info_set_can_id(cfg, old_id);
+		if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_WRITE)
+			return JM_ERR_FLASH_WRITE;
+		if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY)
+			return JM_ERR_FLASH_VERIFY;
+		return (rc > 0) ? JM_ERR_OUT_OF_RANGE : JM_ERR_FLASH;
+	}
+#else
+	(void)new_id;
+	return JM_ERR_UNSUPPORTED;
+#endif
 }
 
 static jm_err_e app_set_baudrate(uint8_t baud_code)

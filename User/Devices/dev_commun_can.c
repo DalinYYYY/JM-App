@@ -28,6 +28,9 @@
 
 #include "assert_report.h"
 #include "main.h" /* HAL_GetTick (降级计时) */
+#if defined(USE_DEV_FLASH)
+#include "motor_info_storage.h"
+#endif
 #include <string.h>
 
 dev_commun_can_t dev_commun_can;
@@ -120,6 +123,8 @@ static void dev_commun_can_set_ops(struct dev_commun_can *pobj, const jm_proto_o
 /* 启动 CAN(配置过滤器、注册回调、使能中断); 幂等: 重复调用只生效一次 */
 static int dev_commun_can_start(struct dev_commun_can *pobj)
 {
+	drvCanDualFilter_t filter;
+
 	assert_report(pobj != NULL);
 	pobj->start_count++;
 	if (pobj->started)
@@ -136,13 +141,12 @@ static int dev_commun_can_start(struct dev_commun_can *pobj)
 		return DEV_ERROR;
 	}
 
-	/* 过滤器配置: 开发期采用宽掩码接收所有帧(NULL = 接收所有 ID),
-	 * 上层 jm_proto_can_feed() 内做地址过滤(dst != motor_id && dst != 0 丢弃)。
-	 * 量产期可扩展 drvCanDualFilter_t 支持掩码模式, 做精确硬件过滤减负 CPU:
-	 *   单播: ID=(任意CMD<<8)|motor_id, 掩码=0x00FF(仅匹配低 8 位 motor_id)
-	 *   广播: ID=(任意CMD<<8)|0x00,     掩码=0x00FF(仅匹配低 8 位=0)
-	 * 当前 drvCanDualFilter_t 为精确匹配设计(FilterID2=全 1), 不适用, 故走宽掩码方案。*/
-	if (drv_can_init(pobj->can, NULL) != DRV_EOK)
+	/* 仲裁ID低8位是节点地址。CMD和多帧标志不参与比较。 */
+	filter.unicast_id = pobj->motor_id;
+	filter.broadcast_id = JM_CAN_BROADCAST_ID;
+	filter.mask = 0xFFu;
+	filter.ide = pobj->ide;
+	if (drv_can_init_dual_filter(pobj->can, &filter) != DRV_EOK)
 	{
 		pobj->start_fail_count++;
 		pobj->last_error = -2;
@@ -201,6 +205,11 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 	 * motor's communication-loss watchdog. */
 	dst = JM_CAN_GET_MOTOR_ID(msg->id);
 	if (dst != pobj->motor_id && dst != JM_CAN_BROADCAST_ID)
+	{
+		return;
+	}
+	if (dst == JM_CAN_BROADCAST_ID &&
+	    !jm_proto_can_broadcast_allowed(JM_CAN_GET_CMD(msg->id)))
 	{
 		return;
 	}
@@ -330,6 +339,16 @@ void dev_commun_can_init(dev_commun_can_t *pobj, jm_can_comm_id_e id)
 	cfg = &commun_can_list[id];
 	pobj->can = cfg->can;
 	pobj->motor_id = cfg->motor_id;
+#if defined(USE_DEV_FLASH)
+	{
+		motor_info_t *info = motor_info_storage_get();
+		uint32_t stored_id = (info != NULL) ? motor_info_get_can_id(info) : 0u;
+		if (stored_id >= 1u && stored_id <= 127u)
+		{
+			pobj->motor_id = (uint8_t)stored_id;
+		}
+	}
+#endif
 	pobj->ide = cfg->ide;
 	pobj->use_fd = cfg->use_fd;
 	pobj->use_fd_runtime = 0u; /* 上电默认经典模式(兼容所有上位机硬件), 由 0xF3 命令切换 */
