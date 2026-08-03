@@ -278,6 +278,36 @@ int drv_can_init_dual_filter(canNumber_e can, drvCanDualFilter_t *dual_filter)
 	return DRV_EOK;
 }
 
+int drv_can_reconfigure_dual_filter(canNumber_e can, drvCanDualFilter_t *dual_filter)
+{
+	void *h = get_can_handle(can);
+	if (h == NULL || dual_filter == NULL)
+		return DRV_ERROR;
+
+#if defined(JM_PERIPH_CAN_CLASSIC)
+	{
+		CAN_HandleTypeDef *handle = (CAN_HandleTypeDef *)h;
+		(void)HAL_CAN_DeactivateNotification(handle, CAN_IT_RX_FIFO0_MSG_PENDING |
+		                                    CAN_IT_BUSOFF | CAN_IT_ERROR |
+		                                    CAN_IT_ERROR_WARNING | CAN_IT_ERROR_PASSIVE);
+		if (HAL_CAN_Stop(handle) != HAL_OK)
+			return DRV_ERROR;
+	}
+#elif defined(JM_PERIPH_CAN_FD)
+	{
+		FDCAN_HandleTypeDef *handle = (FDCAN_HandleTypeDef *)h;
+		(void)HAL_FDCAN_DeactivateNotification(handle,
+		                                      FDCAN_IT_RX_FIFO0_NEW_MESSAGE |
+		                                      FDCAN_IT_BUS_OFF |
+		                                      FDCAN_IT_ERROR_WARNING | FDCAN_IT_ERROR_PASSIVE);
+		if (HAL_FDCAN_Stop(handle) != HAL_OK)
+			return DRV_ERROR;
+	}
+#endif
+
+	return drv_can_init_dual_filter(can, dual_filter);
+}
+
 /**
  * @brief       发送一帧CAN报文
  */
@@ -379,6 +409,33 @@ int drv_can_send(canNumber_e can, drvCanMsg_t *msg)
 #endif
 
 	return DRV_EOK;
+}
+
+int drv_can_wait_tx_idle(canNumber_e can, uint32_t timeout_ms)
+{
+	void *h = get_can_handle(can);
+	uint32_t waited_us = 0u;
+	uint32_t timeout_us = timeout_ms * 1000u;
+	if (h == NULL)
+		return DRV_ERROR;
+
+	for (;;)
+	{
+#if defined(JM_PERIPH_CAN_CLASSIC)
+		CAN_HandleTypeDef *handle = (CAN_HandleTypeDef *)h;
+		if (HAL_CAN_GetTxMailboxesFreeLevel(handle) == 3u)
+			return DRV_EOK;
+#elif defined(JM_PERIPH_CAN_FD)
+		FDCAN_HandleTypeDef *handle = (FDCAN_HandleTypeDef *)h;
+		/* 当前STM32G4 HAL消息RAM固定配置3个Tx FIFO元素(SRAMCAN_TFQ_NBR)。 */
+		if (HAL_FDCAN_GetTxFifoFreeLevel(handle) == 3u)
+			return DRV_EOK;
+#endif
+		if (waited_us >= timeout_us)
+			return DRV_ERROR;
+		drv_delay_us(10u);
+		waited_us += 10u;
+	}
 }
 
 /**

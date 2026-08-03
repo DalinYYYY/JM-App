@@ -147,6 +147,20 @@ int drv_can_init_dual_filter(canNumber_e can, drvCanDualFilter_t *dual_filter);
 int drv_can_send(canNumber_e can, drvCanMsg_t *msg);
 
 /**
+ * @brief       等待所有已排队报文完成发送
+ * @note        仅在线程/主循环调用，禁止在ISR中调用
+ * @return      DRV_EOK=发送队列已空，DRV_ERROR=超时或句柄无效
+ */
+int drv_can_wait_tx_idle(canNumber_e can, uint32_t timeout_ms);
+
+/**
+ * @brief       运行期停止CAN并重新配置单播+广播双过滤器
+ * @note        仅在线程/主循环调用，禁止在ISR中调用
+ */
+int drv_can_reconfigure_dual_filter(canNumber_e can,
+                                    drvCanDualFilter_t *dual_filter);
+
+/**
  * @brief       接收一帧CAN报文(从FIFO0读取)
  * @param        can               : CAN编号
  * @param        msg               : 输出报文(msg->is_fd 标识 FD 帧)
