@@ -9,9 +9,6 @@
  * @copyright   Copyright (c) 2026 Robot Tech.co, Ltd. All rights reserved.
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- * @note        面向自研 PyQt 上位机, 取代已废弃的 serialstudio_commun。
- *              joint_proto 业务回调(反馈/控制/参数/设备信息)统一收敛在 jm_proto_ops.c,
- *              串口与 CAN 注入同一份 ops; 本文件只负责串口绑定与遥测帧打包上报。
  * @note        遥控模式(周期无应答上报):
  *              - 上位机用 SET_TELEMETRY(0xCB)=enable+mask+period 配置开关/种类/周期;
  *                ops 记录后, 本模块每拍读 jm_app_telemetry_enabled() 决定是否上报。
@@ -163,17 +160,7 @@ static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 	dev->report(dev, JM_CMD_TELEMETRY, o, n);
 }
 
-/* ---------------- 调试通道绑定 ----------------*/
-/* [诊断] 电角度换相核对: 开环电压 Ud=0/Uq>0 时 Id/Iq 低频反相大摆动。
- * poles=20 已确认正确, 故疑点在 d轴对齐(enc_offset)或编码器方向(enc_direction)。
- * 重点判读 ch4(enc_dir):
- *   本架构 offset 在标定时强制 dir=+1 采样, 若真实 enc_dir=-1, 运行时 get_raw 反转 raw,
- *   offset 在"正向坐标系"标、"反向坐标系"用 → 机械零点错位 → d轴对齐失效 → Id/Iq大摆动。
- *   (calib_level3_encoder.c 已注释此隐患) 若 ch4=-1 且 Id 大 → 高度怀疑此错位, 需重标零位。
- * 判读:
- *   ch3(poles)=20; ch4(enc_dir)=±1; ch5(ele_deg)匀速转线性锯齿0~360;
- *   ch6(mech_deg)一圈内 ele 循环 poles 次; ch7(enc_offset)标定机械零位(deg)。
- * 核对完恢复电流/dq 遥测。*/
+/* ---------------- 调试通道绑定 ---------------- */
 static void jm_host_commun_update_debug(void)
 {
 	const foc_t *fc = &usr.p_motor_loop->motor.foc;
@@ -290,9 +277,9 @@ void jm_host_commun_can_process(void)
 	/* CAN communication timeout: force IDLE after the configured interval. */
 	if (dev_commun_can.check_loss(&dev_commun_can, HAL_GetTick()))
 	{
-		__disable_irq();
-		motor_loop_set_cmd(CONTROL_MODE_IDLE);
-		__enable_irq();
+//		__disable_irq();
+//		motor_loop_set_cmd(CONTROL_MODE_IDLE);
+//		__enable_irq();
 	}
 
 	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。

@@ -562,7 +562,8 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 	fb->temp_motor = m->thermal.temp_motor; /* 电机温度 ℃ */
 	fb->multiturn = m->motion.multiturn;    /* 多圈计数(整圈,带符号) -> UI"多圈计数" */
 	fb->single = m->motion.single_turn_rad; /* 单圈机械角 rad [0,2π) -> UI"机械角度"(转°)/电角度计算源 */
-	fb->fault_mask = m->fault.fault_mask;   /* 故障掩码 */
+	/* 返回锁存故障，避免瞬态条件消失后 FAULT 状态仍在但上位机显示无故障。 */
+	fb->fault_mask = m->fault.fault_latched;
 	fb->warn_mask = m->fault.warn_mask;     /* 警告掩码 */
 	fb->top_fsm = (uint8_t)m->top_state;
 	fb->run_state = (uint8_t)m->run_state;

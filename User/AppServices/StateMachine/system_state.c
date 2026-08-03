@@ -30,6 +30,8 @@
  */
 uint32_t g_run_state_trans_count = 1000;
 
+#define SYSTEM_SPEED_GUARD_SECONDS (0.020f)
+
 static int state_float_is_finite(float value)
 {
 	uint32_t bits;
@@ -83,7 +85,11 @@ static uint32_t state_active_faults(system_state_t *sys)
 			active |= SYSTEM_FAULT_UNDER_VOLTAGE;
 	}
 
-	if ((enable & SYSTEM_PROTECT_OVER_SPEED) != 0u &&
+	/* 编码器冷启动阶段可能先返回无效角度，随后跳到真实角度。
+	 * 仅在输出已使能且启动保护窗口结束后检测超速，避免 IDLE 态误锁存。 */
+	if (sys->speed_guard_cycles == 0u &&
+		(sys->top_state == TOP_FSM_READY || sys->top_state == TOP_FSM_RUN) &&
+		(enable & SYSTEM_PROTECT_OVER_SPEED) != 0u &&
 		state_float_is_finite(fb->vel) && state_absf(fb->vel) > p->protect_over_speed)
 		active |= SYSTEM_FAULT_OVER_SPEED;
 
@@ -218,6 +224,14 @@ void system_state_init(system_state_t *sys, struct dev_motor *motor, motor_param
 	sys->top_state = TOP_FSM_INIT;
 	sys->ctrl_mode = CONTROL_MODE_IDLE;
 	sys->fault_code = 0;
+	if (dt > 0.0f)
+	{
+		sys->speed_guard_cycles = (uint32_t)(SYSTEM_SPEED_GUARD_SECONDS / dt + 0.5f);
+	}
+	if (sys->speed_guard_cycles == 0u)
+	{
+		sys->speed_guard_cycles = 1u;
+	}
 
 	top_fsm_switch(sys, TOP_FSM_IDLE);
 }
@@ -339,6 +353,8 @@ void fault_check(system_state_t *sys)
 
 	if (sys == NULL || sys->motor.param == NULL)
 		return;
+	if (sys->speed_guard_cycles > 0u)
+		sys->speed_guard_cycles--;
 	active = state_active_faults(sys);
 	new_faults = active & ~sys->fault_latched;
 	sys->fault_code = active;

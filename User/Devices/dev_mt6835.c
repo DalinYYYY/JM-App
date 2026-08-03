@@ -77,9 +77,10 @@ static void dev_mt6835_csn_ctrl(struct dev_mt6835 *pobj, mt6835State_e state)
  *        MISO 返回: 前 2 字节 Hi-Z, 第 3 字节为寄存器数据
  *        MT6835 在收到完整 16bit 命令后, 在第 3 字节(dummy)期间输出数据
  *        注意: 不可多发 dummy 字节, 否则会被 MT6835 当作下一帧命令, 导致状态机错乱
- * @return 寄存器值 (0~255)
+ * @param[out] value 寄存器值
+ * @return true=读取成功，false=SPI 传输失败
  */
-static uint8_t mt6835_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg)
+static bool mt6835_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg, uint8_t *value)
 {
 	uint8_t tx[MT6835_FRAME_LEN] = {
 		(uint8_t)((MT6835_READ | reg) >> 8),  /* 0x30 | A[11:8] */
@@ -87,12 +88,20 @@ static uint8_t mt6835_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg)
 		0xFFu,                                  /* dummy, MT6835 在此字节输出数据 */
 	};
 	uint8_t rx[MT6835_FRAME_LEN] = {0};
+	int status;
 
 	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-	drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, rx, MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
+	status = drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, rx,
+	                          MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
 	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
 
-	return rx[2]; /* 数据在第 3 字节 */
+	if (status != DRV_EOK || value == NULL)
+	{
+		pobj->read_error_count++;
+		return false;
+	}
+	*value = rx[2]; /* 数据在第 3 字节 */
+	return true;
 }
 
 /*
@@ -102,7 +111,7 @@ static uint8_t mt6835_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg)
  *        注意: 不可多发 dummy 字节, 否则会被 MT6835 当作下一帧命令
  *        如需验证写入是否成功, 须另行读回寄存器比较
  */
-static void mt6835_write_reg(dev_mt6835_t *pobj, mt6835_reg_enum_t reg, uint8_t data)
+static bool mt6835_write_reg(dev_mt6835_t *pobj, mt6835_reg_enum_t reg, uint8_t data)
 {
 	uint8_t tx[MT6835_FRAME_LEN] = {
 		(uint8_t)((MT6835_WRITE | reg) >> 8),  /* 0x60 | A[11:8] */
@@ -110,10 +119,13 @@ static void mt6835_write_reg(dev_mt6835_t *pobj, mt6835_reg_enum_t reg, uint8_t 
 		data,                                    /* DI7~DI0 */
 	};
 	uint8_t dummy_rx[MT6835_FRAME_LEN] = {0}; /* HAL_SPI_TransmitReceive 不接受 NULL rx, 须提供 dummy 缓冲 */
+	int status;
 
 	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-	drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, dummy_rx, MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
+	status = drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, dummy_rx,
+	                          MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
 	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+	return status == DRV_EOK;
 }
 
 /*
@@ -185,9 +197,16 @@ static bool mt6835_set_zero_point(dev_mt6835_t *pobj)
  */
 static uint32_t dev_mt6835_get_raw(struct dev_mt6835 *pobj)
 {
-	uint8_t angle3 = mt6835_read_reg(pobj, MT6835_REG_ANGLE3);  /* 0x003, ANGLE[20:13] */
-	uint8_t angle2 = mt6835_read_reg(pobj, MT6835_REG_ANGLE2);  /* 0x004, ANGLE[12:5] */
-	uint8_t angle1 = mt6835_read_reg(pobj, MT6835_REG_ANGLE1);  /* 0x005, ANGLE[4:0]+STATUS */
+	uint8_t angle3;
+	uint8_t angle2;
+	uint8_t angle1;
+
+	if (!mt6835_read_reg(pobj, MT6835_REG_ANGLE3, &angle3) ||
+		!mt6835_read_reg(pobj, MT6835_REG_ANGLE2, &angle2) ||
+		!mt6835_read_reg(pobj, MT6835_REG_ANGLE1, &angle1))
+	{
+		return pobj->raw; /* 任一帧失败均保留上一有效角度 */
+	}
 
 	/* 21bit 角度拼接 (手册权威公式) */
 	uint32_t raw = ((uint32_t)angle3 << 13)
@@ -223,8 +242,13 @@ static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
  */
 static uint16_t mt6835_get_raw_zero_angle(dev_mt6835_t *pobj)
 {
-	uint8_t pos2 = mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2); /* 0x009, 高 8bit */
-	uint8_t pos1 = mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1); /* 0x00A, 低 4bit 在 [7:4] */
+	uint8_t pos2;
+	uint8_t pos1;
+	if (!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &pos2) ||
+		!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, &pos1))
+	{
+		return 0u;
+	}
 	return (uint16_t)(((uint16_t)pos2 << 4) | (pos1 >> 4));
 }
 
@@ -253,12 +277,20 @@ static bool mt6835_set_zero_angle(dev_mt6835_t *pobj, float rad)
 	uint8_t zero_pos2 = (uint8_t)(angle >> 4);           /* ZERO_POS[11:4] */
 	uint8_t zero_pos1 = (uint8_t)((angle & 0x0Fu) << 4); /* ZERO_POS[3:0] 置于 bit[7:4], bit[3:0] 保留位写 0 */
 
-	mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, zero_pos2);
-	mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, zero_pos1);
+	if (!mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, zero_pos2) ||
+		!mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, zero_pos1))
+	{
+		return false;
+	}
 
 	/* 写后读回验证 (普通写无 ACK, 只能靠读回判断) */
-	uint8_t rb_pos2 = mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2);
-	uint8_t rb_pos1 = mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1);
+	uint8_t rb_pos2;
+	uint8_t rb_pos1;
+	if (!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &rb_pos2) ||
+		!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, &rb_pos1))
+	{
+		return false;
+	}
 	return (rb_pos2 == zero_pos2) && ((rb_pos1 & 0xF0u) == zero_pos1);
 }
 

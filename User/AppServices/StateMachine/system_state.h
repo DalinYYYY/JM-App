@@ -55,6 +55,7 @@ typedef struct system_state_s
 	uint16_t fault_count;
 	uint8_t last_fault_code;
 	uint8_t power_sample_valid;
+	uint32_t speed_guard_cycles; /*!< 启动后超速保护延迟武装计数 */
 } system_state_t;
 
 /**

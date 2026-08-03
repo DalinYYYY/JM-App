@@ -97,6 +97,7 @@ extern "C"
 		float offset;				 /* 偏移 */
 		float foc_offset_static;	 /* 静态偏移(电角度对齐用) */
 		int running_dir;			 /* 运行方向 (<=1 正向, 否则反向) */
+		uint32_t read_error_count; /* SPI 读取失败累计次数 */
 
 		/* public */
 		void (*update)(struct dev_mt6835 *pobj);					   /* 读取并刷新机械角度 */
