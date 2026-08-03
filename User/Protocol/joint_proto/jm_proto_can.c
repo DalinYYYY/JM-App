@@ -301,7 +301,43 @@ static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
 /* 广播仅开放不会修改持久化配置的全局安全命令。 */
 uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd)
 {
-	return (cmd == JM_CMD_BROADCAST_SYNC || cmd == JM_CMD_ESTOP) ? 1u : 0u;
+	return (cmd == JM_CMD_BROADCAST_SYNC || cmd == JM_CMD_ESTOP ||
+	        cmd == JM_CMD_CAN_DI_DISCOVER || cmd == JM_CMD_CAN_DI_SET_ID ||
+	        cmd == JM_CMD_CAN_DI_IDENTIFY) ? 1u : 0u;
+}
+
+uint8_t jm_proto_can_is_peer_response(uint8_t cmd, uint8_t len)
+{
+	/* 这两个命令只允许Motor->Host，任何载荷长度都不能作为设备请求。 */
+	if (cmd == JM_CMD_TELEMETRY || cmd == JM_CMD_NACK)
+		return 1u;
+
+	/* 下列查询的Host请求必须是空载荷，非空帧只能是另一节点的响应。
+	 * 同ID设备会收到彼此的响应；若再次dispatch，会形成无限应答环。 */
+	if (len == 0u)
+		return 0u;
+	if (cmd == JM_CMD_CALIB_QUERY || cmd == JM_CMD_PID_SOURCE_GET)
+		return 1u;
+	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_DEBUG)
+		return 1u;
+	if (cmd >= JM_CMD_READ_DEV_INFO && cmd <= JM_CMD_HEARTBEAT)
+		return 1u;
+	return 0u;
+}
+
+void jm_proto_can_di_build(const uint8_t uid[12], uint8_t di56[7], uint8_t *guard)
+{
+	uint16_t lot_crc;
+	uint16_t uid_crc;
+	if (uid == NULL || di56 == NULL || guard == NULL)
+		return;
+
+	memcpy(di56, uid, 5u);
+	lot_crc = crc16_calc((uint8_t *)&uid[5], 7);
+	di56[5] = (uint8_t)(lot_crc & 0xFFu);
+	di56[6] = (uint8_t)((lot_crc >> 8) & 0xFFu);
+	uid_crc = crc16_calc((uint8_t *)uid, 12);
+	*guard = (uint8_t)((uid_crc >> 8) & 0xFFu);
 }
 
 /* 复位多帧重组状态 */
@@ -328,6 +364,13 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t 
 
 	/* 地址过滤: 只收发给本机或广播(0)的帧 */
 	if (dst != c->motor_id && dst != JM_CAN_BROADCAST_ID)
+	{
+		return;
+	}
+	/* Motor->Host only frames are responses, never requests. With duplicate
+	 * node IDs, devices receive each other's telemetry/NACK frames. Dispatching
+	 * them would generate NACK-for-NACK feedback and saturate the bus. */
+	if (jm_proto_can_is_peer_response(cmd, frame->len))
 	{
 		return;
 	}

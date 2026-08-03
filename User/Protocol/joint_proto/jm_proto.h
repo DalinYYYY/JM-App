@@ -145,6 +145,10 @@ extern "C"
 	 * 可为 NULL(回 NACK)。*/
 	jm_err_e (*set_fd_mode)(uint8_t enable, uint8_t *out_ack_enable, uint8_t *out_cap);
 
+	/* CAN-DI物理设备识别(F6): duration_100ms=0停止，否则让目标设备指示灯闪烁。
+	 * 可为NULL，此时CAN绑定层返回UNSUPPORTED。*/
+	jm_err_e (*identify_can_device)(uint8_t duration_100ms);
+
 		/* PID 理论估计(CMD 0xA0): 基于辨识参数计算三环PID写入ControlParam_t,
 		 * 自动设 source=AUTOTUNE 并 reload。仅IDLE态可执行。
 		 * ring_mask: 位掩码 bit0=电流环 bit1=速度环 bit2=位置环(可组合, 如0x05=电流+位置)

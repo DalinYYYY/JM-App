@@ -124,6 +124,12 @@ extern "C"
 	/** @brief 广播命令白名单判断(当前仅 BROADCAST_SYNC 和 ESTOP)。 */
 	uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd);
 
+	/** @brief 判断收到的帧是否为其他同ID节点发出的Motor->Host响应。 */
+	uint8_t jm_proto_can_is_peer_response(uint8_t cmd, uint8_t len);
+
+	/** @brief 从完整96-bit UID生成CAN-DI56和碰撞辅助字节。 */
+	void jm_proto_can_di_build(const uint8_t uid[12], uint8_t di56[7], uint8_t *guard);
+
 	/**
 	 * @brief  设置运行期 CAN FD 模式(由 0xF3 SET_FD_MODE 命令调用)
 	 *         纯软件层操作: 仅修改 use_fd_runtime 标志, 不重新初始化 FDCAN 外设。

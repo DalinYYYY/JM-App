@@ -525,16 +525,22 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	/* 反馈查询 0xC0~0xC8 */
 	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_FAULT)
 	{
+		if (len != 0u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_read(proto, cmd);
 	}
 	/* 调试通道 0xC9: 通用 float[] 观测点 */
 	if (cmd == JM_CMD_READ_DEBUG)
 	{
+		if (len != 0u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_read_debug(proto, cmd);
 	}
 	/* 设备信息 0xD0~0xDF */
 	if (cmd >= JM_CMD_READ_DEV_INFO && cmd <= JM_CMD_HEARTBEAT)
 	{
+		if (len != 0u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_dev(proto, cmd);
 	}
 	/* 参数读写 0xE0~0xEF */
@@ -637,6 +643,10 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	 * 无论 state 为何(空闲/进行/完成/失败)都回 ACK, 由上位机解读。*/
 	if (cmd == JM_CMD_CALIB_QUERY)
 	{
+		if (len != 0u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
 		calib_status_t st = calib_mgr_get_status();
 		uint8_t body[8] = {
 			(uint8_t)st.state,
@@ -710,6 +720,10 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	{
 		uint8_t o[3];
 		jm_err_e e;
+		if (len != 0u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
 		if (proto->ops == NULL || proto->ops->pid_source_get == NULL)
 		{
 			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
