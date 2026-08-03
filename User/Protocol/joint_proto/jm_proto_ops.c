@@ -40,6 +40,9 @@
 #include "motor_pid_autotune.h" /* motor_pid_autotune_apply: 零极点对消法理论估计 */
 #include "motor_pid_load.h"     /* motor_pid_set_source / motor_pid_reload: 三环独立 source */
 #include "main.h"               /* HAL_GetTick (速率限制) */
+#if defined(USE_DEV_LED)
+#include "led_manager.h"
+#endif
 #if defined(USE_DEV_COMMUN_CAN)
 #include "dev_commun_can.h"     /* dev_commun_can: 0xF3 SET_FD_MODE 切换运行期FD模式 */
 #include "jm_proto_can.h"       /* jm_proto_can_set_fd_mode */
@@ -1007,6 +1010,8 @@ static uint8_t s_can_baud_code = 0u; /* 0=1M(默认) 1=500K 2=250K 3=125K */
 
 static jm_err_e app_set_can_id(uint8_t new_id)
 {
+	if (motor_loop_get()->sys.top_state != TOP_FSM_IDLE)
+		return JM_ERR_STATE_DENY;
 	/* Flash 写命令使用 1s 限流, 防止反复改地址损耗存储寿命。 */
 	if (!JM_RATE_CHECK(&s_last_tick_motor_info_s, JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS))
 		return JM_ERR_RATE_LIMIT;
@@ -1038,6 +1043,17 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 	}
 #else
 	(void)new_id;
+	return JM_ERR_UNSUPPORTED;
+#endif
+}
+
+static jm_err_e app_identify_can_device(uint8_t duration_100ms)
+{
+#if defined(USE_DEV_LED)
+	led_manager_identify((uint32_t)duration_100ms * 100u);
+	return JM_ERR_OK;
+#else
+	(void)duration_100ms;
 	return JM_ERR_UNSUPPORTED;
 #endif
 }
@@ -1313,6 +1329,7 @@ static const jm_proto_ops_t s_app_ops = {
 	.set_can_id = app_set_can_id,
 	.set_baudrate = app_set_baudrate,
 	.set_fd_mode = app_set_fd_mode,
+	.identify_can_device = app_identify_can_device,
 	/* 电机配置(motor_info) 0xE6-0xEB (未启用 USE_DEV_FLASH 时置 NULL, 命令返回 NACK) */
 #if defined(USE_DEV_FLASH)
 	.motor_info_read = app_motor_info_read,

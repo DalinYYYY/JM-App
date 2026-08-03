@@ -21,6 +21,7 @@
 #include "dev_led.h"
 #include "motor_loop.h"
 #include "state_define.h"
+#include "main.h"
 
 /* LED 行为类型 */
 typedef enum
@@ -86,6 +87,7 @@ static void apply_action(dev_led_t *led, led_action_e act)
 /* 缓存上次动作, 避免每拍重复写 GPIO（仅状态变化时才重写） */
 static led_action_e s_last_act_fault = LED_ACT_OFF;
 static led_action_e s_last_act_status = LED_ACT_OFF;
+static uint32_t s_identify_until_ms = 0u;
 
 void led_manager_init(void)
 {
@@ -103,6 +105,15 @@ void led_manager_init(void)
 
 	s_last_act_fault = LED_ACT_OFF;
 	s_last_act_status = LED_ACT_OFF;
+	s_identify_until_ms = 0u;
+}
+
+void led_manager_identify(uint32_t duration_ms)
+{
+	s_identify_until_ms = (duration_ms == 0u) ? 0u : (HAL_GetTick() + duration_ms);
+	/* 强制下一拍重新下发LED动作。 */
+	s_last_act_fault = (led_action_e)0xFF;
+	s_last_act_status = (led_action_e)0xFF;
 }
 
 void led_manager_update(void)
@@ -112,6 +123,19 @@ void led_manager_update(void)
 	led_action_e act_status = map_status_led(state);
 	dev_led_t *led1 = dev_led_get(LED_ID_1);
 	dev_led_t *led2 = dev_led_get(LED_ID_2);
+	uint32_t now_ms = HAL_GetTick();
+
+	if (s_identify_until_ms != 0u && (int32_t)(s_identify_until_ms - now_ms) > 0)
+	{
+		act_fault = LED_ACT_OFF;
+		act_status = LED_ACT_BLINK_FAST;
+	}
+	else if (s_identify_until_ms != 0u)
+	{
+		s_identify_until_ms = 0u;
+		s_last_act_fault = (led_action_e)0xFF;
+		s_last_act_status = (led_action_e)0xFF;
+	}
 
 	/* 仅在动作变化时重写 GPIO */
 	if (act_fault != s_last_act_fault)

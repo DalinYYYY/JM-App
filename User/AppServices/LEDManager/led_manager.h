@@ -45,6 +45,12 @@ void led_manager_init(void);
  */
 void led_manager_update(void);
 
+/**
+ * @brief CAN-DI物理识别临时覆盖，使用状态灯快闪
+ * @param duration_ms 持续时间，0表示立即停止覆盖
+ */
+void led_manager_identify(uint32_t duration_ms);
+
 #ifdef __cplusplus
 }
 #endif
