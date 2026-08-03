@@ -118,6 +118,15 @@ extern "C"
 		uint8_t use_fd;          /* 板级配置(编译期) */
 		uint8_t use_fd_runtime;  /* 运行期模式(由 0xF3 命令切换, 默认0=经典) */
 		uint8_t started;
+		uint8_t can_uid[12];
+		uint8_t can_di56[7];
+		uint8_t can_di_guard;
+		uint8_t can_di_valid;
+		uint8_t discover_pending;
+		uint8_t id_switch_pending;
+		uint8_t pending_new_id;
+		uint32_t discover_due_tick;
+		uint32_t commissioning_quiet_until;
 		volatile uint8_t rx_queue_head;
 		volatile uint8_t rx_queue_tail;
 		dev_commun_can_rx_item_t rx_queue[DEV_COMMUN_CAN_RX_QUEUE_SIZE];

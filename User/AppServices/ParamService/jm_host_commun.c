@@ -282,6 +282,14 @@ void jm_host_commun_can_process(void)
 //		__enable_irq();
 	}
 
+	/* CAN-DI扫描窗口暂停普通遥测，避免重复节点ID的主动上报干扰发现时隙。 */
+	if (dev_commun_can.id_switch_pending ||
+	    (int32_t)(HAL_GetTick() - dev_commun_can.commissioning_quiet_until) < 0)
+	{
+		telemetry_tick = 0;
+		return;
+	}
+
 	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。
 	 * 停止时不发, 且复位分频计数, 使下次使能后第一帧及时发出。
 	 * 与 UART 侧对称, 共用 jm_host_commun_pack_telemetry 打包, report 走 CAN 多帧发送。*/

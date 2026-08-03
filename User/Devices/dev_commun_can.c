@@ -27,6 +27,7 @@
 #if defined(USE_DEV_COMMUN_CAN)
 
 #include "assert_report.h"
+#include "crc16.h"
 #include "main.h" /* HAL_GetTick (降级计时) */
 #if defined(USE_DEV_FLASH)
 #include "motor_info_storage.h"
@@ -41,6 +42,15 @@ static dev_commun_can_t *s_active = NULL;
 /* 前向声明: trampoline 用于 drv_can 回调注册(无上下文参数, 通过 s_active 路由) */
 static void s_rx_trampoline(canNumber_e can, drvCanMsg_t *msg);
 static void s_err_trampoline(canNumber_e can, uint8_t error_type);
+
+#define JM_CAN_DI_PROTOCOL_VERSION 1u
+#define JM_CAN_DI_SLOT_EXP_MIN     6u
+#define JM_CAN_DI_SLOT_EXP_MAX     10u
+#define JM_CAN_DI_SLOT_MS_MIN      1u
+#define JM_CAN_DI_SLOT_MS_MAX      10u
+static uint8_t dev_commun_can_handle_commissioning(struct dev_commun_can *pobj,
+	                                                const jm_can_frame_t *frame,
+	                                                uint32_t now_tick);
 
 /* ==================================================================== */
 /*  协议栈发送回调: jm_proto_can 组好整帧后, 经 drv_can 推出              */
@@ -124,6 +134,9 @@ static void dev_commun_can_set_ops(struct dev_commun_can *pobj, const jm_proto_o
 static int dev_commun_can_start(struct dev_commun_can *pobj)
 {
 	drvCanDualFilter_t filter;
+	uint32_t hw = 0u;
+	uint32_t fw = 0u;
+	uint8_t uid[12] = {0};
 
 	assert_report(pobj != NULL);
 	pobj->start_count++;
@@ -139,6 +152,13 @@ static int dev_commun_can_start(struct dev_commun_can *pobj)
 		pobj->start_fail_count++;
 		pobj->last_error = -1;
 		return DEV_ERROR;
+	}
+	if (pobj->ops != NULL && pobj->ops->get_dev_info != NULL &&
+	    pobj->ops->get_dev_info(&hw, &fw, uid) == JM_ERR_OK)
+	{
+		memcpy(pobj->can_uid, uid, sizeof(pobj->can_uid));
+		jm_proto_can_di_build(uid, pobj->can_di56, &pobj->can_di_guard);
+		pobj->can_di_valid = 1u;
 	}
 
 	/* 仲裁ID低8位是节点地址。CMD和多帧标志不参与比较。 */
@@ -182,6 +202,7 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 	uint8_t head;
 	uint8_t next;
 	uint8_t dst;
+	uint8_t cmd;
 	uint32_t now_tick;
 
 	assert_report(pobj != NULL);
@@ -208,8 +229,14 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 	{
 		return;
 	}
+	cmd = JM_CAN_GET_CMD(msg->id);
+	/* Motor->Host响应不进入设备RX队列，避免同ID节点之间形成反馈环。 */
+	if (jm_proto_can_is_peer_response(cmd, msg->len))
+	{
+		return;
+	}
 	if (dst == JM_CAN_BROADCAST_ID &&
-	    !jm_proto_can_broadcast_allowed(JM_CAN_GET_CMD(msg->id)))
+	    !jm_proto_can_broadcast_allowed(cmd))
 	{
 		return;
 	}
@@ -254,6 +281,115 @@ static void dev_commun_can_on_err(struct dev_commun_can *pobj, canNumber_e can, 
 	pobj->err_irq_count++;
 }
 
+static void dev_commun_can_send_di(struct dev_commun_can *pobj, uint8_t cmd, uint8_t status)
+{
+	uint8_t body[8];
+	memcpy(body, pobj->can_di56, sizeof(pobj->can_di56));
+	body[7] = status;
+	s_active = pobj;
+	jm_proto_can_send(&pobj->jm, cmd, body, sizeof(body));
+}
+
+static int dev_commun_can_apply_id(struct dev_commun_can *pobj, uint8_t new_id)
+{
+	drvCanDualFilter_t filter;
+	uint8_t old_id = pobj->motor_id;
+
+	pobj->motor_id = new_id;
+	pobj->jm.motor_id = new_id;
+	pobj->jm.proto.motor_id = new_id;
+	filter.unicast_id = new_id;
+	filter.broadcast_id = JM_CAN_BROADCAST_ID;
+	filter.mask = 0xFFu;
+	filter.ide = pobj->ide;
+	if (drv_can_reconfigure_dual_filter(pobj->can, &filter) == DRV_EOK)
+		return DEV_EOK;
+
+	pobj->motor_id = old_id;
+	pobj->jm.motor_id = old_id;
+	pobj->jm.proto.motor_id = old_id;
+	filter.unicast_id = old_id;
+	(void)drv_can_reconfigure_dual_filter(pobj->can, &filter);
+	return DEV_ERROR;
+}
+
+static uint8_t dev_commun_can_handle_commissioning(struct dev_commun_can *pobj,
+	                                                const jm_can_frame_t *frame,
+	                                                uint32_t now_tick)
+{
+	uint8_t cmd = JM_CAN_GET_CMD(frame->id);
+	uint8_t dst = JM_CAN_GET_MOTOR_ID(frame->id);
+	if (cmd != JM_CMD_CAN_DI_DISCOVER && cmd != JM_CMD_CAN_DI_SET_ID &&
+	    cmd != JM_CMD_CAN_DI_IDENTIFY)
+		return 0u;
+
+	/* 同ID设备会收到彼此的响应，所有非广播commissioning帧必须在此吞掉。 */
+	if (dst != JM_CAN_BROADCAST_ID)
+		return 1u;
+	if (!pobj->can_di_valid || frame->len != 8u)
+		return 1u;
+
+	if (cmd == JM_CMD_CAN_DI_DISCOVER)
+	{
+		uint8_t slot_input[16];
+		uint8_t slot_exp = frame->data[2];
+		uint8_t slot_ms = frame->data[3];
+		uint16_t slot_hash;
+		uint32_t slot_count;
+		if (frame->data[0] != JM_CAN_DI_PROTOCOL_VERSION ||
+		    slot_exp < JM_CAN_DI_SLOT_EXP_MIN || slot_exp > JM_CAN_DI_SLOT_EXP_MAX ||
+		    slot_ms < JM_CAN_DI_SLOT_MS_MIN || slot_ms > JM_CAN_DI_SLOT_MS_MAX)
+			return 1u;
+
+		memcpy(slot_input, pobj->can_uid, sizeof(pobj->can_uid));
+		memcpy(&slot_input[12], &frame->data[4], 4u);
+		slot_hash = crc16_calc(slot_input, (int)sizeof(slot_input));
+		slot_count = 1u << slot_exp;
+		pobj->discover_due_tick = now_tick +
+			((uint32_t)(slot_hash % slot_count) * (uint32_t)slot_ms);
+		pobj->commissioning_quiet_until = now_tick +
+			(slot_count * (uint32_t)slot_ms) + 50u;
+		pobj->discover_pending = 1u;
+		return 1u;
+	}
+
+	if (memcmp(frame->data, pobj->can_di56, sizeof(pobj->can_di56)) != 0)
+		return 1u;
+
+	if (cmd == JM_CMD_CAN_DI_IDENTIFY)
+	{
+		jm_err_e status = (pobj->ops != NULL && pobj->ops->identify_can_device != NULL) ?
+			pobj->ops->identify_can_device(frame->data[7]) : JM_ERR_UNSUPPORTED;
+		dev_commun_can_send_di(pobj, cmd, (uint8_t)status);
+		return 1u;
+	}
+
+	if (cmd == JM_CMD_CAN_DI_SET_ID)
+	{
+		uint8_t new_id = frame->data[7];
+		jm_err_e status;
+		if (pobj->id_switch_pending)
+			status = JM_ERR_BUSY;
+		else if (new_id < 1u || new_id > 127u)
+			status = JM_ERR_OUT_OF_RANGE;
+		else if (pobj->ops == NULL || pobj->ops->set_can_id == NULL)
+			status = JM_ERR_UNSUPPORTED;
+		else
+			status = pobj->ops->set_can_id(new_id);
+
+		dev_commun_can_send_di(pobj, cmd, (uint8_t)status);
+		if (status != JM_ERR_OK || new_id == pobj->motor_id)
+			return 1u;
+
+		/* poll()确认旧ID ACK真正离开发送邮箱后，再热切换地址和过滤器。 */
+		pobj->pending_new_id = new_id;
+		pobj->id_switch_pending = 1u;
+		return 1u;
+	}
+
+	return 1u;
+}
+
 /* 主循环/线程周期调用: 诊断刷新 + 降级超时检查(由应用调用 check_loss) */
 static void dev_commun_can_poll(struct dev_commun_can *pobj)
 {
@@ -280,7 +416,30 @@ static void dev_commun_can_poll(struct dev_commun_can *pobj)
 			next = 0u;
 		__DMB();
 		pobj->rx_queue_tail = next;
-		jm_proto_can_feed(&pobj->jm, &item.frame, item.tick);
+		if (!dev_commun_can_handle_commissioning(pobj, &item.frame, item.tick))
+			jm_proto_can_feed(&pobj->jm, &item.frame, item.tick);
+	}
+	if (pobj->discover_pending &&
+	    (int32_t)(HAL_GetTick() - pobj->discover_due_tick) >= 0)
+	{
+		pobj->discover_pending = 0u;
+		dev_commun_can_send_di(pobj, JM_CMD_CAN_DI_DISCOVER, pobj->can_di_guard);
+	}
+	if (pobj->id_switch_pending &&
+	    drv_can_wait_tx_idle(pobj->can, 0u) == DRV_EOK)
+	{
+		uint8_t new_id = pobj->pending_new_id;
+		if (dev_commun_can_apply_id(pobj, new_id) == DEV_EOK)
+		{
+			pobj->id_switch_pending = 0u;
+			/* 新ID确认帧，供上位机无需多帧查询即可确认热切换完成。 */
+			dev_commun_can_send_di(pobj, JM_CMD_CAN_DI_SET_ID, (uint8_t)JM_ERR_OK);
+		}
+		else
+		{
+			pobj->id_switch_pending = 0u;
+			pobj->last_error = -9;
+		}
 	}
 	(void)drv_can_get_diag(pobj->can, &pobj->diag);
 }
