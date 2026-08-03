@@ -183,10 +183,14 @@ CMDS = [
     (0xEB, "MOTOR_INFO_DEFAULT","Host",2, [U16("param_id",0)], "电机配置恢复默认 0xFFFF=全部", False),
     (0xEC, "MOTOR_INFO_RECALIB_RESET","Host",0, [], "电机配置重新标定复位 清除编码器字段", False),
 
-    # ---- CAN管理 0xF0~0xF2 ----
+    # ---- CAN管理 0xF0~0xF6 ----
     (0xF0, "SET_CAN_ID",      "Host", 1, [U8("new_id",0)], "设置CAN_ID 1~127 需保存重启生效", False),
     (0xF1, "SET_BAUDRATE",    "Host", 1, [U8("baud_code",0)], "设置波特率 0=1M 1=500K 2=250K 3=125K", False),
     (0xF2, "BROADCAST_SYNC",  "Host", 0, [], "广播同步 ID=0广播", False),
+    (0xF3, "SET_FD_MODE",     "Host", 1, [U8("enable",0)], "设置FD模式 运行期切换", False),
+    (0xF4, "CAN_DI_DISCOVER", "Both", 8, [], "CAN-DI广播发现/单帧时隙响应", False),
+    (0xF5, "CAN_DI_SET_ID",   "Both", 8, [], "按CAN-DI定向设置节点ID", False),
+    (0xF6, "CAN_DI_IDENTIFY", "Both", 8, [], "按CAN-DI触发物理设备指示", False),
 
     # ---- 通用 0xFE ----
     (0xFE, "NACK",            "Motor",2, [U8("cmd",0), U8("err_code",8)], "错误应答 err_code见协议文档", False),

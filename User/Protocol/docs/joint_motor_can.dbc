@@ -375,6 +375,15 @@ BO_ 2147545345 SET_BAUDRATE: 1 Host
 
 BO_ 2147545601 BROADCAST_SYNC: 0 Host
 
+BO_ 2147545857 SET_FD_MODE: 1 Host
+ SG_ enable : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147546113 CAN_DI_DISCOVER: 8 Both
+
+BO_ 2147546369 CAN_DI_SET_ID: 8 Both
+
+BO_ 2147546625 CAN_DI_IDENTIFY: 8 Both
+
 BO_ 2147548673 NACK: 2 Motor
  SG_ cmd : 0|8@1+ (1,0) [0|255] "" Host
  SG_ err_code : 8|8@1+ (1,0) [0|255] "" Host
@@ -497,6 +506,10 @@ CM_ BO_ 2147544065 "电机配置重新标定复位 清除编码器字段  CAN_ID
 CM_ BO_ 2147545089 "设置CAN_ID 1~127 需保存重启生效  CAN_ID=0xF0<<8|MotorID";
 CM_ BO_ 2147545345 "设置波特率 0=1M 1=500K 2=250K 3=125K  CAN_ID=0xF1<<8|MotorID";
 CM_ BO_ 2147545601 "广播同步 ID=0广播  CAN_ID=0xF2<<8|MotorID";
+CM_ BO_ 2147545857 "设置FD模式 运行期切换  CAN_ID=0xF3<<8|MotorID";
+CM_ BO_ 2147546113 "CAN-DI广播发现/单帧时隙响应  CAN_ID=0xF4<<8|MotorID";
+CM_ BO_ 2147546369 "按CAN-DI定向设置节点ID  CAN_ID=0xF5<<8|MotorID";
+CM_ BO_ 2147546625 "按CAN-DI触发物理设备指示  CAN_ID=0xF6<<8|MotorID";
 CM_ BO_ 2147548673 "错误应答 err_code见协议文档  CAN_ID=0xFE<<8|MotorID";
 
 SIG_VALTYPE_ 2147487745 ud : 1;

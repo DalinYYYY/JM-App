@@ -252,7 +252,33 @@ if (dst != c->motor_id && dst != JM_CAN_BROADCAST_ID)
 - FDCAN 全局拒绝未命中帧、标准帧和远程帧
 - 经典 CAN 使用两个独立 Filter Bank，并比较 IDE/RTR 位
 
-软件层继续校验本机/广播地址；广播仅开放 `BROADCAST_SYNC` 和 `ESTOP`，执行后不应答。
+软件层继续校验本机/广播地址。广播白名单开放 `BROADCAST_SYNC`、`ESTOP` 和
+CAN-DI commissioning 命令；F4/F5/F6由设备绑定层单独处理，不进入通用广播应答路径。
+
+`TELEMETRY(0xCA)` 和 `NACK(0xFE)` 是 Motor -> Host 单向响应。下位机收到这两类
+CAN帧时必须静默丢弃，禁止进入通用命令分发，防止同 ID设备之间形成 NACK反馈环。
+空载荷查询（0x97、0xA2、0xC0~0xC9、0xD0~0xD2）的非空帧同样属于其他节点的
+响应，也必须静默丢弃。上位机连接 CAN后先执行 CAN-DI发现，确认 ID唯一后再发送
+普通查询。
+
+### 5.3 同 ID 设备发现与立即改址
+
+同一总线上存在多个相同节点 ID 时，禁止使用 `READ_DEV_INFO(0xD0)` 多帧扫描，
+否则不同设备的分片会使用相同仲裁 ID，造成冲突或重组数据杂糅。当前实现使用
+CAN-DI commissioning 命令，且不改变现有仲裁 ID 编码：
+
+```text
+0xF4 CAN_DI_DISCOVER：广播发现，设备按 UID + nonce 派生时隙，返回 8 字节单帧
+0xF5 CAN_DI_SET_ID：按 CAN_DI56 定向保存新 ID，旧 ID ACK 完成后热切换过滤器
+0xF6 CAN_DI_IDENTIFY：按 CAN_DI56 触发目标设备状态灯快闪
+```
+
+发现结果使用 `CAN_DI56 + Guard` 作为列表键，不使用节点 ID 作为唯一键。因此多台
+相同 ID 设备会保留为多行。批量改址由上位机串行执行，每台设备均等待旧 ID ACK和
+新 ID 确认后再处理下一台，最后重新扫描验证。
+
+完整载荷、压缩标识算法、异常处理和验收步骤见
+《CAN_DI同ID设备发现与改址方案.md》。完整 96-bit UUID仍由 `0xD0` 读取。
 
 ---
 
@@ -469,6 +495,7 @@ else:
 | `jm_proto_can_send` | jm_proto_can.c | 主动发送逻辑帧 |
 | `jm_proto_can_set_fd_mode` | jm_proto_can.c | 切换 FD 模式 |
 | `jm_proto_can_get_fd_mode` | jm_proto_can.c | 查询当前 FD 模式 |
+| `jm_proto_can_di_build` | jm_proto_can.c | 从 96-bit UID生成 CAN_DI56和 Guard |
 | `dev_commun_can_init` | dev_commun_can.c | 初始化 CAN 通信设备 |
 | `dev_commun_can.start` | dev_commun_can.c | 启动 CAN 通信 |
 | `dev_commun_can.report` | dev_commun_can.c | 主动上报数据帧 |
@@ -476,6 +503,8 @@ else:
 | `drv_can_send` | drv_can.c | 底层发送 CAN 帧 |
 | `drv_can_recv` | drv_can.c | 底层接收 CAN 帧 |
 | `drv_can_init_dual_filter` | drv_can.c | 双过滤器初始化 |
+| `drv_can_wait_tx_idle` | drv_can.c | 非阻塞/限时确认发送邮箱为空 |
+| `drv_can_reconfigure_dual_filter` | drv_can.c | 运行期热切换单播与广播过滤器 |
 
 ### 12.2 上位机 API
 
@@ -483,9 +512,13 @@ else:
 |------|------|------|
 | `CanTransport.open` | can_transport.py | 打开 CAN 总线 |
 | `CanTransport.send` | can_transport.py | 发送逻辑帧 |
+| `CanTransport.send_to` | can_transport.py | 向指定节点或广播地址发送命令 |
 | `CanTransport.switch_fd_mode` | can_transport.py | 切换 FD 模式 |
 | `JmClient.cmd_switch_fd_mode` | motor_client.py | 高层 FD 切换接口 |
 | `JmClient.set_telemetry` | motor_client.py | 配置遥测上报 |
+| `JmClient.discover_can_di` | motor_client.py | 发送一轮 CAN-DI广播发现 |
+| `JmClient.set_can_id_by_di` | motor_client.py | 按 CAN_DI56定向设置 ID |
+| `JmClient.identify_can_device` | motor_client.py | 触发目标设备物理识别 |
 
 ### 12.3 CAN 管理命令
 
@@ -495,6 +528,9 @@ else:
 | SET_BAUDRATE | 0xF1 | 设置波特率 (0=1M, 1=500K, 2=250K, 3=125K) |
 | BROADCAST_SYNC | 0xF2 | 广播同步（ID=0，所有电机同步执行） |
 | SET_FD_MODE | 0xF3 | 运行期切换 CAN FD 模式 |
+| CAN_DI_DISCOVER | 0xF4 | 广播单帧发现，同 ID设备按随机时隙响应 |
+| CAN_DI_SET_ID | 0xF5 | 按 CAN_DI56定向设置并立即切换节点 ID |
+| CAN_DI_IDENTIFY | 0xF6 | 按 CAN_DI56触发目标设备指示灯 |
 
 ---
 
@@ -519,7 +555,9 @@ else:
 | `User/Common/crc16.c` | 公共 | CRC16 实现 (CCITT/XMODEM) |
 | `User/Protocol/docs/joint_motor_command_list.csv` | 文档 | 协议命令表 |
 | `User/Protocol/docs/joint_motor_can.dbc` | 文档 | CAN DBC 文件 |
+| `User/Protocol/docs/CAN_DI同ID设备发现与改址方案.md` | 文档 | CAN-DI协议、实现和验收说明 |
 | `User/Tools/pyqt_gui/transport/can_transport.py` | 上位机 | python-can 传输层 |
 | `User/Tools/pyqt_gui/core/motor_client.py` | 上位机 | 高层客户端 |
+| `User/Tools/pyqt_gui/ui/can_device_manager.py` | 上位机 | 多设备发现、识别和批量改址窗口 |
 | `User/Tools/pyqt_gui/jmproto/cmd_def.py` | 上位机 | 命令码定义 |
 | `User/Tools/pyqt_gui/jmproto/crc16.py` | 上位机 | CRC16 计算 |
