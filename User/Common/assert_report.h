@@ -21,8 +21,6 @@
 #define __ASSERT_REPORT_H__
 
 /* Includes -----------------------------------------------------------------------*/
-#include <stdio.h>
-#include <string.h>
 #include <stdint.h>
 
 /* Exported macro -----------------------------------------------------------------*/

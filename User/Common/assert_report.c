@@ -16,6 +16,15 @@
 
 /* include -------------------------------------------------------------------------------------- */
 #include "assert_report.h"
+#include "board_select.h"
+
+#ifndef ASSERT_REPORT_ENABLE_PRINTF
+#define ASSERT_REPORT_ENABLE_PRINTF 1
+#endif
+
+#if ASSERT_REPORT_ENABLE_PRINTF
+#include <stdio.h>
+#endif
 
 /* public function ------------------------------------------------------------------------------ */
 
@@ -38,8 +47,13 @@ static void assert_func(void)
  */
 uint8_t user_assert(uint8_t *file, uint32_t location)
 {
+#if ASSERT_REPORT_ENABLE_PRINTF
 	printf("[error] Assert failure!\r\n");
 	printf("[error] Location: %s %d.\r\n", file, location);
+#else
+	(void)file;
+	(void)location;
+#endif
 
 	// assert function. user code can be added here.
 	// assert_func();
