@@ -210,7 +210,7 @@ motor_info_storage_status_t motor_info_storage_init(void)
 	 *    dev_flash_init 扫描扇区 flag，last_sequence>0 表示有写入过的数据 */
 	dev_flash_init(&pobj->flash_dev,
 	               MOTORINFO_FLASH_START_ADDR,
-	               MOTORINFO_FLASH_PAGE_SIZE, /* total_size = page_size，单扇区 */
+	               MOTORINFO_FLASH_TOTAL_SIZE,
 	               MOTORINFO_FLASH_PAGE_SIZE);
 	pobj->inited = pobj->flash_dev.inited ? true : false;
 
