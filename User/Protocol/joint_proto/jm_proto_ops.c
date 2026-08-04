@@ -938,7 +938,7 @@ static jm_err_e app_get_dev_info(uint32_t *hw_ver, uint32_t *fw_ver, uint8_t uid
 
 static const char *app_get_dev_name(void)
 {
-	const char *name = motor_param_get_motor_name(&usr.motor_param[M1]);
+	const char *name = (&usr.motor_param[M1])->motor_instance.motor_name;
 	if (name == NULL || name[0] == '\0')
 	{
 		return "JointMotor"; /* 未命名时给默认名 */
@@ -1025,8 +1025,8 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 
 		if (cfg == NULL)
 			return JM_ERR_FLASH;
-		old_id = motor_info_get_can_id(cfg);
-		if (motor_info_set_can_id(cfg, new_id) != 0)
+		old_id = cfg->blocks.device.can_id;
+		if (motor_info_write_u32(cfg, MOTOR_INFO_PID_CAN_ID, new_id) != 0)
 			return JM_ERR_OUT_OF_RANGE;
 
 		rc = jm_app_motor_info_storage_save(cfg);
@@ -1034,7 +1034,7 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 			return JM_ERR_OK;
 
 		/* 保存失败时恢复运行期配置; CAN 协议和硬件过滤器始终保持旧地址。 */
-		(void)motor_info_set_can_id(cfg, old_id);
+		(void)motor_info_write_u32(cfg, MOTOR_INFO_PID_CAN_ID, old_id);
 		if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_WRITE)
 			return JM_ERR_FLASH_WRITE;
 		if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY)

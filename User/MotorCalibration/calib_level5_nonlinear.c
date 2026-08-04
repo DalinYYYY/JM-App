@@ -151,10 +151,10 @@ static calib_state_e poll_deadtime_comp(void)
 				return CALIB_STATE_FAILED;
 			}
 			/* V_dt 写入 motor_param，供 foc_decoupling 运行时使用 */
-			motor_param_set_deadtime_comp_v(io->param, V_dt);
-			motor_param_set_deadtime_comp_enable(io->param, 1);
+			(io->param)->current_loop.deadtime_comp_v = V_dt;
+			(io->param)->current_loop.deadtime_comp_enable = 1;
 			/* R 也顺便更新（三点法精度高于两点法）*/
-			motor_param_set_r(io->param, R_fit);
+			(io->param)->motor_base.r = R_fit;
 			(void)motor_info_calib_submit_r(R_fit);
 			calib_mgr_mark_done(CALIB_LEVEL5_NONLINEAR, CALIB_L5_DEADTIME_COMP);
 			calib_step_reset(&s_l5.step);

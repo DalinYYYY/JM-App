@@ -33,11 +33,11 @@ static void decouple_feedforward(const foc_decoupling_in_t *in,
                                  foc_decoupling_out_t *out,
                                  const motor_param_t *param)
 {
-    float k_decoup = motor_param_get_decoupling_gain(param);
-    float k_dff    = motor_param_get_d_feedforward_gain(param);
-    float Lq       = motor_param_get_lq(param);
-    float Ld       = motor_param_get_ld(param);
-    float we       = (float)motor_param_get_pole_pairs(param) * in->omega_mech;
+    float k_decoup = (param)->current_loop.decoupling_gain;
+    float k_dff    = (param)->current_loop.d_feedforward_gain;
+    float Lq       = (param)->motor_base.lq;
+    float Ld       = (param)->motor_base.ld;
+    float we       = (float)(param)->motor_base.pole_pairs * in->omega_mech;
     /* PMSM 方程：ud += -we*Lq*iq (q→d 耦合)，uq += +we*Ld*id (d→q 耦合) */
     out->ud += -we * Lq * in->iq * k_decoup * k_dff;
     out->uq +=  we * Ld * in->id * k_decoup;
@@ -51,11 +51,11 @@ static void decouple_feedback(const foc_decoupling_in_t *in,
                               foc_decoupling_out_t *out,
                               const motor_param_t *param)
 {
-    float k_decoup = motor_param_get_decoupling_gain(param);
-    float k_dff    = motor_param_get_d_feedforward_gain(param);
-    float Lq       = motor_param_get_lq(param);
-    float Ld       = motor_param_get_ld(param);
-    float we       = (float)motor_param_get_pole_pairs(param) * in->omega_mech;
+    float k_decoup = (param)->current_loop.decoupling_gain;
+    float k_dff    = (param)->current_loop.d_feedforward_gain;
+    float Lq       = (param)->motor_base.lq;
+    float Ld       = (param)->motor_base.ld;
+    float we       = (float)(param)->motor_base.pole_pairs * in->omega_mech;
     out->ud += -we * Lq * in->iq_ref * k_decoup * k_dff;
     out->uq +=  we * Ld * in->id_ref * k_decoup;
 }
@@ -101,12 +101,12 @@ static void deadtime_compensate(const foc_decoupling_in_t *in,
                                 const motor_param_t *param)
 {
     /* V_dt 来源：配置值优先，否则自动计算 */
-    float v_dt = motor_param_get_deadtime_comp_v(param);
+    float v_dt = (param)->current_loop.deadtime_comp_v;
     if (v_dt <= 0.0f)
     {
         /* 自动计算：V_dt = t_dt/T_pwm × Vbus */
-        float t_dt  = motor_param_get_dead_time_ns(param) * 1e-9f;
-        float f_pwm = (float)motor_param_get_pwm_freq_hz(param);
+        float t_dt  = (param)->motor_base.dead_time_ns * 1e-9f;
+        float f_pwm = (float)(param)->motor_base.pwm_freq_hz;
         float vbus  = in->vbus;
         if (vbus < 1.0f)
             return; /* Vbus 未就绪, 跳过补偿 */
@@ -116,7 +116,7 @@ static void deadtime_compensate(const foc_decoupling_in_t *in,
         return;
 
     /* 过零平滑阈值：额定电流的 10% */
-    float i_th = motor_param_get_rated_current(param) * 0.1f;
+    float i_th = (param)->motor_base.rated_current * 0.1f;
     if (i_th < 1e-3f)
         i_th = 1e-3f; /* 保护：避免除零 */
 
@@ -161,9 +161,9 @@ void foc_decoupling_run(const foc_decoupling_in_t *in,
      * 抵消 PMSM 方程中的 -we*flux 反电势扰动项 */
     if (config->bemf_ff_enable)
     {
-        float k_qff = motor_param_get_q_feedforward_gain(param);
-        float flux  = motor_param_get_flux(param);
-        float we    = (float)motor_param_get_pole_pairs(param) * in->omega_mech;
+        float k_qff = (param)->current_loop.q_feedforward_gain;
+        float flux  = (param)->motor_base.flux;
+        float we    = (float)(param)->motor_base.pole_pairs * in->omega_mech;
         out->uq += we * flux * k_qff;
     }
 

@@ -116,7 +116,8 @@ void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
 		return;
 
 	const MotorCalibParam_t *c = &info->blocks.motor_calib;
-	uint32_t can_id = motor_info_get_can_id(info);
+	const ProtectCommParam_t *pc = &info->blocks.protect_comm;
+	uint32_t can_id = info->blocks.device.can_id;
 
 	/* 节点地址由 motor_info 持久化配置统一提供, motor_param 仅保留运行期镜像。 */
 	if (can_id >= 1u && can_id <= 127u)
@@ -145,7 +146,20 @@ void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
 	param->encoder_param.elec_angle_bias = c->elec_angle_bias;
 
 	/* 解耦配置：始终同步（默认值已在 motor_info_init 中设置，不依赖 is_calibrated）*/
-	param->current_loop.decouple_algo = (uint8_t)motor_info_get_decouple_algo(info);
-	param->current_loop.bemf_ff_enable = (uint8_t)motor_info_get_bemf_ff_enable(info);
-	param->current_loop.deadtime_comp_enable = (uint8_t)motor_info_get_deadtime_comp_enable(info);
+	param->current_loop.decouple_algo = (uint8_t)info->blocks.control.decouple_algo;
+	param->current_loop.bemf_ff_enable = (uint8_t)info->blocks.control.bemf_ff_enable;
+	param->current_loop.deadtime_comp_enable = (uint8_t)info->blocks.control.deadtime_comp_enable;
+
+	/* Protection parameters are stored in motor_info Flash, but runtime fault
+	 * checking reads motor_param_t.protection_param. Keep the runtime copy in
+	 * sync during boot so 0xE7/0xEA changes take effect after restart. */
+	param->protection_param.protect_over_current = pc->over_current_A;
+	param->protection_param.protect_over_voltage = pc->over_voltage_V;
+	param->protection_param.protect_under_voltage = pc->under_voltage_V;
+	param->protection_param.protect_over_speed = pc->over_speed_rad_s;
+	param->protection_param.protect_over_temp =
+		(pc->over_temp_drive < pc->over_temp_motor) ? pc->over_temp_drive : pc->over_temp_motor;
+	param->protection_param.protect_under_temp = pc->under_temp_d;
+	param->protection_param.protect_pos_error = pc->position_following_error_p;
+	param->protection_param.protect_enable_mask = pc->error_enable_mask;
 }

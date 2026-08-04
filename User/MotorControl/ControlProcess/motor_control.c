@@ -150,8 +150,8 @@ void motor_mode_legacy_run(motor_ctrl_t *ctrl)
 			ref->ctrl_type = REF_CTRL_VELOCITY;
 			ref->vel_profile = MOTOR_PID_PROFILE_JOG;
 			ref->vel = motor_mode_clamp(ctrl->cmd.vel,
-			                            -motor_param_get_max_speed(ctrl->param),
-			                            motor_param_get_max_speed(ctrl->param));
+			                            -(ctrl->param)->motor_base.max_speed,
+			                            (ctrl->param)->motor_base.max_speed);
 			break;
 
 		case RUN_STATE_STEP_DIR:

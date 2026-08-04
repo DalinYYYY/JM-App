@@ -8,8 +8,8 @@ void motor_mode_velocity_run(motor_ctrl_t *ctrl)
 {
 	motor_param_t *p = ctrl->param;
 	motor_ref_t *ref = &ctrl->ref;
-	float max_spd = motor_param_get_max_speed(p);
-	float peak_t = motor_param_get_peak_torque(p);
+	float max_spd = (p)->motor_base.max_speed;
+	float peak_t = (p)->motor_base.peak_torque;
 
 	ref->pos_profile = MOTOR_PID_PROFILE_POSITION;
 	ref->vel_profile = MOTOR_PID_PROFILE_VELOCITY;

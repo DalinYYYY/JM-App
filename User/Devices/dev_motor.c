@@ -174,7 +174,7 @@ void dev_motor_set_encoder_dir(dev_motor_t *pobj, int8_t dir)
 	pobj->encoder.set_dir(&pobj->encoder, dir);
 
 	/* 同步到参数层(便于后续持久化到 Flash / 上位机读取一致) */
-	motor_param_set_enc_direction(&usr.motor_param[(motor_num_e)pobj->id], dir);
+	(&usr.motor_param[(motor_num_e)pobj->id])->encoder_param.enc_direction = dir;
 }
 
 #endif /* MOTOR_LOOP_ENABLE_DEV_DRIVER */

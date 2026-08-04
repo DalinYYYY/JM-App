@@ -272,14 +272,14 @@ void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
 	motor_param_t *mp = &usr.motor_param[M1];
 	virtual_motor_model_t *vm = &pobj->model;
 
-	vm->Ld = motor_param_get_ld(mp);
-	vm->Lq = motor_param_get_lq(mp);
-	vm->flux = motor_param_get_flux(mp);
-	vm->inertia = motor_param_get_inertia(mp);
-	vm->fric_visc = motor_param_get_friction_viscous(mp);
-	vm->fric_coul = motor_param_get_friction_coulomb(mp);
-	vm->poles = motor_param_get_pole_pairs(mp);
-	vm->Rs = motor_param_get_r(mp);
+	vm->Ld = (mp)->motor_base.ld;
+	vm->Lq = (mp)->motor_base.lq;
+	vm->flux = (mp)->motor_base.flux;
+	vm->inertia = (mp)->motor_base.inertia;
+	vm->fric_visc = (mp)->position_loop.friction_viscous;
+	vm->fric_coul = (mp)->position_loop.friction_coulomb;
+	vm->poles = (mp)->motor_base.pole_pairs;
+	vm->Rs = (mp)->motor_base.r;
 
 	if (vm->Ld < VIRT_MIN_L)
 		vm->Ld = VIRT_MIN_L;

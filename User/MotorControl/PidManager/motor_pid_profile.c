@@ -112,46 +112,46 @@ int motor_pid_profile_set(motor_pid_profile_id_e id, const pid_param_t *param)
 void motor_pid_profile_load_from_motor_param(const motor_param_t *p)
 {
 	// 电流环参数
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.kp = motor_param_get_current_kp_d(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.ki = motor_param_get_current_ki_d(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.integral_limit = motor_param_get_current_integral_limit(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.output_limit = motor_param_get_rated_voltage(p);
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.kp = (p)->current_loop.current_kp_d;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.ki = (p)->current_loop.current_ki_d;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.integral_limit = (p)->current_loop.current_integral_limit;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.output_limit = (p)->motor_base.rated_voltage;
 
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.kp = motor_param_get_current_kp_q(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.ki = motor_param_get_current_ki_q(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.integral_limit = motor_param_get_current_integral_limit(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.output_limit = motor_param_get_rated_voltage(p);
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.kp = (p)->current_loop.current_kp_q;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.ki = (p)->current_loop.current_ki_q;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.integral_limit = (p)->current_loop.current_integral_limit;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.output_limit = (p)->motor_base.rated_voltage;
 
 	// 速度环参数
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.kp = motor_param_get_speed_kp(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.ki = motor_param_get_speed_ki(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.integral_limit = motor_param_get_speed_integral_limit(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.output_limit = motor_param_get_peak_current(p);
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.kp = (p)->position_loop.speed_kp;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.ki = (p)->position_loop.speed_ki;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.integral_limit = (p)->position_loop.speed_integral_limit;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.output_limit = (p)->motor_base.peak_current;
 
 	// 位置环参数
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.kp = motor_param_get_position_kp(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.integral_limit = motor_param_get_position_integral_limit(p);
-	s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.output_limit = motor_param_get_max_speed(p);
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.kp = (p)->position_loop.position_kp;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.integral_limit = (p)->position_loop.position_integral_limit;
+	s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.output_limit = (p)->motor_base.max_speed;
 }
 
 void motor_pid_profile_save_to_motor_param(motor_param_t *p)
 {
 	// 电流环参数
-	motor_param_set_current_kp_d(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.kp);
-	motor_param_set_current_ki_d(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.ki);
-	motor_param_set_current_integral_limit(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.integral_limit);
+	(p)->current_loop.current_kp_d = s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.kp;
+	(p)->current_loop.current_ki_d = s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.ki;
+	(p)->current_loop.current_integral_limit = s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_D].param.integral_limit;
 
-	motor_param_set_current_kp_q(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.kp);
-	motor_param_set_current_ki_q(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.ki);
+	(p)->current_loop.current_kp_q = s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.kp;
+	(p)->current_loop.current_ki_q = s_motor_pid_profiles[MOTOR_PID_PROFILE_CURRENT_Q].param.ki;
 
 	// 速度环参数
-	motor_param_set_speed_kp(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.kp);
-	motor_param_set_speed_ki(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.ki);
-	motor_param_set_speed_integral_limit(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.integral_limit);
+	(p)->position_loop.speed_kp = s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.kp;
+	(p)->position_loop.speed_ki = s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.ki;
+	(p)->position_loop.speed_integral_limit = s_motor_pid_profiles[MOTOR_PID_PROFILE_VELOCITY].param.integral_limit;
 
 	// 位置环参数
-	motor_param_set_position_kp(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.kp);
-	motor_param_set_position_integral_limit(p, s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.integral_limit);
+	(p)->position_loop.position_kp = s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.kp;
+	(p)->position_loop.position_integral_limit = s_motor_pid_profiles[MOTOR_PID_PROFILE_POSITION].param.integral_limit;
 }
 
 void motor_pid_profile_restore_default(motor_pid_profile_id_e id)

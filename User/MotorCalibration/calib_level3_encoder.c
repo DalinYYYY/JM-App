@@ -91,9 +91,9 @@ static calib_state_e poll_zero_offset(void)
 				calib_hw_exit(&s_l3.session);
 				return CALIB_STATE_FAILED;
 			}
-			motor_param_set_enc_offset(io->param, avg_deg);
-			motor_param_set_enc_direction(io->param, 1); /* 1=CW */
-			motor_param_set_elec_angle_bias(io->param, 0.0f);
+			(io->param)->encoder_param.enc_offset = avg_deg;
+			(io->param)->encoder_param.enc_direction = 1; /* 1=CW */
+			(io->param)->encoder_param.elec_angle_bias = 0.0f;
 			/* 提交零位标定结果到 motor_info */
 			(void)motor_info_calib_submit_enc_zero(0.0f, avg_deg, 1);
 			calib_hw_exit(&s_l3.session);
@@ -194,7 +194,7 @@ static calib_state_e poll_direction(void)
 			/* 通过抽象编码器层写入运行时方向（统一 -1/1 约定）*/
 			m->encoder.set_dir(&m->encoder, enc_dir);
 			/* 写入 motor_param_t（持久化） */
-			motor_param_set_enc_direction(io->param, enc_dir);
+			(io->param)->encoder_param.enc_direction = enc_dir;
 			(void)motor_info_calib_submit_enc_direction(enc_dir);
 			calib_hw_exit(&s_l3.session);
 			calib_mgr_mark_done(CALIB_LEVEL3_ENCODER, CALIB_L3_DIRECTION);

@@ -501,7 +501,7 @@ void dev_commun_can_init(dev_commun_can_t *pobj, jm_can_comm_id_e id)
 #if defined(USE_DEV_FLASH)
 	{
 		motor_info_t *info = motor_info_storage_get();
-		uint32_t stored_id = (info != NULL) ? motor_info_get_can_id(info) : 0u;
+		uint32_t stored_id = (info != NULL) ? info->blocks.device.can_id : 0u;
 		if (stored_id >= 1u && stored_id <= 127u)
 		{
 			pobj->motor_id = (uint8_t)stored_id;

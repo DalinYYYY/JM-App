@@ -80,17 +80,17 @@ void cascade_control_run_position(cascade_ctrl_t *c, const motor_ref_t *ref, con
 	float vel_sp = motor_pid_profile_calculate(&c->pid_pos, ref->pos_profile, ref->pos, fb->pos, c->dt_pos);
 
 	// 叠加速度前馈
-	vel_sp += ref->vel_ff * motor_param_get_velocity_ff_gain(c->param);
+	vel_sp += ref->vel_ff * (c->param)->position_loop.velocity_ff_gain;
 
 	// 速度限幅
-	c->vel_setpoint = clamp(vel_sp, -motor_param_get_max_speed(c->param), motor_param_get_max_speed(c->param));
+	c->vel_setpoint = clamp(vel_sp, -(c->param)->motor_base.max_speed, (c->param)->motor_base.max_speed);
 }
 
 void cascade_control_run(cascade_ctrl_t *c, const motor_ref_t *ref, const cascade_fb_t *fb, cascade_out_t *out)
 {
 	motor_param_t *p = c->param;
-	float kt = motor_param_get_kt(p);
-	float peak_i = motor_param_get_peak_current(p);
+	float kt = (p)->motor_base.kt;
+	float peak_i = (p)->motor_base.peak_current;
 
 	// 入环层级或配置文件变化：先做无扰预装载（仅闭环模式需要）
 	if ((ref->ctrl_type != c->last_ctrl_type || ref->pos_profile != c->last_pos_profile || ref->vel_profile != c->last_vel_profile)

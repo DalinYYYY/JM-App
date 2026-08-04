@@ -132,12 +132,12 @@ static calib_state_e poll_resistance(void)
 					calib_hw_exit(&s_l2.session);
 					return CALIB_STATE_FAILED;
 				}
-				motor_param_set_r(io->param, R);
+				(io->param)->motor_base.r = R;
 				(void)motor_info_calib_submit_r(R);
 				/* 交流注入法同时输出 Ld，校验通过则顺便写入并标记 Ld 完成 */
 				if (isfinite(Ld) && Ld > 0.0f && calib_validate_ld(Ld))
 				{
-					motor_param_set_ld(io->param, Ld);
+					(io->param)->motor_base.ld = Ld;
 					(void)motor_info_calib_submit_ld(Ld);
 					calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_INDUCTANCE_D);
 				}
@@ -247,7 +247,7 @@ static calib_state_e poll_resistance(void)
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
-			motor_param_set_r(io->param, R);
+			(io->param)->motor_base.r = R;
 			(void)motor_info_calib_submit_r(R);
 			calib_hw_exit(&s_l2.session);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_RESISTANCE);
@@ -331,12 +331,12 @@ static calib_state_e poll_inductance_d(void)
 				if (ld_ok)
 				{
 					/* 交流注入法结果可信，写入实测值 */
-					motor_param_set_ld(io->param, Ld);
+					(io->param)->motor_base.ld = Ld;
 					(void)motor_info_calib_submit_ld(Ld);
 					/* 顺便刷新 R（如果 R 校验通过）*/
 					if (isfinite(R) && R > 0.0f && calib_validate_r(R))
 					{
-						motor_param_set_r(io->param, R);
+						(io->param)->motor_base.r = R;
 						(void)motor_info_calib_submit_r(R);
 					}
 				}
@@ -355,7 +355,7 @@ static calib_state_e poll_inductance_d(void)
 						calib_hw_exit(&s_l2.session);
 						return CALIB_STATE_FAILED;
 					}
-					motor_param_set_ld(io->param, default_ld);
+					(io->param)->motor_base.ld = default_ld;
 					/* 不调 motor_info_calib_submit_ld，保留 motor_info 中的原值 */
 				}
 				calib_hw_exit(&s_l2.session);
@@ -425,7 +425,7 @@ static calib_state_e poll_inductance_d(void)
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
-			motor_param_set_ld(io->param, Ld);
+			(io->param)->motor_base.ld = Ld;
 			(void)motor_info_calib_submit_ld(Ld);
 			calib_hw_exit(&s_l2.session);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_INDUCTANCE_D);
@@ -476,7 +476,7 @@ static calib_state_e poll_inductance_q(void)
 			calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 			return CALIB_STATE_FAILED;
 		}
-		motor_param_set_lq(io->param, Ld);
+		(io->param)->motor_base.lq = Ld;
 		(void)motor_info_calib_submit_lq(Ld);
 		calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_INDUCTANCE_Q);
 		return CALIB_STATE_DONE;
@@ -534,7 +534,7 @@ static calib_state_e poll_inductance_q(void)
 				calib_hw_exit(&s_l2.session);
 				return CALIB_STATE_FAILED;
 			}
-			motor_param_set_lq(io->param, Lq);
+			(io->param)->motor_base.lq = Lq;
 			(void)motor_info_calib_submit_lq(Lq);
 			calib_hw_exit(&s_l2.session);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_INDUCTANCE_Q);
@@ -647,7 +647,7 @@ static calib_state_e poll_flux_linkage(void)
 					if (isfinite(default_flux) && default_flux > 0.0f
 					    && calib_validate_flux(default_flux))
 					{
-						motor_param_set_flux(io->param, default_flux);
+						(io->param)->motor_base.flux = default_flux;
 						calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_FLUX_LINKAGE);
 						calib_step_reset(&s_l2.step);
 						return CALIB_STATE_DONE;
@@ -666,7 +666,7 @@ static calib_state_e poll_flux_linkage(void)
 					if (isfinite(default_flux) && default_flux > 0.0f
 					    && calib_validate_flux(default_flux))
 					{
-						motor_param_set_flux(io->param, default_flux);
+						(io->param)->motor_base.flux = default_flux;
 						calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_FLUX_LINKAGE);
 						calib_step_reset(&s_l2.step);
 						return CALIB_STATE_DONE;
@@ -675,7 +675,7 @@ static calib_state_e poll_flux_linkage(void)
 				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				return CALIB_STATE_FAILED;
 			}
-			motor_param_set_flux(io->param, flux);
+			(io->param)->motor_base.flux = flux;
 			(void)motor_info_calib_submit_flux(flux);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_FLUX_LINKAGE);
 			calib_step_reset(&s_l2.step);
@@ -859,7 +859,7 @@ static calib_state_e poll_pole_pairs(void)
 				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
 				return CALIB_STATE_FAILED;
 			}
-			motor_param_set_pole_pairs(io->param, pp);
+			(io->param)->motor_base.pole_pairs = pp;
 			(void)motor_info_calib_submit_pole_pairs(pp);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_POLE_PAIRS);
 			calib_step_reset(&s_l2.step);
