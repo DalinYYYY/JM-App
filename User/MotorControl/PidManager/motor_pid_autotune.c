@@ -13,7 +13,7 @@
 #endif
 
 /* 推荐带宽默认值 (Hz) */
-#define AUTOTUNE_DEFAULT_CURRENT_BW  1000.0f
+#define AUTOTUNE_DEFAULT_CURRENT_BW  500.0f
 #define AUTOTUNE_DEFAULT_VELOCITY_BW 100.0f
 #define AUTOTUNE_DEFAULT_POSITION_BW 20.0f
 
@@ -45,9 +45,15 @@ int motor_pid_autotune_current(const motor_info_t *info, float bandwidth_hz,
 	if (!check_calib_ready(info))
 		return -2;
 
-	/* 带宽默认值 fallback */
+	/* 带宽默认值 fallback：优先使用 motor_info 中的电机配置值。 */
 	if (bandwidth_hz <= 0.0f)
-		bandwidth_hz = AUTOTUNE_DEFAULT_CURRENT_BW;
+	{
+		float configured_bw = info->blocks.motor_calib.current_control_bandwidth;
+		if (isfinite(configured_bw) && configured_bw > 0.0f)
+			bandwidth_hz = configured_bw;
+		else
+			bandwidth_hz = AUTOTUNE_DEFAULT_CURRENT_BW;
+	}
 
 	float r = info->blocks.motor_calib.phase_resistance;
 	float ld = info->blocks.motor_calib.phase_inductance_d;
