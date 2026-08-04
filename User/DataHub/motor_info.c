@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.c
  * @brief   MotorInfo 配置参数 API 实现
- * @date    2026-07-20
+ * @date    2026-08-04
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <stddef.h>
 
 int motor_info_init(motor_info_t *cfg)
 {
@@ -50,20 +51,20 @@ int motor_info_init(motor_info_t *cfg)
     cfg->blocks.motor_calib.pole_pairs = 7U;
     cfg->blocks.motor_calib.motor_type = 0U;
     cfg->blocks.motor_calib.direction = 0U;
-    cfg->blocks.motor_calib.phase_resistance = 0.1f;
-    cfg->blocks.motor_calib.phase_inductance_d = 0.0001f;
-    cfg->blocks.motor_calib.phase_inductance_q = 0.00012f;
-    cfg->blocks.motor_calib.flux_linkage = 0.001f;
-    cfg->blocks.motor_calib.torque_constant = 0.1f;
+    cfg->blocks.motor_calib.phase_resistance = 3.6f;
+    cfg->blocks.motor_calib.phase_inductance_d = 0.0048f;
+    cfg->blocks.motor_calib.phase_inductance_q = 0.0048f;
+    cfg->blocks.motor_calib.flux_linkage = 0.02f;
+    cfg->blocks.motor_calib.torque_constant = 0.21f;
     cfg->blocks.motor_calib.rotor_inertia = 0.00001f;
     cfg->blocks.motor_calib.friction_coulomb = 0.0f;
     cfg->blocks.motor_calib.friction_viscous = 0.0f;
     cfg->blocks.motor_calib.gear_ratio = 100.0f;
     cfg->blocks.motor_calib.gear_efficiency = 0.85f;
-    cfg->blocks.motor_calib.calibration_current = 5.0f;
-    cfg->blocks.motor_calib.resistance_calib_max_voltage = 1.0f;
-    cfg->blocks.motor_calib.current_lim = 15.0f;
-    cfg->blocks.motor_calib.current_control_bandwidth = 1000.0f;
+    cfg->blocks.motor_calib.calibration_current = 0.5f;
+    cfg->blocks.motor_calib.resistance_calib_max_voltage = 3.0f;
+    cfg->blocks.motor_calib.current_lim = 3.7f;
+    cfg->blocks.motor_calib.current_control_bandwidth = 500.0f;
     cfg->blocks.motor_calib.enc_type = 1U;
     cfg->blocks.motor_calib.enc_lines = 16384U;
     cfg->blocks.motor_calib.enc_direction = 1;
@@ -73,8 +74,8 @@ int motor_info_init(motor_info_t *cfg)
     cfg->blocks.motor_calib.dead_time_ns = 500.0f;
     cfg->blocks.motor_calib.shunt_resistance = 0.01f;
     cfg->blocks.motor_calib.current_amp_gain = 50.0f;
-    cfg->blocks.motor_calib.peak_current = 6.0f;
-    cfg->blocks.motor_calib.max_speed = 150.0f;
+    cfg->blocks.motor_calib.peak_current = 3.7f;
+    cfg->blocks.motor_calib.max_speed = 200.0f;
 
     /* ---- 设备参数（CAN/UART） ---- */
     cfg->blocks.device.device_zero = 0.0f;
@@ -371,2118 +372,353 @@ void motor_info_print(const motor_info_t *cfg)
 }
 
 /******************************************************************************
- * 系统级参数
+ * Table-driven param_id dispatch. Field-level get/set functions are not generated.
  ******************************************************************************/
-uint32_t motor_info_get_config_version(const motor_info_t *cfg)
-{
-    return cfg->blocks.system.config_version;
-}
-
-int motor_info_set_config_version(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)4294967295) return -EINVAL;  /* 越界 */
-    cfg->blocks.system.config_version = value;
-    return 0;
-}
-
-uint32_t motor_info_get_enable_uart(const motor_info_t *cfg)
-{
-    return cfg->blocks.system.enable_uart;
-}
-
-int motor_info_set_enable_uart(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)15) return -EINVAL;  /* 越界 */
-    cfg->blocks.system.enable_uart = value;
-    return 0;
-}
-
-uint32_t motor_info_get_enable_bus_sensor(const motor_info_t *cfg)
-{
-    return cfg->blocks.system.enable_bus_sensor;
-}
-
-int motor_info_set_enable_bus_sensor(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.system.enable_bus_sensor = value;
-    return 0;
-}
-
-uint32_t motor_info_get_safety_limit(const motor_info_t *cfg)
-{
-    return cfg->blocks.system.safety_limit;
-}
-
-int motor_info_set_safety_limit(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.system.safety_limit = value;
-    return 0;
-}
-
-uint32_t motor_info_get_total_runtime_s(const motor_info_t *cfg)
-{
-    return cfg->blocks.system.total_runtime_s;
-}
-
-int motor_info_set_total_runtime_s(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)4294967295) return -EINVAL;  /* 越界 */
-    cfg->blocks.system.total_runtime_s = value;
-    return 0;
-}
-
-/******************************************************************************
- * 电机标定参数（含减速器/编码器/功率级/电流采样）
- ******************************************************************************/
-uint32_t motor_info_get_is_calibrated(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.is_calibrated;
-}
-
-int motor_info_set_is_calibrated(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.is_calibrated = value;
-    return 0;
-}
-
-uint32_t motor_info_get_pole_pairs(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.pole_pairs;
-}
-
-int motor_info_set_pole_pairs(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (uint32_t)1 || value > (uint32_t)128) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.pole_pairs = value;
-    return 0;
-}
-
-uint32_t motor_info_get_motor_type(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.motor_type;
-}
-
-int motor_info_set_motor_type(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)2) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.motor_type = value;
-    return 0;
-}
-
-uint32_t motor_info_get_direction(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.direction;
-}
-
-int motor_info_set_direction(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.direction = value;
-    return 0;
-}
-
-float motor_info_get_phase_resistance(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.phase_resistance;
-}
-
-int motor_info_set_phase_resistance(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.001f || value > 50.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.phase_resistance = value;
-    return 0;
-}
-
-float motor_info_get_phase_inductance_d(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.phase_inductance_d;
-}
-
-int motor_info_set_phase_inductance_d(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.000001f || value > 0.1f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.phase_inductance_d = value;
-    return 0;
-}
-
-float motor_info_get_phase_inductance_q(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.phase_inductance_q;
-}
-
-int motor_info_set_phase_inductance_q(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.000001f || value > 0.1f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.phase_inductance_q = value;
-    return 0;
-}
-
-float motor_info_get_flux_linkage(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.flux_linkage;
-}
-
-int motor_info_set_flux_linkage(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.00001f || value > 1.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.flux_linkage = value;
-    return 0;
-}
-
-float motor_info_get_torque_constant(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.torque_constant;
-}
-
-int motor_info_set_torque_constant(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.00001f || value > 50.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.torque_constant = value;
-    return 0;
-}
-
-float motor_info_get_rotor_inertia(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.rotor_inertia;
-}
-
-int motor_info_set_rotor_inertia(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0000001f || value > 1.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.rotor_inertia = value;
-    return 0;
-}
-
-float motor_info_get_friction_coulomb(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.friction_coulomb;
-}
-
-int motor_info_set_friction_coulomb(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 500.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.friction_coulomb = value;
-    return 0;
-}
-
-float motor_info_get_friction_viscous(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.friction_viscous;
-}
-
-int motor_info_set_friction_viscous(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 100.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.friction_viscous = value;
-    return 0;
-}
-
-float motor_info_get_gear_ratio(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.gear_ratio;
-}
-
-int motor_info_set_gear_ratio(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 1.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.gear_ratio = value;
-    return 0;
-}
-
-float motor_info_get_gear_efficiency(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.gear_efficiency;
-}
-
-int motor_info_set_gear_efficiency(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.1f || value > 1.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.gear_efficiency = value;
-    return 0;
-}
-
-float motor_info_get_calibration_current(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.calibration_current;
-}
-
-int motor_info_set_calibration_current(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.1f || value > 50.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.calibration_current = value;
-    return 0;
-}
-
-float motor_info_get_resistance_calib_max_voltage(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.resistance_calib_max_voltage;
-}
-
-int motor_info_set_resistance_calib_max_voltage(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.1f || value > 60.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.resistance_calib_max_voltage = value;
-    return 0;
-}
-
-float motor_info_get_current_lim(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.current_lim;
-}
-
-int motor_info_set_current_lim(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.1f || value > 500.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.current_lim = value;
-    return 0;
-}
-
-float motor_info_get_current_control_bandwidth(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.current_control_bandwidth;
-}
-
-int motor_info_set_current_control_bandwidth(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 50.0f || value > 20000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.current_control_bandwidth = value;
-    return 0;
-}
-
-uint32_t motor_info_get_enc_type(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.enc_type;
-}
-
-int motor_info_set_enc_type(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)10) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.enc_type = value;
-    return 0;
-}
-
-uint32_t motor_info_get_enc_lines(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.enc_lines;
-}
-
-int motor_info_set_enc_lines(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (uint32_t)100 || value > (uint32_t)10000000) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.enc_lines = value;
-    return 0;
-}
-
-int32_t motor_info_get_enc_direction(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.enc_direction;
-}
-
-int motor_info_set_enc_direction(motor_info_t *cfg, int32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (int32_t)-1 || value > (int32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.enc_direction = value;
-    return 0;
-}
-
-float motor_info_get_enc_offset(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.enc_offset;
-}
-
-int motor_info_set_enc_offset(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < -360.0f || value > 360.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.enc_offset = value;
-    return 0;
-}
-
-float motor_info_get_elec_angle_bias(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.elec_angle_bias;
-}
-
-int motor_info_set_elec_angle_bias(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < -3.1416f || value > 3.1416f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.elec_angle_bias = value;
-    return 0;
-}
-
-uint32_t motor_info_get_pwm_freq_hz(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.pwm_freq_hz;
-}
-
-int motor_info_set_pwm_freq_hz(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (uint32_t)1000 || value > (uint32_t)200000) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.pwm_freq_hz = value;
-    return 0;
-}
-
-float motor_info_get_dead_time_ns(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.dead_time_ns;
-}
-
-int motor_info_set_dead_time_ns(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 50.0f || value > 5000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.dead_time_ns = value;
-    return 0;
-}
-
-float motor_info_get_shunt_resistance(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.shunt_resistance;
-}
-
-int motor_info_set_shunt_resistance(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0001f || value > 1.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.shunt_resistance = value;
-    return 0;
-}
-
-float motor_info_get_current_amp_gain(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.current_amp_gain;
-}
-
-int motor_info_set_current_amp_gain(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 1.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.current_amp_gain = value;
-    return 0;
-}
-
-float motor_info_get_peak_current(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.peak_current;
-}
-
-int motor_info_set_peak_current(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.1f || value > 200.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.peak_current = value;
-    return 0;
-}
-
-float motor_info_get_max_speed(const motor_info_t *cfg)
-{
-    return cfg->blocks.motor_calib.max_speed;
-}
-
-int motor_info_set_max_speed(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 10.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.motor_calib.max_speed = value;
-    return 0;
-}
-
-/******************************************************************************
- * 设备参数（CAN/UART）
- ******************************************************************************/
-float motor_info_get_device_zero(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.device_zero;
-}
-
-int motor_info_set_device_zero(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < -12.566f || value > 12.566f) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.device_zero = value;
-    return 0;
-}
-
-uint32_t motor_info_get_device_time(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.device_time;
-}
-
-int motor_info_set_device_time(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)99999999) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.device_time = value;
-    return 0;
-}
-
-uint32_t motor_info_get_can_id(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.can_id;
-}
-
-int motor_info_set_can_id(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (uint32_t)1 || value > (uint32_t)127) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.can_id = value;
-    return 0;
-}
-
-uint32_t motor_info_get_can_baudrate(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.can_baudrate;
-}
-
-int motor_info_set_can_baudrate(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (uint32_t)10000 || value > (uint32_t)8000000) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.can_baudrate = value;
-    return 0;
-}
-
-float motor_info_get_can_timeout_s(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.can_timeout_s;
-}
-
-int motor_info_set_can_timeout_s(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 60.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.can_timeout_s = value;
-    return 0;
-}
-
-uint32_t motor_info_get_can_fd_enable(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.can_fd_enable;
-}
-
-int motor_info_set_can_fd_enable(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.can_fd_enable = value;
-    return 0;
-}
-
-uint32_t motor_info_get_can_fd_baudrate(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.can_fd_baudrate;
-}
-
-int motor_info_set_can_fd_baudrate(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (uint32_t)100000 || value > (uint32_t)8000000) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.can_fd_baudrate = value;
-    return 0;
-}
-
-uint32_t motor_info_get_uart_baudrate(const motor_info_t *cfg)
-{
-    return cfg->blocks.device.uart_baudrate;
-}
-
-int motor_info_set_uart_baudrate(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (uint32_t)1200 || value > (uint32_t)8000000) return -EINVAL;  /* 越界 */
-    cfg->blocks.device.uart_baudrate = value;
-    return 0;
-}
-
-/******************************************************************************
- * 控制参数（三环PID+前馈+滤波）
- ******************************************************************************/
-float motor_info_get_kp_ld(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.kp_ld;
-}
-
-int motor_info_set_kp_ld(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.kp_ld = value;
-    return 0;
-}
-
-float motor_info_get_ki_ld(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.ki_ld;
-}
-
-int motor_info_set_ki_ld(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 100000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.ki_ld = value;
-    return 0;
-}
-
-float motor_info_get_kp_lq(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.kp_lq;
-}
-
-int motor_info_set_kp_lq(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.kp_lq = value;
-    return 0;
-}
-
-float motor_info_get_ki_lq(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.ki_lq;
-}
-
-int motor_info_set_ki_lq(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 100000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.ki_lq = value;
-    return 0;
-}
-
-float motor_info_get_integral_limit(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.integral_limit;
-}
-
-int motor_info_set_integral_limit(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.integral_limit = value;
-    return 0;
-}
 
-float motor_info_get_decoupling_gain(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.decoupling_gain;
-}
-
-int motor_info_set_decoupling_gain(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 5.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.decoupling_gain = value;
-    return 0;
-}
-
-float motor_info_get_comp_du_V(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.comp_du_V;
-}
-
-int motor_info_set_comp_du_V(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 20.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.comp_du_V = value;
-    return 0;
-}
-
-float motor_info_get_pwm_duty_max(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.pwm_duty_max;
-}
-
-int motor_info_set_pwm_duty_max(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.1f || value > 0.99f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.pwm_duty_max = value;
-    return 0;
-}
-
-float motor_info_get_kp_s(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.kp_s;
-}
-
-int motor_info_set_kp_s(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.kp_s = value;
-    return 0;
-}
-
-float motor_info_get_ki_s(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.ki_s;
-}
-
-int motor_info_set_ki_s(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 100000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.ki_s = value;
-    return 0;
-}
-
-float motor_info_get_speed_integral_limit(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.speed_integral_limit;
-}
-
-int motor_info_set_speed_integral_limit(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.speed_integral_limit = value;
-    return 0;
-}
-
-float motor_info_get_vff(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.vff;
-}
-
-int motor_info_set_vff(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 5.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.vff = value;
-    return 0;
-}
-
-float motor_info_get_aff(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.aff;
-}
-
-int motor_info_set_aff(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 5.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.aff = value;
-    return 0;
-}
-
-float motor_info_get_jerk_ff(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.jerk_ff;
-}
-
-int motor_info_set_jerk_ff(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 5.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.jerk_ff = value;
-    return 0;
-}
-
-float motor_info_get_speed_filter_alpha(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.speed_filter_alpha;
-}
-
-int motor_info_set_speed_filter_alpha(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.speed_filter_alpha = value;
-    return 0;
-}
-
-uint32_t motor_info_get_speed_filter_enable(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.speed_filter_enable;
-}
-
-int motor_info_set_speed_filter_enable(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.speed_filter_enable = value;
-    return 0;
-}
-
-float motor_info_get_kp_p(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.kp_p;
-}
-
-int motor_info_set_kp_p(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.kp_p = value;
-    return 0;
-}
-
-float motor_info_get_ki_p(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.ki_p;
-}
-
-int motor_info_set_ki_p(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.ki_p = value;
-    return 0;
-}
-
-float motor_info_get_position_integral_limit(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.position_integral_limit;
-}
-
-int motor_info_set_position_integral_limit(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.position_integral_limit = value;
-    return 0;
-}
-
-float motor_info_get_position_filter_alpha(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.position_filter_alpha;
-}
-
-int motor_info_set_position_filter_alpha(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.position_filter_alpha = value;
-    return 0;
-}
-
-uint32_t motor_info_get_position_filter_enable(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.position_filter_enable;
-}
-
-int motor_info_set_position_filter_enable(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.position_filter_enable = value;
-    return 0;
-}
-
-float motor_info_get_following_error_limit(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.following_error_limit;
-}
-
-int motor_info_set_following_error_limit(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.following_error_limit = value;
-    return 0;
-}
-
-uint32_t motor_info_get_decouple_algo(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.decouple_algo;
-}
-
-int motor_info_set_decouple_algo(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)2) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.decouple_algo = value;
-    return 0;
-}
-
-uint32_t motor_info_get_bemf_ff_enable(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.bemf_ff_enable;
-}
-
-int motor_info_set_bemf_ff_enable(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.bemf_ff_enable = value;
-    return 0;
-}
-
-uint32_t motor_info_get_deadtime_comp_enable(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.deadtime_comp_enable;
-}
-
-int motor_info_set_deadtime_comp_enable(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.deadtime_comp_enable = value;
-    return 0;
-}
-
-uint32_t motor_info_get_pid_source_mask(const motor_info_t *cfg)
-{
-    return cfg->blocks.control.pid_source_mask;
-}
-
-int motor_info_set_pid_source_mask(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)4294967295) return -EINVAL;  /* 越界 */
-    cfg->blocks.control.pid_source_mask = value;
-    return 0;
-}
-
-/******************************************************************************
- * 保护与通信参数
- ******************************************************************************/
-float motor_info_get_over_current_A(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.over_current_A;
-}
-
-int motor_info_set_over_current_A(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.1f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.over_current_A = value;
-    return 0;
-}
-
-float motor_info_get_over_voltage_V(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.over_voltage_V;
-}
-
-int motor_info_set_over_voltage_V(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 5.0f || value > 120.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.over_voltage_V = value;
-    return 0;
-}
-
-float motor_info_get_under_voltage_V(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.under_voltage_V;
-}
-
-int motor_info_set_under_voltage_V(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 60.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.under_voltage_V = value;
-    return 0;
-}
-
-float motor_info_get_over_temp_drive(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.over_temp_drive;
-}
-
-int motor_info_set_over_temp_drive(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 20.0f || value > 150.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.over_temp_drive = value;
-    return 0;
-}
-
-float motor_info_get_over_temp_motor(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.over_temp_motor;
-}
-
-int motor_info_set_over_temp_motor(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 20.0f || value > 200.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.over_temp_motor = value;
-    return 0;
-}
-
-float motor_info_get_under_temp_d(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.under_temp_d;
-}
-
-int motor_info_set_under_temp_d(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < -80.0f || value > 0.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.under_temp_d = value;
-    return 0;
-}
-
-float motor_info_get_over_speed_rad_s(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.over_speed_rad_s;
-}
-
-int motor_info_set_over_speed_rad_s(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 1.0f || value > 20000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.over_speed_rad_s = value;
-    return 0;
-}
-
-int32_t motor_info_get_position_following_error_p(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.position_following_error_p;
-}
-
-int motor_info_set_position_following_error_p(motor_info_t *cfg, int32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (int32_t)1 || value > (int32_t)1000000) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.position_following_error_p = value;
-    return 0;
-}
-
-int32_t motor_info_get_pos_limit_min(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.pos_limit_min;
-}
-
-int motor_info_set_pos_limit_min(motor_info_t *cfg, int32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (int32_t)-10000000 || value > (int32_t)0) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.pos_limit_min = value;
-    return 0;
-}
-
-int32_t motor_info_get_pos_limit_max(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.pos_limit_max;
-}
-
-int motor_info_set_pos_limit_max(motor_info_t *cfg, int32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < (int32_t)0 || value > (int32_t)10000000) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.pos_limit_max = value;
-    return 0;
-}
-
-uint32_t motor_info_get_error_enable_mask(const motor_info_t *cfg)
-{
-    return cfg->blocks.protect_comm.error_enable_mask;
-}
-
-int motor_info_set_error_enable_mask(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)4294967295) return -EINVAL;  /* 越界 */
-    cfg->blocks.protect_comm.error_enable_mask = value;
-    return 0;
-}
-
-/******************************************************************************
- * 高级算法参数（MIT/力控/回零）
- ******************************************************************************/
-float motor_info_get_mit_kp(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.mit_kp;
-}
-
-int motor_info_set_mit_kp(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.mit_kp = value;
-    return 0;
-}
-
-float motor_info_get_mit_kd(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.mit_kd;
-}
-
-int motor_info_set_mit_kd(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.mit_kd = value;
-    return 0;
-}
-
-float motor_info_get_mit_max_current(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.mit_max_current;
-}
-
-int motor_info_set_mit_max_current(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 500.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.mit_max_current = value;
-    return 0;
-}
-
-float motor_info_get_mit_feedforward_torque(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.mit_feedforward_torque;
-}
-
-int motor_info_set_mit_feedforward_torque(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 500.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.mit_feedforward_torque = value;
-    return 0;
-}
-
-float motor_info_get_force_kp(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.force_kp;
-}
-
-int motor_info_set_force_kp(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.force_kp = value;
-    return 0;
-}
-
-float motor_info_get_force_ki(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.force_ki;
-}
-
-int motor_info_set_force_ki(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 10000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.force_ki = value;
-    return 0;
-}
-
-float motor_info_get_force_limit(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.force_limit;
-}
-
-int motor_info_set_force_limit(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.0f || value > 1000.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.force_limit = value;
-    return 0;
-}
-
-uint32_t motor_info_get_force_control_enable(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.force_control_enable;
-}
-
-int motor_info_set_force_control_enable(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)1) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.force_control_enable = value;
-    return 0;
-}
-
-uint32_t motor_info_get_homing_method(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.homing_method;
-}
-
-int motor_info_set_homing_method(motor_info_t *cfg, uint32_t value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value > (uint32_t)10) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.homing_method = value;
-    return 0;
-}
-
-float motor_info_get_homing_speed(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.homing_speed;
-}
-
-int motor_info_set_homing_speed(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < 0.001f || value > 500.0f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.homing_speed = value;
-    return 0;
-}
-
-float motor_info_get_homing_offset(const motor_info_t *cfg)
-{
-    return cfg->blocks.advanced.homing_offset;
-}
-
-int motor_info_set_homing_offset(motor_info_t *cfg, float value)
-{
-    if (cfg == NULL) return -EINVAL;
-    if (value < -6.283f || value > 6.283f) return -EINVAL;  /* 越界 */
-    cfg->blocks.advanced.homing_offset = value;
-    return 0;
+#define MOTOR_INFO_PARAM_IDX_INVALID 0xFFu
+#define MOTOR_INFO_ACCESS_RO 0u
+#define MOTOR_INFO_ACCESS_RW 1u
+#define MOTOR_INFO_DESC_HAS_RANGE 0x01u
+
+typedef union
+{
+    uint32_t u32;
+    int32_t i32;
+    float f32;
+} motor_info_word_t;
+
+typedef struct
+{
+    uint16_t pid;
+    uint16_t offset;
+    uint8_t type;
+    uint8_t access;
+    uint8_t size;
+    uint8_t flags;
+    motor_info_word_t min;
+    motor_info_word_t max;
+} motor_info_param_desc_t;
+
+static const uint8_t s_pid_to_desc_index[MOTOR_INFO_MAX_PID + 1u] =
+{
+    0u, 1u, 2u, 3u, 4u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
+    5u, 6u, 7u, 8u, 9u, 10u, 11u, 12u, 13u, 14u, 15u, 16u, 17u, 18u, 19u, 20u,
+    21u, 22u, 23u, 24u, 25u, 26u, 27u, 28u, 29u, 30u, 31u, 32u, 33u, 255u, 255u, 255u,
+    34u, 35u, 36u, 37u, 38u, 39u, 40u, 41u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
+    42u, 43u, 44u, 45u, 46u, 47u, 48u, 49u, 50u, 51u, 52u, 53u, 54u, 55u, 56u, 57u,
+    58u, 59u, 60u, 61u, 62u, 63u, 64u, 65u, 66u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
+    255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
+    255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 67u,
+    68u, 69u, 70u, 71u, 72u, 73u, 74u, 75u, 76u, 77u, 78u, 255u, 255u, 255u, 255u, 255u,
+    255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
+    79u, 80u, 81u, 82u, 83u, 84u, 85u, 86u, 87u, 88u, 89u,
+};
+
+static const motor_info_param_desc_t s_motor_info_desc[MOTOR_INFO_PARAM_COUNT] =
+{
+    /* config_version */
+    { 0u, (uint16_t)offsetof(motor_info_t, blocks.system.config_version), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 4294967295U } },
+    /* enable_uart */
+    { 1u, (uint16_t)offsetof(motor_info_t, blocks.system.enable_uart), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 15U } },
+    /* enable_bus_sensor */
+    { 2u, (uint16_t)offsetof(motor_info_t, blocks.system.enable_bus_sensor), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* safety_limit */
+    { 3u, (uint16_t)offsetof(motor_info_t, blocks.system.safety_limit), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* total_runtime_s */
+    { 4u, (uint16_t)offsetof(motor_info_t, blocks.system.total_runtime_s), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 4294967295U } },
+    /* is_calibrated */
+    { 16u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.is_calibrated), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* pole_pairs */
+    { 17u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.pole_pairs), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 1U }, { .u32 = 128U } },
+    /* motor_type */
+    { 18u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.motor_type), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 2U } },
+    /* direction */
+    { 19u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.direction), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* phase_resistance */
+    { 20u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.phase_resistance), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.001f }, { .f32 = 50.0f } },
+    /* phase_inductance_d */
+    { 21u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.phase_inductance_d), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.000001f }, { .f32 = 0.1f } },
+    /* phase_inductance_q */
+    { 22u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.phase_inductance_q), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.000001f }, { .f32 = 0.1f } },
+    /* flux_linkage */
+    { 23u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.flux_linkage), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.00001f }, { .f32 = 1.0f } },
+    /* torque_constant */
+    { 24u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.torque_constant), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.00001f }, { .f32 = 50.0f } },
+    /* rotor_inertia */
+    { 25u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.rotor_inertia), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0000001f }, { .f32 = 1.0f } },
+    /* friction_coulomb */
+    { 26u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.friction_coulomb), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 500.0f } },
+    /* friction_viscous */
+    { 27u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.friction_viscous), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 100.0f } },
+    /* gear_ratio */
+    { 28u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.gear_ratio), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 1.0f }, { .f32 = 10000.0f } },
+    /* gear_efficiency */
+    { 29u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.gear_efficiency), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.1f }, { .f32 = 1.0f } },
+    /* calibration_current */
+    { 30u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.calibration_current), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.1f }, { .f32 = 50.0f } },
+    /* resistance_calib_max_voltage */
+    { 31u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.resistance_calib_max_voltage), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.1f }, { .f32 = 60.0f } },
+    /* current_lim */
+    { 32u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.current_lim), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.1f }, { .f32 = 500.0f } },
+    /* current_control_bandwidth */
+    { 33u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.current_control_bandwidth), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 50.0f }, { .f32 = 20000.0f } },
+    /* enc_type */
+    { 34u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.enc_type), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 10U } },
+    /* enc_lines */
+    { 35u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.enc_lines), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 100U }, { .u32 = 10000000U } },
+    /* enc_direction */
+    { 36u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.enc_direction), MOTOR_INFO_TYPE_I32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .i32 = -1 }, { .i32 = 1 } },
+    /* enc_offset */
+    { 37u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.enc_offset), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = -360.0f }, { .f32 = 360.0f } },
+    /* elec_angle_bias */
+    { 38u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.elec_angle_bias), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = -3.1416f }, { .f32 = 3.1416f } },
+    /* pwm_freq_hz */
+    { 39u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.pwm_freq_hz), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 1000U }, { .u32 = 200000U } },
+    /* dead_time_ns */
+    { 40u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.dead_time_ns), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 50.0f }, { .f32 = 5000.0f } },
+    /* shunt_resistance */
+    { 41u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.shunt_resistance), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0001f }, { .f32 = 1.0f } },
+    /* current_amp_gain */
+    { 42u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.current_amp_gain), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 1.0f }, { .f32 = 10000.0f } },
+    /* peak_current */
+    { 43u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.peak_current), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.1f }, { .f32 = 200.0f } },
+    /* max_speed */
+    { 44u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.max_speed), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 10.0f }, { .f32 = 1000.0f } },
+    /* device_zero */
+    { 48u, (uint16_t)offsetof(motor_info_t, blocks.device.device_zero), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = -12.566f }, { .f32 = 12.566f } },
+    /* device_time */
+    { 49u, (uint16_t)offsetof(motor_info_t, blocks.device.device_time), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 99999999U } },
+    /* can_id */
+    { 50u, (uint16_t)offsetof(motor_info_t, blocks.device.can_id), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 1U }, { .u32 = 127U } },
+    /* can_baudrate */
+    { 51u, (uint16_t)offsetof(motor_info_t, blocks.device.can_baudrate), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 10000U }, { .u32 = 8000000U } },
+    /* can_timeout_s */
+    { 52u, (uint16_t)offsetof(motor_info_t, blocks.device.can_timeout_s), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 60.0f } },
+    /* can_fd_enable */
+    { 53u, (uint16_t)offsetof(motor_info_t, blocks.device.can_fd_enable), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* can_fd_baudrate */
+    { 54u, (uint16_t)offsetof(motor_info_t, blocks.device.can_fd_baudrate), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 100000U }, { .u32 = 8000000U } },
+    /* uart_baudrate */
+    { 55u, (uint16_t)offsetof(motor_info_t, blocks.device.uart_baudrate), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 1200U }, { .u32 = 8000000U } },
+    /* kp_ld */
+    { 64u, (uint16_t)offsetof(motor_info_t, blocks.control.kp_ld), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000.0f } },
+    /* ki_ld */
+    { 65u, (uint16_t)offsetof(motor_info_t, blocks.control.ki_ld), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 100000.0f } },
+    /* kp_lq */
+    { 66u, (uint16_t)offsetof(motor_info_t, blocks.control.kp_lq), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000.0f } },
+    /* ki_lq */
+    { 67u, (uint16_t)offsetof(motor_info_t, blocks.control.ki_lq), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 100000.0f } },
+    /* integral_limit */
+    { 68u, (uint16_t)offsetof(motor_info_t, blocks.control.integral_limit), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000.0f } },
+    /* decoupling_gain */
+    { 69u, (uint16_t)offsetof(motor_info_t, blocks.control.decoupling_gain), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 5.0f } },
+    /* comp_du_V */
+    { 70u, (uint16_t)offsetof(motor_info_t, blocks.control.comp_du_V), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 20.0f } },
+    /* pwm_duty_max */
+    { 71u, (uint16_t)offsetof(motor_info_t, blocks.control.pwm_duty_max), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.1f }, { .f32 = 0.99f } },
+    /* kp_s */
+    { 72u, (uint16_t)offsetof(motor_info_t, blocks.control.kp_s), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 10000.0f } },
+    /* ki_s */
+    { 73u, (uint16_t)offsetof(motor_info_t, blocks.control.ki_s), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 100000.0f } },
+    /* speed_integral_limit */
+    { 74u, (uint16_t)offsetof(motor_info_t, blocks.control.speed_integral_limit), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000.0f } },
+    /* vff */
+    { 75u, (uint16_t)offsetof(motor_info_t, blocks.control.vff), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 5.0f } },
+    /* aff */
+    { 76u, (uint16_t)offsetof(motor_info_t, blocks.control.aff), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 5.0f } },
+    /* jerk_ff */
+    { 77u, (uint16_t)offsetof(motor_info_t, blocks.control.jerk_ff), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 5.0f } },
+    /* speed_filter_alpha */
+    { 78u, (uint16_t)offsetof(motor_info_t, blocks.control.speed_filter_alpha), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1.0f } },
+    /* speed_filter_enable */
+    { 79u, (uint16_t)offsetof(motor_info_t, blocks.control.speed_filter_enable), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* kp_p */
+    { 80u, (uint16_t)offsetof(motor_info_t, blocks.control.kp_p), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 10000.0f } },
+    /* ki_p */
+    { 81u, (uint16_t)offsetof(motor_info_t, blocks.control.ki_p), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 10000.0f } },
+    /* position_integral_limit */
+    { 82u, (uint16_t)offsetof(motor_info_t, blocks.control.position_integral_limit), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000.0f } },
+    /* position_filter_alpha */
+    { 83u, (uint16_t)offsetof(motor_info_t, blocks.control.position_filter_alpha), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1.0f } },
+    /* position_filter_enable */
+    { 84u, (uint16_t)offsetof(motor_info_t, blocks.control.position_filter_enable), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* following_error_limit */
+    { 85u, (uint16_t)offsetof(motor_info_t, blocks.control.following_error_limit), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000000.0f } },
+    /* decouple_algo */
+    { 86u, (uint16_t)offsetof(motor_info_t, blocks.control.decouple_algo), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 2U } },
+    /* bemf_ff_enable */
+    { 87u, (uint16_t)offsetof(motor_info_t, blocks.control.bemf_ff_enable), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* deadtime_comp_enable */
+    { 88u, (uint16_t)offsetof(motor_info_t, blocks.control.deadtime_comp_enable), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* pid_source_mask */
+    { 127u, (uint16_t)offsetof(motor_info_t, blocks.control.pid_source_mask), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 4294967295U } },
+    /* over_current_A */
+    { 128u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.over_current_A), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.1f }, { .f32 = 1000.0f } },
+    /* over_voltage_V */
+    { 129u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.over_voltage_V), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 5.0f }, { .f32 = 120.0f } },
+    /* under_voltage_V */
+    { 130u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.under_voltage_V), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 60.0f } },
+    /* over_temp_drive */
+    { 131u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.over_temp_drive), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 20.0f }, { .f32 = 150.0f } },
+    /* over_temp_motor */
+    { 132u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.over_temp_motor), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 20.0f }, { .f32 = 200.0f } },
+    /* under_temp_d */
+    { 133u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.under_temp_d), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = -80.0f }, { .f32 = 0.0f } },
+    /* over_speed_rad_s */
+    { 134u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.over_speed_rad_s), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 1.0f }, { .f32 = 20000.0f } },
+    /* position_following_error_p */
+    { 135u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.position_following_error_p), MOTOR_INFO_TYPE_I32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .i32 = 1 }, { .i32 = 1000000 } },
+    /* pos_limit_min */
+    { 136u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.pos_limit_min), MOTOR_INFO_TYPE_I32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .i32 = -10000000 }, { .i32 = 0 } },
+    /* pos_limit_max */
+    { 137u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.pos_limit_max), MOTOR_INFO_TYPE_I32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .i32 = 0 }, { .i32 = 10000000 } },
+    /* error_enable_mask */
+    { 138u, (uint16_t)offsetof(motor_info_t, blocks.protect_comm.error_enable_mask), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 4294967295U } },
+    /* mit_kp */
+    { 160u, (uint16_t)offsetof(motor_info_t, blocks.advanced.mit_kp), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 10000.0f } },
+    /* mit_kd */
+    { 161u, (uint16_t)offsetof(motor_info_t, blocks.advanced.mit_kd), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000.0f } },
+    /* mit_max_current */
+    { 162u, (uint16_t)offsetof(motor_info_t, blocks.advanced.mit_max_current), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 500.0f } },
+    /* mit_feedforward_torque */
+    { 163u, (uint16_t)offsetof(motor_info_t, blocks.advanced.mit_feedforward_torque), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 500.0f } },
+    /* force_kp */
+    { 164u, (uint16_t)offsetof(motor_info_t, blocks.advanced.force_kp), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 10000.0f } },
+    /* force_ki */
+    { 165u, (uint16_t)offsetof(motor_info_t, blocks.advanced.force_ki), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 10000.0f } },
+    /* force_limit */
+    { 166u, (uint16_t)offsetof(motor_info_t, blocks.advanced.force_limit), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.0f }, { .f32 = 1000.0f } },
+    /* force_control_enable */
+    { 167u, (uint16_t)offsetof(motor_info_t, blocks.advanced.force_control_enable), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
+    /* homing_method */
+    { 168u, (uint16_t)offsetof(motor_info_t, blocks.advanced.homing_method), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 10U } },
+    /* homing_speed */
+    { 169u, (uint16_t)offsetof(motor_info_t, blocks.advanced.homing_speed), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = 0.001f }, { .f32 = 500.0f } },
+    /* homing_offset */
+    { 170u, (uint16_t)offsetof(motor_info_t, blocks.advanced.homing_offset), MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .f32 = -6.283f }, { .f32 = 6.283f } },
+};
+
+static const motor_info_param_desc_t *motor_info_find_desc(uint16_t pid)
+{
+    if (pid > MOTOR_INFO_MAX_PID)
+        return NULL;
+    uint8_t idx = s_pid_to_desc_index[pid];
+    if (idx == MOTOR_INFO_PARAM_IDX_INVALID || idx >= MOTOR_INFO_PARAM_COUNT)
+        return NULL;
+    return &s_motor_info_desc[idx];
+}
+
+static int motor_info_raw_in_range(const motor_info_param_desc_t *desc, const uint8_t raw[4])
+{
+    if ((desc->flags & MOTOR_INFO_DESC_HAS_RANGE) == 0u)
+        return 1;
+    switch (desc->type)
+    {
+    case MOTOR_INFO_TYPE_U8: { uint8_t v; memcpy(&v, raw, sizeof(v)); return (v >= (uint8_t)desc->min.u32 && v <= (uint8_t)desc->max.u32); }
+    case MOTOR_INFO_TYPE_I8: { int8_t v; memcpy(&v, raw, sizeof(v)); return (v >= (int8_t)desc->min.i32 && v <= (int8_t)desc->max.i32); }
+    case MOTOR_INFO_TYPE_U16: { uint16_t v; memcpy(&v, raw, sizeof(v)); return (v >= (uint16_t)desc->min.u32 && v <= (uint16_t)desc->max.u32); }
+    case MOTOR_INFO_TYPE_I16: { int16_t v; memcpy(&v, raw, sizeof(v)); return (v >= (int16_t)desc->min.i32 && v <= (int16_t)desc->max.i32); }
+    case MOTOR_INFO_TYPE_U32: { uint32_t v; memcpy(&v, raw, sizeof(v)); return (v >= desc->min.u32 && v <= desc->max.u32); }
+    case MOTOR_INFO_TYPE_I32: { int32_t v; memcpy(&v, raw, sizeof(v)); return (v >= desc->min.i32 && v <= desc->max.i32); }
+    case MOTOR_INFO_TYPE_F32: { float v; memcpy(&v, raw, sizeof(v)); return (v >= desc->min.f32 && v <= desc->max.f32); }
+    default:
+        return 0;
+    }
 }
-
-/******************************************************************************
- * 协议分发表实现 (param_id -> get/set), 供 0xE6-0xEB 单参读写
- ******************************************************************************/
 
 int motor_info_dispatch_read(uint16_t pid, const motor_info_t *cfg, uint8_t out4[4], uint8_t *out_type, uint8_t *out_len)
 {
     if (cfg == NULL || out4 == NULL || out_type == NULL || out_len == NULL)
         return -1;
-    /* 固定4B, 先清零(短类型高字节补零) */
-    out4[0] = out4[1] = out4[2] = out4[3] = 0;
-    switch (pid)
-    {
-    case 0: { /* config_version (uint32_t) */
-        uint32_t v = motor_info_get_config_version(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 1: { /* enable_uart (uint32_t) */
-        uint32_t v = motor_info_get_enable_uart(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 2: { /* enable_bus_sensor (uint32_t) */
-        uint32_t v = motor_info_get_enable_bus_sensor(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 3: { /* safety_limit (uint32_t) */
-        uint32_t v = motor_info_get_safety_limit(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 4: { /* total_runtime_s (uint32_t) */
-        uint32_t v = motor_info_get_total_runtime_s(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 16: { /* is_calibrated (uint32_t) */
-        uint32_t v = motor_info_get_is_calibrated(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 17: { /* pole_pairs (uint32_t) */
-        uint32_t v = motor_info_get_pole_pairs(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 18: { /* motor_type (uint32_t) */
-        uint32_t v = motor_info_get_motor_type(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 19: { /* direction (uint32_t) */
-        uint32_t v = motor_info_get_direction(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 20: { /* phase_resistance (float) */
-        float v = motor_info_get_phase_resistance(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 21: { /* phase_inductance_d (float) */
-        float v = motor_info_get_phase_inductance_d(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 22: { /* phase_inductance_q (float) */
-        float v = motor_info_get_phase_inductance_q(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 23: { /* flux_linkage (float) */
-        float v = motor_info_get_flux_linkage(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 24: { /* torque_constant (float) */
-        float v = motor_info_get_torque_constant(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 25: { /* rotor_inertia (float) */
-        float v = motor_info_get_rotor_inertia(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 26: { /* friction_coulomb (float) */
-        float v = motor_info_get_friction_coulomb(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 27: { /* friction_viscous (float) */
-        float v = motor_info_get_friction_viscous(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 28: { /* gear_ratio (float) */
-        float v = motor_info_get_gear_ratio(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 29: { /* gear_efficiency (float) */
-        float v = motor_info_get_gear_efficiency(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 30: { /* calibration_current (float) */
-        float v = motor_info_get_calibration_current(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 31: { /* resistance_calib_max_voltage (float) */
-        float v = motor_info_get_resistance_calib_max_voltage(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 32: { /* current_lim (float) */
-        float v = motor_info_get_current_lim(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 33: { /* current_control_bandwidth (float) */
-        float v = motor_info_get_current_control_bandwidth(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 34: { /* enc_type (uint32_t) */
-        uint32_t v = motor_info_get_enc_type(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 35: { /* enc_lines (uint32_t) */
-        uint32_t v = motor_info_get_enc_lines(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 36: { /* enc_direction (int32_t) */
-        int32_t v = motor_info_get_enc_direction(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 5; *out_len = 4;
-        return 0; }
-    case 37: { /* enc_offset (float) */
-        float v = motor_info_get_enc_offset(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 38: { /* elec_angle_bias (float) */
-        float v = motor_info_get_elec_angle_bias(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 39: { /* pwm_freq_hz (uint32_t) */
-        uint32_t v = motor_info_get_pwm_freq_hz(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 40: { /* dead_time_ns (float) */
-        float v = motor_info_get_dead_time_ns(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 41: { /* shunt_resistance (float) */
-        float v = motor_info_get_shunt_resistance(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 42: { /* current_amp_gain (float) */
-        float v = motor_info_get_current_amp_gain(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 43: { /* peak_current (float) */
-        float v = motor_info_get_peak_current(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 44: { /* max_speed (float) */
-        float v = motor_info_get_max_speed(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 48: { /* device_zero (float) */
-        float v = motor_info_get_device_zero(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 49: { /* device_time (uint32_t) */
-        uint32_t v = motor_info_get_device_time(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 50: { /* can_id (uint32_t) */
-        uint32_t v = motor_info_get_can_id(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 51: { /* can_baudrate (uint32_t) */
-        uint32_t v = motor_info_get_can_baudrate(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 52: { /* can_timeout_s (float) */
-        float v = motor_info_get_can_timeout_s(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 53: { /* can_fd_enable (uint32_t) */
-        uint32_t v = motor_info_get_can_fd_enable(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 54: { /* can_fd_baudrate (uint32_t) */
-        uint32_t v = motor_info_get_can_fd_baudrate(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 55: { /* uart_baudrate (uint32_t) */
-        uint32_t v = motor_info_get_uart_baudrate(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 64: { /* kp_ld (float) */
-        float v = motor_info_get_kp_ld(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 65: { /* ki_ld (float) */
-        float v = motor_info_get_ki_ld(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 66: { /* kp_lq (float) */
-        float v = motor_info_get_kp_lq(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 67: { /* ki_lq (float) */
-        float v = motor_info_get_ki_lq(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 68: { /* integral_limit (float) */
-        float v = motor_info_get_integral_limit(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 69: { /* decoupling_gain (float) */
-        float v = motor_info_get_decoupling_gain(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 70: { /* comp_du_V (float) */
-        float v = motor_info_get_comp_du_V(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 71: { /* pwm_duty_max (float) */
-        float v = motor_info_get_pwm_duty_max(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 72: { /* kp_s (float) */
-        float v = motor_info_get_kp_s(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 73: { /* ki_s (float) */
-        float v = motor_info_get_ki_s(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 74: { /* speed_integral_limit (float) */
-        float v = motor_info_get_speed_integral_limit(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 75: { /* vff (float) */
-        float v = motor_info_get_vff(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 76: { /* aff (float) */
-        float v = motor_info_get_aff(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 77: { /* jerk_ff (float) */
-        float v = motor_info_get_jerk_ff(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 78: { /* speed_filter_alpha (float) */
-        float v = motor_info_get_speed_filter_alpha(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 79: { /* speed_filter_enable (uint32_t) */
-        uint32_t v = motor_info_get_speed_filter_enable(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 80: { /* kp_p (float) */
-        float v = motor_info_get_kp_p(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 81: { /* ki_p (float) */
-        float v = motor_info_get_ki_p(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 82: { /* position_integral_limit (float) */
-        float v = motor_info_get_position_integral_limit(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 83: { /* position_filter_alpha (float) */
-        float v = motor_info_get_position_filter_alpha(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 84: { /* position_filter_enable (uint32_t) */
-        uint32_t v = motor_info_get_position_filter_enable(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 85: { /* following_error_limit (float) */
-        float v = motor_info_get_following_error_limit(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 86: { /* decouple_algo (uint32_t) */
-        uint32_t v = motor_info_get_decouple_algo(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 87: { /* bemf_ff_enable (uint32_t) */
-        uint32_t v = motor_info_get_bemf_ff_enable(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 88: { /* deadtime_comp_enable (uint32_t) */
-        uint32_t v = motor_info_get_deadtime_comp_enable(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 127: { /* pid_source_mask (uint32_t) */
-        uint32_t v = motor_info_get_pid_source_mask(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 128: { /* over_current_A (float) */
-        float v = motor_info_get_over_current_A(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 129: { /* over_voltage_V (float) */
-        float v = motor_info_get_over_voltage_V(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 130: { /* under_voltage_V (float) */
-        float v = motor_info_get_under_voltage_V(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 131: { /* over_temp_drive (float) */
-        float v = motor_info_get_over_temp_drive(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 132: { /* over_temp_motor (float) */
-        float v = motor_info_get_over_temp_motor(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 133: { /* under_temp_d (float) */
-        float v = motor_info_get_under_temp_d(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 134: { /* over_speed_rad_s (float) */
-        float v = motor_info_get_over_speed_rad_s(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 135: { /* position_following_error_p (int32_t) */
-        int32_t v = motor_info_get_position_following_error_p(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 5; *out_len = 4;
-        return 0; }
-    case 136: { /* pos_limit_min (int32_t) */
-        int32_t v = motor_info_get_pos_limit_min(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 5; *out_len = 4;
-        return 0; }
-    case 137: { /* pos_limit_max (int32_t) */
-        int32_t v = motor_info_get_pos_limit_max(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 5; *out_len = 4;
-        return 0; }
-    case 138: { /* error_enable_mask (uint32_t) */
-        uint32_t v = motor_info_get_error_enable_mask(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 160: { /* mit_kp (float) */
-        float v = motor_info_get_mit_kp(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 161: { /* mit_kd (float) */
-        float v = motor_info_get_mit_kd(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 162: { /* mit_max_current (float) */
-        float v = motor_info_get_mit_max_current(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 163: { /* mit_feedforward_torque (float) */
-        float v = motor_info_get_mit_feedforward_torque(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 164: { /* force_kp (float) */
-        float v = motor_info_get_force_kp(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 165: { /* force_ki (float) */
-        float v = motor_info_get_force_ki(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 166: { /* force_limit (float) */
-        float v = motor_info_get_force_limit(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 167: { /* force_control_enable (uint32_t) */
-        uint32_t v = motor_info_get_force_control_enable(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 168: { /* homing_method (uint32_t) */
-        uint32_t v = motor_info_get_homing_method(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 4; *out_len = 4;
-        return 0; }
-    case 169: { /* homing_speed (float) */
-        float v = motor_info_get_homing_speed(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    case 170: { /* homing_offset (float) */
-        float v = motor_info_get_homing_offset(cfg);
-        memcpy(out4, &v, 4);
-        *out_type = 6; *out_len = 4;
-        return 0; }
-    default:
+    const motor_info_param_desc_t *desc = motor_info_find_desc(pid);
+    if (desc == NULL)
         return -1;
-    }
+    out4[0] = out4[1] = out4[2] = out4[3] = 0;
+    memcpy(out4, &cfg->raw[desc->offset], desc->size);
+    *out_type = desc->type;
+    *out_len = desc->size;
+    return 0;
 }
 
 int motor_info_dispatch_write(uint16_t pid, motor_info_t *cfg, const uint8_t in4[4], uint8_t len)
 {
-    (void)len; /* 帧内固定4B, 仅取低4B */
+    (void)len;
     if (cfg == NULL || in4 == NULL)
         return -1;
-    switch (pid)
-    {
-    case 0: { /* config_version (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_config_version(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 1: { /* enable_uart (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_enable_uart(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 2: { /* enable_bus_sensor (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_enable_bus_sensor(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 3: { /* safety_limit (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_safety_limit(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 4: { /* total_runtime_s (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_total_runtime_s(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 16: { /* is_calibrated (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_is_calibrated(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 17: { /* pole_pairs (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_pole_pairs(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 18: { /* motor_type (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_motor_type(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 19: { /* direction (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_direction(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 20: { /* phase_resistance (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_phase_resistance(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 21: { /* phase_inductance_d (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_phase_inductance_d(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 22: { /* phase_inductance_q (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_phase_inductance_q(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 23: { /* flux_linkage (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_flux_linkage(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 24: { /* torque_constant (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_torque_constant(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 25: { /* rotor_inertia (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_rotor_inertia(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 26: { /* friction_coulomb (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_friction_coulomb(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 27: { /* friction_viscous (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_friction_viscous(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 28: { /* gear_ratio (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_gear_ratio(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 29: { /* gear_efficiency (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_gear_efficiency(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 30: { /* calibration_current (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_calibration_current(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 31: { /* resistance_calib_max_voltage (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_resistance_calib_max_voltage(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 32: { /* current_lim (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_current_lim(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 33: { /* current_control_bandwidth (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_current_control_bandwidth(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 34: { /* enc_type (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_enc_type(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 35: { /* enc_lines (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_enc_lines(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 36: { /* enc_direction (int32_t) */
-        int32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_enc_direction(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 37: { /* enc_offset (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_enc_offset(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 38: { /* elec_angle_bias (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_elec_angle_bias(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 39: { /* pwm_freq_hz (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_pwm_freq_hz(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 40: { /* dead_time_ns (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_dead_time_ns(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 41: { /* shunt_resistance (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_shunt_resistance(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 42: { /* current_amp_gain (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_current_amp_gain(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 43: { /* peak_current (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_peak_current(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 44: { /* max_speed (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_max_speed(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 48: { /* device_zero (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_device_zero(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 49: { /* device_time (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_device_time(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 50: { /* can_id (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_can_id(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 51: { /* can_baudrate (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_can_baudrate(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 52: { /* can_timeout_s (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_can_timeout_s(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 53: { /* can_fd_enable (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_can_fd_enable(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 54: { /* can_fd_baudrate (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_can_fd_baudrate(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 55: { /* uart_baudrate (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_uart_baudrate(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 64: { /* kp_ld (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_kp_ld(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 65: { /* ki_ld (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_ki_ld(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 66: { /* kp_lq (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_kp_lq(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 67: { /* ki_lq (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_ki_lq(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 68: { /* integral_limit (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_integral_limit(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 69: { /* decoupling_gain (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_decoupling_gain(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 70: { /* comp_du_V (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_comp_du_V(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 71: { /* pwm_duty_max (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_pwm_duty_max(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 72: { /* kp_s (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_kp_s(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 73: { /* ki_s (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_ki_s(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 74: { /* speed_integral_limit (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_speed_integral_limit(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 75: { /* vff (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_vff(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 76: { /* aff (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_aff(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 77: { /* jerk_ff (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_jerk_ff(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 78: { /* speed_filter_alpha (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_speed_filter_alpha(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 79: { /* speed_filter_enable (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_speed_filter_enable(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 80: { /* kp_p (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_kp_p(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 81: { /* ki_p (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_ki_p(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 82: { /* position_integral_limit (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_position_integral_limit(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 83: { /* position_filter_alpha (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_position_filter_alpha(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 84: { /* position_filter_enable (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_position_filter_enable(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 85: { /* following_error_limit (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_following_error_limit(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 86: { /* decouple_algo (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_decouple_algo(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 87: { /* bemf_ff_enable (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_bemf_ff_enable(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 88: { /* deadtime_comp_enable (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_deadtime_comp_enable(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 127: { /* pid_source_mask (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_pid_source_mask(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 128: { /* over_current_A (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_over_current_A(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 129: { /* over_voltage_V (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_over_voltage_V(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 130: { /* under_voltage_V (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_under_voltage_V(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 131: { /* over_temp_drive (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_over_temp_drive(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 132: { /* over_temp_motor (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_over_temp_motor(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 133: { /* under_temp_d (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_under_temp_d(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 134: { /* over_speed_rad_s (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_over_speed_rad_s(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 135: { /* position_following_error_p (int32_t) */
-        int32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_position_following_error_p(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 136: { /* pos_limit_min (int32_t) */
-        int32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_pos_limit_min(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 137: { /* pos_limit_max (int32_t) */
-        int32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_pos_limit_max(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 138: { /* error_enable_mask (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_error_enable_mask(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 160: { /* mit_kp (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_mit_kp(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 161: { /* mit_kd (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_mit_kd(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 162: { /* mit_max_current (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_mit_max_current(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 163: { /* mit_feedforward_torque (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_mit_feedforward_torque(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 164: { /* force_kp (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_force_kp(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 165: { /* force_ki (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_force_ki(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 166: { /* force_limit (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_force_limit(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 167: { /* force_control_enable (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_force_control_enable(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 168: { /* homing_method (uint32_t) */
-        uint32_t v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_homing_method(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 169: { /* homing_speed (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_homing_speed(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    case 170: { /* homing_offset (float) */
-        float v;
-        memcpy(&v, in4, 4);
-        int rc = motor_info_set_homing_offset(cfg, v);
-        return (rc == 0) ? 0 : -2; }
-    default:
+    const motor_info_param_desc_t *desc = motor_info_find_desc(pid);
+    if (desc == NULL)
         return -1;
-    }
+    if (desc->access == MOTOR_INFO_ACCESS_RO)
+        return -3;
+    if (!motor_info_raw_in_range(desc, in4))
+        return -2;
+    memcpy(&cfg->raw[desc->offset], in4, desc->size);
+    return 0;
+}
+
+int motor_info_read_u32(const motor_info_t *cfg, uint16_t pid, uint32_t *value)
+{
+    if (value == NULL)
+        return -1;
+    uint8_t raw[4], type, len;
+    int rc = motor_info_dispatch_read(pid, cfg, raw, &type, &len);
+    if (rc != 0)
+        return rc;
+    if (type != MOTOR_INFO_TYPE_U8 && type != MOTOR_INFO_TYPE_U16 && type != MOTOR_INFO_TYPE_U32)
+        return -1;
+    uint32_t v = 0;
+    memcpy(&v, raw, len);
+    *value = v;
+    return 0;
+}
+
+int motor_info_write_u32(motor_info_t *cfg, uint16_t pid, uint32_t value)
+{
+    uint8_t raw[4];
+    memcpy(raw, &value, sizeof(value));
+    return motor_info_dispatch_write(pid, cfg, raw, sizeof(value));
+}
+
+int motor_info_read_i32(const motor_info_t *cfg, uint16_t pid, int32_t *value)
+{
+    if (value == NULL)
+        return -1;
+    uint8_t raw[4], type, len;
+    int rc = motor_info_dispatch_read(pid, cfg, raw, &type, &len);
+    if (rc != 0)
+        return rc;
+    if (type != MOTOR_INFO_TYPE_I8 && type != MOTOR_INFO_TYPE_I16 && type != MOTOR_INFO_TYPE_I32)
+        return -1;
+    int32_t v = 0;
+    memcpy(&v, raw, len);
+    *value = v;
+    return 0;
+}
+
+int motor_info_write_i32(motor_info_t *cfg, uint16_t pid, int32_t value)
+{
+    uint8_t raw[4];
+    memcpy(raw, &value, sizeof(value));
+    return motor_info_dispatch_write(pid, cfg, raw, sizeof(value));
+}
+
+int motor_info_read_f32(const motor_info_t *cfg, uint16_t pid, float *value)
+{
+    if (value == NULL)
+        return -1;
+    uint8_t raw[4], type, len;
+    int rc = motor_info_dispatch_read(pid, cfg, raw, &type, &len);
+    if (rc != 0)
+        return rc;
+    if (type != MOTOR_INFO_TYPE_F32 || len != sizeof(float))
+        return -1;
+    memcpy(value, raw, sizeof(float));
+    return 0;
+}
+
+int motor_info_write_f32(motor_info_t *cfg, uint16_t pid, float value)
+{
+    uint8_t raw[4];
+    memcpy(raw, &value, sizeof(value));
+    return motor_info_dispatch_write(pid, cfg, raw, sizeof(value));
 }

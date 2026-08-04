@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.h
  * @brief   MotorInfo 配置参数 API 接口（1024B 整块空间）
- * @date    2026-07-20
+ * @date    2026-08-04
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -25,7 +25,7 @@ extern "C" {
 #endif
 
 /* ===== 自动生成元信息 ===== */
-#define MOTOR_INFO_GEN_DATE     "2026-07-20"
+#define MOTOR_INFO_GEN_DATE     "2026-08-04"
 #define MOTOR_INFO_PARAM_COUNT   90
 #define MOTOR_INFO_VERSION_MAJOR 1
 #define MOTOR_INFO_VERSION_MINOR 0
@@ -127,7 +127,7 @@ typedef struct __ALIGNED_4
 {
     float    device_zero                     ; /* 设备零度 (rad)  [机械零点位置 [DeviceParam段48-63 本表占用48-55]] */
     uint32_t device_time                     ; /* 设备生产日期  [YYYYMMDD格式] */
-    uint32_t can_id                          ; /* CAN节点ID  [1~127, 0保留为广播] */
+    uint32_t can_id                          ; /* CAN节点ID  [设备节点地址 0保留为广播] */
     uint32_t can_baudrate                    ; /* CAN波特率 (bps) */
     float    can_timeout_s                   ; /* CAN通信超时 (s)  [0=禁用超时] */
     uint32_t can_fd_enable                   ; /* CAN FD使能  [0:传统CAN 1:CAN FD] */
@@ -228,6 +228,99 @@ typedef union __ALIGNED_4
     } blocks;
 } motor_info_t;  /* 1024B */
 
+/* ===== Parameter IDs (CSV Index) ===== */
+#define MOTOR_INFO_PID_CONFIG_VERSION                    0u
+#define MOTOR_INFO_PID_ENABLE_UART                       1u
+#define MOTOR_INFO_PID_ENABLE_BUS_SENSOR                 2u
+#define MOTOR_INFO_PID_SAFETY_LIMIT                      3u
+#define MOTOR_INFO_PID_TOTAL_RUNTIME_S                   4u
+#define MOTOR_INFO_PID_IS_CALIBRATED                     16u
+#define MOTOR_INFO_PID_POLE_PAIRS                        17u
+#define MOTOR_INFO_PID_MOTOR_TYPE                        18u
+#define MOTOR_INFO_PID_DIRECTION                         19u
+#define MOTOR_INFO_PID_PHASE_RESISTANCE                  20u
+#define MOTOR_INFO_PID_PHASE_INDUCTANCE_D                21u
+#define MOTOR_INFO_PID_PHASE_INDUCTANCE_Q                22u
+#define MOTOR_INFO_PID_FLUX_LINKAGE                      23u
+#define MOTOR_INFO_PID_TORQUE_CONSTANT                   24u
+#define MOTOR_INFO_PID_ROTOR_INERTIA                     25u
+#define MOTOR_INFO_PID_FRICTION_COULOMB                  26u
+#define MOTOR_INFO_PID_FRICTION_VISCOUS                  27u
+#define MOTOR_INFO_PID_GEAR_RATIO                        28u
+#define MOTOR_INFO_PID_GEAR_EFFICIENCY                   29u
+#define MOTOR_INFO_PID_CALIBRATION_CURRENT               30u
+#define MOTOR_INFO_PID_RESISTANCE_CALIB_MAX_VOLTAGE      31u
+#define MOTOR_INFO_PID_CURRENT_LIM                       32u
+#define MOTOR_INFO_PID_CURRENT_CONTROL_BANDWIDTH         33u
+#define MOTOR_INFO_PID_ENC_TYPE                          34u
+#define MOTOR_INFO_PID_ENC_LINES                         35u
+#define MOTOR_INFO_PID_ENC_DIRECTION                     36u
+#define MOTOR_INFO_PID_ENC_OFFSET                        37u
+#define MOTOR_INFO_PID_ELEC_ANGLE_BIAS                   38u
+#define MOTOR_INFO_PID_PWM_FREQ_HZ                       39u
+#define MOTOR_INFO_PID_DEAD_TIME_NS                      40u
+#define MOTOR_INFO_PID_SHUNT_RESISTANCE                  41u
+#define MOTOR_INFO_PID_CURRENT_AMP_GAIN                  42u
+#define MOTOR_INFO_PID_PEAK_CURRENT                      43u
+#define MOTOR_INFO_PID_MAX_SPEED                         44u
+#define MOTOR_INFO_PID_DEVICE_ZERO                       48u
+#define MOTOR_INFO_PID_DEVICE_TIME                       49u
+#define MOTOR_INFO_PID_CAN_ID                            50u
+#define MOTOR_INFO_PID_CAN_BAUDRATE                      51u
+#define MOTOR_INFO_PID_CAN_TIMEOUT_S                     52u
+#define MOTOR_INFO_PID_CAN_FD_ENABLE                     53u
+#define MOTOR_INFO_PID_CAN_FD_BAUDRATE                   54u
+#define MOTOR_INFO_PID_UART_BAUDRATE                     55u
+#define MOTOR_INFO_PID_KP_LD                             64u
+#define MOTOR_INFO_PID_KI_LD                             65u
+#define MOTOR_INFO_PID_KP_LQ                             66u
+#define MOTOR_INFO_PID_KI_LQ                             67u
+#define MOTOR_INFO_PID_INTEGRAL_LIMIT                    68u
+#define MOTOR_INFO_PID_DECOUPLING_GAIN                   69u
+#define MOTOR_INFO_PID_COMP_DU_V                         70u
+#define MOTOR_INFO_PID_PWM_DUTY_MAX                      71u
+#define MOTOR_INFO_PID_KP_S                              72u
+#define MOTOR_INFO_PID_KI_S                              73u
+#define MOTOR_INFO_PID_SPEED_INTEGRAL_LIMIT              74u
+#define MOTOR_INFO_PID_VFF                               75u
+#define MOTOR_INFO_PID_AFF                               76u
+#define MOTOR_INFO_PID_JERK_FF                           77u
+#define MOTOR_INFO_PID_SPEED_FILTER_ALPHA                78u
+#define MOTOR_INFO_PID_SPEED_FILTER_ENABLE               79u
+#define MOTOR_INFO_PID_KP_P                              80u
+#define MOTOR_INFO_PID_KI_P                              81u
+#define MOTOR_INFO_PID_POSITION_INTEGRAL_LIMIT           82u
+#define MOTOR_INFO_PID_POSITION_FILTER_ALPHA             83u
+#define MOTOR_INFO_PID_POSITION_FILTER_ENABLE            84u
+#define MOTOR_INFO_PID_FOLLOWING_ERROR_LIMIT             85u
+#define MOTOR_INFO_PID_DECOUPLE_ALGO                     86u
+#define MOTOR_INFO_PID_BEMF_FF_ENABLE                    87u
+#define MOTOR_INFO_PID_DEADTIME_COMP_ENABLE              88u
+#define MOTOR_INFO_PID_PID_SOURCE_MASK                   127u
+#define MOTOR_INFO_PID_OVER_CURRENT_A                    128u
+#define MOTOR_INFO_PID_OVER_VOLTAGE_V                    129u
+#define MOTOR_INFO_PID_UNDER_VOLTAGE_V                   130u
+#define MOTOR_INFO_PID_OVER_TEMP_DRIVE                   131u
+#define MOTOR_INFO_PID_OVER_TEMP_MOTOR                   132u
+#define MOTOR_INFO_PID_UNDER_TEMP_D                      133u
+#define MOTOR_INFO_PID_OVER_SPEED_RAD_S                  134u
+#define MOTOR_INFO_PID_POSITION_FOLLOWING_ERROR_P        135u
+#define MOTOR_INFO_PID_POS_LIMIT_MIN                     136u
+#define MOTOR_INFO_PID_POS_LIMIT_MAX                     137u
+#define MOTOR_INFO_PID_ERROR_ENABLE_MASK                 138u
+#define MOTOR_INFO_PID_MIT_KP                            160u
+#define MOTOR_INFO_PID_MIT_KD                            161u
+#define MOTOR_INFO_PID_MIT_MAX_CURRENT                   162u
+#define MOTOR_INFO_PID_MIT_FEEDFORWARD_TORQUE            163u
+#define MOTOR_INFO_PID_FORCE_KP                          164u
+#define MOTOR_INFO_PID_FORCE_KI                          165u
+#define MOTOR_INFO_PID_FORCE_LIMIT                       166u
+#define MOTOR_INFO_PID_FORCE_CONTROL_ENABLE              167u
+#define MOTOR_INFO_PID_HOMING_METHOD                     168u
+#define MOTOR_INFO_PID_HOMING_SPEED                      169u
+#define MOTOR_INFO_PID_HOMING_OFFSET                     170u
+#define MOTOR_INFO_MAX_PID                                   170u
+
 /******************************************************************************
  * @brief   基础 API
  ******************************************************************************/
@@ -252,1284 +345,6 @@ int  motor_info_validate(const motor_info_t *cfg);
 void motor_info_print(const motor_info_t *cfg);
 
 /******************************************************************************
- * @brief   系统级参数
- ******************************************************************************/
-/**
- * @brief   读取 配置版本号
- * @param   cfg 参数区指针
- * @return  配置版本号
- */
-uint32_t motor_info_get_config_version(const motor_info_t *cfg);
-/**
- * @brief   设置 配置版本号
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_config_version(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 接口使能
- * @param   cfg 参数区指针
- * @return  接口使能
- */
-uint32_t motor_info_get_enable_uart(const motor_info_t *cfg);
-/**
- * @brief   设置 接口使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_enable_uart(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 总线传感器使能
- * @param   cfg 参数区指针
- * @return  总线传感器使能
- */
-uint32_t motor_info_get_enable_bus_sensor(const motor_info_t *cfg);
-/**
- * @brief   设置 总线传感器使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_enable_bus_sensor(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 安全限制使能
- * @param   cfg 参数区指针
- * @return  安全限制使能
- */
-uint32_t motor_info_get_safety_limit(const motor_info_t *cfg);
-/**
- * @brief   设置 安全限制使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_safety_limit(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 累计运行时间 (s)
- * @param   cfg 参数区指针
- * @return  累计运行时间
- */
-uint32_t motor_info_get_total_runtime_s(const motor_info_t *cfg);
-/**
- * @brief   设置 累计运行时间 (s)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_total_runtime_s(motor_info_t *cfg, uint32_t value);
-
-/******************************************************************************
- * @brief   电机标定参数（含减速器/编码器/功率级/电流采样）
- ******************************************************************************/
-/**
- * @brief   读取 电机是否校准
- * @param   cfg 参数区指针
- * @return  电机是否校准
- */
-uint32_t motor_info_get_is_calibrated(const motor_info_t *cfg);
-/**
- * @brief   设置 电机是否校准
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_is_calibrated(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 电机极对数 (pairs)
- * @param   cfg 参数区指针
- * @return  电机极对数
- */
-uint32_t motor_info_get_pole_pairs(const motor_info_t *cfg);
-/**
- * @brief   设置 电机极对数 (pairs)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_pole_pairs(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 电机类型
- * @param   cfg 参数区指针
- * @return  电机类型
- */
-uint32_t motor_info_get_motor_type(const motor_info_t *cfg);
-/**
- * @brief   设置 电机类型
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_motor_type(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 电机方向
- * @param   cfg 参数区指针
- * @return  电机方向
- */
-uint32_t motor_info_get_direction(const motor_info_t *cfg);
-/**
- * @brief   设置 电机方向
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_direction(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 相电阻 (ohm)
- * @param   cfg 参数区指针
- * @return  相电阻
- */
-float motor_info_get_phase_resistance(const motor_info_t *cfg);
-/**
- * @brief   设置 相电阻 (ohm)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_phase_resistance(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 d轴相电感 (H)
- * @param   cfg 参数区指针
- * @return  d轴相电感
- */
-float motor_info_get_phase_inductance_d(const motor_info_t *cfg);
-/**
- * @brief   设置 d轴相电感 (H)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_phase_inductance_d(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 q轴相电感 (H)
- * @param   cfg 参数区指针
- * @return  q轴相电感
- */
-float motor_info_get_phase_inductance_q(const motor_info_t *cfg);
-/**
- * @brief   设置 q轴相电感 (H)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_phase_inductance_q(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 永磁体磁链 (Wb)
- * @param   cfg 参数区指针
- * @return  永磁体磁链
- */
-float motor_info_get_flux_linkage(const motor_info_t *cfg);
-/**
- * @brief   设置 永磁体磁链 (Wb)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_flux_linkage(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 转矩常数 (Nm/A)
- * @param   cfg 参数区指针
- * @return  转矩常数
- */
-float motor_info_get_torque_constant(const motor_info_t *cfg);
-/**
- * @brief   设置 转矩常数 (Nm/A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_torque_constant(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 转子惯量 (kg·m²)
- * @param   cfg 参数区指针
- * @return  转子惯量
- */
-float motor_info_get_rotor_inertia(const motor_info_t *cfg);
-/**
- * @brief   设置 转子惯量 (kg·m²)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_rotor_inertia(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 库仑摩擦力矩 (Nm)
- * @param   cfg 参数区指针
- * @return  库仑摩擦力矩
- */
-float motor_info_get_friction_coulomb(const motor_info_t *cfg);
-/**
- * @brief   设置 库仑摩擦力矩 (Nm)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_friction_coulomb(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 粘滞摩擦系数 (Nm/(rad/s))
- * @param   cfg 参数区指针
- * @return  粘滞摩擦系数
- */
-float motor_info_get_friction_viscous(const motor_info_t *cfg);
-/**
- * @brief   设置 粘滞摩擦系数 (Nm/(rad/s))
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_friction_viscous(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 减速比
- * @param   cfg 参数区指针
- * @return  减速比
- */
-float motor_info_get_gear_ratio(const motor_info_t *cfg);
-/**
- * @brief   设置 减速比
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_gear_ratio(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 减速器效率
- * @param   cfg 参数区指针
- * @return  减速器效率
- */
-float motor_info_get_gear_efficiency(const motor_info_t *cfg);
-/**
- * @brief   设置 减速器效率
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_gear_efficiency(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 校准电流 (A)
- * @param   cfg 参数区指针
- * @return  校准电流
- */
-float motor_info_get_calibration_current(const motor_info_t *cfg);
-/**
- * @brief   设置 校准电流 (A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_calibration_current(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 电阻校准最大电压 (V)
- * @param   cfg 参数区指针
- * @return  电阻校准最大电压
- */
-float motor_info_get_resistance_calib_max_voltage(const motor_info_t *cfg);
-/**
- * @brief   设置 电阻校准最大电压 (V)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_resistance_calib_max_voltage(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 峰值电流限制 (A)
- * @param   cfg 参数区指针
- * @return  峰值电流限制
- */
-float motor_info_get_current_lim(const motor_info_t *cfg);
-/**
- * @brief   设置 峰值电流限制 (A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_current_lim(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 电流环带宽 (Hz)
- * @param   cfg 参数区指针
- * @return  电流环带宽
- */
-float motor_info_get_current_control_bandwidth(const motor_info_t *cfg);
-/**
- * @brief   设置 电流环带宽 (Hz)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_current_control_bandwidth(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 编码器类型
- * @param   cfg 参数区指针
- * @return  编码器类型
- */
-uint32_t motor_info_get_enc_type(const motor_info_t *cfg);
-/**
- * @brief   设置 编码器类型
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_enc_type(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 编码器分辨率 (CPR)
- * @param   cfg 参数区指针
- * @return  编码器分辨率
- */
-uint32_t motor_info_get_enc_lines(const motor_info_t *cfg);
-/**
- * @brief   设置 编码器分辨率 (CPR)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_enc_lines(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 编码器计数方向
- * @param   cfg 参数区指针
- * @return  编码器计数方向
- */
-int32_t motor_info_get_enc_direction(const motor_info_t *cfg);
-/**
- * @brief   设置 编码器计数方向
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_enc_direction(motor_info_t *cfg, int32_t value);
-
-/**
- * @brief   读取 编码器初始位置偏移 (deg)
- * @param   cfg 参数区指针
- * @return  编码器初始位置偏移
- */
-float motor_info_get_enc_offset(const motor_info_t *cfg);
-/**
- * @brief   设置 编码器初始位置偏移 (deg)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_enc_offset(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 电角度偏移 (rad)
- * @param   cfg 参数区指针
- * @return  电角度偏移
- */
-float motor_info_get_elec_angle_bias(const motor_info_t *cfg);
-/**
- * @brief   设置 电角度偏移 (rad)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_elec_angle_bias(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 PWM载波频率 (Hz)
- * @param   cfg 参数区指针
- * @return  PWM载波频率
- */
-uint32_t motor_info_get_pwm_freq_hz(const motor_info_t *cfg);
-/**
- * @brief   设置 PWM载波频率 (Hz)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_pwm_freq_hz(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 PWM死区时间 (ns)
- * @param   cfg 参数区指针
- * @return  PWM死区时间
- */
-float motor_info_get_dead_time_ns(const motor_info_t *cfg);
-/**
- * @brief   设置 PWM死区时间 (ns)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_dead_time_ns(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 电流采样电阻 (ohm)
- * @param   cfg 参数区指针
- * @return  电流采样电阻
- */
-float motor_info_get_shunt_resistance(const motor_info_t *cfg);
-/**
- * @brief   设置 电流采样电阻 (ohm)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_shunt_resistance(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 电流放大增益
- * @param   cfg 参数区指针
- * @return  电流放大增益
- */
-float motor_info_get_current_amp_gain(const motor_info_t *cfg);
-/**
- * @brief   设置 电流放大增益
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_current_amp_gain(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 峰值电流 (A)
- * @param   cfg 参数区指针
- * @return  峰值电流
- */
-float motor_info_get_peak_current(const motor_info_t *cfg);
-/**
- * @brief   设置 峰值电流 (A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_peak_current(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 最大转速 (rad/s)
- * @param   cfg 参数区指针
- * @return  最大转速
- */
-float motor_info_get_max_speed(const motor_info_t *cfg);
-/**
- * @brief   设置 最大转速 (rad/s)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_max_speed(motor_info_t *cfg, float value);
-
-/******************************************************************************
- * @brief   设备参数（CAN/UART）
- ******************************************************************************/
-/**
- * @brief   读取 设备零度 (rad)
- * @param   cfg 参数区指针
- * @return  设备零度
- */
-float motor_info_get_device_zero(const motor_info_t *cfg);
-/**
- * @brief   设置 设备零度 (rad)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_device_zero(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 设备生产日期
- * @param   cfg 参数区指针
- * @return  设备生产日期
- */
-uint32_t motor_info_get_device_time(const motor_info_t *cfg);
-/**
- * @brief   设置 设备生产日期
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_device_time(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 CAN节点ID
- * @param   cfg 参数区指针
- * @return  CAN节点ID
- */
-uint32_t motor_info_get_can_id(const motor_info_t *cfg);
-/**
- * @brief   设置 CAN节点ID
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_can_id(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 CAN波特率 (bps)
- * @param   cfg 参数区指针
- * @return  CAN波特率
- */
-uint32_t motor_info_get_can_baudrate(const motor_info_t *cfg);
-/**
- * @brief   设置 CAN波特率 (bps)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_can_baudrate(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 CAN通信超时 (s)
- * @param   cfg 参数区指针
- * @return  CAN通信超时
- */
-float motor_info_get_can_timeout_s(const motor_info_t *cfg);
-/**
- * @brief   设置 CAN通信超时 (s)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_can_timeout_s(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 CAN FD使能
- * @param   cfg 参数区指针
- * @return  CAN FD使能
- */
-uint32_t motor_info_get_can_fd_enable(const motor_info_t *cfg);
-/**
- * @brief   设置 CAN FD使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_can_fd_enable(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 CAN FD数据波特率 (bps)
- * @param   cfg 参数区指针
- * @return  CAN FD数据波特率
- */
-uint32_t motor_info_get_can_fd_baudrate(const motor_info_t *cfg);
-/**
- * @brief   设置 CAN FD数据波特率 (bps)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_can_fd_baudrate(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 UART波特率 (bps)
- * @param   cfg 参数区指针
- * @return  UART波特率
- */
-uint32_t motor_info_get_uart_baudrate(const motor_info_t *cfg);
-/**
- * @brief   设置 UART波特率 (bps)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_uart_baudrate(motor_info_t *cfg, uint32_t value);
-
-/******************************************************************************
- * @brief   控制参数（三环PID+前馈+滤波）
- ******************************************************************************/
-/**
- * @brief   读取 d轴比例增益 (V/A)
- * @param   cfg 参数区指针
- * @return  d轴比例增益
- */
-float motor_info_get_kp_ld(const motor_info_t *cfg);
-/**
- * @brief   设置 d轴比例增益 (V/A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_kp_ld(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 d轴积分增益 (V/(A·s))
- * @param   cfg 参数区指针
- * @return  d轴积分增益
- */
-float motor_info_get_ki_ld(const motor_info_t *cfg);
-/**
- * @brief   设置 d轴积分增益 (V/(A·s))
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_ki_ld(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 q轴比例增益 (V/A)
- * @param   cfg 参数区指针
- * @return  q轴比例增益
- */
-float motor_info_get_kp_lq(const motor_info_t *cfg);
-/**
- * @brief   设置 q轴比例增益 (V/A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_kp_lq(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 q轴积分增益 (V/(A·s))
- * @param   cfg 参数区指针
- * @return  q轴积分增益
- */
-float motor_info_get_ki_lq(const motor_info_t *cfg);
-/**
- * @brief   设置 q轴积分增益 (V/(A·s))
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_ki_lq(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 积分限幅 (V)
- * @param   cfg 参数区指针
- * @return  积分限幅
- */
-float motor_info_get_integral_limit(const motor_info_t *cfg);
-/**
- * @brief   设置 积分限幅 (V)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_integral_limit(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 dq轴解耦增益
- * @param   cfg 参数区指针
- * @return  dq轴解耦增益
- */
-float motor_info_get_decoupling_gain(const motor_info_t *cfg);
-/**
- * @brief   设置 dq轴解耦增益
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_decoupling_gain(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 死区补偿电压 (V)
- * @param   cfg 参数区指针
- * @return  死区补偿电压
- */
-float motor_info_get_comp_du_V(const motor_info_t *cfg);
-/**
- * @brief   设置 死区补偿电压 (V)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_comp_du_V(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 PWM最大占空比
- * @param   cfg 参数区指针
- * @return  PWM最大占空比
- */
-float motor_info_get_pwm_duty_max(const motor_info_t *cfg);
-/**
- * @brief   设置 PWM最大占空比
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_pwm_duty_max(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 速度环比例增益 (A/(rad/s))
- * @param   cfg 参数区指针
- * @return  速度环比例增益
- */
-float motor_info_get_kp_s(const motor_info_t *cfg);
-/**
- * @brief   设置 速度环比例增益 (A/(rad/s))
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_kp_s(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 速度环积分增益 (A/rad)
- * @param   cfg 参数区指针
- * @return  速度环积分增益
- */
-float motor_info_get_ki_s(const motor_info_t *cfg);
-/**
- * @brief   设置 速度环积分增益 (A/rad)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_ki_s(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 速度环积分限幅 (A)
- * @param   cfg 参数区指针
- * @return  速度环积分限幅
- */
-float motor_info_get_speed_integral_limit(const motor_info_t *cfg);
-/**
- * @brief   设置 速度环积分限幅 (A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_speed_integral_limit(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 速度前馈系数
- * @param   cfg 参数区指针
- * @return  速度前馈系数
- */
-float motor_info_get_vff(const motor_info_t *cfg);
-/**
- * @brief   设置 速度前馈系数
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_vff(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 加速度前馈系数
- * @param   cfg 参数区指针
- * @return  加速度前馈系数
- */
-float motor_info_get_aff(const motor_info_t *cfg);
-/**
- * @brief   设置 加速度前馈系数
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_aff(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 加加速度前馈系数
- * @param   cfg 参数区指针
- * @return  加加速度前馈系数
- */
-float motor_info_get_jerk_ff(const motor_info_t *cfg);
-/**
- * @brief   设置 加加速度前馈系数
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_jerk_ff(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 速度滤波系数
- * @param   cfg 参数区指针
- * @return  速度滤波系数
- */
-float motor_info_get_speed_filter_alpha(const motor_info_t *cfg);
-/**
- * @brief   设置 速度滤波系数
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_speed_filter_alpha(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 速度滤波使能
- * @param   cfg 参数区指针
- * @return  速度滤波使能
- */
-uint32_t motor_info_get_speed_filter_enable(const motor_info_t *cfg);
-/**
- * @brief   设置 速度滤波使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_speed_filter_enable(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 位置环比例增益 (Hz)
- * @param   cfg 参数区指针
- * @return  位置环比例增益
- */
-float motor_info_get_kp_p(const motor_info_t *cfg);
-/**
- * @brief   设置 位置环比例增益 (Hz)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_kp_p(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 位置环积分增益 (1/s)
- * @param   cfg 参数区指针
- * @return  位置环积分增益
- */
-float motor_info_get_ki_p(const motor_info_t *cfg);
-/**
- * @brief   设置 位置环积分增益 (1/s)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_ki_p(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 位置环积分限幅 (rad)
- * @param   cfg 参数区指针
- * @return  位置环积分限幅
- */
-float motor_info_get_position_integral_limit(const motor_info_t *cfg);
-/**
- * @brief   设置 位置环积分限幅 (rad)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_position_integral_limit(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 位置滤波系数
- * @param   cfg 参数区指针
- * @return  位置滤波系数
- */
-float motor_info_get_position_filter_alpha(const motor_info_t *cfg);
-/**
- * @brief   设置 位置滤波系数
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_position_filter_alpha(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 位置滤波使能
- * @param   cfg 参数区指针
- * @return  位置滤波使能
- */
-uint32_t motor_info_get_position_filter_enable(const motor_info_t *cfg);
-/**
- * @brief   设置 位置滤波使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_position_filter_enable(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 跟随误差限制 (P)
- * @param   cfg 参数区指针
- * @return  跟随误差限制
- */
-float motor_info_get_following_error_limit(const motor_info_t *cfg);
-/**
- * @brief   设置 跟随误差限制 (P)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_following_error_limit(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 交叉解耦算法
- * @param   cfg 参数区指针
- * @return  交叉解耦算法
- */
-uint32_t motor_info_get_decouple_algo(const motor_info_t *cfg);
-/**
- * @brief   设置 交叉解耦算法
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_decouple_algo(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 反电势前馈使能
- * @param   cfg 参数区指针
- * @return  反电势前馈使能
- */
-uint32_t motor_info_get_bemf_ff_enable(const motor_info_t *cfg);
-/**
- * @brief   设置 反电势前馈使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_bemf_ff_enable(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 死区补偿使能
- * @param   cfg 参数区指针
- * @return  死区补偿使能
- */
-uint32_t motor_info_get_deadtime_comp_enable(const motor_info_t *cfg);
-/**
- * @brief   设置 死区补偿使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_deadtime_comp_enable(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 PID来源位掩码
- * @param   cfg 参数区指针
- * @return  PID来源位掩码
- */
-uint32_t motor_info_get_pid_source_mask(const motor_info_t *cfg);
-/**
- * @brief   设置 PID来源位掩码
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_pid_source_mask(motor_info_t *cfg, uint32_t value);
-
-/******************************************************************************
- * @brief   保护与通信参数
- ******************************************************************************/
-/**
- * @brief   读取 过流保护阈值 (A)
- * @param   cfg 参数区指针
- * @return  过流保护阈值
- */
-float motor_info_get_over_current_A(const motor_info_t *cfg);
-/**
- * @brief   设置 过流保护阈值 (A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_over_current_A(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 过压保护阈值 (V)
- * @param   cfg 参数区指针
- * @return  过压保护阈值
- */
-float motor_info_get_over_voltage_V(const motor_info_t *cfg);
-/**
- * @brief   设置 过压保护阈值 (V)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_over_voltage_V(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 欠压保护阈值 (V)
- * @param   cfg 参数区指针
- * @return  欠压保护阈值
- */
-float motor_info_get_under_voltage_V(const motor_info_t *cfg);
-/**
- * @brief   设置 欠压保护阈值 (V)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_under_voltage_V(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 驱动器过温阈值 (℃)
- * @param   cfg 参数区指针
- * @return  驱动器过温阈值
- */
-float motor_info_get_over_temp_drive(const motor_info_t *cfg);
-/**
- * @brief   设置 驱动器过温阈值 (℃)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_over_temp_drive(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 电机过温阈值 (℃)
- * @param   cfg 参数区指针
- * @return  电机过温阈值
- */
-float motor_info_get_over_temp_motor(const motor_info_t *cfg);
-/**
- * @brief   设置 电机过温阈值 (℃)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_over_temp_motor(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 欠温保护阈值 (℃)
- * @param   cfg 参数区指针
- * @return  欠温保护阈值
- */
-float motor_info_get_under_temp_d(const motor_info_t *cfg);
-/**
- * @brief   设置 欠温保护阈值 (℃)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_under_temp_d(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 过速保护阈值 (rad/s)
- * @param   cfg 参数区指针
- * @return  过速保护阈值
- */
-float motor_info_get_over_speed_rad_s(const motor_info_t *cfg);
-/**
- * @brief   设置 过速保护阈值 (rad/s)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_over_speed_rad_s(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 位置跟随误差保护 (P)
- * @param   cfg 参数区指针
- * @return  位置跟随误差保护
- */
-int32_t motor_info_get_position_following_error_p(const motor_info_t *cfg);
-/**
- * @brief   设置 位置跟随误差保护 (P)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_position_following_error_p(motor_info_t *cfg, int32_t value);
-
-/**
- * @brief   读取 位置下限 (P)
- * @param   cfg 参数区指针
- * @return  位置下限
- */
-int32_t motor_info_get_pos_limit_min(const motor_info_t *cfg);
-/**
- * @brief   设置 位置下限 (P)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_pos_limit_min(motor_info_t *cfg, int32_t value);
-
-/**
- * @brief   读取 位置上限 (P)
- * @param   cfg 参数区指针
- * @return  位置上限
- */
-int32_t motor_info_get_pos_limit_max(const motor_info_t *cfg);
-/**
- * @brief   设置 位置上限 (P)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_pos_limit_max(motor_info_t *cfg, int32_t value);
-
-/**
- * @brief   读取 保护使能掩码
- * @param   cfg 参数区指针
- * @return  保护使能掩码
- */
-uint32_t motor_info_get_error_enable_mask(const motor_info_t *cfg);
-/**
- * @brief   设置 保护使能掩码
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_error_enable_mask(motor_info_t *cfg, uint32_t value);
-
-/******************************************************************************
- * @brief   高级算法参数（MIT/力控/回零）
- ******************************************************************************/
-/**
- * @brief   读取 MIT位置刚度 (Nm/rad)
- * @param   cfg 参数区指针
- * @return  MIT位置刚度
- */
-float motor_info_get_mit_kp(const motor_info_t *cfg);
-/**
- * @brief   设置 MIT位置刚度 (Nm/rad)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_mit_kp(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 MIT速度阻尼 (Nm/(rad/s))
- * @param   cfg 参数区指针
- * @return  MIT速度阻尼
- */
-float motor_info_get_mit_kd(const motor_info_t *cfg);
-/**
- * @brief   设置 MIT速度阻尼 (Nm/(rad/s))
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_mit_kd(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 MIT最大电流 (A)
- * @param   cfg 参数区指针
- * @return  MIT最大电流
- */
-float motor_info_get_mit_max_current(const motor_info_t *cfg);
-/**
- * @brief   设置 MIT最大电流 (A)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_mit_max_current(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 MIT前馈力矩 (Nm)
- * @param   cfg 参数区指针
- * @return  MIT前馈力矩
- */
-float motor_info_get_mit_feedforward_torque(const motor_info_t *cfg);
-/**
- * @brief   设置 MIT前馈力矩 (Nm)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_mit_feedforward_torque(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 力控比例增益 (A/Nm)
- * @param   cfg 参数区指针
- * @return  力控比例增益
- */
-float motor_info_get_force_kp(const motor_info_t *cfg);
-/**
- * @brief   设置 力控比例增益 (A/Nm)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_force_kp(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 力控积分增益 (A/(Nm·s))
- * @param   cfg 参数区指针
- * @return  力控积分增益
- */
-float motor_info_get_force_ki(const motor_info_t *cfg);
-/**
- * @brief   设置 力控积分增益 (A/(Nm·s))
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_force_ki(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 力控力矩限制 (Nm)
- * @param   cfg 参数区指针
- * @return  力控力矩限制
- */
-float motor_info_get_force_limit(const motor_info_t *cfg);
-/**
- * @brief   设置 力控力矩限制 (Nm)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_force_limit(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 力控使能
- * @param   cfg 参数区指针
- * @return  力控使能
- */
-uint32_t motor_info_get_force_control_enable(const motor_info_t *cfg);
-/**
- * @brief   设置 力控使能
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_force_control_enable(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 回零方法
- * @param   cfg 参数区指针
- * @return  回零方法
- */
-uint32_t motor_info_get_homing_method(const motor_info_t *cfg);
-/**
- * @brief   设置 回零方法
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_homing_method(motor_info_t *cfg, uint32_t value);
-
-/**
- * @brief   读取 回零速度 (rad/s)
- * @param   cfg 参数区指针
- * @return  回零速度
- */
-float motor_info_get_homing_speed(const motor_info_t *cfg);
-/**
- * @brief   设置 回零速度 (rad/s)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_homing_speed(motor_info_t *cfg, float value);
-
-/**
- * @brief   读取 回零偏移 (rad)
- * @param   cfg 参数区指针
- * @return  回零偏移
- */
-float motor_info_get_homing_offset(const motor_info_t *cfg);
-/**
- * @brief   设置 回零偏移 (rad)
- * @param   cfg 参数区指针
- * @param   value 要设置的值
- * @return  0=成功, -EINVAL=空指针或越界
- */
-int motor_info_set_homing_offset(motor_info_t *cfg, float value);
-
-/******************************************************************************
  * @brief   协议分发表 (param_id -> get/set), 供 0xE6-0xEB 单参读写
  ******************************************************************************/
 /* dispatch 返回码 */
@@ -1537,6 +352,15 @@ int motor_info_set_homing_offset(motor_info_t *cfg, float value);
 #define MOTOR_INFO_DISPATCH_E_BAD_ID -1
 #define MOTOR_INFO_DISPATCH_E_BOUNDS -2
 #define MOTOR_INFO_DISPATCH_E_RO     -3
+
+/* Protocol value type codes: u8=0 i8=1 u16=2 i16=3 u32=4 i32=5 f32=6 */
+#define MOTOR_INFO_TYPE_U8   0u
+#define MOTOR_INFO_TYPE_I8   1u
+#define MOTOR_INFO_TYPE_U16  2u
+#define MOTOR_INFO_TYPE_I16  3u
+#define MOTOR_INFO_TYPE_U32  4u
+#define MOTOR_INFO_TYPE_I32  5u
+#define MOTOR_INFO_TYPE_F32  6u
 
 /**
  * @brief 按 param_id 读单个参数, 值写入 out4(固定4B, 零填充)
@@ -1558,6 +382,14 @@ int motor_info_dispatch_read(uint16_t pid, const motor_info_t *cfg, uint8_t out4
  * @return 0=成功, -1=未知pid/空指针, -2=越界, -3=只读
  */
 int motor_info_dispatch_write(uint16_t pid, motor_info_t *cfg, const uint8_t in4[4], uint8_t len);
+
+/* Generic typed accessors for internal code paths. No field-level get/set API is generated. */
+int motor_info_read_u32(const motor_info_t *cfg, uint16_t pid, uint32_t *value);
+int motor_info_write_u32(motor_info_t *cfg, uint16_t pid, uint32_t value);
+int motor_info_read_i32(const motor_info_t *cfg, uint16_t pid, int32_t *value);
+int motor_info_write_i32(motor_info_t *cfg, uint16_t pid, int32_t value);
+int motor_info_read_f32(const motor_info_t *cfg, uint16_t pid, float *value);
+int motor_info_write_f32(motor_info_t *cfg, uint16_t pid, float value);
 
 #ifdef __cplusplus
 }

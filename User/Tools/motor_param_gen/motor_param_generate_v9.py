@@ -314,7 +314,9 @@ def generate_h(params, groups, output_h, module_name, config_type):
     L.append('')
 
     # Get/Set 声明
-    for group_name, gp in groups.items():
+    # Field-level get/set declarations are intentionally not generated.
+    # Use direct struct fields in runtime paths; protocol/config writes use table validation.
+    for group_name, gp in {}.items():
         L.append('/******************************************************************************')
         L.append(f' * @brief   {GROUP_COMMENTS[group_name]}')
         L.append(' ******************************************************************************/')
@@ -483,7 +485,9 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
     L.append('')
 
     # Get/Set 实现
-    for group_name, gp in groups.items():
+    # Field-level get/set implementations are intentionally not generated.
+    # This keeps Flash usage low and avoids function-call overhead in control paths.
+    for group_name, gp in {}.items():
         _, member_name = GROUP_STRUCT_NAMES[group_name]
         for p in gp:
             name = p['param_name']
@@ -596,10 +600,10 @@ def generate(csv_file, output_h, output_c, do_format=True, clang_format_path=Non
     print(f'   - 参数总数   : {len(params)}')
     print(f'   - 标量参数   : {scalar}  (字符串数组 {char_arr}, 数值数组 {num_arr} 已跳过访问接口)')
     print(f'   - 只读参数   : {readonly} (不生成 Set)')
-    print(f'   - Get 函数   : {accessible}')
-    print(f'   - Set 函数   : {set_count}')
+    print(f'   - Get ???   : 0')
+    print(f'   - Set ???   : 0')
     print(f'   - 基础函数   : 3 (init/validate/print)')
-    print(f'   - 合计 API   : {accessible + set_count + 3}')
+    print(f'   - 合计 API   : 3')
 
     if do_format:
         run_clang_format([output_h, output_c], clang_format_path)
