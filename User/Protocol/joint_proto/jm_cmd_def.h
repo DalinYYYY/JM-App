@@ -243,7 +243,9 @@ extern "C"
 		JM_TLM_TORQUE = (1u << 6),    /* torque(f32)                  4B */
 		JM_TLM_FAULT = (1u << 7),     /* fault(u32),warn(u32)         8B */
 		JM_TLM_STATE = (1u << 8),     /* topFsm,runState,ctrlMode,enable(u8) 4B */
-		JM_TLM_DEBUG = (1u << 9),     /* jm_dbg[JM_DBG_CH](f32)   N*4B */
+		JM_TLM_DEBUG = (1u << 9),     /* jm_dbg[JM_DBG_CH](f32), 变长组始终最后 */
+		JM_TLM_CURRENT_TARGET = (1u << 10), /* idRef,iqRef(f32)        8B */
+		JM_TLM_MOTION_TARGET = (1u << 11),  /* velRef,posRef(f32)      8B */
 	} jm_telemetry_bit_e;
 
 	/* ===================== 错误码(NACK 的 err_code) =====================

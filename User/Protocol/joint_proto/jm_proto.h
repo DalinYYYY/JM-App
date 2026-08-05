@@ -39,9 +39,13 @@ extern "C"
 	{
 		float pos;           /* 电机端多圈位置 θ_m rad (带符号, ±∞) */
 		float vel;           /* 电机端机械角速度 rad/s */
+		float pos_ref;       /* 位置目标 rad */
+		float vel_ref;       /* 速度目标 rad/s */
 		float torque;        /* 输出端力矩 Nm */
 		float id;            /* d轴电流 A */
 		float iq;            /* q轴电流 A */
+		float id_ref;        /* d轴电流目标 A */
+		float iq_ref;        /* q轴电流目标 A */
 		float ia, ib, ic;    /* 三相电流 A */
 		float vbus;          /* 母线电压 V */
 		float ibus;          /* 母线电流 A */

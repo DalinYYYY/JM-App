@@ -115,6 +115,20 @@ static uint16_t jm_host_commun_pack_telemetry(uint16_t mask, const jm_feedback_t
 		o[n++] = fb->ctrl_mode;
 		o[n++] = fb->enable;
 	}
+	if (mask & JM_TLM_CURRENT_TARGET) /* idRef,iqRef  8B */
+	{
+		jm_wr_f32(&o[n], fb->id_ref);
+		n += 4;
+		jm_wr_f32(&o[n], fb->iq_ref);
+		n += 4;
+	}
+	if (mask & JM_TLM_MOTION_TARGET) /* velRef,posRef  8B */
+	{
+		jm_wr_f32(&o[n], fb->vel_ref);
+		n += 4;
+		jm_wr_f32(&o[n], fb->pos_ref);
+		n += 4;
+	}
 	if (mask & JM_TLM_DEBUG) /* jm_dbg[JM_DBG_CH](f32)  N*4B */
 	{
 		uint8_t i;
@@ -142,7 +156,7 @@ static volatile uint32_t s_rx_timeout_count = 0;
 static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 {
 	jm_feedback_t fb;
-	uint8_t o[2 + 64 + JM_DBG_CH * 4]; /* mask(2) + 最大固定组(<=64) + 调试通道 */
+	uint8_t o[2 + 96 + JM_DBG_CH * 4]; /* mask(2) + 固定遥测组 + 调试通道 */
 	uint16_t mask;
 	uint16_t n;
 
@@ -301,7 +315,7 @@ void jm_host_commun_can_process(void)
 	if (++telemetry_tick >= jm_host_commun_telemetry_tick())
 	{
 		jm_feedback_t fb;
-		uint8_t o[2 + 64 + JM_DBG_CH * 4]; /* mask(2) + 最大固定组(<=64) + 调试通道 */
+		uint8_t o[2 + 96 + JM_DBG_CH * 4]; /* mask(2) + 固定遥测组 + 调试通道 */
 		uint16_t mask = jm_app_telemetry_mask();
 		if (mask != 0u && jm_app_get_feedback(&fb) == JM_ERR_OK)
 		{

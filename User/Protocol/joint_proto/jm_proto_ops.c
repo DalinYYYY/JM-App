@@ -553,9 +553,13 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 
 	fb->pos = m->motion.position_rad;       /* 电机端多圈位置 θ_m rad(带符号,±∞) -> UI"电机位置" */
 	fb->vel = m->motion.velocity_rad_s;     /* 电机端机械角速度 rad/s -> UI"电机速度" */
+	fb->pos_ref = motor_loop_get()->sys.motor.ref.pos;
+	fb->vel_ref = motor_loop_get()->sys.motor.ref.vel;
 	fb->torque = m->power.torque_est;       /* 输出端力矩 Nm(估算) */
 	fb->id = m->electrical.id_meas;         /* d轴电流 A */
 	fb->iq = m->electrical.iq_meas;         /* q轴电流 A */
+	fb->id_ref = motor_loop_get()->out.id_ref;
+	fb->iq_ref = motor_loop_get()->out.iq_ref;
 	fb->ia = m->electrical.ia;              /* A 相电流 A */
 	fb->ib = m->electrical.ib;              /* B 相电流 A */
 	fb->ic = m->electrical.ic;              /* C 相电流 A */
@@ -957,6 +961,19 @@ static uint16_t s_tlm_period_ms = 0u; /* 0 表示沿用绑定层默认周期 */
 
 static jm_err_e app_set_telemetry(uint8_t enable, uint16_t mask, uint16_t period_ms)
 {
+	const uint16_t supported_mask = (uint16_t)(
+		JM_TLM_POS_VEL | JM_TLM_DQ | JM_TLM_PHASE | JM_TLM_BUS |
+		JM_TLM_TEMP | JM_TLM_MULTITURN | JM_TLM_TORQUE | JM_TLM_FAULT |
+		JM_TLM_STATE | JM_TLM_DEBUG | JM_TLM_CURRENT_TARGET |
+		JM_TLM_MOTION_TARGET);
+	if ((mask & (uint16_t)~supported_mask) != 0u)
+	{
+		return JM_ERR_OUT_OF_RANGE;
+	}
+	if (enable && mask == 0u)
+	{
+		mask = supported_mask;
+	}
 	s_tlm_enable = enable ? 1u : 0u;
 	s_tlm_mask = mask;
 	if (period_ms != 0u)
