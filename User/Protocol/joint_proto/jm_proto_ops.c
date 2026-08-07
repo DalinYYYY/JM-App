@@ -40,7 +40,7 @@
 #include "motor_pid_autotune.h" /* motor_pid_autotune_apply: 零极点对消法理论估计 */
 #include "motor_pid_load.h"     /* motor_pid_set_source / motor_pid_reload: 三环独立 source */
 #include "motor_pid_profile.h"
-#include "motor_observer.h"     /* 统一实时快照与 B7/B6/C9 高速采样 */
+#include "motor_observer.h"     /* 统一实时快照与 TRACE 高速采样 */
 #include "main.h"               /* HAL_GetTick (速率限制) */
 #if defined(USE_DEV_LED)
 #include "led_manager.h"
@@ -108,7 +108,7 @@ static void app_pid_debug_abort(void)
 	uint8_t i;
 	if (!s_pid_debug.active)
 		return;
-	motor_observer_capture_stop();
+	motor_observer_trace_stop();
 	primask = __get_PRIMASK();
 	__disable_irq();
 	for (i = 0u; i < PID_RING_MAX; i++)
@@ -546,7 +546,7 @@ static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 		motor_pid_get_source(PID_RING_VELOCITY) != PID_SOURCE_DEBUG &&
 		motor_pid_get_source(PID_RING_POSITION) != PID_SOURCE_DEBUG)
 	{
-		motor_observer_capture_stop();
+		motor_observer_trace_stop();
 		s_pid_debug.active = 0u; /* 用户主动退出 DEBUG，不触发超时回滚 */
 	}
 
@@ -1144,26 +1144,36 @@ static jm_err_e app_get_debug(float *out, uint8_t *out_count, uint8_t max_count)
 	return JM_ERR_OK;
 }
 
-static jm_err_e app_capture_start(uint32_t channel_mask, uint32_t rate_hz,
-	uint16_t sample_count)
+static jm_err_e app_trace_config(uint8_t enable, uint16_t session_id,
+	uint32_t channel_mask, uint32_t rate_hz, uint8_t packet_samples,
+	uint8_t flags, uint8_t *out, uint16_t *out_len)
 {
 	const motor_loop_t *loop = motor_loop_get();
-	if (loop->current.dt <= 0.0f)
+	motor_observer_trace_status_t status;
+	(void)flags;
+	if (out == NULL || out_len == NULL || loop->current.dt <= 0.0f)
 		return JM_ERR_STATE_DENY;
-	return (motor_observer_capture_start(channel_mask, rate_hz, sample_count,
-			1.0f / loop->current.dt) == 0) ? JM_ERR_OK : JM_ERR_OUT_OF_RANGE;
+	if (!enable)
+	{
+		motor_observer_trace_stop();
+		*out_len = 0u;
+		return JM_ERR_OK;
+	}
+	if (motor_observer_trace_start(channel_mask, rate_hz, packet_samples,
+		1.0f / loop->current.dt, session_id, &status) != 0)
+		return JM_ERR_OUT_OF_RANGE;
+	jm_wr_u16(&out[0], status.session_id);
+	jm_wr_u32(&out[2], status.actual_rate_hz);
+	out[6] = status.packet_samples;
+	jm_wr_u16(&out[7], status.buffer_capacity);
+	*out_len = 9u;
+	return JM_ERR_OK;
 }
 
-static jm_err_e app_capture_stop(void)
+jm_err_e jm_app_trace_pop(uint8_t *out, uint16_t *out_len)
 {
-	return (motor_observer_capture_stop() == 0) ? JM_ERR_OK : JM_ERR_STATE_DENY;
-}
-
-static jm_err_e app_capture_read(uint16_t offset, uint8_t count,
-	uint8_t *out, uint16_t *out_len)
-{
-	return (motor_observer_capture_read(offset, count, out, out_len) == 0) ?
-		JM_ERR_OK : JM_ERR_OUT_OF_RANGE;
+	return (motor_observer_trace_pop(out, out_len) == 0) ?
+		JM_ERR_OK : JM_ERR_STATE_DENY;
 }
 
 /* ============================================================================
@@ -1488,9 +1498,8 @@ static const jm_proto_ops_t s_app_ops = {
 	.get_dev_name = app_get_dev_name,
 	.set_telemetry = app_set_telemetry,
 	.get_debug = app_get_debug,
-	.capture_start = app_capture_start,
-	.capture_stop = app_capture_stop,
-	.capture_read = app_capture_read,
+	.trace_config = app_trace_config,
+	.trace_pop = jm_app_trace_pop,
 	.param_read_bulk = app_param_read_bulk,
 	.param_write_bulk = app_param_write_bulk,
 	.set_can_id = app_set_can_id,

@@ -67,6 +67,9 @@ extern "C"
 	 */
 	uint16_t jm_app_telemetry_period_ms(void);
 
+	/* TRACE 通信服务从环形缓冲取一批数据。返回 JM_ERR_STATE_DENY 表示当前无完整数据包。 */
+	jm_err_e jm_app_trace_pop(uint8_t *out, uint16_t *out_len);
+
 	/* PID DEBUG 会话租约检查: 通信线程每拍调用，超时自动回滚。 */
 	void jm_app_pid_debug_poll(void);
 

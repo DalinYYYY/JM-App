@@ -54,14 +54,31 @@ void motor_observer_on_control_isr(const struct motor_loop_s *loop);
 /* Coherent, decimated live snapshot for telemetry, plots and PID observation. */
 int motor_observer_snapshot_read(motor_observer_snapshot_t *out);
 
-/* B7/B6/C9 trace backend. Channel bits are motor_observer_channel_e. */
-#define MOTOR_OBSERVER_CAPTURE_MAX_SAMPLES 256u
-#define MOTOR_OBSERVER_CAPTURE_CHANNELS 8u
-int motor_observer_capture_start(uint32_t channel_mask, uint32_t rate_hz,
-		uint16_t sample_count, float control_hz);
-int motor_observer_capture_stop(void);
-int motor_observer_capture_read(uint16_t offset, uint8_t count,
-		uint8_t *out, uint16_t *out_len);
+/* Continuous TRACE backend. Rows are packed in channel-bit order. */
+#define MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES 128u
+#define MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES 8u
+#define MOTOR_OBSERVER_TRACE_PAYLOAD_MAX 256u
+#define MOTOR_OBSERVER_TRACE_FLAG_OVERFLOW       0x01u
+#define MOTOR_OBSERVER_TRACE_FLAG_DISCONTINUITY  0x02u
+#define MOTOR_OBSERVER_TRACE_FLAG_LAST           0x04u
+
+typedef struct
+{
+	uint16_t session_id;
+	uint32_t channel_mask;
+	uint32_t actual_rate_hz;
+	uint8_t packet_samples;
+	uint8_t channels;
+	uint16_t buffer_capacity;
+	uint32_t overflow_count;
+	uint8_t running;
+} motor_observer_trace_status_t;
+
+int motor_observer_trace_start(uint32_t channel_mask, uint32_t rate_hz,
+		uint8_t packet_samples, float control_hz, uint16_t session_id,
+		motor_observer_trace_status_t *status);
+int motor_observer_trace_stop(void);
+int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len);
 
 #ifdef __cplusplus
 }

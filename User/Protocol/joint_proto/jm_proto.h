@@ -34,6 +34,20 @@ extern "C"
 /* 单帧载荷上限(数据区, 不含CMD) */
 #define JM_PAYLOAD_MAX 256
 
+/* TRACE 通道位序与 motor_observer_channel_e 对齐。 */
+#define JM_TRACE_CH_ID_REF  (1u << 0)
+#define JM_TRACE_CH_ID      (1u << 1)
+#define JM_TRACE_CH_IQ_REF  (1u << 2)
+#define JM_TRACE_CH_IQ      (1u << 3)
+#define JM_TRACE_CH_VEL_REF (1u << 4)
+#define JM_TRACE_CH_VEL     (1u << 5)
+#define JM_TRACE_CH_POS_REF (1u << 6)
+#define JM_TRACE_CH_POS     (1u << 7)
+#define JM_TRACE_CH_ALL     0xFFu
+#define JM_TRACE_FLAG_OVERFLOW       0x01u
+#define JM_TRACE_FLAG_DISCONTINUITY  0x02u
+#define JM_TRACE_FLAG_LAST            0x04u
+
 	/* ---------------- 实时反馈数据(读命令的数据源) ---------------- */
 	typedef struct
 	{
@@ -99,11 +113,14 @@ extern "C"
 		 * (reply_len-1)/4 解析)。max_count 为 out 容量。可为 NULL(则回通用 ACK)。
 		 * 用途: 免改协议加观测点, 任意处写 jm_dbg[i]=变量 即可上位机查看。*/
 		jm_err_e (*get_debug)(float *out, uint8_t *out_count, uint8_t max_count);
-		/* 高速采样复用 B7/B6/C9: B7 启动, B6 停止, C9 带载荷读取分块。 */
-		jm_err_e (*capture_start)(uint32_t ch_mask, uint32_t rate_hz, uint16_t sample_count);
-		jm_err_e (*capture_stop)(void);
-		jm_err_e (*capture_read)(uint16_t offset, uint8_t count,
+		/* TRACE 配置(CMD 0xB9): enable=0 停止; enable=1 开始独立批量波形流。
+		 * 成功时返回实际采样率、打包点数和缓冲容量。 */
+		jm_err_e (*trace_config)(uint8_t enable, uint16_t session_id,
+		                         uint32_t ch_mask, uint32_t rate_hz,
+		                         uint8_t packet_samples, uint8_t flags,
 		                         uint8_t *out, uint16_t *out_len);
+		/* 通信任务取一批已采样数据; 不在控制ISR内调用。 */
+		jm_err_e (*trace_pop)(uint8_t *out, uint16_t *out_len);
 
 		/* 批量读参数(CMD 0xE2): 从 start_id 起连续读 count 个, 应答体由实现层组织为
 		 * [start_id:u16][count:u8][[type:u8][value]...] 并写入 out, 写回 *out_len。

@@ -37,7 +37,7 @@ extern "C"
 	/* 主版本: 不兼容变更(命令码重排/载荷语义改); 次版本: 兼容追加(新命令/新字段);
 	 * 补丁: bug 修复。0xD0 READ_DEV_INFO 应答(FD 模式)携带此版本号。 */
 #define JM_PROTO_VERSION_MAJOR  1
-#define JM_PROTO_VERSION_MINOR  1   /* 1.1: 新增命令码保留区 + 预留同步/OTA 命令码 */
+#define JM_PROTO_VERSION_MINOR  2   /* 1.2: LIVE/TRACE 双数据流, TRACE 主动批量上报 */
 #define JM_PROTO_VERSION_PATCH  0
 #define JM_PROTO_VERSION  ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
 
@@ -169,10 +169,13 @@ extern "C"
 		JM_CMD_ENTER_BOOTLOADER = 0xB2,
 		JM_CMD_SAVE_CONFIG = 0xB3,
 		JM_CMD_FACTORY_RESET = 0xB4,
+		/* B5~B7 为旧版一次性采样命令, 已废弃且不可复用 */
 		JM_CMD_START_LOG = 0xB5,
 		JM_CMD_STOP_LOG = 0xB6,
 		JM_CMD_HIGH_SPEED_DAQ = 0xB7,
 		JM_CMD_SINGLE_STEP = 0xB8,
+		JM_CMD_TRACE_CONFIG = 0xB9, /* Host->Motor: TRACE配置/停止 */
+		JM_CMD_TRACE_DATA = 0xBA,   /* Motor->Host: TRACE批量数据, 无应答 */
 
 		/* 反馈查询 0xC0~0xCB (已用), 0xCC~0xCF OTA 预留 (仅定义不实现) */
 		JM_CMD_READ_FEEDBACK = 0xC0, /* 主实时反馈 */

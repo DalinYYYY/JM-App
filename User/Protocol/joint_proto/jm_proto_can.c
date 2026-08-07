@@ -310,17 +310,17 @@ uint8_t jm_proto_can_is_peer_response(uint32_t id, uint8_t len)
 {
 	uint8_t cmd = JM_CAN_GET_CMD(id);
 
-	/* 这两个命令只允许Motor->Host，任何载荷长度都不能作为设备请求。 */
-	if (cmd == JM_CMD_TELEMETRY || cmd == JM_CMD_NACK)
+	/* 主动上行数据只允许Motor->Host，任何载荷长度都不能作为设备请求。 */
+	if (cmd == JM_CMD_TELEMETRY || cmd == JM_CMD_TRACE_DATA || cmd == JM_CMD_NACK)
 		return 1u;
 
-	/* C9同时承载空载荷调试查询和三字节高速采样读取请求；多帧C9只可能是响应。 */
+	/* B9请求可在经典CAN上分包；带多帧标志的片段一定是请求。单帧配置请求为13B，ACK为9B或空载荷。 */
+	if (cmd == JM_CMD_TRACE_CONFIG)
+		return JM_CAN_IS_MULTI_ID(id) ? 0u : ((len == 13u) ? 0u : 1u);
+
+	/* C9 只支持空载荷通用调试查询。 */
 	if (cmd == JM_CMD_READ_DEBUG)
-	{
-		if (JM_CAN_IS_MULTI_ID(id))
-			return 1u;
-		return (len == 0u || len == 3u) ? 0u : 1u;
-	}
+		return (len == 0u) ? 0u : 1u;
 
 	/* 下列查询的Host请求必须是空载荷，非空帧只能是另一节点的响应。
 	 * 同ID设备会收到彼此的响应；若再次dispatch，会形成无限应答环。 */

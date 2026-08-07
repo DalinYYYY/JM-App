@@ -529,57 +529,35 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_read(proto, cmd);
 	}
-	/* 调试通道 0xC9: 通用 float[] 观测点 */
+	/* C9 仅保留通用 jm_dbg 查询，不再承载高速波形读取。 */
 	if (cmd == JM_CMD_READ_DEBUG)
-	{
-		/* 带 offset/count 时读取 B7 高速采样分块；空载荷保持旧版 jm_dbg 语义。 */
-		if (len != 0u && len != 3u)
-			return reply_nack(proto, cmd, JM_ERR_LENGTH);
-		if (len == 3u)
-		{
-			uint8_t out[JM_PAYLOAD_MAX];
-			uint16_t out_len = 0;
-			if (proto->ops == NULL || proto->ops->capture_read == NULL)
-				return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
-			{
-				jm_err_e e = proto->ops->capture_read(jm_rd_u16(payload), payload[2], out, &out_len);
-				if (e != JM_ERR_OK)
-					return reply_nack(proto, cmd, e);
-			}
-			reply_set(proto, cmd, out, out_len);
-			return JM_ERR_OK;
-		}
-		return handle_read_debug(proto, cmd);
-	}
-	/* 高速采样 B7/B6 复用既有诊断命令，不改变旧命令号。 */
-	if (cmd == JM_CMD_HIGH_SPEED_DAQ)
-	{
-		uint32_t mask, rate;
-		uint16_t samples = 256u;
-		if (len != 8u && len != 10u)
-			return reply_nack(proto, cmd, JM_ERR_LENGTH);
-		if (proto->ops == NULL || proto->ops->capture_start == NULL)
-			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
-		mask = jm_rd_u32(&payload[0]);
-		rate = jm_rd_u32(&payload[4]);
-		if (len == 10u)
-			samples = jm_rd_u16(&payload[8]);
-		{
-			jm_err_e e = proto->ops->capture_start(mask, rate, samples);
-			return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
-		}
-	}
-	if (cmd == JM_CMD_STOP_LOG)
 	{
 		if (len != 0u)
 			return reply_nack(proto, cmd, JM_ERR_LENGTH);
-		if (proto->ops == NULL || proto->ops->capture_stop == NULL)
-			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
-		{
-			jm_err_e e = proto->ops->capture_stop();
-			return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
-		}
+		return handle_read_debug(proto, cmd);
 	}
+	/* TRACE_CONFIG 0xB9: enable + session + mask + rate + packet + flags。 */
+	if (cmd == JM_CMD_TRACE_CONFIG)
+	{
+		uint8_t out[JM_PAYLOAD_MAX];
+		uint16_t out_len = 0u;
+		jm_err_e e;
+		if (len != 13u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		if (proto->ops == NULL || proto->ops->trace_config == NULL)
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		e = proto->ops->trace_config(payload[0], jm_rd_u16(&payload[1]),
+			jm_rd_u32(&payload[3]), jm_rd_u32(&payload[7]), payload[11],
+			payload[12], out, &out_len);
+		if (e != JM_ERR_OK)
+			return reply_nack(proto, cmd, e);
+		reply_set(proto, cmd, out, out_len);
+		return JM_ERR_OK;
+	}
+	/* B5~B7 旧版采集命令不再支持, B8 单步调试仍由 set_mode 处理。 */
+	if (cmd == JM_CMD_START_LOG || cmd == JM_CMD_STOP_LOG ||
+		cmd == JM_CMD_HIGH_SPEED_DAQ)
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
 	/* 设备信息 0xD0~0xDF */
 	if (cmd >= JM_CMD_READ_DEV_INFO && cmd <= JM_CMD_HEARTBEAT)
 	{

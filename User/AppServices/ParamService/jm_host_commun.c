@@ -22,7 +22,14 @@
 #include "runtime_param.h" /* JM_DBG_CH, jm_dbg[] */
 #include "thread_config.h" /* THREAD_DELAY_COMMUN */
 #include "jm_proto_ops.h"  /* Shared protocol operations and command definitions. */
-
+#include "motor_observer.h"
+#if defined(USE_DEV_COMMUN_UART)
+#include "dev_commun_uart.h"
+#endif
+#if defined(USE_DEV_COMMUN_CAN)
+#include "dev_commun_can.h"
+#include "main.h" /* HAL_GetTick */
+#endif
 #if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
 #define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick 发一帧 */
 #endif
@@ -30,6 +37,28 @@
 /* ---------------- 公共遥测打包函数(UART/CAN 共用) ----------------
  * pack_telemetry: 传输无关, 仅把 mask+feedback 打包成字节流
  * telemetry_tick:  把 period_ms 换算成通信 tick 数 */
+#if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
+static int jm_host_commun_trace_pop(uint8_t *body, uint16_t *len)
+{
+	return (body != NULL && len != NULL &&
+		jm_app_trace_pop(body, len) == JM_ERR_OK) ? 1 : 0;
+}
+#endif
+
+static void jm_host_commun_trace_service(void)
+{
+	uint8_t body[MOTOR_OBSERVER_TRACE_PAYLOAD_MAX];
+	uint16_t len = 0u;
+	if (jm_host_commun_trace_pop(body, &len) == 0)
+		return;
+#if defined(USE_DEV_COMMUN_UART)
+	dev_commun_uart.report(&dev_commun_uart, JM_CMD_TRACE_DATA, body, len);
+#endif
+#if defined(USE_DEV_COMMUN_CAN)
+	dev_commun_can.report(&dev_commun_can, JM_CMD_TRACE_DATA, body, len);
+#endif
+}
+
 static uint16_t jm_host_commun_telemetry_tick(void)
 {
 	uint16_t period_ms = jm_app_telemetry_period_ms();
@@ -247,18 +276,19 @@ void jm_host_commun_process(void)
 	/* 取空闲突发数据喂协议栈, 自动完成命令分发与应答 */
 	dev_commun_uart.poll(&dev_commun_uart);
 
-	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。
-	 * 停止时不发, 且复位分频计数, 使下次使能后第一帧及时发出。*/
+	/* LIVE 优先于 TRACE；每个通信周期最多发送一帧各自数据。 */
 	if (!jm_app_telemetry_enabled())
 	{
 		telemetry_tick = 0;
-		return;
 	}
-	if (++telemetry_tick >= jm_host_commun_telemetry_tick())
+	else if (++telemetry_tick >= jm_host_commun_telemetry_tick())
 	{
 		telemetry_tick = 0;
 		commun_uart_push_telemetry(&dev_commun_uart);
 	}
+#if !defined(USE_DEV_COMMUN_CAN)
+	jm_host_commun_trace_service();
+#endif
 }
 
 #endif /* USE_DEV_COMMUN_UART */
@@ -298,7 +328,7 @@ void jm_host_commun_can_process(void)
 //		__enable_irq();
 	}
 
-	/* CAN-DI扫描窗口暂停普通遥测，避免重复节点ID的主动上报干扰发现时隙。 */
+	/* CAN-DI扫描窗口暂停所有主动数据，避免TRACE/LIVE干扰发现时隙。 */
 	if (dev_commun_can.id_switch_pending ||
 	    (int32_t)(HAL_GetTick() - dev_commun_can.commissioning_quiet_until) < 0)
 	{
@@ -306,15 +336,12 @@ void jm_host_commun_can_process(void)
 		return;
 	}
 
-	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。
-	 * 停止时不发, 且复位分频计数, 使下次使能后第一帧及时发出。
-	 * 与 UART 侧对称, 共用 jm_host_commun_pack_telemetry 打包, report 走 CAN 多帧发送。*/
+	/* LIVE 优先于 TRACE；TRACE 只使用剩余的低优先级通信预算。 */
 	if (!jm_app_telemetry_enabled())
 	{
 		telemetry_tick = 0;
-		return;
 	}
-	if (++telemetry_tick >= jm_host_commun_telemetry_tick())
+	else if (++telemetry_tick >= jm_host_commun_telemetry_tick())
 	{
 		jm_feedback_t fb;
 		uint8_t o[2 + 96 + JM_DBG_CH * 4]; /* mask(2) + 固定遥测组 + 调试通道 */
@@ -326,6 +353,7 @@ void jm_host_commun_can_process(void)
 		}
 		telemetry_tick = 0;
 	}
+	jm_host_commun_trace_service();
 }
 
 #endif /* USE_DEV_COMMUN_CAN */
