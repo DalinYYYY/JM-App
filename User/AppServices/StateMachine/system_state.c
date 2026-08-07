@@ -1,9 +1,10 @@
 /**
  * @file        system_state.c
  * @brief 系统状态机实现文件
- * @details 仅负责状态管理：顶层主状态机（INIT/IDLE/READY/RUN/FAULT/SAFETY/
+ * @details 仅负责状态管理：顶层主状态机表驱动转移 + 进入/退出动作，
+ *          控制逻辑(参考生成)经 motor_ctrl_dispatch 调用，本文件不含。
  *
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.1
  * @date        2026-06-11
  *
@@ -314,8 +315,6 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
  */
 void motor_control_loop(system_state_t *sys)
 {
-	// fault_check(sys);
-
 	/* CALIB 态：周期推进标定，不生成运动参考 */
 	if (sys->top_state == TOP_FSM_CALIB)
 	{
@@ -464,8 +463,8 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 			return;
 
 			/* 校准指令：进入 CALIB 状态
-	 * 0x90-0x96: 启动标定（子模式已由 app_set_mode 传给 calib_mgr）
-	 * 0x97/0x98: 查询/中止，不切状态（app_set_mode 已处理并 return）*/
+			 * 0x90-0x96: 启动标定（子模式已由 app_set_mode 传给 calib_mgr）
+			 * 0x97/0x98: 查询/中止，不切状态（app_set_mode 已处理并 return）*/
 		case CONTROL_MODE_CALIB_LEVEL1:
 		case CONTROL_MODE_CALIB_LEVEL2:
 		case CONTROL_MODE_CALIB_LEVEL3:
@@ -485,7 +484,7 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 			else if (sys->top_state == TOP_FSM_CALIB)
 			{
 				/* 已在 CALIB 态：上一个标定已 DONE/FAILED，calib_mgr_start 已成功启动新标定，
-			 * 直接接受即可，不得 abort（否则会终止刚启动的新标定）*/
+				 * 直接接受即可，不得 abort（否则会终止刚启动的新标定）*/
 				sys->ctrl_mode = cmd;
 			}
 			else
@@ -501,12 +500,10 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 			return;
 
 		case CONTROL_MODE_SAVE_CONFIG:
-			// extern int motor_param_save(const motor_param_t *cfg);
 			sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_FACTORY_RESET:
-			// extern int motor_param_load_default(motor_param_t * cfg);
 			sys->ctrl_mode = cmd;
 			return;
 

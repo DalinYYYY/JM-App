@@ -2,7 +2,7 @@
  * @file        dev_dwt_counter.c
  * @brief       基于内核DWT周期计数器的耗时打点与阻塞延时
  *
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.1
  * @date        2026-06-9
  *

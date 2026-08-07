@@ -14,7 +14,7 @@
  * | 2026-06-16 | 1.0  | Dalin  | 初始创建   |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- * @note        基于DWT计数器，使用前需调用drv_dwt_timer_init初始化DWT
+ *              基于 DWT 计数器，使用前需先调用 drv_dwt_timer_init。
  */
 #ifndef _DRV_DELAY_H_
 #define _DRV_DELAY_H_

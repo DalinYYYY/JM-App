@@ -55,6 +55,9 @@ u8 drv_f4_flash_get_bank(u32 addr)
 	return 1U; /* F4 单 Bank */
 }
 
+/**
+ * @brief 擦除一个或多个扇区（addr 需扇区对齐）
+ */
 u8 drv_f4_flash_erase_sector(const u32 addr, u8 len, u8 bank)
 {
 	(void)bank; /* F4 单 Bank */
@@ -82,6 +85,9 @@ u8 drv_f4_flash_erase_sector(const u32 addr, u8 len, u8 bank)
 	return (hal_ret == HAL_OK) ? FLASH_ERR_OK : FLASH_ERR_ERASE_FAILED;
 }
 
+/**
+ * @brief 从 FLASH 读取数据（addr 需 8 字节对齐）
+ */
 u8 drv_f4_flash_read(const u32 addr, u64 *pdata64, u32 len_64)
 {
 	if (pdata64 == NULL || len_64 == 0U || (addr % 8U) != 0U)
@@ -176,7 +182,7 @@ u8 drv_f4_flash_write_buffer(const u32 addr, u64 *pdata64, u32 len_64, u8 bank)
 
 u8 drv_flash_read(const u32 addr, u64 *pdata64, u32 len_64)
 {
-	/* Memory-mapped Flash read does not require a global interrupt critical section. */
+	/* 内存映射读Flash无需关全局中断临界区 */
 	return drv_f4_flash_read(addr, pdata64, len_64);
 }
 
@@ -192,6 +198,9 @@ u8 drv_flash_write(const u32 addr, u64 *pdata64, u32 len_64)
 	return ret;
 }
 
+/**
+ * @brief 上层通用扇区擦除（关中断保护）
+ */
 u8 drv_flash_clear(const u32 addr, u8 len, u8 bank)
 {
 	u8 ret;

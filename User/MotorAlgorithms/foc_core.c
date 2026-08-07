@@ -1,32 +1,29 @@
 /**
  * @file        foc_core.c
- * @brief 		FOC算法实现
- * 
- * @author      name (name@robot.com)
+ * @brief       FOC 算法实现
+ *
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.0
  * @date        2026-06-15
- * 
+ *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
- * 
- * 
+ *
  * @par 修改日志:
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
- * | 2026-06-15     | 1.0  | yangsl | 初始创建   |
- * 
+ * | 2026-06-15 | 1.0  | yangsl | 初始创建   |
+ *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
 #include "foc_core.h"
 #include <stdio.h>
 #include "utils.h"
 
-//#define IQ_MATH_ENABLE 0
 #define DSP_MATH_ENABLE 1
 
 #ifdef IQ_MATH_ENABLE
 #include "IQmathLib.h"
 #elif DSP_MATH_ENABLE
-//#include "dsp/fast_math_functions.h"
 #include "arm_math.h"
 #else
 #include <math.h>
@@ -40,24 +37,9 @@
   */
 static void clarke_transfer(struct foc *pobj)
 {
-	pobj->current = pobj->current_callback(); /* 获取当前三相电流 */
+	pobj->current = pobj->current_callback();
 
-	/* 两相重构: 丢弃占空比最大(低侧窗口最窄)相, 由其余两相重构 */
-	// float da = pobj->svpwm.ta, db = pobj->svpwm.tb, dc = pobj->svpwm.tc;
-	// if (da >= db && da >= dc)
-	// {
-	// 	pobj->current.ia = -(pobj->current.ib + pobj->current.ic);
-	// }
-	// else if (db >= da && db >= dc)
-	// {
-	// 	pobj->current.ib = -(pobj->current.ia + pobj->current.ic);
-	// }
-	// else
-	// {
-	// 	pobj->current.ic = -(pobj->current.ia + pobj->current.ib);
-	// }
-
-	// 等幅值Clarke变换公式
+	// 等幅值 Clarke 变换：Ia/Ib/Ic → Iα/Iβ
 	pobj->i_alphaBeta.alpha = (2.0f / 3.0f) * (pobj->current.ia - 0.5f * pobj->current.ib - 0.5f * pobj->current.ic);
 	pobj->i_alphaBeta.beta = (2.0f / 3.0f) * ((pobj->current.ib - pobj->current.ic) * SQRT3_BY_2);
 }
@@ -70,9 +52,8 @@ static void clarke_transfer(struct foc *pobj)
   */
 static void park_transfer(struct foc *pobj)
 {
-	pobj->Theta = pobj->ele_radian_callback(); // 获取当前电角度
+	pobj->Theta = pobj->ele_radian_callback();
 
-											   /* park变换 */
 #ifdef IQ_MATH_ENABLE
 	pobj->i_dq.d = pobj->i_alphaBeta.alpha * _IQ28toF(_IQ28cos(_IQ28(pobj->Theta))) + pobj->i_alphaBeta.beta * _IQ28toF(_IQ28sin(_IQ28(pobj->Theta)));
 	pobj->i_dq.q = -pobj->i_alphaBeta.alpha * _IQ28toF(_IQ28sin(_IQ28(pobj->Theta))) + pobj->i_alphaBeta.beta * _IQ28toF(_IQ28cos(_IQ28(pobj->Theta)));
@@ -110,9 +91,7 @@ static void park_transfer(struct foc *pobj)
   */
 static void inverse_park_transfer(struct foc *pobj)
 {
-	pobj->Theta = pobj->ele_radian_callback(); // 获取当前电角度
-											   // float sin_theta;
-											   // float cos_theta;
+	pobj->Theta = pobj->ele_radian_callback();
 
 #ifdef IQ_MATH_ENABLE
 	pobj->u_alphaBeta.alpha = _IQ28toF(_IQ28mpy(_IQ28cos(_IQ28(pobj->Theta)), _IQ28(pobj->u_dq.d)) - _IQ28mpy(_IQ28sin(_IQ28(pobj->Theta)), _IQ28(pobj->u_dq.q)));
@@ -164,7 +143,7 @@ static void foc_svpwm(struct foc *pobj)
 	float ub_sqrt3 = k_amp * pobj->svpwm.u_beta * ONE_BY_SQRT3;  /* 1.5·Uβ/√3 */
 	float ub_2sqrt3 = k_amp * pobj->svpwm.u_beta * TWO_BY_SQRT3; /* 1.5·2·Uβ/√3 */
 
-	// step1 计算u1、u2和u3 , 计算SVPWM算法中的三个控制电压u1、u2和u3
+	// step1 计算三个控制电压 u1、u2、u3
 	pobj->svpwm.u1 = pobj->svpwm.u_beta;
 
 #ifdef IQ_MATH_ENABLE
@@ -175,10 +154,10 @@ static void foc_svpwm(struct foc *pobj)
 	pobj->svpwm.u3 = (-SQRT3_BY_2) * pobj->svpwm.u_alpha - 0.5F * pobj->svpwm.u_beta;
 #endif // IQ_MATH_ENABLE
 
-	// step2：扇区判断 , 根据u1、u2和u3的正负情况确定所处的扇区 N = 4*C + 2*B + A
+	// step2 扇区判断：N = 4·C + 2·B + A（u1/u2/u3 正负组合）
 	pobj->svpwm.sector = ((pobj->svpwm.u1 > 0.0F) ? 1 : 0) + ((pobj->svpwm.u2 > 0.0F) ? (1 << 1) : 0) + ((pobj->svpwm.u3 > 0.0F) ? (1 << 2) : 0);
 
-	// step3:计算基本矢量电压作用时间（占空比）, 根据扇区的不同，计算对应的ta、tb和tc的值，表示生成的三相电压的时间
+	// step3 按扇区计算基本矢量作用时间（对应三相占空比 ta/tb/tc）
 	switch (pobj->svpwm.sector)
 	{
 		case 3:

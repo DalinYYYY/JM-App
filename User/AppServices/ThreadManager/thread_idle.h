@@ -1,6 +1,6 @@
 /**
  * @file thread_idle.h
- * @brief 
+ * @brief 空闲线程声明 
  * @author Dalin
  * @version 1.00
  * @date 2025-02-11

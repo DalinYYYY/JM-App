@@ -1,6 +1,6 @@
 /**
  * @file thread_control.c
- * @brief 
+ * @brief 控制线程实现（当前仅做周期任务计数） 
  * @author Dalin
  * @version 1.00
  * @date 2025-02-11
@@ -27,7 +27,6 @@ void control_thread(void const *argument)
 	{
 
 		drv_rtos_delay_ms(THREAD_DELAY_CONTROL * 500);
-		/* 任务计数 */
 		usr.sys.task_cnt.control_cnt++;
 	}
 }

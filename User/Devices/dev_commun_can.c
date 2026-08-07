@@ -193,7 +193,7 @@ static int dev_commun_can_start(struct dev_commun_can *pobj)
 	return DEV_EOK;
 }
 
-/* CAN RX ISR: validate and enqueue only; protocol dispatch runs in poll(). */
+/* CAN 接收中断: 仅校验并入队, 协议分发在 poll() 中执行 */
 static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e can, drvCanMsg_t *msg)
 {
 	jm_can_frame_t frame;
@@ -221,9 +221,8 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 		return;
 	}
 
-	/* The hardware filter currently accepts the whole protocol ID range. Ignore
-	 * traffic for other motors before it consumes queue space or refreshes this
-	 * motor's communication-loss watchdog. */
+	/* 硬件过滤器当前接受整个协议 ID 域, 在消耗队列空间或刷新本机
+	 * 通信掉线看门狗之前, 过滤掉发给其他电机的流量 */
 	dst = JM_CAN_GET_MOTOR_ID(msg->id);
 	if (dst != pobj->motor_id && dst != JM_CAN_BROADCAST_ID)
 	{
@@ -241,7 +240,7 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 		return;
 	}
 
-	/* Copy the validated frame into the fixed-size ISR-to-thread queue. */
+	/* 将校验通过的帧拷入固定大小的 ISR→线程 队列 */
 	frame.id = msg->id;
 	frame.len = msg->len;
 	frame.is_fd = msg->is_fd;
@@ -281,6 +280,7 @@ static void dev_commun_can_on_err(struct dev_commun_can *pobj, canNumber_e can, 
 	pobj->err_irq_count++;
 }
 
+/* 发送调试初始化应答帧(DI 发现/设ID/点名) */
 static void dev_commun_can_send_di(struct dev_commun_can *pobj, uint8_t cmd, uint8_t status)
 {
 	uint8_t body[8];
@@ -290,6 +290,7 @@ static void dev_commun_can_send_di(struct dev_commun_can *pobj, uint8_t cmd, uin
 	jm_proto_can_send(&pobj->jm, cmd, body, sizeof(body));
 }
 
+/* 热切换节点地址：更新协议层并重配硬件过滤器，失败回滚旧地址 */
 static int dev_commun_can_apply_id(struct dev_commun_can *pobj, uint8_t new_id)
 {
 	drvCanDualFilter_t filter;
@@ -313,6 +314,7 @@ static int dev_commun_can_apply_id(struct dev_commun_can *pobj, uint8_t new_id)
 	return DEV_ERROR;
 }
 
+/* 处理调试初始化命令(设备发现/设ID/点名)：返回1=已处理，不再喂协议栈 */
 static uint8_t dev_commun_can_handle_commissioning(struct dev_commun_can *pobj,
 	                                                const jm_can_frame_t *frame,
 	                                                uint32_t now_tick)

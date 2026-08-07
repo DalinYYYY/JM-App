@@ -1,6 +1,6 @@
 /**
  * @file thread_period.c
- * @brief 
+ * @brief 周期线程实现（电源/温度监控刷新） 
  * 
  * @author dalin (dalinyy@163.com)
  * @version 1.0
@@ -53,7 +53,6 @@ void power_monitor_update(void)
 void period_thread(void const *argument)
 {
 
-	/* Infinite loop */
 	drv_rtos_delay_ms(INTO_THREAD_DELAY / 5);
 
 	for (;;)
@@ -63,7 +62,6 @@ void period_thread(void const *argument)
 		/* 电源监控刷新 */
 		power_monitor_update();
 
-		/* 任务计数 */
 		usr.sys.task_cnt.period_cnt++;
 	}
 }

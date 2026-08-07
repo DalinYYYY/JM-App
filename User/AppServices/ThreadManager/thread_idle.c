@@ -13,7 +13,6 @@ void idle_thread(void const *argument)
 	{
 
 		drv_rtos_delay_ms(THREAD_DELAY_IDLE);
-		/* 任务计数 */
 		usr.sys.task_cnt.idle_cnt++;
 	}
 }

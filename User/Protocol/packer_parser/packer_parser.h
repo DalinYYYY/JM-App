@@ -2,7 +2,7 @@
  * @file        packer_parser.h
  * @brief       数据包解析器头文件
  * 
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.0
  * @date        2026-06-18
  * 

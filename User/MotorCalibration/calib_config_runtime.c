@@ -293,7 +293,7 @@ float calib_cfg_l2_pole_pairs_target_rad(void)
 	uint16_t cycles = (uint16_t)id->pole_pairs;
 	if (cycles < CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES)
 	{
-		cycles = CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES; /* 最少 8 电周期(小极对数电机) */
+		cycles = CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES; /* 小极对数电机保底扫描电周期数 */
 	}
 	return 2.0f * PI * (float)cycles;
 }

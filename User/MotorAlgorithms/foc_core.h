@@ -1,19 +1,18 @@
 /**
  * @file        foc_core.h
- * @brief       BLDC FOC算法核心接口定义
- * 
- * @author      name (name@robot.com)
+ * @brief       BLDC FOC 算法核心接口定义
+ *
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.0
  * @date        2026-06-15
- * 
+ *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
- * 
- * 
+ *
  * @par 修改日志:
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
- * | 2026-06-15     | 1.0  | yangsl | 初始创建   |
- * 
+ * | 2026-06-15 | 1.0  | yangsl | 初始创建   |
+ *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
 
@@ -37,20 +36,20 @@ typedef struct
 
 typedef struct
 {
-	float alpha; // alpha-axis current
-	float beta;	 // beta-axis current
+	float alpha; // α轴电流
+	float beta;	 // β轴电流
 } alphaBeta_t;
 
 typedef struct
 {
-	float d; // d-axis current
-	float q; // q-axis current
+	float d; // d轴电流
+	float q; // q轴电流
 } focDQ_t;
 
 typedef struct
 {
-	float u_alpha; // alpha-axis current
-	float u_beta;  // beta-axis current
+	float u_alpha; // α轴电压
+	float u_beta;  // β轴电压
 	int sector;
 
 	float u1;
@@ -72,19 +71,9 @@ typedef struct
 	float t7;
 } focSvpwm_t;
 
-// oop
-/* 
- * 外部输入接口（回调函数）
- * 1、ia ib ic三相电流（来源adc采样）
- * 2、Theta（电弧度）
- * 3、u_dq数据（来源i_dq经过pid运算后的结果）
- * 
- * 外部访问接口（函数）
- * 1、clarke_transfer
- * 2、park_transfer
- * 3、inverse_park_transfer
- * 4、foc_svpwm
- */
+// 面向对象封装的回调接口说明：
+// 外部输入：三相电流 Ia/Ib/Ic（ADC 采样）、电弧度 Theta、u_dq（PID 输出）
+// 内部算法：clarke_transfer、park_transfer、inverse_park_transfer、foc_svpwm
 typedef struct foc
 {
 	float Theta;

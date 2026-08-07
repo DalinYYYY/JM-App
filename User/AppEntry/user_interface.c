@@ -2,7 +2,7 @@
  * @file        user_interface.c
  * @brief       用户接口层（硬件初始化 + 线程创建 + 主循环调度）
  * 
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.0
  * @date        2026-06-16
  * 
@@ -99,8 +99,8 @@ void user_init(void)
 	thread_init();
 
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER == 0u)
-	HAL_TIM_Base_Start_IT(&htim2); /* TODO:启动定时器更新中断，进入 user_control 调周期执行 */
-	HAL_TIM_Base_Start_IT(&htim5); /* TODO:启动定时器更新中断，进入 motor_virtual_loop 调周期执行 */
+	HAL_TIM_Base_Start_IT(&htim2); /* 启动 htim2 更新中断，周期进入 user_control 执行 */
+	HAL_TIM_Base_Start_IT(&htim5); /* 启动 htim5 更新中断，周期进入 motor_virtual_loop 执行 */
 #endif
 }
 

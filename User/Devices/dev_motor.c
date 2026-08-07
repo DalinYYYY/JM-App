@@ -68,7 +68,7 @@ static float device_compensation(void)
 	return 0.0F;
 }
 
-/* 获取电机极对数 TODO: 后续支持自动识别 */
+/* 获取电机极对数(Flash 无标定值时的兜底; 已标定时由 motor_profile 装载的 pole_pairs 覆盖) */
 static uint8_t dev_motor_get_poles(motor_id_e id)
 {
 	uint8_t poles;
@@ -102,7 +102,7 @@ void dev_motor_init(dev_motor_t *pobj,
 	pobj->id = id;
 	pobj->poles = dev_motor_get_poles((motor_id_e)id);
 
-	pobj->fsm_tim = DRV_TIM2; // 定时器2 // TODO: 后续支持配置表
+	pobj->fsm_tim = DRV_TIM2; /* TODO: 后续支持配置表 */
 
 							  /* 创建编码器实例并装配抽象接口（1行替代原30行 #if 装配）
 	 * 适配层内部持有 static 实体，绑定到 encoder.ctx 并装配全部方法指针 */
@@ -152,7 +152,7 @@ void dev_motor_init(dev_motor_t *pobj,
 	pobj->phase_current.set_offset(&pobj->phase_current,
 	                               (dev_current_i3axis_t){PHASE_CURRENT_ZERO_ADC,
 	                                                      PHASE_CURRENT_ZERO_ADC,
-	                                                      PHASE_CURRENT_ZERO_ADC}); // TODO: 后续支持自动校准
+	                                                      PHASE_CURRENT_ZERO_ADC}); /* 兜底零偏置; 标定时由 cur_loop_calibrate_offset 采样取均值覆盖 */
 
 	// 初始化FOC
 	pobj->current_callback = current_callback;

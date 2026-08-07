@@ -51,6 +51,7 @@ static uint8_t observer_popcount(uint32_t mask)
 	return count;
 }
 
+/* 位置模式取位置环输出的速度设定，其余模式取系统参考速度 */
 static float observer_velocity_ref(const motor_loop_t *m)
 {
 	return (m->sys.motor.ref.ctrl_type == REF_CTRL_POSITION) ?
@@ -71,6 +72,7 @@ static void observer_wr_u32(uint8_t *p, uint32_t value)
 	p[3] = (uint8_t)(value >> 24);
 }
 
+/* 将控制环实时量打包进双缓冲快照，供上位机无锁读取 */
 static void observer_publish_runtime(const motor_loop_t *m)
 {
 	motor_state_t *st = &usr.motor_state[M1];
@@ -143,6 +145,7 @@ static void observer_publish_runtime(const motor_loop_t *m)
 	s_live_sequence = next_sequence;
 }
 
+/* 按通道掩码写入一拍示波 trace 数据(环形缓冲，溢出时丢弃最旧) */
 static void observer_trace_write(const motor_loop_t *m)
 {
 	uint16_t write_index;
@@ -179,6 +182,7 @@ static void observer_trace_write(const motor_loop_t *m)
 	s_trace_count++;
 }
 
+/* 控制环 ISR 入口：每拍写 trace，按分频发布实时快照 */
 void motor_observer_on_control_isr(const struct motor_loop_s *loop)
 {
 	const motor_loop_t *m = (const motor_loop_t *)loop;
@@ -198,6 +202,7 @@ void motor_observer_on_control_isr(const struct motor_loop_s *loop)
 	}
 }
 
+/* 读取最新快照：用序列号校验避免读写竞争读到不一致的半帧数据 */
 int motor_observer_snapshot_read(motor_observer_snapshot_t *out)
 {
 	uint8_t retry;
@@ -216,6 +221,7 @@ int motor_observer_snapshot_read(motor_observer_snapshot_t *out)
 	return -1;
 }
 
+/* 启动示波采集：校验参数后在关中断临界区内配置环形缓冲并置采集态 */
 int motor_observer_trace_start(uint32_t channel_mask, uint32_t rate_hz,
 	uint8_t packet_samples, float control_hz, uint16_t session_id,
 	motor_observer_trace_status_t *status)
@@ -280,6 +286,7 @@ int motor_observer_trace_stop(void)
 	return 0;
 }
 
+/* 从环形缓冲取出一包采集数据并打包成协议帧(含包头元数据) */
 int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len)
 {
 	uint8_t count;

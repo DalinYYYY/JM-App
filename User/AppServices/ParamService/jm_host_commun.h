@@ -13,7 +13,6 @@
  *              - 复用 jm_proto_ops 业务回调(反馈/参数/控制, 串口/CAN 共用)
  *              - 遥控模式: 上位机用 SET_TELEMETRY(0xCB) 配置 enable/mask/period,
  *                本模块按 mask 变长打包 TELEMETRY(0xCA) 周期主动上报, 不要求逐帧应答。
- *              通信线程只需 init() 一次, 每周期调 process()。
  */
 #ifndef __JM_HOST_COMMUN_H__
 #define __JM_HOST_COMMUN_H__

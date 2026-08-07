@@ -1,6 +1,6 @@
 /**
  * @file thread_period.h
- * @brief 
+ * @brief 周期线程声明 
  * @author Dalin
  * @version 1.00
  * @date 2025-02-11

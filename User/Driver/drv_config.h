@@ -6,8 +6,8 @@
 #include <stdint.h>
 #include "mcu_compat.h"
 
-#define DRV_EOK (0)	  /**< There is no error */
-#define DRV_ERROR (1) /**< A generic error happens */
+#define DRV_EOK (0)	  /**< 无错误 */
+#define DRV_ERROR (1) /**< 发生通用错误 */
 
 // -------------------定义可视化配置---------------------
 //***<<< Use Configuration Wizard in Context Menu >>>***

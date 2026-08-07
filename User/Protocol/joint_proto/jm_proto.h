@@ -162,7 +162,7 @@ extern "C"
 		jm_err_e (*set_can_id)(uint8_t new_id);
 
 		/* 设置 CAN 波特率(CMD 0xF1): baud_code 0=1M 1=500K 2=250K 3=125K。
-	 * 重启后由 CAN 绑定层加载生效。可为 NULL(回 NACK)。*/
+		 * 重启后由 CAN 绑定层加载生效。可为 NULL(回 NACK)。*/
 	jm_err_e (*set_baudrate)(uint8_t baud_code);
 
 	/* 切换 CAN FD 运行期模式(CMD 0xF3): enable 1=切FD长帧 0=切回经典。

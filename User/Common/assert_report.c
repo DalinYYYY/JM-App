@@ -4,7 +4,7 @@
   * @author  Dalin
   * @version V1.0
   * @date    2026-06-17
-  * @brief   assert report source file.
+  * @brief   assert 失败上报源文件。
   ******************************************************************************
   * @par 修改日志:
   * | 日期       | 版本 | 作者   | 修改内容                                   |
@@ -29,21 +29,20 @@
 /* public function ------------------------------------------------------------------------------ */
 
 /**
-  * @brief  assert function. 
-  * @retval None
+  * @brief  断言失败后进入死循环，供用户自定义错误处理
+  * @retval 无
   */
 static void assert_func(void)
 {
 	while (1)
 	{
-		/* code */
 	}
 }
 
 /**
- * @brief  The internal assert function when assert fails.
- * @param  file : The assert file line number.
- * @param  location The assert location in file.
+ * @brief  断言失败时调用的内部回调函数
+ * @param  file      断言所在文件名
+ * @param  location  断言所在行号
  */
 uint8_t user_assert(uint8_t *file, uint32_t location)
 {
@@ -55,7 +54,5 @@ uint8_t user_assert(uint8_t *file, uint32_t location)
 	(void)location;
 #endif
 
-	// assert function. user code can be added here.
-	// assert_func();
 	return 1;
 }

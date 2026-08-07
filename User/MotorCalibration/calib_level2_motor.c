@@ -1,17 +1,9 @@
 /**
  * @file calib_level2_motor.c
  * @brief L2 电机电气身份辨识（相序/极对数/R/Ld/Lq/flux）
- * @note L2 子模式 1-2（相序/极对数）与 3-6（R/Ld/Lq/flux）当前为桩实现。
- *       真实算法填充 poll_*() 函数即可，硬件访问通过 calib_hw 共享层，
- *       参数通过 calib_config.h 集中管理，结果写入 motor_param_set_r/ld/lq/flux/pole_pairs。
- *
- * @par 各子模式算法（未来实现参考）
- *   - 相序识别：施加 ud，观测三相电流相序方向
- *   - 极对数：施加 ud 旋转一周，数电周期数 = 极对数
- *   - R：施加 DC 电压 ud，稳态后 R = ud / id
- *   - Ld：施加 ud 阶跃，观测 di/dt，Ld = (ud - R*id) / (did/dt)
- *   - Lq：施加 uq 阶跃，观测 diq/dt，Lq = uq / (diq/dt)（近似）
- *   - flux：开环驱动电机稳速转动，flux = (uq - R*iq) / ω
+ * @note 六个子模式均已实现：正常阻值电机用 DC 差分法/阶跃响应法/反电势法，
+ *       低阻电机自动切换交流注入法。硬件访问通过 calib_hw 共享层，参数由
+ *       calib_config.h 集中管理，结果写入 motor_param_set_r/ld/lq/flux/pole_pairs。
  */
 #include <math.h>
 #include "calib_types.h"

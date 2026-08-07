@@ -57,10 +57,6 @@
 #endif
 #endif
 
-#if defined(USE_DEV_COMMUN_VESC)
-#define DEV_VESC_RX_BUF_SIZE (256u)
-#endif
-
 #if defined(USE_DEV_COMMUN_UART)
 #define DEV_JM_UART_RX_BUF_SIZE (256u)
 #endif

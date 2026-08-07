@@ -23,6 +23,7 @@
 #include "dev_power_monitor.h" /* 真实电机：SVPWM 归一化用 Vbus */
 #endif
 
+/* 判断浮点是否为有限值(排除 NaN/Inf)，异常时走安全输出路径 */
 static int cur_float_is_finite(float value)
 {
 	uint32_t bits;
@@ -30,6 +31,7 @@ static int cur_float_is_finite(float value)
 	return (bits & 0x7F800000u) != 0x7F800000u;
 }
 
+/* 占空比[0,1] → TIM 比较寄存器值，越界/非法输入钳位到安全值 */
 static uint32_t cur_pwm_compare(float duty)
 {
 	if (!cur_float_is_finite(duty))

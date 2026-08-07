@@ -57,7 +57,7 @@ static led_action_e map_status_led(top_fsm_e state)
 		case TOP_FSM_CALIB: return LED_ACT_BLINK_FAST;
 		case TOP_FSM_CONFIG: return LED_ACT_BLINK_SLOW;
 		case TOP_FSM_BOOTLOADER: return LED_ACT_BLINK_FAST;
-		default: return LED_ACT_OFF; /* IDLE / SAFETY / FAULT */
+		default: return LED_ACT_OFF; /* SAFETY / FAULT 等: 状态灯灭(由故障灯指示) */
 	}
 }
 

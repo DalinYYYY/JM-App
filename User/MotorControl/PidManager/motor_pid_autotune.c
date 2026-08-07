@@ -17,7 +17,7 @@
 #define AUTOTUNE_DEFAULT_VELOCITY_BW 100.0f
 #define AUTOTUNE_DEFAULT_POSITION_BW 20.0f
 
-/* Keep readiness thresholds aligned with motor_info_validate(). */
+/* 就绪阈值与 motor_info_validate() 保持一致 */
 #define AUTOTUNE_MIN_PHASE_RESISTANCE 0.001f
 #define AUTOTUNE_MIN_PHASE_INDUCTANCE 0.000001f
 #define AUTOTUNE_MIN_TORQUE_CONSTANT  0.00001f
@@ -44,7 +44,7 @@ static int check_calib_ready(const motor_info_t *info)
 	return 1;
 }
 
-/* current_lim/peak_current only affect generated integral limits. */
+/* current_lim/peak_current 仅影响生成的积分限幅 */
 static float autotune_current_limit(const motor_info_t *info)
 {
 	float limit = info->blocks.motor_calib.current_lim;

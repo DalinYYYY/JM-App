@@ -1,6 +1,6 @@
 /**
  * @file thread_config.h
- * @brief 
+ * @brief 线程延时与使能配置 
  * 
  * @author dalin (dalinyy@163.com)
  * @version 1.0

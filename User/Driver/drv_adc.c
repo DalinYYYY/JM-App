@@ -63,7 +63,7 @@ static const uint32_t s_adc_injected_rank_map[] = {
 	[DRV_ADC_RANK4] = ADC_INJECTED_RANK_4,
 };
 
-/* 句柄转换为drv_adc.c内部使用，不对外暴露HAL类型(见drv_adc.h规则) */
+/* 句柄仅供本文件内部使用，不对外暴露HAL类型(见drv_adc.h规则) */
 static inline ADC_HandleTypeDef *get_adc_handle(adcNumber_e adcx)
 {
 	if (adcx >= DRV_ADC_MAX)

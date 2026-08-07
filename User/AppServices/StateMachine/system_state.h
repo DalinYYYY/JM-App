@@ -2,7 +2,7 @@
  * @file        system_state.h
  * @brief 		系统状态机核心头文件
  * 
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.0
  * @date        2026-06-11
  * 
@@ -51,10 +51,10 @@ typedef struct system_state_s
 	motor_ctrl_t motor;			  /*!< 电机控制核心上下文 */
 	transition_mgr_t trans_mgr; /*!< 过渡管理器（内含 transition_t + ref_smooth_cfg） */
 	calib_state_e calib_state;	/*!< 标定子状态（仅 CALIB 态有效）*/
-	uint32_t fault_latched;
-	uint16_t fault_count;
-	uint8_t last_fault_code;
-	uint8_t power_sample_valid;
+	uint32_t fault_latched; /*!< 已锁存故障掩码（清除前持续生效） */
+	uint16_t fault_count;   /*!< 故障累积计数 */
+	uint8_t last_fault_code; /*!< 最近一次故障编号 */
+	uint8_t power_sample_valid; /*!< 母线电压采样有效标志 */
 	uint32_t speed_guard_cycles; /*!< 启动后超速保护延迟武装计数 */
 } system_state_t;
 

@@ -707,7 +707,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		memcpy(&vel_bw, &payload[5], 4);
 		memcpy(&pos_bw, &payload[9], 4);
 		e = proto->ops->pid_autotune(ring_select, cur_bw, vel_bw, pos_bw, &fail_reason);
-		/* 0x9A 总是回 8字节 ACK(成功/失败均回), 返回 JM_ERR_OK 避免调用方覆盖 reply。
+		/* 0xA0 总是回 8字节 ACK(成功/失败均回), 返回 JM_ERR_OK 避免调用方覆盖 reply。
 		 * 成败信息编码在 body[0](status) 和 body[1](fail_reason) 中, 同 0x97 先例。*/
 		{
 			uint8_t body[8] = {(e == JM_ERR_OK) ? 0u : 1u, fail_reason,

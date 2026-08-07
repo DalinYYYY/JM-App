@@ -75,7 +75,9 @@ void drv_rtos_exit_critical(void)
 	taskEXIT_CRITICAL();
 }
 
-// 创建一个RTOS线程
+/**
+ * @brief       创建一个RTOS线程
+ */
 drv_rtos_thread_handle_t drv_rtos_thread_create(const char *name,
                                                 drv_rtos_thread_func_t func,
                                                 drv_rtos_priority_e priority,

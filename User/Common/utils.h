@@ -2,10 +2,9 @@
  * @file        utils.h
  * @brief       通用数学与信号处理工具集接口（角度、三角函数、FFT、滤波、常量与宏）
  *
- * @details     面向 Cortex-M4F 单精度 FPU：内联函数与常量宏均带 f 后缀，避免
- *              单精度操作数被隐式提升为双精度（编译告警 rgba(48, 34, 75, 0.33)-D）。其中数学常量
- *              （M_PI 等）保留双精度定义，在单精度场景由调用方以 (float) 强转或
- *              用宏内的 (float)(...) 编译期常量表达式完成转换。
+ * @details     面向 Cortex-M4F 单精度 FPU：内联函数与常量宏均带 f 后缀，避免单精度
+ *              操作数被隐式提升为双精度（编译告警 #1035-D）。数学常量（M_PI 等）保留
+ *              双精度定义，单精度场景由调用方以 (float) 强转或宏内编译期常量表达式转换。
  *
  * @author      Dalin (dalinyy@163.com)
  * @version     1.0
@@ -75,7 +74,6 @@ void utils_rotate_vector3(float *input, float *rotation, float *output, bool rev
 #define SQ(x) ((x) * (x))
 
 /* 二维向量的二范数（单精度） */
-//#define NORM2(x,y)		(sqrt(SQ(x) + SQ(y)))
 #define NORM2_f(x, y) (sqrtf(SQ(x) + SQ(y)))
 
 /* 浮点 NaN / 无穷判断与置零 */

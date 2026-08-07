@@ -1,6 +1,6 @@
 /**
  * @file crc16.h
- * @brief 
+ * @brief CRC16（CCITT）校验与累加校验和接口
  * @author Dalin
  * @version 1.00
  * @date 2024-11-13

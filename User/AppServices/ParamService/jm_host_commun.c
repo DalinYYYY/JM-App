@@ -21,7 +21,7 @@
 /* ---- 公共头文件(UART/CAN 共用遥测打包) ---- */
 #include "runtime_param.h" /* JM_DBG_CH, jm_dbg[] */
 #include "thread_config.h" /* THREAD_DELAY_COMMUN */
-#include "jm_proto_ops.h"  /* Shared protocol operations and command definitions. */
+#include "jm_proto_ops.h"  /* 共享协议操作与命令定义 */
 #include "motor_observer.h"
 #if defined(USE_DEV_COMMUN_UART)
 #include "dev_commun_uart.h"
@@ -320,12 +320,9 @@ void jm_host_commun_can_process(void)
 	/* 刷新诊断统计(供应用读取总线负载/通信质量) */
 	dev_commun_can.poll(&dev_commun_can);
 
-	/* CAN communication timeout: force IDLE after the configured interval. */
+	/* CAN 通信超时检测：结果当前仅作预留，未触发降级动作 */
 	if (dev_commun_can.check_loss(&dev_commun_can, HAL_GetTick()))
 	{
-//		__disable_irq();
-//		motor_loop_set_cmd(CONTROL_MODE_IDLE);
-//		__enable_irq();
 	}
 
 	/* CAN-DI扫描窗口暂停所有主动数据，避免TRACE/LIVE干扰发现时隙。 */

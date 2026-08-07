@@ -1,6 +1,6 @@
 /**
  * @file vofa.c
- * @brief 
+ * @brief VOFA+ 上位机通信：justFloat 数据上传与下行协议解析
  * 
  * @author dalin (dalinyy@163.com)
  * @version 1.0
@@ -21,48 +21,22 @@
 #include <stdlib.h>
 
 justFloat_t vofa_frame = {.tail[0] = 0x00, .tail[1] = 0x00, .tail[2] = 0x80, .tail[3] = 0x7f};
-/* 上传just_float格式数据 */
+
+/* 上传 justFloat 格式数据（当前为占位实现，待接入实际串口发送） */
 void vofa_upload(void *data, uint8_t len)
 {
-#if 0
-    uint8_t *buf = data;
-    memcpy(&vofa_frame, buf, len);
-    drv_usart_send(DEV_VOFA, (uint8_t *)&vofa_frame.fdata[0], len, 1000);
-    drv_usart_send(DEV_VOFA, (uint8_t *)&vofa_frame.tail[0], 4, 1000);
-#elif 0
-
-	uint8_t *msg = (uint8_t *)malloc(len + 4);
-
-	memcpy(msg, data, len);
-	memcpy(&msg[len], &vofa_frame.tail[0], 4);
-	drv_uart_dma_send(DEV_VOFA, (uint8_t *)msg, len + 4);
-
-	free(msg);
-#endif
+	(void)data;
+	(void)len;
 }
 
-/* 协议解析 */
+/* 下行协议解析（当前为占位实现，待实现） */
 void vofa_rcv_unpack(uint8_t *data_buf, uint8_t len)
 {
+	(void)data_buf;
+	(void)len;
 }
 
 void vofa_receive_data(void)
 {
-	// static int en = 0;
-	// static uint8_t rx_buffer[64];
-	// uint16_t rx_len = 0;
-
-	// if (en == 0)
-	// {
-	//     usart_idle_init(DEV_VOFA, 64);
-	//     en = 1;
-	// }
-	// else
-	// {
-	//     usart_idle_get_data(DEV_VOFA, rx_buffer, &rx_len);
-	//     if (rx_len != 0)
-	//     {
-	//         vofa_rcv_unpack(rx_buffer, rx_len);
-	//     }
-	// }
+	/* 占位实现，待接入串口接收处理 */
 }

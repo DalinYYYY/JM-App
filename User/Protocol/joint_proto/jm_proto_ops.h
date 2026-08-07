@@ -15,7 +15,7 @@
  * | 2026-06-25 | 1.1  | Dalin  | 增补 jm_app_can_baudrate 声明 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- * @note        把 jm_proto_ops_t 的全部回调集中实现在一处, 对接固件应用层:
+ *              把 jm_proto_ops_t 的全部回调集中实现在一处, 对接固件应用层:
  *              - 反馈/状态     ← usr.motor_state[M1]   (runtime_param)
  *              - 控制/模式     → motor_loop (sys.motor.cmd + motor_loop_set_cmd)
  *              - 参数读写      ← usr.motor_param[M1]    (motor_param, 按 param_id 表寻址)

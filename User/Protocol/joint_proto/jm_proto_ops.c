@@ -62,7 +62,7 @@ motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *c
  * ==========================================================================*/
 #if defined(JM_RATE_LIMIT_ENABLE) && (JM_RATE_LIMIT_ENABLE == 1)
 #define JM_RATE_MIN_INTERVAL_PARAM_WRITE_MS   100u  /* 0xE1 PARAM_WRITE: 100ms (10Hz) */
-#define JM_RATE_MIN_INTERVAL_PARAM_SAVE_MS    1000u /* 0xE4 PARAM_SAVE: 1s (防 Flash 擟写) */
+#define JM_RATE_MIN_INTERVAL_PARAM_SAVE_MS    1000u /* 0xE4 PARAM_SAVE: 1s (防 Flash 频繁擦写) */
 #define JM_RATE_MIN_INTERVAL_CALIB_MS         2000u /* 0x90~0x96 CALIB: 2s (防并发启动) */
 #define JM_RATE_MIN_INTERVAL_MOTOR_INFO_W_MS  100u  /* 0xE7/0xE9 MOTOR_INFO_WRITE: 100ms */
 #define JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS  1000u /* 0xEA MOTOR_INFO_SAVE: 1s */
@@ -102,6 +102,7 @@ typedef struct
 } pid_debug_session_t;
 static pid_debug_session_t s_pid_debug;
 
+/* 退出 PID 调试会话：恢复快照的来源与 profile，使电机回到 IDLE */
 static void app_pid_debug_abort(void)
 {
 	uint32_t primask;
@@ -143,6 +144,7 @@ static void app_pid_debug_touch(void)
 		s_pid_debug.last_heartbeat = HAL_GetTick();
 }
 
+/* 进入 PID 调试会话：保存当前来源与 profile 快照并激活 */
 static void app_pid_debug_begin(void)
 {
 	uint8_t i;
@@ -351,7 +353,7 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 			next.torque = jm_rd_f32(&pl[0]);
 			break;
 
-			/* ---- 标定启动 0x90-0x96: payload[0]=子模式 ---- */
+		/* ---- 标定启动 0x90-0x96: payload[0]=子模式 ---- */
 		case JM_CMD_CALIB_LEVEL1:
 		case JM_CMD_CALIB_LEVEL2:
 		case JM_CMD_CALIB_LEVEL3:
@@ -370,7 +372,7 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 			if (!calib_mgr_start(level, submode))
 			{
 				/* 区分失败原因：已在标定中 → BUSY，前置依赖未完成 → STATE_DENY，
-			 * 其余（submode 越界/不支持）→ OUT_OF_RANGE */
+				 * 其余（submode 越界/不支持）→ OUT_OF_RANGE */
 				calib_status_t st = calib_mgr_get_status();
 				if (st.state == CALIB_STATE_RUNNING)
 				{ ret = JM_ERR_CALIB_BUSY; goto done; }      /* NACK(0x0A) 已在标定中 */
@@ -401,8 +403,8 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		}
 
 		/* ---- 其余模式(力控/轨迹/特殊/测试/诊断): 暂仅切状态 ----
-	 * 这些模式的载荷由各自 run_*_control 处理逻辑后续接管; 当前先保证
-	 * 模式切换可达。无法识别的码不在 0x00~0xB8 段(dispatch 已过滤)。*/
+		 * 这些模式的载荷由各自 run_*_control 处理逻辑后续接管; 当前先保证
+		 * 模式切换可达。无法识别的码不在 0x00~0xB8 段(dispatch 已过滤)。*/
 		default:
 			break;
 	}

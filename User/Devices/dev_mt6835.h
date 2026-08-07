@@ -96,7 +96,7 @@ extern "C"
 		float mech_angle_remove_off; /* 去偏移角度, ° */
 		float offset;				 /* 偏移 */
 		float foc_offset_static;	 /* 静态偏移(电角度对齐用) */
-		int running_dir;			 /* 运行方向 (<=1 正向, 否则反向) */
+		int running_dir;			 /* 运行方向: 1=正向(CW), -1=反向(CCW) */
 		uint32_t read_error_count; /* SPI 读取失败累计次数 */
 
 		/* public */

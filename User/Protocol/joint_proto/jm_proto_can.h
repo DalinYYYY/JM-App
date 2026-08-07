@@ -22,8 +22,6 @@
  *              上电默认经典模式, 上位机主动切换到 FD 长帧模式, 兼容所有上位机硬件。
  *              切换为纯软件操作, 仅影响 jm_can_frame_t.is_fd 字段与 drv_can_send
  *              中 header.FDFormat 的选择, 不需要重新初始化 FDCAN 外设。
- * @note        本层不直接依赖 drv_can, 通过收发回调注入(同 UART 层的解耦风格);
- *              桥接 drv_can 只需在应用层把 drvCanMsg_t 与本层的 jm_can_frame_t 互转。
  */
 #ifndef __JM_PROTO_CAN_H__
 #define __JM_PROTO_CAN_H__
@@ -121,7 +119,7 @@ extern "C"
 	 */
 	void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t now_tick);
 
-	/** @brief 广播命令白名单判断(当前仅 BROADCAST_SYNC 和 ESTOP)。 */
+	/** @brief 广播命令白名单判断(仅允许不会修改持久化配置的安全命令)。 */
 	uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd);
 
 	/** @brief 判断收到的帧是否为其他同ID节点发出的Motor->Host响应。 */

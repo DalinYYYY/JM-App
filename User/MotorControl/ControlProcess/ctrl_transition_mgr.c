@@ -64,6 +64,7 @@ static void apply_stop_cmd(system_state_t *sys)
 	}
 }
 
+/* STOP 请求：仅纯参考闭环模式支持停机过渡，构造零目标并置挂起标志 */
 bool transition_mgr_on_stop(transition_mgr_t *mgr, system_state_t *sys)
 {
 	run_state_e rs = sys->motor.run_state;
@@ -93,6 +94,7 @@ bool transition_mgr_on_stop(transition_mgr_t *mgr, system_state_t *sys)
 	return true;
 }
 
+/* 过渡管理器每拍处理：模式切换过渡/同模式渐变/STOP 停机过渡统一调度 */
 void transition_mgr_step(transition_mgr_t *mgr, system_state_t *sys)
 {
 	if (mgr->trans.state == TRANSITION_IN_PROGRESS)

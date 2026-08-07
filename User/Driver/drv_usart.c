@@ -115,7 +115,6 @@ static inline DMA_HandleTypeDef *get_usart_dma_rx_ch(usartNumber_e uart)
 /* 打印函数(fputc/__io_putchar重定向) */
 PUTCHAR_PROTOTYPE
 {
-	//	HAL_UART_Transmit(PRINTF_API, (uint8_t *)&ch, 1, 0xFFFF);
 	return ch;
 }
 

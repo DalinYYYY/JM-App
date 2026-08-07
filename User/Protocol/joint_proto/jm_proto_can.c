@@ -110,7 +110,6 @@ static inline uint8_t jm_can_single_max(const jm_proto_can_t *c)
 	return c->use_fd_runtime ? JM_CAN_SINGLE_MAX_FD : JM_CAN_SINGLE_MAX_CLS;
 }
 
-/* 运行期多帧片段载荷: FD=63B, 经典=7B (留 1B 给控制字) */
 static uint8_t jm_can_fd_len_is_valid(uint16_t len)
 {
 	return len <= 8u || len == 12u || len == 16u || len == 20u ||
@@ -377,9 +376,8 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t 
 	{
 		return;
 	}
-	/* Motor->Host only frames are responses, never requests. With duplicate
-	 * node IDs, devices receive each other's telemetry/NACK frames. Dispatching
-	 * them would generate NACK-for-NACK feedback and saturate the bus. */
+	/* 仅 Motor->Host 方向的帧才是响应, 不是请求。节点 ID 重复时, 设备会收到
+	 * 彼此的遥测/NACK 帧; 若对其再分发, 会形成 NACK 叠 NACK 的无应答环, 使总线饱和。 */
 	if (jm_proto_can_is_peer_response(frame->id, frame->len))
 	{
 		return;

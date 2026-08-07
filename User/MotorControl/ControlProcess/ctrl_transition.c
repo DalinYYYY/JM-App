@@ -24,6 +24,7 @@ static float blend(float old_v, float new_v, float ratio)
 	return old_v * (1.0f - ratio) + new_v * ratio;
 }
 
+/* 状态机参考渐变：按累计调用次数推进线性混合，量纲变化时直接切换 */
 bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_ref_t *out_ref)
 {
 	if (trans->state != TRANSITION_IN_PROGRESS)
@@ -173,6 +174,7 @@ static bool ref_smooth_run_state_enabled(run_state_e s)
 	}
 }
 
+/* 同模式目标值渐变检测：单拍突变超阈值则启动参考渐变过渡 */
 bool transition_ref_smooth_check(transition_t *trans,
                                  run_state_e run_state,
                                  const motor_ref_t *raw_ref,

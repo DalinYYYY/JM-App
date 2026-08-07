@@ -1,6 +1,6 @@
 /**
  * @file thread_display.c
- * @brief 
+ * @brief 显示/LED 线程实现（周期驱动 LED 状态指示） 
  * 
  * @author dalin (dalinyy@163.com)
  * @version 1.0
@@ -30,7 +30,6 @@
 
 void display_thread(void const *argument)
 {
-	/* Infinite loop */
 	drv_rtos_delay_ms(INTO_THREAD_DELAY / 2);
 
 	for (;;)
@@ -43,7 +42,6 @@ void display_thread(void const *argument)
 		led_manager_update();
 #endif
 
-		/* 任务计数 */
 		usr.sys.task_cnt.display_cnt++;
 	}
 }

@@ -78,8 +78,8 @@ extern "C"
 	/* 配置表定义在 dev_config.c */
 	extern const dev_commun_can_config_t commun_can_list[JM_CAN_COMM_ID_MAX];
 
-/* One maximum classic-CAN transfer needs ceil((JM_PAYLOAD_MAX + CRC16) / 7)
- * frames. Keep one extra ring slot because head == tail denotes empty. */
+/* 一帧最大经典 CAN 传输需 ceil((JM_PAYLOAD_MAX + CRC16) / 7) 帧;
+ * 环形队列多留 1 个槽位, 因为 head == tail 表示队列空 */
 #define DEV_COMMUN_CAN_RX_QUEUE_SIZE 40u
 
 	typedef struct

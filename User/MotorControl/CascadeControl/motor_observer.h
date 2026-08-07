@@ -1,9 +1,8 @@
 /**
  * @file        motor_observer.h
- * @brief       Motor-control observation, live snapshot and high-speed trace
- * @details     This module is the only adapter allowed to map motor_loop internals
- *              to telemetry/plot channels. Control code produces state; protocol
- *              and UI consumers read snapshots or frozen trace chunks.
+ * @brief       电机控制的观测、实时快照与高速波形采集
+ * @details     本模块是唯一允许将 motor_loop 内部映射到遥测/绘图通道的适配层。
+ *              控制代码产生状态，协议与 UI 消费方读取快照或冻结的波形分片。
  */
 
 #ifndef __MOTOR_OBSERVER_H__
@@ -48,13 +47,13 @@ typedef struct
 	float pos;
 } motor_observer_snapshot_t;
 
-/* Called once after motor_loop_isr(). Inactive trace cost is one state check. */
+/* 在 motor_loop_isr() 之后调用一次；未激活波形时仅一次状态判断开销。 */
 void motor_observer_on_control_isr(const struct motor_loop_s *loop);
 
-/* Coherent, decimated live snapshot for telemetry, plots and PID observation. */
+/* 供遥测、绘图与 PID 观测读取的同步、降采样实时快照。 */
 int motor_observer_snapshot_read(motor_observer_snapshot_t *out);
 
-/* Continuous TRACE backend. Rows are packed in channel-bit order. */
+/* 连续波形(TRACE)后端；行数据按通道位顺序紧凑排列。 */
 #define MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES 128u
 #define MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES 8u
 #define MOTOR_OBSERVER_TRACE_PAYLOAD_MAX 256u

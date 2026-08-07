@@ -360,7 +360,7 @@ u8 drv_flash_write(const u32 addr, u64 *pdata64, u32 len_64)
 	u8 ret = FLASH_ERR_OK;
 	u8 bank = drv_g4_flash_get_bank(addr);
 	if (bank == 0xFF)
-		return FLASH_ERR_ADDR_OUT_RANGE; // 地址无效
+		return FLASH_ERR_ADDR_OUT_RANGE;
 
 	__disable_irq();
 	ret = drv_g4_flash_write(addr, pdata64, len_64, bank);
@@ -375,7 +375,7 @@ u8 drv_flash_write(const u32 addr, u64 *pdata64, u32 len_64)
 u8 drv_flash_clear(const u32 addr, u8 len, u8 bank)
 {
 	u8 ret = FLASH_ERR_OK;
-	__disable_irq(); // 中断保护，避免擦除被打断
+	__disable_irq();
 	ret = drv_g4_flash_erase_page(addr, len, bank);
 	__enable_irq();
 	return ret;

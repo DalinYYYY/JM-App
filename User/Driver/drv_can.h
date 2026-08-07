@@ -15,9 +15,7 @@
  * | 2026-07-27 | 1.1  | Dalin  | FIFO循环读+错误回调+TxFull+FD模式+双过滤器+诊断字段 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- * @note        CAN初始化由CubeMX的MX_xxCAN_Init完成，此层封装运行期收发
- * @note        对外接口不暴露HAL类型，报文用统一结构drvCanMsg_t；
- *              F4走CAN、G4/H7走FDCAN，差异在drv_can.c内屏蔽
+ *              初始化由 CubeMX 完成，本层封装运行期收发，不暴露 HAL 类型。
  */
 #ifndef __DRV_CAN_H
 #define __DRV_CAN_H

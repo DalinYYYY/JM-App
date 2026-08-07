@@ -22,7 +22,6 @@
 #include "stm32g4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-//#include "dev_commun_vesc.h"
 #include "dev_commun_uart.h"
 #include "jm_host_commun.h"
 /* USER CODE END Includes */
@@ -289,10 +288,6 @@ void TIM2_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-#if defined(USE_DEV_COMMUN_VESC)
-  /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
-//  dev_commun_vesc.on_rx_idle(&dev_commun_vesc);
-#endif
 #if defined(USE_DEV_COMMUN_UART)
   /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
   if (dev_commun_uart.on_rx_idle != 0)

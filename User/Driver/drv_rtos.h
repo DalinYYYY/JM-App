@@ -60,18 +60,6 @@ void drv_rtos_enter_critical(void);
 void drv_rtos_exit_critical(void);
 
 /**
- * @brief 创建任务
- *
- * @param[in] name      任务名称
- * @param[in] func      任务入口函数
- * @param[in] priority  任务优先级
- * @param[in] stack_size 任务栈大小(字节)
- * @param[in] arg       任务参数
- *
- * @return 任务句柄，创建失败返回NULL
- */
-
-/**
   * @brief  创建一个RTOS线程
   * @param  name          : 线程名称 (单位: 字符串, 范围: 任意有效字符串)
   * @param  func          : 线程入口函数 (单位: 函数指针, 范围: 任意符合类型定义的函数)
