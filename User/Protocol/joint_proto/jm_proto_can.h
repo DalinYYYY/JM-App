@@ -125,7 +125,7 @@ extern "C"
 	uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd);
 
 	/** @brief 判断收到的帧是否为其他同ID节点发出的Motor->Host响应。 */
-	uint8_t jm_proto_can_is_peer_response(uint8_t cmd, uint8_t len);
+	uint8_t jm_proto_can_is_peer_response(uint32_t id, uint8_t len);
 
 	/** @brief 从完整96-bit UID生成CAN-DI56和碰撞辅助字节。 */
 	void jm_proto_can_di_build(const uint8_t uid[12], uint8_t di56[7], uint8_t *guard);

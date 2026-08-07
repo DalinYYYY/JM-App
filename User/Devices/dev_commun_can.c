@@ -231,7 +231,7 @@ static void dev_commun_can_on_rx_msg(struct dev_commun_can *pobj, canNumber_e ca
 	}
 	cmd = JM_CAN_GET_CMD(msg->id);
 	/* Motor->Host响应不进入设备RX队列，避免同ID节点之间形成反馈环。 */
-	if (jm_proto_can_is_peer_response(cmd, msg->len))
+	if (jm_proto_can_is_peer_response(msg->id, msg->len))
 	{
 		return;
 	}

@@ -306,11 +306,21 @@ uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd)
 	        cmd == JM_CMD_CAN_DI_IDENTIFY) ? 1u : 0u;
 }
 
-uint8_t jm_proto_can_is_peer_response(uint8_t cmd, uint8_t len)
+uint8_t jm_proto_can_is_peer_response(uint32_t id, uint8_t len)
 {
+	uint8_t cmd = JM_CAN_GET_CMD(id);
+
 	/* 这两个命令只允许Motor->Host，任何载荷长度都不能作为设备请求。 */
 	if (cmd == JM_CMD_TELEMETRY || cmd == JM_CMD_NACK)
 		return 1u;
+
+	/* C9同时承载空载荷调试查询和三字节高速采样读取请求；多帧C9只可能是响应。 */
+	if (cmd == JM_CMD_READ_DEBUG)
+	{
+		if (JM_CAN_IS_MULTI_ID(id))
+			return 1u;
+		return (len == 0u || len == 3u) ? 0u : 1u;
+	}
 
 	/* 下列查询的Host请求必须是空载荷，非空帧只能是另一节点的响应。
 	 * 同ID设备会收到彼此的响应；若再次dispatch，会形成无限应答环。 */
@@ -318,7 +328,7 @@ uint8_t jm_proto_can_is_peer_response(uint8_t cmd, uint8_t len)
 		return 0u;
 	if (cmd == JM_CMD_CALIB_QUERY || cmd == JM_CMD_PID_SOURCE_GET)
 		return 1u;
-	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_DEBUG)
+	if (cmd >= JM_CMD_READ_FEEDBACK && cmd < JM_CMD_READ_DEBUG)
 		return 1u;
 	if (cmd >= JM_CMD_READ_DEV_INFO && cmd <= JM_CMD_HEARTBEAT)
 		return 1u;
@@ -370,7 +380,7 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t 
 	/* Motor->Host only frames are responses, never requests. With duplicate
 	 * node IDs, devices receive each other's telemetry/NACK frames. Dispatching
 	 * them would generate NACK-for-NACK feedback and saturate the bus. */
-	if (jm_proto_can_is_peer_response(cmd, frame->len))
+	if (jm_proto_can_is_peer_response(frame->id, frame->len))
 	{
 		return;
 	}

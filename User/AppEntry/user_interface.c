@@ -30,6 +30,7 @@
 #endif
 #include "motor_info_storage.h"
 #include "motor_loop.h"
+#include "motor_observer.h"
 #include "motor_loop_config.h"
 #include "runtime_param.h"
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER == 0u)
@@ -120,6 +121,7 @@ void motor_virtual_loop(void)
 
 	// 三环控制入口（电流10kHz / 速度2kHz / 位置1kHz 分频）
 	motor_loop_isr();
+	motor_observer_on_control_isr(motor_loop_get());
 
 	dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_TIME);
 #endif
