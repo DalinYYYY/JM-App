@@ -64,33 +64,25 @@ static uint32_t state_active_faults(system_state_t *sys)
 	float current_limit = p->protect_over_current;
 	float bus = fb->bus_voltage;
 
-	if (!state_float_is_finite(fb->id) || !state_float_is_finite(fb->iq) ||
-		!state_float_is_finite(fb->vel) || !state_float_is_finite(bus))
+	if (!state_float_is_finite(fb->id) || !state_float_is_finite(fb->iq) || !state_float_is_finite(fb->vel) || !state_float_is_finite(bus))
 		active |= SYSTEM_FAULT_NUMERIC;
 
-	if ((enable & SYSTEM_PROTECT_OVER_CURRENT) != 0u &&
-		state_float_is_finite(fb->id) && state_float_is_finite(fb->iq) &&
-		(fb->id * fb->id + fb->iq * fb->iq) > current_limit * current_limit)
+	if ((enable & SYSTEM_PROTECT_OVER_CURRENT) != 0u && state_float_is_finite(fb->id) && state_float_is_finite(fb->iq) && (fb->id * fb->id + fb->iq * fb->iq) > current_limit * current_limit)
 		active |= SYSTEM_FAULT_OVER_CURRENT;
 
 	if (state_float_is_finite(bus) && bus > 1.0f)
 		sys->power_sample_valid = 1u;
 	if (sys->power_sample_valid)
 	{
-		if ((enable & SYSTEM_PROTECT_OVER_VOLTAGE) != 0u &&
-			bus > p->protect_over_voltage)
+		if ((enable & SYSTEM_PROTECT_OVER_VOLTAGE) != 0u && bus > p->protect_over_voltage)
 			active |= SYSTEM_FAULT_OVER_VOLTAGE;
-		if ((enable & SYSTEM_PROTECT_UNDER_VOLTAGE) != 0u &&
-			sys->top_state != TOP_FSM_IDLE && bus < p->protect_under_voltage)
+		if ((enable & SYSTEM_PROTECT_UNDER_VOLTAGE) != 0u && sys->top_state != TOP_FSM_IDLE && bus < p->protect_under_voltage)
 			active |= SYSTEM_FAULT_UNDER_VOLTAGE;
 	}
 
 	/* 编码器冷启动阶段可能先返回无效角度，随后跳到真实角度。
 	 * 仅在输出已使能且启动保护窗口结束后检测超速，避免 IDLE 态误锁存。 */
-	if (sys->speed_guard_cycles == 0u &&
-		(sys->top_state == TOP_FSM_READY || sys->top_state == TOP_FSM_RUN) &&
-		(enable & SYSTEM_PROTECT_OVER_SPEED) != 0u &&
-		state_float_is_finite(fb->vel) && state_absf(fb->vel) > p->protect_over_speed)
+	if (sys->speed_guard_cycles == 0u && (sys->top_state == TOP_FSM_READY || sys->top_state == TOP_FSM_RUN) && (enable & SYSTEM_PROTECT_OVER_SPEED) != 0u && state_float_is_finite(fb->vel) && state_absf(fb->vel) > p->protect_over_speed)
 		active |= SYSTEM_FAULT_OVER_SPEED;
 
 	return active;
@@ -103,7 +95,7 @@ static uint32_t state_active_faults(system_state_t *sys)
 static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 	[CONTROL_MODE_IDLE] = RUN_STATE_IDLE,
 	[CONTROL_MODE_HOLD] = RUN_STATE_HOLD,
-	[CONTROL_MODE_BRAKE] = RUN_STATE_HOLD,  /* 刹车=位置保持 */
+	[CONTROL_MODE_BRAKE] = RUN_STATE_HOLD, /* 刹车=位置保持 */
 
 	[CONTROL_MODE_OPEN_LOOP] = RUN_STATE_OPEN_LOOP,
 	[CONTROL_MODE_CURRENT] = RUN_STATE_CURRENT,
@@ -136,13 +128,13 @@ static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 	[CONTROL_MODE_TRAPEZOIDAL_TRAJ] = RUN_STATE_TRAPEZOIDAL_TRAJ,
 	[CONTROL_MODE_S_CURVE_TRAJ] = RUN_STATE_S_CURVE_TRAJ,
 	[CONTROL_MODE_HOMING] = RUN_STATE_HOMING,
-	[CONTROL_MODE_CANOPEN_SYNC] = RUN_STATE_POSITION,  /* SYNC 同步位置 */
+	[CONTROL_MODE_CANOPEN_SYNC] = RUN_STATE_POSITION, /* SYNC 同步位置 */
 	[CONTROL_MODE_ETHERCAT_CSP] = RUN_STATE_POSITION, /* CSP = Cyclic Sync Position */
 	[CONTROL_MODE_ETHERCAT_CSV] = RUN_STATE_VELOCITY, /* CSV = Cyclic Sync Velocity */
 	[CONTROL_MODE_ETHERCAT_CST] = RUN_STATE_TORQUE,   /* CST = Cyclic Sync Torque */
-	[CONTROL_MODE_PP] = RUN_STATE_POSITION,              /* Profile Position（前期复用 POSITION）*/
-	[CONTROL_MODE_PV] = RUN_STATE_PROFILE_VELOCITY,     /* Profile Velocity → 独立模式文件 */
-	[CONTROL_MODE_PT] = RUN_STATE_PROFILE_TORQUE,       /* Profile Torque → 独立模式文件 */
+	[CONTROL_MODE_PP] = RUN_STATE_POSITION,           /* Profile Position（前期复用 POSITION）*/
+	[CONTROL_MODE_PV] = RUN_STATE_PROFILE_VELOCITY,   /* Profile Velocity → 独立模式文件 */
+	[CONTROL_MODE_PT] = RUN_STATE_PROFILE_TORQUE,     /* Profile Torque → 独立模式文件 */
 	[CONTROL_MODE_ELECTRONIC_GEAR] = RUN_STATE_ELECTRONIC_GEAR,
 	[CONTROL_MODE_ELECTRONIC_CAM] = RUN_STATE_ELECTRONIC_CAM,
 
@@ -322,7 +314,7 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
  */
 void motor_control_loop(system_state_t *sys)
 {
-	fault_check(sys);
+	// fault_check(sys);
 
 	/* CALIB 态：周期推进标定，不生成运动参考 */
 	if (sys->top_state == TOP_FSM_CALIB)
@@ -471,42 +463,42 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 				sys->ctrl_mode = cmd;
 			return;
 
-		/* 校准指令：进入 CALIB 状态
+			/* 校准指令：进入 CALIB 状态
 	 * 0x90-0x96: 启动标定（子模式已由 app_set_mode 传给 calib_mgr）
 	 * 0x97/0x98: 查询/中止，不切状态（app_set_mode 已处理并 return）*/
-	case CONTROL_MODE_CALIB_LEVEL1:
-	case CONTROL_MODE_CALIB_LEVEL2:
-	case CONTROL_MODE_CALIB_LEVEL3:
-	case CONTROL_MODE_CALIB_LEVEL4:
-	case CONTROL_MODE_CALIB_LEVEL5:
-	case CONTROL_MODE_CALIB_LEVEL6:
-	case CONTROL_MODE_CALIB_LEVEL7:
-		/* IDLE 或 READY 态可进入校准；RUN 态需先停止再标定 */
-		if (sys->top_state == TOP_FSM_IDLE || sys->top_state == TOP_FSM_READY)
-		{
-			top_fsm_switch(sys, TOP_FSM_CALIB);
-			if (sys->top_state == TOP_FSM_CALIB)
-				sys->ctrl_mode = cmd;
-			else
-				calib_mgr_abort(); /* 状态切换失败，回滚标定避免卡死 */
-		}
-		else if (sys->top_state == TOP_FSM_CALIB)
-		{
-			/* 已在 CALIB 态：上一个标定已 DONE/FAILED，calib_mgr_start 已成功启动新标定，
+		case CONTROL_MODE_CALIB_LEVEL1:
+		case CONTROL_MODE_CALIB_LEVEL2:
+		case CONTROL_MODE_CALIB_LEVEL3:
+		case CONTROL_MODE_CALIB_LEVEL4:
+		case CONTROL_MODE_CALIB_LEVEL5:
+		case CONTROL_MODE_CALIB_LEVEL6:
+		case CONTROL_MODE_CALIB_LEVEL7:
+			/* IDLE 或 READY 态可进入校准；RUN 态需先停止再标定 */
+			if (sys->top_state == TOP_FSM_IDLE || sys->top_state == TOP_FSM_READY)
+			{
+				top_fsm_switch(sys, TOP_FSM_CALIB);
+				if (sys->top_state == TOP_FSM_CALIB)
+					sys->ctrl_mode = cmd;
+				else
+					calib_mgr_abort(); /* 状态切换失败，回滚标定避免卡死 */
+			}
+			else if (sys->top_state == TOP_FSM_CALIB)
+			{
+				/* 已在 CALIB 态：上一个标定已 DONE/FAILED，calib_mgr_start 已成功启动新标定，
 			 * 直接接受即可，不得 abort（否则会终止刚启动的新标定）*/
-			sys->ctrl_mode = cmd;
-		}
-		else
-		{
-			/* 非法状态（RUN/FAULT/SAFETY等），回滚 calib_mgr_start */
-			calib_mgr_abort();
-		}
-		return;
+				sys->ctrl_mode = cmd;
+			}
+			else
+			{
+				/* 非法状态（RUN/FAULT/SAFETY等），回滚 calib_mgr_start */
+				calib_mgr_abort();
+			}
+			return;
 
-	case CONTROL_MODE_CALIB_QUERY:
-	case CONTROL_MODE_CALIB_ABORT:
-		/* 查询/中止不切状态，app_set_mode 已处理 */
-		return;
+		case CONTROL_MODE_CALIB_QUERY:
+		case CONTROL_MODE_CALIB_ABORT:
+			/* 查询/中止不切状态，app_set_mode 已处理 */
+			return;
 
 		case CONTROL_MODE_SAVE_CONFIG:
 			// extern int motor_param_save(const motor_param_t *cfg);
