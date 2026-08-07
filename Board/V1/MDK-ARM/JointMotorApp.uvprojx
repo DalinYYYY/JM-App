@@ -609,6 +609,11 @@
               <FilePath>..\..\..\User\MotorControl\CascadeControl\motor_loop.c</FilePath>
             </File>
             <File>
+              <FileName>motor_observer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\CascadeControl\motor_observer.c</FilePath>
+            </File>
+            <File>
               <FileName>dev_motor_virtual.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorControl\CascadeControl\dev_motor_virtual.c</FilePath>
