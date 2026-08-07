@@ -8,3 +8,4 @@
 | 1.0.2 | 2026-08-07 | feat | 新增 motor_observer 实时快照与高速采样（B7/B6/C9） |
 | 1.0.3 | 2026-08-07 | feat | 增强 PID 整定/校验与调试会话（autotune/validate/A1/A2/A5，含 B7/B6/C9 协议接口）；同步 pyqt_gui PID 调试 UI |
 | 1.0.4 | 2026-08-07 | fix | system_state 调整：注释 fault_check 调用、CALIB 态切换逻辑收敛与缩进整理 |
+| 1.0.5 | 2026-08-07 | docs | 更新协议文档与命令清单（高速采样 B7/B6/C9、PID 调试 A1/A2/A5） |

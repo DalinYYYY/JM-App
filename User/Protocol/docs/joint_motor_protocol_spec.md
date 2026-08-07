@@ -94,7 +94,7 @@ DATA = DB 0F C9 3F   (1.57f 小端, 4字节)
 | 0x53 | S_CURVE_TRAJ | 请求 16B |
 | 0x76 | TEST_SWEEP_FREQ | 请求 12B |
 
-> 不在白名单的命令在 CAN 上请求方向仅支持 ≤8B 单帧。CSV 备注列标注「CAN需分包」的命令中，请求方向需多帧的（如 0x31/0x50/0xA0/0xE1 等）应在此清单内；仅应答方向需多帧的（如 0xD0/0xD1/0xC2/0xC4/0xC9/0xCA/0xE8）不在清单中是正常的，由 `can_emit_payload` 自动分包。
+> 不在白名单的命令在 CAN 上请求方向仅支持 ≤8B 单帧。CSV 备注列标注「CAN需分包」的命令中，请求方向需多帧的（如 0x31/0x50/0xA0/0xE1 等）应在此清单内；仅应答方向需多帧的（如 0xD0/0xD1/0xC2/0xC4/0xC9/0xCA/0xE8）不在清单中是正常的，由 `can_emit_payload` 自动分包。0xC9 空载荷为调试查询，三字节载荷为高速采样分块读取请求，C9 多帧应答带 `JM_CAN_MULTI_FLAG`。
 
 ## 4. MIT 控制帧定点压缩（0x13 / 0x30，CAN 专用 8 字节）
 
@@ -213,8 +213,8 @@ CSV 描述应答为 `{hw_ver:u32;fw_ver:u32;uid:bytes12}`（20B），实际固�
 | 0xB0 | CLEAR_FAULT | 占位：仅切状态，不清 fault_mask |
 | 0xB1 | DIAGNOSTIC | 占位：仅切状态，不解析载荷 |
 | 0xB5 | START_LOG | 占位：不解析 rate_hz/mask |
-| 0xB6 | STOP_LOG | 占位：仅切状态 |
-| 0xB7 | HIGH_SPEED_DAQ | 占位：不解析 ch_mask/rate_hz |
+| 0xB6 | STOP_LOG | 已实现：停止 0xB7 高速采样（幂等） |
+| 0xB7 | HIGH_SPEED_DAQ | 已实现：按通道掩码、采样率和可选采样点数启动高速采样；详细载荷以 `joint_motor_command_list.csv` 为准 |
 | 0xB8 | SINGLE_STEP | 占位：仅切状态 |
 | 0xD2 | HEARTBEAT | 占位：仅被动应答，未实现主动周期上报 |
 
@@ -238,4 +238,3 @@ CSV 描述应答为 `{hw_ver:u32;fw_ver:u32;uid:bytes12}`（20B），实际固�
 - 批量写速率限制缺失（0xE3/0xE9，单次写 0xE1/0xE7 已有）
 - FAULT_STATE(0x09) 错误码未使用（故障态拦截缺失）
 - feature_flags 不上报 AUTH(bit1)/DUAL_ARB(bit4)
-

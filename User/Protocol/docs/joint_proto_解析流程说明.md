@@ -264,7 +264,7 @@ flowchart TB
 单位  rad        rad/s      Nm         ℃          V          位
 ```
 
-> CAN 路径对 0xC0 不使用此 22B 全精度应答，而是**重新调用** `get_feedback` + `jm_fb_pack` 压成 8B 定点（见 [§8](#8-uart-与-can-解析差异)）。
+> `vel` 保持原始机械角速度语义；滤波速度通过独立观测字段提供。CAN 路径对 0xC0 不使用此 22B 全精度应答，而是**重新调用** `get_feedback` + `jm_fb_pack` 压成 8B 定点（见 [§8](#8-uart-与-can-解析差异)）。
 
 **0xC9 READ_DEBUG**（`handle_read_debug`）：
 
@@ -281,6 +281,10 @@ flowchart TB
 ```
 
 应答载荷为 N×4 字节（纯 f32 拼接，无计数字节），与 0xCA 遥测 DEBUG 组同构。上位机按 `(reply_len-1)/4` 解析。
+
+当 0xC9 携带 `offset:u16 + count:u8` 三字节请求时，协议层改为读取高速采样分块；
+返回头包含状态、通道掩码、实际采样率、已提交点数、偏移和点数，后续为按通道排列的
+f32 数据。C9 多帧响应使用 `JM_CAN_MULTI_FLAG`，不能被识别为主机请求。
 
 ---
 
