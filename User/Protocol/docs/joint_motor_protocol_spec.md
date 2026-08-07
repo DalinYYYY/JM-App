@@ -7,7 +7,7 @@
 >
 > 本协议同时覆盖**串口（USART）**与 **CAN/CAN FD**，逻辑命令码 `CMD` 两者共用，仅封装层不同。
 >
-> **协议版本**: 1.1（§AA1，由 0xD0 READ_DEV_INFO 应答携带，详见 `jm_cmd_def.h`）
+> **协议版本**: 1.2（§AA1，由 0xD0 READ_DEV_INFO 应答携带，详见 `jm_cmd_def.h`）
 
 ## 1. 命令码 CMD 分区
 
@@ -81,6 +81,7 @@ DATA = DB 0F C9 3F   (1.57f 小端, 4字节)
 | CMD | 名称 | 说明 |
 |-----|------|------|
 | 0xA0 | PID_AUTOTUNE | 请求 13B |
+| 0xB9 | TRACE_CONFIG | 请求 13B，经典 CAN 需分包 |
 | 0xE1 | PARAM_WRITE | 写 char[16] 时 18B |
 | 0xE9 | MOTOR_INFO_WRITE_BULK | 变长请求 |
 | 0xE2 | PARAM_READ_BULK | 应答变长 |
@@ -94,7 +95,7 @@ DATA = DB 0F C9 3F   (1.57f 小端, 4字节)
 | 0x53 | S_CURVE_TRAJ | 请求 16B |
 | 0x76 | TEST_SWEEP_FREQ | 请求 12B |
 
-> 不在白名单的命令在 CAN 上请求方向仅支持 ≤8B 单帧。CSV 备注列标注「CAN需分包」的命令中，请求方向需多帧的（如 0x31/0x50/0xA0/0xE1 等）应在此清单内；仅应答方向需多帧的（如 0xD0/0xD1/0xC2/0xC4/0xC9/0xCA/0xE8）不在清单中是正常的，由 `can_emit_payload` 自动分包。0xC9 空载荷为调试查询，三字节载荷为高速采样分块读取请求，C9 多帧应答带 `JM_CAN_MULTI_FLAG`。
+> 不在白名单的命令在 CAN 上请求方向仅支持 ≤8B 单帧。CSV 备注列标注「CAN需分包」的命令中，请求方向需多帧的（如 0x31/0x50/0xA0/0xB9/0xE1 等）应在此清单内；仅应答方向需多帧的（如 0xBA/0xCA/0xD0/0xD1/0xE8）不在清单中是正常的，由 `can_emit_payload` 自动分包。0xC9 仅保留空载荷通用调试查询，不再承载波形数据。
 
 ## 4. MIT 控制帧定点压缩（0x13 / 0x30，CAN 专用 8 字节）
 
@@ -212,10 +213,12 @@ CSV 描述应答为 `{hw_ver:u32;fw_ver:u32;uid:bytes12}`（20B），实际固�
 |-----|------|------|
 | 0xB0 | CLEAR_FAULT | 占位：仅切状态，不清 fault_mask |
 | 0xB1 | DIAGNOSTIC | 占位：仅切状态，不解析载荷 |
-| 0xB5 | START_LOG | 占位：不解析 rate_hz/mask |
-| 0xB6 | STOP_LOG | 已实现：停止 0xB7 高速采样（幂等） |
-| 0xB7 | HIGH_SPEED_DAQ | 已实现：按通道掩码、采样率和可选采样点数启动高速采样；详细载荷以 `joint_motor_command_list.csv` 为准 |
+| 0xB5 | START_LOG | 旧版命令，返回 NOT_SUPPORTED |
+| 0xB6 | STOP_LOG | 旧版命令，返回 NOT_SUPPORTED |
+| 0xB7 | HIGH_SPEED_DAQ | 旧版命令，返回 NOT_SUPPORTED |
 | 0xB8 | SINGLE_STEP | 占位：仅切状态 |
+| 0xB9 | TRACE_CONFIG | 配置/停止高速 TRACE：`enable:u8 + session:u16 + mask:u32 + rate:u32 + packet_samples:u8 + flags:u8`；ACK 返回 session、实际采样率、实际打包点数和缓冲容量。LIVE 与 TRACE 配置相互独立 |
+| 0xBA | TRACE_DATA | 设备主动批量上报，无逐包 ACK；固定头25B含 session、sequence、first_sample_index、actual_rate、mask、count、channels、flags、overflow_count，之后为通道位序排列的 float32 样本；控制/ACK > LIVE > TRACE，TRACE 溢出丢旧保新并置 DISCONTINUITY |
 | 0xD2 | HEARTBEAT | 占位：仅被动应答，未实现主动周期上报 |
 
 ### 11.2 安全隐患（量产前必须补全）

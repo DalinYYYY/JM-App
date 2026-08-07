@@ -282,9 +282,9 @@ flowchart TB
 
 应答载荷为 N×4 字节（纯 f32 拼接，无计数字节），与 0xCA 遥测 DEBUG 组同构。上位机按 `(reply_len-1)/4` 解析。
 
-当 0xC9 携带 `offset:u16 + count:u8` 三字节请求时，协议层改为读取高速采样分块；
-返回头包含状态、通道掩码、实际采样率、已提交点数、偏移和点数，后续为按通道排列的
-f32 数据。C9 多帧响应使用 `JM_CAN_MULTI_FLAG`，不能被识别为主机请求。
+0xC9 仅接受空载荷通用调试查询；旧版 `offset:u16 + count:u8` 高速采样分块请求
+已删除，不再支持。高速波形统一通过 0xB9 TRACE_CONFIG 配置，由设备主动发送
+0xBA TRACE_DATA，接收端按 session、sequence 和 sample index 重建时间轴。
 
 ---
 
