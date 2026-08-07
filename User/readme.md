@@ -26,7 +26,7 @@ User/
 │   ├── CascadeControl/             # 三环级联控制（电流环/外环/集成编排/虚拟电机）
 │   ├── ControlProcess/             # 控制流程与过渡引擎
 │   └── Modes/                      # 控制模式（一模式一文件 + 分发表）
-├── Protocol/                   # 通信协议层（joint_proto / vesc_proto / packer_parser）
+├── Protocol/                   # 通信协议层（joint_proto / packer_parser）
 └── Tools/                      # 离线工具（非 MCU 编译）
     ├── motor_param_gen/            # 参数表代码生成器（Python）
     ├── motor_info_gen/             # MotorInfo 持久化参数代码生成器（Python）
@@ -118,14 +118,13 @@ User/
 | `dev_power_monitor.c/h` | 电源监控（ADC 规则组 DMA：母线电压/电流/温度等） |
 | `dev_dwt_counter.c/h` | DWT 周期计数设备封装 |
 | `dev_commun_uart.c/h` | 关节电机串口通信设备（USART+DMA 空闲中断，承载 joint_proto，上接 `jm_proto_uart` 下接 `drv_usart`） |
-| `dev_commun_vesc.c/h` | VESC Tool 串口通信设备（把本机伪装成 VESC 从机，上接 `vesc_slave` 下接 `drv_usart`） |
 | `dev_config.c/h` | 设备层统一接口：公共常量 + 板级选择器，板级映射在 `Board/<板名>/Config/` |
 | `dev_eeprom.h` | EEPROM 设备：字节/块读写、跨页写、参数持久化（接口预留） |
 | `dev_led.h` | LED 设备：单色/RGB 统一对象接口（接口预留） |
 
 **文档子目录**：`Devices/docs/`（含 `dev_mt6701_说明.md`、`相电流采样_PWM触发ADC时序说明.md`）
 
-**设计要点**：每个设备一组 `.c/.h`，上层只通过接口访问，不直接操作寄存器。通信设备（`dev_commun_uart`/`dev_commun_vesc`）作为粘合层，连接协议栈与底层 USART 驱动。
+**设计要点**：每个设备一组 `.c/.h`，上层只通过接口访问，不直接操作寄存器。通信设备（`dev_commun_uart`/`dev_commun_can`）作为粘合层，连接协议栈与底层 USART/CAN 驱动。
 
 ---
 
@@ -217,8 +216,6 @@ User/
 | --- | --- | --- |
 | `joint_proto/` | 关节电机自研协议（传输无关） | `jm_proto.c/h`（CMD 分发 + 小端编解码助手，业务动作经 `jm_proto_ops_t` 回调注入）、`jm_cmd_def.h`（命令码定义）、`jm_proto_uart.c/h`（串口组帧/拆帧）、`jm_proto_can.c/h`（CAN 组帧/拆帧）、`jm_proto_ops.c/h`（业务回调实现：反馈/参数/控制）、`example_jm_proto_uart.c`（使用示例） |
 | `packer_parser/` | 通用数据包解析器 | `packer_parser.c/h` |
-| `serial_studio/` | SerialStudio 上位机配置与生成工具 | `frame_parser.js`、`gen_ssproj.pl`/`gen_ssproj.py`（项目生成脚本）、`jointmotor_uart.ssproj` |
-| `vesc_proto/` | VESC 串行通信协议（平台无关，可多实例） | `vesc_proto.c/h`（帧层 + 命令封装）、`vesc_slave.c/h`（VESC 从机协议栈）、`vesc_comm_ids.h`（COMM_PACKET_ID 枚举 0~159）、`example_slave.c`/`example_dev_commun_vesc.c`（使用示例）、`README.md`、`VESC串行通信协议.md` |
 
 **文档子目录**：`Protocol/docs/`（含 `joint_motor_command_list.csv` 命令清单、`joint_motor_param_index.csv` 参数索引、`joint_motor_protocol_spec.md` 协议规范、`joint_proto_layer_diagram.md` 分层图）
 
@@ -253,7 +250,7 @@ MotorAlgorithms（FOC / 运动解算 / 多圈计数）  │
     ↓                                        │
 DataHub（motor_param / motor_info / runtime）│
     ↓                                        │
-Devices（设备抽象，含 dev_commun_uart/vesc） ┘
+Devices（设备抽象，含 dev_commun_uart/can） ┘
     ↓
 Driver（HAL 封装）
     ↓
@@ -261,7 +258,7 @@ CubeMX 生成的 HAL 库
 
 横向支撑层（各层均可调用）：
 Common（utils / pid_core / crc16 / assert / vofa）、Config（含 motor_profile / board_select）
-Protocol（joint_proto / vesc_proto）经 Devices/dev_commun_* 接入，供 AppServices/ParamService 使用
+Protocol（joint_proto）经 Devices/dev_commun_* 接入，供 AppServices/ParamService 使用
 ```
 
 > 设备接入采用编译期切换：`MOTOR_LOOP_ENABLE_DEV_DRIVER==1` 走真实 `Devices/dev_motor.c`，`==0` 走 `CascadeControl/dev_motor_virtual.c`（虚拟在环仿真），两者实现同一套 `dev_motor_*` API，互斥编译避免符号冲突。

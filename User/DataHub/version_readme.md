@@ -14,3 +14,4 @@
 | 1.1.1 | 2026-08-07 | docs | 更新协议文档与命令清单（TRACE 0xB9/0xBA、废弃 B5~B7/C9 波形） |
 | 1.1.2 | 2026-08-07 | build | 更新 Keil 编译分析结果（TRACE 重构后 Flash/RAM 占用） |
 | 1.1.3 | 2026-08-07 | feat | 删除 VESC/SerialStudio 通信模块（dev_commun_vesc/vesc_proto/serial_studio）并清理冗余注释与死代码 |
+| 1.1.4 | 2026-08-07 | docs+build | 更新 readme 与协议文档（移除 VESC/SerialStudio 引用）、Keil 工程移除 vesc_proto 头文件路径 |

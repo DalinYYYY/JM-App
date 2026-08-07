@@ -47,7 +47,6 @@ flowchart TB
 
     subgraph DEVS["Devices/ — 设备粘合层"]
         DCU["dev_commun_uart.c/.h<br/>━━━━━━━<br/>dev_commun_uart_init<br/>set_ops/start/poll/report/on_rx_idle"]
-        DCV["dev_commun_vesc.c/.h<br/>(VESC 旁路, 不在本文档主链)"]
     end
 
     subgraph PROTO["Protocol/joint_proto/ — 协议核心"]
@@ -103,7 +102,6 @@ flowchart TB
     PP -->|"CRC16 校验"| CRC
     DCU -->|"串口收发"| DU
     JHC -->|"信号量/延时"| DRT
-    TC -->|"VESC 旁路"| DCV
 
     JPO -->|"写控制目标"| ML
     JPO -->|"读活数据"| RP
@@ -130,7 +128,7 @@ flowchart TB
     class JHC thread
     class JP,JPO,JPU,JPC,JCD,EX proto
     class PP packer
-    class DCU,DCV dev
+    class DCU dev
     class RP,MP,MI,VER hub
     class ML,CM ctrl
 ```
@@ -265,7 +263,6 @@ flowchart LR
     TC -->|"初始化"| JHCI["jm_host_commun_init()<br/>(jm_host_commun.c)"]
     TC -->|"周期处理"| JHCP["jm_host_commun_process()<br/>(jm_host_commun.c)"]
     TC -->|"等待/延时"| JHCW["jm_host_commun_wait()<br/>(jm_host_commun.c)"]
-    TC -.->|"VESC 旁路"| DCV["dev_commun_vesc_*<br/>(dev_commun_vesc.c)"]
     TC -.->|"VOFA 旁路(已注释)"| VOFA["vofa_upload<br/>(vofa.c)"]
 ```
 
@@ -274,7 +271,7 @@ flowchart LR
 - `jm_host_commun_process()` → 每拍 poll + 遥测分频
 - `jm_host_commun_wait(THREAD_DELAY_COMMUN)` → 信号量等待（RX 唤醒或超时）
 
-**include 依赖**：`drv_rtos.h`、`runtime_param.h`、`thread_config.h`、`thread_commun.h`、`vofa.h`、`main.h`、`dev_commun_vesc.h`、`jm_host_commun.h`
+**include 依赖**：`drv_rtos.h`、`runtime_param.h`、`thread_config.h`、`thread_commun.h`、`vofa.h`、`main.h`、`jm_host_commun.h`
 
 ---
 
@@ -460,7 +457,6 @@ flowchart TB
 
     subgraph DEV["设备层头文件"]
         DCU_H["dev_commun_uart.h"]
-        DCV_H["dev_commun_vesc.h"]
     end
 
     subgraph PROTO_H["协议层头文件"]
@@ -655,7 +651,6 @@ flowchart LR
 | 宏 | 定义位置 | 作用 | 影响文件 |
 |----|---------|------|---------|
 | `USE_DEV_COMMUN_UART` | `dev_config.h`（板级） | 启用 joint_proto 串口通信链路 | `dev_commun_uart.c`、`jm_host_commun.c`、`thread_commun.c` |
-| `USE_DEV_COMMUN_VESC` | `dev_config.h`（板级） | 启用 VESC Tool 兼容链路 | `dev_commun_vesc.c`、`thread_commun.c` |
 | `USE_DATA_CHECK` | `packer_parser.h` | 启用 CRC16 + 头校验 | `packer_parser.c` |
 | `USE_DYNAMIC_MEM` | `packer_parser.h` | packer 缓冲动态分配（默认静态） | `packer_parser.c` |
 | `MAX_PACK_SIZE` | `packer_parser.h` | 单帧数据区上限（默认 1024） | `packer_parser.c/.h` |
@@ -666,7 +661,6 @@ flowchart LR
 
 ```c
 #define USE_DEV_COMMUN_UART   1   /* 启用 joint_proto 串口 */
-#define USE_DEV_COMMUN_VESC   0   /* 禁用 VESC 兼容 */
 ```
 
 ---
@@ -678,7 +672,6 @@ flowchart LR
 | `AppServices/ThreadManager/` | `thread_commun.c/.h` | 通信线程入口 |
 | `AppServices/ParamService/` | `jm_host_commun.c/.h` | 通信服务接入 + 遥测打包 |
 | `Devices/` | `dev_commun_uart.c/.h` | UART 设备粘合层 |
-| `Devices/` | `dev_commun_vesc.c/.h` | VESC 设备粘合层（旁路） |
 | `Protocol/joint_proto/` | `jm_proto.c/.h` | 协议核心 dispatch |
 | `Protocol/joint_proto/` | `jm_proto_uart.c/.h` | 串口绑定层 |
 | `Protocol/joint_proto/` | `jm_proto_can.c/.h` | CAN 绑定层（旁路） |
