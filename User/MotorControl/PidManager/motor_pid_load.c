@@ -211,6 +211,20 @@ void motor_pid_load_boot(motor_param_t *param, const motor_info_t *info)
 void motor_pid_reload(void)
 {
 	motor_param_t *param = &usr.motor_param[M1];
+	motor_pid_profile_t debug_saved[MOTOR_PID_PROFILE_MAX];
+	uint8_t debug_valid[MOTOR_PID_PROFILE_MAX] = {0};
+	uint8_t i;
+	/* 保留已进入 DEBUG 的 RAM profile，避免 reload 其它环时覆盖调试值。 */
+	for (i = 0u; i < MOTOR_PID_PROFILE_MAX; i++)
+	{
+		if ((i <= MOTOR_PID_PROFILE_CURRENT_Q && motor_pid_get_source(PID_RING_CURRENT) == PID_SOURCE_DEBUG) ||
+			(i == MOTOR_PID_PROFILE_VELOCITY && motor_pid_get_source(PID_RING_VELOCITY) == PID_SOURCE_DEBUG) ||
+			(i == MOTOR_PID_PROFILE_POSITION && motor_pid_get_source(PID_RING_POSITION) == PID_SOURCE_DEBUG))
+		{
+			debug_valid[i] = 1u;
+			debug_saved[i] = s_motor_pid_profiles[i];
+		}
+	}
 #if defined(USE_DEV_FLASH)
 	const motor_info_t *info = motor_info_storage_get();
 #else
@@ -222,4 +236,7 @@ void motor_pid_reload(void)
 
 	/* 重新同步到 motor_pid_profile 管理器（motor_pid_profile 读 motor_param_t） */
 	motor_pid_profile_load_from_motor_param(param);
+	for (i = 0u; i < MOTOR_PID_PROFILE_MAX; i++)
+		if (debug_valid[i])
+			s_motor_pid_profiles[i] = debug_saved[i];
 }

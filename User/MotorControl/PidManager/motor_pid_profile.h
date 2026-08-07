@@ -31,6 +31,8 @@ typedef struct
 	char name[16];
 } motor_pid_profile_t;
 
+extern motor_pid_profile_t s_motor_pid_profiles[MOTOR_PID_PROFILE_MAX];
+
 /**
  * @brief 初始化PID参数管理器
  * @param motor_param 电机参数指针
@@ -86,6 +88,11 @@ int motor_pid_profile_set_param(uint8_t id, uint8_t param_type, const uint8_t *v
  * @return 0=成功 -1=参数非法
  */
 int motor_pid_profile_get_param(uint8_t id, uint8_t param_type, uint8_t *out_value4);
+
+/* A5 param_type=0 的原子批量写，entries 为 count:u8 + (type:u8,value4)*。 */
+int motor_pid_profile_apply_batch(uint8_t id, const uint8_t *entries,
+                                  uint16_t entries_len, float output_limit_max);
+int motor_pid_profile_validate(const pid_param_t *param, float output_limit_max);
 
 /**
  * @brief 恢复指定配置文件的默认值

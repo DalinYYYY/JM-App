@@ -13,9 +13,15 @@
 #endif
 
 /* 推荐带宽默认值 (Hz) */
-#define AUTOTUNE_DEFAULT_CURRENT_BW  500.0f
+#define AUTOTUNE_DEFAULT_CURRENT_BW  1000.0f
 #define AUTOTUNE_DEFAULT_VELOCITY_BW 100.0f
 #define AUTOTUNE_DEFAULT_POSITION_BW 20.0f
+
+/* Keep readiness thresholds aligned with motor_info_validate(). */
+#define AUTOTUNE_MIN_PHASE_RESISTANCE 0.001f
+#define AUTOTUNE_MIN_PHASE_INDUCTANCE 0.000001f
+#define AUTOTUNE_MIN_TORQUE_CONSTANT  0.00001f
+#define AUTOTUNE_MIN_ROTOR_INERTIA    0.0000001f
 
 /**
  * @brief 检查辨识数据是否就绪
@@ -31,9 +37,23 @@ static int check_calib_ready(const motor_info_t *info)
 	/* R/Ld 有效性检查（启动时 motor_profile_apply_info 已用默认值填充零值字段） */
 	float r = info->blocks.motor_calib.phase_resistance;
 	float ld = info->blocks.motor_calib.phase_inductance_d;
-	if (r < 0.001f || ld < 0.00001f)
+	if (!isfinite(r) || !isfinite(ld) ||
+		r < AUTOTUNE_MIN_PHASE_RESISTANCE ||
+		ld < AUTOTUNE_MIN_PHASE_INDUCTANCE)
 		return 0;
 	return 1;
+}
+
+/* current_lim/peak_current only affect generated integral limits. */
+static float autotune_current_limit(const motor_info_t *info)
+{
+	float limit = info->blocks.motor_calib.current_lim;
+	if (isfinite(limit) && limit > 0.0f)
+		return limit;
+	limit = info->blocks.motor_calib.peak_current;
+	if (isfinite(limit) && limit > 0.0f)
+		return limit;
+	return 1.0f;
 }
 
 int motor_pid_autotune_current(const motor_info_t *info, float bandwidth_hz,
@@ -54,10 +74,15 @@ int motor_pid_autotune_current(const motor_info_t *info, float bandwidth_hz,
 		else
 			bandwidth_hz = AUTOTUNE_DEFAULT_CURRENT_BW;
 	}
+	if (!isfinite(bandwidth_hz) || bandwidth_hz > 100000.0f)
+		return -3;
 
 	float r = info->blocks.motor_calib.phase_resistance;
 	float ld = info->blocks.motor_calib.phase_inductance_d;
 	float lq = info->blocks.motor_calib.phase_inductance_q;
+	if (!isfinite(lq) || lq < AUTOTUNE_MIN_PHASE_INDUCTANCE)
+		lq = ld; /* 仅完成Ld标定时，Q轴使用Ld作为保守估计，避免Kp=0。 */
+	float current_limit = autotune_current_limit(info);
 	float wc = 2.0f * M_PI * bandwidth_hz; /* 截止角频率 rad/s */
 
 	/* 电流环零极点对消: Kp = ωc·L, Ki = ωc·R */
@@ -66,9 +91,8 @@ int motor_pid_autotune_current(const motor_info_t *info, float bandwidth_hz,
 	out_q->kp = wc * lq;
 	out_q->ki = wc * r;
 
-	/* 积分限幅 = Kp_q × 额定电流 × 1.5
-	 * 额定电流取 current_lim × 0.6（持续电流约 60% 限幅） */
-	float rated = info->blocks.motor_calib.current_lim * 0.6f;
+	/* 积分限幅 = Kp_q × 可用电流限幅 × 0.6 × 1.5。 */
+	float rated = current_limit * 0.6f;
 	out_q->integral_limit = out_q->kp * rated * 1.5f;
 	out_d->integral_limit = out_q->integral_limit;
 
@@ -87,12 +111,17 @@ int motor_pid_autotune_velocity(const motor_info_t *info, float bandwidth_hz,
 	/* 检查 J/Kt 有效性 */
 	float j = info->blocks.motor_calib.rotor_inertia;
 	float kt = info->blocks.motor_calib.torque_constant;
-	if (j < 1e-7f || kt < 0.01f)
+	if (!isfinite(j) || !isfinite(kt) ||
+		j < AUTOTUNE_MIN_ROTOR_INERTIA ||
+		kt < AUTOTUNE_MIN_TORQUE_CONSTANT)
 		return -2;
+	float current_limit = autotune_current_limit(info);
 
 	/* 带宽默认值 fallback */
 	if (bandwidth_hz <= 0.0f)
 		bandwidth_hz = AUTOTUNE_DEFAULT_VELOCITY_BW;
+	if (!isfinite(bandwidth_hz) || bandwidth_hz > 100000.0f)
+		return -3;
 
 	float wc = 2.0f * M_PI * bandwidth_hz;
 
@@ -103,7 +132,7 @@ int motor_pid_autotune_velocity(const motor_info_t *info, float bandwidth_hz,
 	out->ki = j * wc * wc / (4.0f * kt);
 
 	/* 积分限幅 = 额定电流 × 0.5 */
-	out->integral_limit = info->blocks.motor_calib.current_lim * 0.5f;
+	out->integral_limit = current_limit * 0.5f;
 
 	return 0;
 }
@@ -119,6 +148,8 @@ int motor_pid_autotune_position(const motor_info_t *info, float bandwidth_hz,
 	/* 带宽默认值 fallback */
 	if (bandwidth_hz <= 0.0f)
 		bandwidth_hz = AUTOTUNE_DEFAULT_POSITION_BW;
+	if (!isfinite(bandwidth_hz) || bandwidth_hz > 100000.0f)
+		return -3;
 
 	/* 位置环纯比例: Kp = 2π·f (带宽 = Kp) */
 	out->kp = 2.0f * M_PI * bandwidth_hz;
@@ -136,11 +167,28 @@ int motor_pid_autotune_apply(motor_info_t *info, uint8_t ring_mask,
 	/* ring_mask 位掩码: bit0=电流 bit1=速度 bit2=位置, 0=空选无效, >0x07=越界 */
 	if (ring_mask == 0 || ring_mask > 0x07)
 		return -1;
+	if ((isfinite(current_bw_hz) && current_bw_hz > 0.0f && current_bw_hz > 20000.0f) ||
+		(isfinite(velocity_bw_hz) && velocity_bw_hz > 0.0f && velocity_bw_hz > 10000.0f) ||
+		(isfinite(position_bw_hz) && position_bw_hz > 0.0f && position_bw_hz > 5000.0f))
+		return -1;
+	if ((!isfinite(current_bw_hz) && current_bw_hz != 0.0f) ||
+		(!isfinite(velocity_bw_hz) && velocity_bw_hz != 0.0f) ||
+		(!isfinite(position_bw_hz) && position_bw_hz != 0.0f))
+		return -1;
 
 	autotune_result_t d, q, v, p;
 	bool do_cur = (ring_mask & 0x01) != 0;
 	bool do_vel = (ring_mask & 0x02) != 0;
 	bool do_pos = (ring_mask & 0x04) != 0;
+	{
+		float cur_bw = (current_bw_hz > 0.0f) ? current_bw_hz : AUTOTUNE_DEFAULT_CURRENT_BW;
+		float vel_bw = (velocity_bw_hz > 0.0f) ? velocity_bw_hz : AUTOTUNE_DEFAULT_VELOCITY_BW;
+		float pos_bw = (position_bw_hz > 0.0f) ? position_bw_hz : AUTOTUNE_DEFAULT_POSITION_BW;
+		if (do_cur && do_vel && vel_bw > cur_bw * 0.2f)
+			return -1;
+		if (do_vel && do_pos && pos_bw > vel_bw * 0.2f)
+			return -1;
+	}
 
 	/* 事务语义：先计算所选环，任一失败则不写入 */
 	if (do_cur)

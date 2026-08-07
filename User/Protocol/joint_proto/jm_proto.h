@@ -99,6 +99,11 @@ extern "C"
 		 * (reply_len-1)/4 解析)。max_count 为 out 容量。可为 NULL(则回通用 ACK)。
 		 * 用途: 免改协议加观测点, 任意处写 jm_dbg[i]=变量 即可上位机查看。*/
 		jm_err_e (*get_debug)(float *out, uint8_t *out_count, uint8_t max_count);
+		/* 高速采样复用 B7/B6/C9: B7 启动, B6 停止, C9 带载荷读取分块。 */
+		jm_err_e (*capture_start)(uint32_t ch_mask, uint32_t rate_hz, uint16_t sample_count);
+		jm_err_e (*capture_stop)(void);
+		jm_err_e (*capture_read)(uint16_t offset, uint8_t count,
+		                         uint8_t *out, uint16_t *out_len);
 
 		/* 批量读参数(CMD 0xE2): 从 start_id 起连续读 count 个, 应答体由实现层组织为
 		 * [start_id:u16][count:u8][[type:u8][value]...] 并写入 out, 写回 *out_len。
@@ -162,9 +167,10 @@ extern "C"
 		jm_err_e (*pid_autotune)(uint8_t ring_mask, float cur_bw, float vel_bw, float pos_bw,
 		                         uint8_t *out_fail_reason);
 
-		/* PID 来源切换(CMD 0xA1): 独立设置某环参数来源, 立即 reload。仅IDLE态可执行。
+		/* PID 来源切换(CMD 0xA1): 独立设置某环参数来源, 立即 reload。
+		 * 仅 IDLE/READY 态可执行（READY 下 PWM 关闭）；RUN/CALIB/FAULT 拒绝。
 		 * ring_select: 0=电流环 1=速度环 2=位置环
-		 * source: 0=默认 1=Flash工程值 2=理论估计 3=调试
+		 * source: 0=默认 1=Flash工程值 2=理论估计 3=调试；调试来源由 A2 心跳续租
 		 * 返回 JM_ERR_OK 成功, 其余失败。可为 NULL(回 NACK)。*/
 		jm_err_e (*pid_source_set)(uint8_t ring_select, uint8_t source);
 
@@ -177,7 +183,9 @@ extern "C"
 		 * ring: 0=D轴 1=Q轴 2=速度 3=位置; param_type: 1=kp 2=ki 3=kd
 		 * 4=output_limit 5=integral_limit 6=output_filter_alpha 7=flags
 		 * value4: 4字节小端值。可为 NULL(回 NACK)。*/
-		jm_err_e (*pid_param_set)(uint8_t ring, uint8_t param_type, const uint8_t *value4);
+		/* value_len=4 为旧版单字段写；param_type=0 时 value 为原子批量载荷。 */
+		jm_err_e (*pid_param_set)(uint8_t ring, uint8_t param_type,
+		                          const uint8_t *value, uint16_t value_len);
 
 		/* PID 参数实时读(CMD 0xA6): 随时可读, 返回当前 profile 中的值(4字节)。
 		 * ring/param_type 同 0xA5。可为 NULL(回 NACK)。*/

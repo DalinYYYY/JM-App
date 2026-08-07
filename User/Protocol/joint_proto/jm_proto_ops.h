@@ -67,6 +67,9 @@ extern "C"
 	 */
 	uint16_t jm_app_telemetry_period_ms(void);
 
+	/* PID DEBUG 会话租约检查: 通信线程每拍调用，超时自动回滚。 */
+	void jm_app_pid_debug_poll(void);
+
 	/**
 	 * @brief  当前 CAN 波特率码(SET_BAUDRATE 0xF1 写入)
 	 * @return 0=1M(默认) 1=500K 2=250K 3=125K; 由 CAN 绑定层初始化时读取

@@ -145,7 +145,7 @@ static uint16_t jm_host_commun_pack_telemetry(uint16_t mask, const jm_feedback_t
 
 #include "drv_rtos.h"
 #include "dev_commun_uart.h"
-#include "motor_loop.h" /* motor_loop_t: 调试通道通过 p_motor_loop 读 ADC 原始值 */
+#include "motor_observer.h"
 
 /* UART 专用的接收信号量与统计计数器 */
 static drv_rtos_sem_handle_t s_rx_sem = NULL;
@@ -177,18 +177,18 @@ static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 /* ---------------- 调试通道绑定 ---------------- */
 static void jm_host_commun_update_debug(void)
 {
-	const foc_t *fc = &usr.p_motor_loop->motor.foc;
-	const motor_loop_t *ml = usr.p_motor_loop;
-	const motion_param_t *mp = &usr.p_motor_loop->motor.motor_param;
+	const motor_state_t *st = &usr.motor_state[M1];
 	const motor_param_t *param = &usr.motor_param[M1];
+	motor_observer_snapshot_t obs;
+	int obs_ok = motor_observer_snapshot_read(&obs);
 
-	jm_dbg[0] = (float)ml->out.id_ref;                  /* d轴电流参考(A) */
-	jm_dbg[1] = (float)ml->out.iq_ref;                  /* q轴电流参考(A) */
+	jm_dbg[0] = (obs_ok == 0) ? obs.id_ref : st->setpoint.current_id;
+	jm_dbg[1] = (obs_ok == 0) ? obs.iq_ref : st->setpoint.current_iq;
 	jm_dbg[2] = 0.0f;                                   /* 保留 */
-	jm_dbg[3] = (float)fc->i_dq.d;                      /* Id */
-	jm_dbg[4] = (float)fc->i_dq.q;                      /* Iq */
-	jm_dbg[5] = (float)fc->Theta;                       /* park 用电角度(rad) */
-	jm_dbg[6] = (float)mp->mechanical_angle;            /* 机械角(deg) */
+	jm_dbg[3] = (obs_ok == 0) ? obs.id : st->electrical.id_meas;
+	jm_dbg[4] = (obs_ok == 0) ? obs.iq : st->electrical.iq_meas;
+	jm_dbg[5] = st->motion.elec_angle_rad;
+	jm_dbg[6] = st->motion.mech_angle_rad * 57.2957795f; /* 机械角(deg) */
 	jm_dbg[7] = (float)param->encoder_param.enc_offset; /* 编码器机械零位偏移(deg) */
 }
 
@@ -239,6 +239,7 @@ void jm_host_commun_wait(uint32_t timeout_ms)
 void jm_host_commun_process(void)
 {
 	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
+	jm_app_pid_debug_poll();
 
 	/* 刷新调试通道: 从 motor_state 快照填充 jm_dbg[] */
 	jm_host_commun_update_debug();
@@ -284,6 +285,7 @@ void jm_host_commun_can_init(void)
 void jm_host_commun_can_process(void)
 {
 	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
+	jm_app_pid_debug_poll();
 
 	/* 刷新诊断统计(供应用读取总线负载/通信质量) */
 	dev_commun_can.poll(&dev_commun_can);

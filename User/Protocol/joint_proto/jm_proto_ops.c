@@ -39,6 +39,8 @@
 #include "calib_mgr.h"          /* 标定管理器 start/poll/abort/get_status */
 #include "motor_pid_autotune.h" /* motor_pid_autotune_apply: 零极点对消法理论估计 */
 #include "motor_pid_load.h"     /* motor_pid_set_source / motor_pid_reload: 三环独立 source */
+#include "motor_pid_profile.h"
+#include "motor_observer.h"     /* 统一实时快照与 B7/B6/C9 高速采样 */
 #include "main.h"               /* HAL_GetTick (速率限制) */
 #if defined(USE_DEV_LED)
 #include "led_manager.h"
@@ -88,6 +90,71 @@ static int jm_rate_check(uint32_t *last_tick, uint32_t min_interval_ms)
 #else
 #define JM_RATE_CHECK(last_tick_ptr, min_ms)  (1) /* 速率限制关闭, 始终允许 */
 #endif /* JM_RATE_LIMIT_ENABLE */
+
+/* PID DEBUG 会话：A1 首次进入时保存 source/profile；A2 作为心跳续租。
+ * 通信中断、STOP/DISABLE 或 2s 无心跳都会恢复快照并让电机回到 IDLE。 */
+typedef struct
+{
+	uint8_t active;
+	uint32_t last_heartbeat;
+	pid_source_e source[PID_RING_MAX];
+	motor_pid_profile_t profiles[MOTOR_PID_PROFILE_MAX];
+} pid_debug_session_t;
+static pid_debug_session_t s_pid_debug;
+
+static void app_pid_debug_abort(void)
+{
+	uint32_t primask;
+	uint8_t i;
+	if (!s_pid_debug.active)
+		return;
+	motor_observer_capture_stop();
+	primask = __get_PRIMASK();
+	__disable_irq();
+	for (i = 0u; i < PID_RING_MAX; i++)
+		motor_pid_set_source((pid_ring_e)i, s_pid_debug.source[i]);
+	memcpy(s_motor_pid_profiles, s_pid_debug.profiles, sizeof(s_pid_debug.profiles));
+	motor_loop_get()->out.id_ref = 0.0f;
+	motor_loop_get()->out.iq_ref = 0.0f;
+	motor_pid_profile_reset_state(&motor_loop_get()->current.pid_id);
+	motor_pid_profile_reset_state(&motor_loop_get()->current.pid_iq);
+	motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_vel);
+	motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_pos);
+	motor_pid_reload();
+	motor_loop_set_cmd(CONTROL_MODE_IDLE);
+	__set_PRIMASK(primask);
+	s_pid_debug.active = 0u;
+}
+
+void jm_app_pid_debug_poll(void)
+{
+	top_fsm_e top_state;
+	if (!s_pid_debug.active)
+		return;
+	top_state = motor_loop_get()->sys.top_state;
+	if (top_state == TOP_FSM_FAULT || top_state == TOP_FSM_SAFETY ||
+		(uint32_t)(HAL_GetTick() - s_pid_debug.last_heartbeat) > 2000u)
+		app_pid_debug_abort();
+}
+
+static void app_pid_debug_touch(void)
+{
+	if (s_pid_debug.active)
+		s_pid_debug.last_heartbeat = HAL_GetTick();
+}
+
+static void app_pid_debug_begin(void)
+{
+	uint8_t i;
+	if (!s_pid_debug.active)
+	{
+		for (i = 0u; i < PID_RING_MAX; i++)
+			s_pid_debug.source[i] = motor_pid_get_source((pid_ring_e)i);
+		memcpy(s_pid_debug.profiles, s_motor_pid_profiles, sizeof(s_pid_debug.profiles));
+		s_pid_debug.active = 1u;
+	}
+	s_pid_debug.last_heartbeat = HAL_GetTick();
+}
 
 /* ============================================================================
  * 鉴权令牌 (开发期关闭, 量产期启用)
@@ -196,12 +263,18 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 	{
 		/* ---- 系统控制 0x00~0x06: 无载荷, 仅切状态 ---- */
 		case JM_CMD_IDLE:
-		case JM_CMD_HOLD:
-		case JM_CMD_BRAKE:
 		case JM_CMD_ESTOP:
-		case JM_CMD_ENABLE:
 		case JM_CMD_DISABLE:
 		case JM_CMD_STOP:
+			if (s_pid_debug.active)
+				app_pid_debug_abort();
+			break;
+
+		/* DEBUG 会话必须跨越上使能并保持到 RUN，才能实际验证 PID。
+		 * HOLD/BRAKE 只改变运动状态，也不退出调试来源。 */
+		case JM_CMD_HOLD:
+		case JM_CMD_BRAKE:
+		case JM_CMD_ENABLE:
 			break;
 
 		/* ---- 开环电压 {ud,uq}: 下游用 cmd.torque 作开环电压目标 ---- */
@@ -428,13 +501,15 @@ static jm_err_e app_pid_autotune(uint8_t ring_select, float cur_bw, float vel_bw
 
 /* ============================================================================
  *  1c) PID 来源切换: CMD 0xA1  ->  pid_source_set
- *      独立设置某环参数来源(默认/Flash/理论估计/调试), 立即 reload。仅 IDLE 态可执行。
+ *      独立设置某环参数来源(默认/Flash/理论估计/调试), 立即 reload。
+ *      IDLE/READY 态可执行；READY 态 PWM 为零且控制器每拍复位，可安全 reload。
  *      source=3(DEBUG) 不持久化到 pid_source_mask, 重启自动消失。
  * ==========================================================================*/
 static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 {
-	/* 状态检查: 仅 IDLE 态允许 */
-	if (motor_loop_get()->sys.top_state != TOP_FSM_IDLE)
+	/* RUN/CALIB/FAULT 等状态禁止切换；READY 态 PWM 为零，可安全 reload。 */
+	top_fsm_e top_state = motor_loop_get()->sys.top_state;
+	if (top_state != TOP_FSM_IDLE && top_state != TOP_FSM_READY)
 	{
 		return JM_ERR_STATE_DENY;
 	}
@@ -445,8 +520,11 @@ static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 		return JM_ERR_OUT_OF_RANGE;
 	}
 
+	if (source == (uint8_t)PID_SOURCE_DEBUG)
+		app_pid_debug_begin();
 	/* 调用 PidManager API 设置 source */
 	motor_pid_set_source((pid_ring_e)ring_select, (pid_source_e)source);
+	app_pid_debug_touch();
 
 	/* 同步写入 Flash 持久化字段 pid_source_mask（RAM，由 0xEA 固化）
 	 * DEBUG 不持久化: 重启自动回 DEFAULT/FLASH/AUTOTUNE */
@@ -463,6 +541,14 @@ static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 
 	/* 立即 reload 生效 */
 	motor_pid_reload();
+	if (source != (uint8_t)PID_SOURCE_DEBUG &&
+		motor_pid_get_source(PID_RING_CURRENT) != PID_SOURCE_DEBUG &&
+		motor_pid_get_source(PID_RING_VELOCITY) != PID_SOURCE_DEBUG &&
+		motor_pid_get_source(PID_RING_POSITION) != PID_SOURCE_DEBUG)
+	{
+		motor_observer_capture_stop();
+		s_pid_debug.active = 0u; /* 用户主动退出 DEBUG，不触发超时回滚 */
+	}
 
 	return JM_ERR_OK;
 }
@@ -477,6 +563,7 @@ static jm_err_e app_pid_source_get(uint8_t *out_cur, uint8_t *out_vel, uint8_t *
 	{
 		return JM_ERR_OUT_OF_RANGE;
 	}
+	app_pid_debug_touch();
 	*out_cur = (uint8_t)motor_pid_get_source(PID_RING_CURRENT);
 	*out_vel = (uint8_t)motor_pid_get_source(PID_RING_VELOCITY);
 	*out_pos = (uint8_t)motor_pid_get_source(PID_RING_POSITION);
@@ -489,9 +576,29 @@ static jm_err_e app_pid_source_get(uint8_t *out_cur, uint8_t *out_vel, uint8_t *
  *      ring: 0=D轴 1=Q轴 2=速度 3=位置
  *      param_type: 1=kp 2=ki 3=kd 4=output_limit 5=integral_limit 6=output_filter_alpha 7=flags
  * ==========================================================================*/
-static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type, const uint8_t *value4)
+static float app_pid_output_limit(uint8_t ring)
 {
-	if (value4 == NULL || ring > 3 || param_type < 1 || param_type > 7)
+	const motor_param_t *p = &usr.motor_param[M1];
+	if (ring <= 1u) return p->motor_base.rated_voltage;
+	if (ring == 2u) return p->motor_base.peak_current;
+	return p->motor_base.max_speed;
+}
+
+static void app_pid_reset_runtime(uint8_t ring)
+{
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (ring == 0u) motor_pid_profile_reset_state(&motor_loop_get()->current.pid_id);
+	else if (ring == 1u) motor_pid_profile_reset_state(&motor_loop_get()->current.pid_iq);
+	else if (ring == 2u) motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_vel);
+	else motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_pos);
+	__set_PRIMASK(primask);
+}
+
+static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type,
+	const uint8_t *value, uint16_t value_len)
+{
+	if (value == NULL || ring > 3u)
 	{
 		return JM_ERR_OUT_OF_RANGE;
 	}
@@ -510,12 +617,26 @@ static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type, const uint8_
 		return JM_ERR_STATE_DENY;
 	}
 
-	/* 直接写 s_motor_pid_profiles, ISR 下一拍生效 */
-	if (motor_pid_profile_set_param(ring, param_type, value4) != 0)
+	if (param_type == 0u)
 	{
-		return JM_ERR_OUT_OF_RANGE;
+		if (motor_pid_profile_apply_batch(ring, value, value_len,
+				app_pid_output_limit(ring)) != 0)
+			return JM_ERR_OUT_OF_RANGE;
 	}
-
+	else
+	{
+		uint8_t entry[6];
+		if (param_type > 7u || value_len != 4u)
+			return JM_ERR_OUT_OF_RANGE;
+		entry[0] = 1u;
+		entry[1] = param_type;
+		memcpy(&entry[2], value, 4u);
+		if (motor_pid_profile_apply_batch(ring, entry, sizeof(entry),
+				app_pid_output_limit(ring)) != 0)
+			return JM_ERR_OUT_OF_RANGE;
+	}
+	app_pid_debug_touch();
+	app_pid_reset_runtime(ring);
 	return JM_ERR_OK;
 }
 
@@ -545,21 +666,25 @@ static jm_err_e app_pid_param_get(uint8_t ring, uint8_t param_type, uint8_t *out
 jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 {
 	const motor_state_t *m = &usr.motor_state[M1];
+	motor_observer_snapshot_t obs;
+	int obs_ok;
 
 	if (fb == NULL)
 	{
 		return JM_ERR_STATE_DENY;
 	}
 
-	fb->pos = m->motion.position_rad;       /* 电机端多圈位置 θ_m rad(带符号,±∞) -> UI"电机位置" */
-	fb->vel = m->motion.velocity_rad_s;     /* 电机端机械角速度 rad/s -> UI"电机速度" */
-	fb->pos_ref = motor_loop_get()->sys.motor.ref.pos;
-	fb->vel_ref = motor_loop_get()->sys.motor.ref.vel;
+	obs_ok = motor_observer_snapshot_read(&obs);
+	/* 四组控制目标/反馈必须来自同一个控制周期；启动早期回退到 DataHub。 */
+	fb->pos = (obs_ok == 0) ? obs.pos : m->motion.position_rad;
+	fb->vel = (obs_ok == 0) ? obs.vel : m->motion.velocity_rad_s;
+	fb->pos_ref = (obs_ok == 0) ? obs.pos_ref : m->setpoint.pos_rad;
+	fb->vel_ref = (obs_ok == 0) ? obs.vel_ref : m->setpoint.velocity_rad_s;
 	fb->torque = m->power.torque_est;       /* 输出端力矩 Nm(估算) */
-	fb->id = m->electrical.id_meas;         /* d轴电流 A */
-	fb->iq = m->electrical.iq_meas;         /* q轴电流 A */
-	fb->id_ref = motor_loop_get()->out.id_ref;
-	fb->iq_ref = motor_loop_get()->out.iq_ref;
+	fb->id = (obs_ok == 0) ? obs.id : m->electrical.id_meas;
+	fb->iq = (obs_ok == 0) ? obs.iq : m->electrical.iq_meas;
+	fb->id_ref = (obs_ok == 0) ? obs.id_ref : m->setpoint.current_id;
+	fb->iq_ref = (obs_ok == 0) ? obs.iq_ref : m->setpoint.current_iq;
 	fb->ia = m->electrical.ia;              /* A 相电流 A */
 	fb->ib = m->electrical.ib;              /* B 相电流 A */
 	fb->ic = m->electrical.ic;              /* C 相电流 A */
@@ -1019,6 +1144,28 @@ static jm_err_e app_get_debug(float *out, uint8_t *out_count, uint8_t max_count)
 	return JM_ERR_OK;
 }
 
+static jm_err_e app_capture_start(uint32_t channel_mask, uint32_t rate_hz,
+	uint16_t sample_count)
+{
+	const motor_loop_t *loop = motor_loop_get();
+	if (loop->current.dt <= 0.0f)
+		return JM_ERR_STATE_DENY;
+	return (motor_observer_capture_start(channel_mask, rate_hz, sample_count,
+			1.0f / loop->current.dt) == 0) ? JM_ERR_OK : JM_ERR_OUT_OF_RANGE;
+}
+
+static jm_err_e app_capture_stop(void)
+{
+	return (motor_observer_capture_stop() == 0) ? JM_ERR_OK : JM_ERR_STATE_DENY;
+}
+
+static jm_err_e app_capture_read(uint16_t offset, uint8_t count,
+	uint8_t *out, uint16_t *out_len)
+{
+	return (motor_observer_capture_read(offset, count, out, out_len) == 0) ?
+		JM_ERR_OK : JM_ERR_OUT_OF_RANGE;
+}
+
 /* ============================================================================
  *  7) CAN 管理: CMD 0xF0/0xF1  ->  set_can_id / set_baudrate
  *     CAN ID 原子写入 motor_info Flash, 由 CAN 绑定层在下次启动时加载。
@@ -1341,6 +1488,9 @@ static const jm_proto_ops_t s_app_ops = {
 	.get_dev_name = app_get_dev_name,
 	.set_telemetry = app_set_telemetry,
 	.get_debug = app_get_debug,
+	.capture_start = app_capture_start,
+	.capture_stop = app_capture_stop,
+	.capture_read = app_capture_read,
 	.param_read_bulk = app_param_read_bulk,
 	.param_write_bulk = app_param_write_bulk,
 	.set_can_id = app_set_can_id,
