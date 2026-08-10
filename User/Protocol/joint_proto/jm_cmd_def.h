@@ -36,10 +36,10 @@ extern "C"
 	/* ===================== 协议版本号 ===================== */
 	/* 主版本: 不兼容变更(命令码重排/载荷语义改); 次版本: 兼容追加(新命令/新字段);
 	 * 补丁: bug 修复。0xD0 READ_DEV_INFO 应答(FD 模式)携带此版本号。 */
-#define JM_PROTO_VERSION_MAJOR  1
-#define JM_PROTO_VERSION_MINOR  2   /* 1.2: LIVE/TRACE 双数据流, TRACE 主动批量上报 */
-#define JM_PROTO_VERSION_PATCH  0
-#define JM_PROTO_VERSION  ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
+#define JM_PROTO_VERSION_MAJOR 1
+#define JM_PROTO_VERSION_MINOR 2 /* 1.2: LIVE/TRACE 双数据流, TRACE 主动批量上报 */
+#define JM_PROTO_VERSION_PATCH 0
+#define JM_PROTO_VERSION       ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
 
 	/* ===================== feature_flags 位定义 =====================
 	 * 0xD0 READ_DEV_INFO 应答(28B 扩展格式)携带的特性位图(u16), 上位机据此自适应。
@@ -53,9 +53,9 @@ extern "C"
 #define JM_FEAT_CAN_LOSS_TIMER (1u << 5)
 
 #if defined(USE_CAN_FD_MODE) && (USE_CAN_FD_MODE == 1)
-#define JM_FEATURE_FLAGS_LO  (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
 #else
-#define JM_FEATURE_FLAGS_LO  (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
 #endif
 
 	/* ===================== 命令码 CMD ===================== */
@@ -133,14 +133,11 @@ extern "C"
 		 *   0x81 PRESET_AND_TRIGGER: 预存指令不执行
 		 *   0x82 TRIGGER: 广播触发同步执行
 		 * 注: 0x12/0x13 已被 TORQUE/MIT 占用, 故同步触发改到 0x80 段预留 */
-		JM_CMD_SYNC = 0x80,                /* 预留: 周期同步帧 */
-		JM_CMD_PRESET_AND_TRIGGER = 0x81,  /* 预留: 预存指令不执行 */
-		JM_CMD_TRIGGER = 0x82,             /* 预留: 广播触发同步执行 */
+		JM_CMD_SYNC = 0x80,               /* 预留: 周期同步帧 */
+		JM_CMD_PRESET_AND_TRIGGER = 0x81, /* 预留: 预存指令不执行 */
+		JM_CMD_TRIGGER = 0x82,            /* 预留: 广播触发同步执行 */
 
-		/* 校准 0x90~0xAF: 类别命令+子命令模式
-		 * 0x90-0x96: payload[0]=子模式ID, 进入CALIB态并启动标定
-		 * 0x97: 进度查询, 返回 8 字节详细状态 ACK (state/fail_reason/progress/level/submode/step/step_total/reserved)
-		 * 0x98: 中止标定, ACK */
+		/* 校准 0x90~0xAF: 类别命令+子命令模式*/
 		JM_CMD_CALIB_LEVEL1 = 0x90, /* L1 驱动硬件底层 */
 		JM_CMD_CALIB_LEVEL2 = 0x91, /* L2 电机电气身份 */
 		JM_CMD_CALIB_LEVEL3 = 0x92, /* L3 编码器校准 */
@@ -151,17 +148,12 @@ extern "C"
 		JM_CMD_CALIB_QUERY = 0x97,  /* 进度查询 */
 		JM_CMD_CALIB_ABORT = 0x98,  /* 中止标定 */
 
-		/* PID 管理 0xA0~0xAF: 三环独立参数来源管理 + 实时调试
-		 * 0xA0: 触发理论估计(零极点对消法)并自动设 source=2, 仅IDLE态
-		 * 0xA1: 独立切换某环 source(0=默认 1=Flash 2=理论估计 3=调试), 仅IDLE/READY态
-		 * 0xA2: 读取三环当前 source 状态
-		 * 0xA5: 实时写单个PID参数(调试模式, 直接写profile, ISR下一拍生效)
-		 * 0xA6: 实时读单个PID参数 */
-		JM_CMD_PID_AUTOTUNE   = 0xA0, /* PID 理论估计 */
+		/* PID 管理 0xA0~0xAF: 三环独立参数来源管理 + 实时调试*/
+		JM_CMD_PID_AUTOTUNE = 0xA0,   /* PID 理论估计 */
 		JM_CMD_PID_SOURCE_SET = 0xA1, /* PID 来源切换 */
 		JM_CMD_PID_SOURCE_GET = 0xA2, /* 读 PID 来源状态 */
-		JM_CMD_PID_PARAM_SET  = 0xA5, /* 实时写PID参数 */
-		JM_CMD_PID_PARAM_GET  = 0xA6, /* 实时读PID参数 */
+		JM_CMD_PID_PARAM_SET = 0xA5,  /* 实时写PID参数 */
+		JM_CMD_PID_PARAM_GET = 0xA6,  /* 实时读PID参数 */
 
 		/* 系统诊断 0xB0~0xBF */
 		JM_CMD_CLEAR_FAULT = 0xB0,
@@ -192,10 +184,10 @@ extern "C"
 		JM_CMD_SET_TELEMETRY = 0xCB, /* 遥控开关(上位机->下位机): enable(u8)+mask(u16)[+period_ms(u16)], 回单次ACK */
 		/* OTA 预留: 仅定义命令码, 不实现 handler, 回 NACK(NOT_SUPPORTED)
 		 * 注: 0xB0~0xB3 已被系统诊断占用, 故 OTA 改到 0xCC~0xCF 预留 */
-		JM_CMD_OTA_START  = 0xCC,    /* 预留: 固件升级启动 */
-		JM_CMD_OTA_DATA   = 0xCD,    /* 预留: 固件数据分块 */
-		JM_CMD_OTA_END    = 0xCE,    /* 预留: 固件升级结束 */
-		JM_CMD_OTA_RESUME = 0xCF,    /* 预留: 断点续传查询 */
+		JM_CMD_OTA_START = 0xCC,  /* 预留: 固件升级启动 */
+		JM_CMD_OTA_DATA = 0xCD,   /* 预留: 固件数据分块 */
+		JM_CMD_OTA_END = 0xCE,    /* 预留: 固件升级结束 */
+		JM_CMD_OTA_RESUME = 0xCF, /* 预留: 断点续传查询 */
 
 		/* 设备信息 0xD0~0xDF */
 		JM_CMD_READ_DEV_INFO = 0xD0,
@@ -209,25 +201,24 @@ extern "C"
 		JM_CMD_PARAM_WRITE_BULK = 0xE3,
 		JM_CMD_PARAM_SAVE = 0xE4,
 		JM_CMD_PARAM_RESET = 0xE5,
-		/* 电机配置(motor_info)读写 0xE6~0xE8: 独立于0xE0-0xE5的运行时参数,
-		 * 面向Flash/EEPROM持久化的硬件配置/校准数据。固定4字节值传输,固件按字段类型转换。*/
-		JM_CMD_MOTOR_INFO_READ = 0xE6,       /* 读单个电机配置 */
-		JM_CMD_MOTOR_INFO_WRITE = 0xE7,      /* 写单个电机配置(RAM, 需0xEA固化) */
-		JM_CMD_MOTOR_INFO_READ_BULK = 0xE8,  /* 批量读(块内连续ID, 固定4B/值) */
-		JM_CMD_MOTOR_INFO_WRITE_BULK = 0xE9, /* 批量写(块内连续ID, 固定4B/值) */
-		JM_CMD_MOTOR_INFO_SAVE = 0xEA,       /* 把motor_info整块写入Flash */
-		JM_CMD_MOTOR_INFO_RESET = 0xEB,      /* 恢复默认(param_id=0xFFFF全部) */
+		/* 电机配置(motor_info)读写 0xE6~0xE8: 独立于0xE0-0xE5的运行时参数*/
+		JM_CMD_MOTOR_INFO_READ = 0xE6,          /* 读单个电机配置 */
+		JM_CMD_MOTOR_INFO_WRITE = 0xE7,         /* 写单个电机配置(RAM, 需0xEA固化) */
+		JM_CMD_MOTOR_INFO_READ_BULK = 0xE8,     /* 批量读(块内连续ID, 固定4B/值) */
+		JM_CMD_MOTOR_INFO_WRITE_BULK = 0xE9,    /* 批量写(块内连续ID, 固定4B/值) */
+		JM_CMD_MOTOR_INFO_SAVE = 0xEA,          /* 把motor_info整块写入Flash */
+		JM_CMD_MOTOR_INFO_RESET = 0xEB,         /* 恢复默认(param_id=0xFFFF全部) */
 		JM_CMD_MOTOR_INFO_RECALIB_RESET = 0xEC, /* 清除标定状态以便重新标定(保留电机本体参数) */
 
 		/* CAN管理与通用 0xF0~0xFF */
 		JM_CMD_SET_CAN_ID = 0xF0,
 		JM_CMD_SET_BAUDRATE = 0xF1,
 		JM_CMD_BROADCAST_SYNC = 0xF2,
-		JM_CMD_SET_FD_MODE = 0xF3, /* CAN FD模式切换: enable(u8) → ACK(enable+cap) */
+		JM_CMD_SET_FD_MODE = 0xF3,     /* CAN FD模式切换: enable(u8) → ACK(enable+cap) */
 		JM_CMD_CAN_DI_DISCOVER = 0xF4, /* CAN-DI广播发现: 单帧时隙响应 */
 		JM_CMD_CAN_DI_SET_ID = 0xF5,   /* 按CAN-DI广播定向设置节点ID */
 		JM_CMD_CAN_DI_IDENTIFY = 0xF6, /* 按CAN-DI触发物理设备指示 */
-		JM_CMD_NACK = 0xFE,        /* 错误应答 */
+		JM_CMD_NACK = 0xFE,            /* 错误应答 */
 	} jm_cmd_e;
 
 	/* ===================== 同步遥测分组位掩码(0xCA/0xCB 共用) =====================
@@ -237,16 +228,16 @@ extern "C"
 	 * 新增一组: 在此追加一个 bit, 固件 pack 端按位序补一段, 上位机解析端按位序补一段。*/
 	typedef enum
 	{
-		JM_TLM_POS_VEL = (1u << 0),   /* pos(f32),vel(f32)            8B */
-		JM_TLM_DQ = (1u << 1),        /* id(f32),iq(f32)              8B */
-		JM_TLM_PHASE = (1u << 2),     /* ia,ib,ic(f32)               12B */
-		JM_TLM_BUS = (1u << 3),       /* vbus,ibus,power(f32)        12B */
-		JM_TLM_TEMP = (1u << 4),      /* tempFet,tempMotor(f32)       8B */
-		JM_TLM_MULTITURN = (1u << 5), /* multiturn(u32),single(f32)   8B */
-		JM_TLM_TORQUE = (1u << 6),    /* torque(f32)                  4B */
-		JM_TLM_FAULT = (1u << 7),     /* fault(u32),warn(u32)         8B */
-		JM_TLM_STATE = (1u << 8),     /* topFsm,runState,ctrlMode,enable(u8) 4B */
-		JM_TLM_DEBUG = (1u << 9),     /* jm_dbg[JM_DBG_CH](f32), 变长组始终最后 */
+		JM_TLM_POS_VEL = (1u << 0),         /* pos(f32),vel(f32)            8B */
+		JM_TLM_DQ = (1u << 1),              /* id(f32),iq(f32)              8B */
+		JM_TLM_PHASE = (1u << 2),           /* ia,ib,ic(f32)               12B */
+		JM_TLM_BUS = (1u << 3),             /* vbus,ibus,power(f32)        12B */
+		JM_TLM_TEMP = (1u << 4),            /* tempFet,tempMotor(f32)       8B */
+		JM_TLM_MULTITURN = (1u << 5),       /* multiturn(u32),single(f32)   8B */
+		JM_TLM_TORQUE = (1u << 6),          /* torque(f32)                  4B */
+		JM_TLM_FAULT = (1u << 7),           /* fault(u32),warn(u32)         8B */
+		JM_TLM_STATE = (1u << 8),           /* topFsm,runState,ctrlMode,enable(u8) 4B */
+		JM_TLM_DEBUG = (1u << 9),           /* jm_dbg[JM_DBG_CH](f32), 变长组始终最后 */
 		JM_TLM_CURRENT_TARGET = (1u << 10), /* idRef,iqRef(f32)        8B */
 		JM_TLM_MOTION_TARGET = (1u << 11),  /* velRef,posRef(f32)      8B */
 	} jm_telemetry_bit_e;
@@ -264,29 +255,29 @@ extern "C"
 	 *   - 0x13: 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC, 有意留空) */
 	typedef enum
 	{
-		JM_ERR_OK = 0x00,              /* 成功(用ACK,不发NACK) */
-		JM_ERR_UNSUPPORTED = 0x01,     /* CMD不支持(命令码区间不识别) */
-		JM_ERR_OUT_OF_RANGE = 0x02,    /* 参数越界 */
-		JM_ERR_STATE_DENY = 0x03,      /* 状态不允许 */
-		JM_ERR_BAD_PARAM_ID = 0x04,    /* param_id无效 */
-		JM_ERR_CRC = 0x05,             /* 校验错误 */
-		JM_ERR_LENGTH = 0x06,          /* 长度错误 */
-		JM_ERR_READ_ONLY = 0x07,       /* 只读参数不可写 */
-		JM_ERR_FLASH = 0x08,           /* Flash读写失败(通用) */
-		JM_ERR_FAULT_STATE = 0x09,     /* 故障态需先清障 */
-		JM_ERR_CALIB_BUSY = 0x0A,      /* 校准未完成/校准中 */
+		JM_ERR_OK = 0x00,           /* 成功(用ACK,不发NACK) */
+		JM_ERR_UNSUPPORTED = 0x01,  /* CMD不支持(命令码区间不识别) */
+		JM_ERR_OUT_OF_RANGE = 0x02, /* 参数越界 */
+		JM_ERR_STATE_DENY = 0x03,   /* 状态不允许 */
+		JM_ERR_BAD_PARAM_ID = 0x04, /* param_id无效 */
+		JM_ERR_CRC = 0x05,          /* 校验错误 */
+		JM_ERR_LENGTH = 0x06,       /* 长度错误 */
+		JM_ERR_READ_ONLY = 0x07,    /* 只读参数不可写 */
+		JM_ERR_FLASH = 0x08,        /* Flash读写失败(通用) */
+		JM_ERR_FAULT_STATE = 0x09,  /* 故障态需先清障 */
+		JM_ERR_CALIB_BUSY = 0x0A,   /* 校准未完成/校准中 */
 		/* 新增 0x0B~0x0F */
-		JM_ERR_PENDING = 0x0B,         /* 异步已排队, 即时 NACK 携带 seq */
-		JM_ERR_BUSY = 0x0C,            /* 忙(双通道主控被占用) */
-		JM_ERR_UNAUTHORIZED = 0x0D,    /* 鉴权失败(令牌不匹配) */
-		JM_ERR_RATE_LIMIT = 0x0E,      /* 速率限制(命令频率超限) */
-		JM_ERR_NOT_FOUND = 0x0F,       /* 未找到(资源/文件/记录不存在) */
+		JM_ERR_PENDING = 0x0B,      /* 异步已排队, 即时 NACK 携带 seq */
+		JM_ERR_BUSY = 0x0C,         /* 忙(双通道主控被占用) */
+		JM_ERR_UNAUTHORIZED = 0x0D, /* 鉴权失败(令牌不匹配) */
+		JM_ERR_RATE_LIMIT = 0x0E,   /* 速率限制(命令频率超限) */
+		JM_ERR_NOT_FOUND = 0x0F,    /* 未找到(资源/文件/记录不存在) */
 		/* 新增 0x10~0x12 (Flash 详细错误码) */
-		JM_ERR_FLASH_ERASE = 0x10,     /* Flash 擦除失败 */
-		JM_ERR_FLASH_WRITE = 0x11,     /* Flash 写入失败 */
-		JM_ERR_FLASH_VERIFY = 0x12,    /* Flash 校验失败(读回不匹配) */
+		JM_ERR_FLASH_ERASE = 0x10,  /* Flash 擦除失败 */
+		JM_ERR_FLASH_WRITE = 0x11,  /* Flash 写入失败 */
+		JM_ERR_FLASH_VERIFY = 0x12, /* Flash 校验失败(读回不匹配) */
 		/* 新增 0x13 (预留命令专用) */
-		JM_ERR_NOT_SUPPORTED = 0x13,   /* 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC) */
+		JM_ERR_NOT_SUPPORTED = 0x13, /* 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC) */
 	} jm_err_e;
 
 	/* ===================== 参数类型码(0xE0读应答的 type 字段) ===================== */
@@ -303,15 +294,15 @@ extern "C"
 	} jm_param_type_e;
 
 	/* CAN 仲裁ID编解码: ID = (CMD<<8) | 电机ID */
-#define JM_CAN_MAKE_ID(cmd, motor_id) (((uint32_t)(cmd) << 8) | ((motor_id) & 0xFF))
-#define JM_CAN_MULTI_FLAG             (1u << 16)
+#define JM_CAN_MAKE_ID(cmd, motor_id)       (((uint32_t)(cmd) << 8) | ((motor_id) & 0xFF))
+#define JM_CAN_MULTI_FLAG                   (1u << 16)
 #define JM_CAN_MAKE_MULTI_ID(cmd, motor_id) (JM_CAN_MAKE_ID((cmd), (motor_id)) | JM_CAN_MULTI_FLAG)
-#define JM_CAN_IS_MULTI_ID(id)        (((id) & JM_CAN_MULTI_FLAG) != 0u)
-#define JM_CAN_GET_CMD(id)            ((uint8_t)(((id) >> 8) & 0xFF))
-#define JM_CAN_GET_MOTOR_ID(id)       ((uint8_t)((id) & 0xFF))
-#define JM_CAN_BROADCAST_ID           0x00 /* 电机ID=0 为广播地址 */
+#define JM_CAN_IS_MULTI_ID(id)              (((id) & JM_CAN_MULTI_FLAG) != 0u)
+#define JM_CAN_GET_CMD(id)                  ((uint8_t)(((id) >> 8) & 0xFF))
+#define JM_CAN_GET_MOTOR_ID(id)             ((uint8_t)((id) & 0xFF))
+#define JM_CAN_BROADCAST_ID                 0x00 /* 电机ID=0 为广播地址 */
 
-										   /* Bootloader/恢复出厂魔数(防误触) */
+												 /* Bootloader/恢复出厂魔数(防误触) */
 #define JM_MAGIC_BOOTLOADER    0xB00710ADu
 #define JM_MAGIC_FACTORY_RESET 0xFAC70F5Fu
 

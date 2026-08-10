@@ -15,3 +15,4 @@
 | 1.1.2 | 2026-08-07 | build | 更新 Keil 编译分析结果（TRACE 重构后 Flash/RAM 占用） |
 | 1.1.3 | 2026-08-07 | feat | 删除 VESC/SerialStudio 通信模块（dev_commun_vesc/vesc_proto/serial_studio）并清理冗余注释与死代码 |
 | 1.1.4 | 2026-08-07 | docs+build | 更新 readme 与协议文档（移除 VESC/SerialStudio 引用）、Keil 工程移除 vesc_proto 头文件路径 |
+| 1.1.5 | 2026-08-07 | chore | 同步 pyqt_gui 子模块至 TRACE 主动波形适配版本；清理本地计划/HTML 模式文档并加入 .gitignore，整理 jm_cmd_def.h 注释对齐 |
