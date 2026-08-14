@@ -33,6 +33,7 @@
  *   控制层只面向 dev_encoder_t 抽象接口，与型号无关；具体用哪颗芯片由本宏决定。
  *   切换编码器：只改本宏值，dev_motor_init 内的初始化/装配按宏条件编译，
  *==========================================================================*/
+
 #define DEV_MOTOR_ENCODER_MT6701 1
 #define DEV_MOTOR_ENCODER_MT6835 2
 #define DEV_MOTOR_ENCODER_AS5047 3
@@ -53,6 +54,9 @@ typedef struct
 	char name[20];
 	gpioDrv_t gpio;
 } dev_motor_enable_config_t;
+
+/* 配置表定义在板级 dev_config_board.inc, 由 dev_config.c include */
+extern const dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX];
 
 typedef struct
 {

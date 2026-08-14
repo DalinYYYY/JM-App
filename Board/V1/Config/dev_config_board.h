@@ -7,6 +7,7 @@
 
 /* ===== 1. 设备使能集（按板载硬件勾选）===== */
 #define USE_DEV_HALF_BRIDGE   /* 半桥驱动 (TIM1 CH1/2/3 → 栅极) */
+#define USE_DEV_MOTOR         /* 电机功率级使能 (PB12) */
 #define USE_DEV_MT6701        /* MT6701 磁编码器 (SPI3, 副编码器备料) */
 #define USE_DEV_MT6835        /* MT6835 磁编码器 (SPI1, 主编码器) */
 #define USE_DEV_POWER_MONITOR /* 母线电压/电流/温度监控 */

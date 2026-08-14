@@ -1,4 +1,14 @@
 #ifdef JM_BOARD_CONFIG_DEFINE_TABLES
+#if defined(USE_DEV_MOTOR)
+/* 电机功率级使能: PB12 (硬件接线作 EN, 高电平使能功率级) */
+const dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
+    [DEV_MOTOR_1] = {
+        .name = "MOTOR1_EN",
+        .gpio = {.gpiox = DRV_GPIOB, .pin = DRV_PIN_12, .ste = DRV_PIN_LOW},
+    },
+};
+#endif
+
 #if defined(USE_DEV_MT6701)
 const mt6701_config_t mt6701_list[MT6701_ID_MAX] = {
     [MT6701_ID_1] = {

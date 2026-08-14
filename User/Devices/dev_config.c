@@ -11,6 +11,7 @@
 #include "dev_as5047.h"
 #include "dev_drv8301.h"
 #include "dev_half_bridge.h"
+#include "dev_motor.h"
 #include "dev_eeprom.h"
 #include "dev_power_monitor.h"
 #include "dev_motor_phase_current.h"

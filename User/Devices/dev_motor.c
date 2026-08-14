@@ -38,28 +38,20 @@
 #include "dev_encoder_as5047.h"
 #endif
 
-#if defined(JM_BOARD_ODRIVE)
-/* ODrive Mini: EN_GATE = PB12 (DRV8301) */
-static dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
-	{"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_12, (drvPinState_e)0}},
-};
-#else
-/* SFOC/V1: EN = PB2 */
-static dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX] = {
-	{"MOTOR1_EN", {(gpioType_e)DRV_GPIOB, (gpioPin_e)DRV_PIN_12, (drvPinState_e)0}},
-};
-#endif
-
-/* 使能电机功率级(拉高EN引脚) */
+/* 使能电机功率级(拉高EN引脚); 无 MOTOR_EN 功能板(SFOC/SFOC_V2)为空操作 */
 static void dev_motor_enable(void)
 {
+#if defined(USE_DEV_MOTOR)
 	drv_gpio_write(motor_enable_list[DEV_MOTOR_1].gpio, (drvPinState_e)1);
+#endif
 }
 
-/* 禁用电机功率级(拉低EN引脚) */
+/* 禁用电机功率级(拉低EN引脚); 无 MOTOR_EN 功能板(SFOC/SFOC_V2)为空操作 */
 static void dev_motor_disable(void)
 {
+#if defined(USE_DEV_MOTOR)
 	drv_gpio_write(motor_enable_list[DEV_MOTOR_1].gpio, (drvPinState_e)0);
+#endif
 }
 
 /* 设备角度补偿回调(注入多圈计数) TODO: 接入 motor_info 后返回实际补偿值 */
