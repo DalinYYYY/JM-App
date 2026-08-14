@@ -6,7 +6,7 @@
  * @date 2024-11-13
  * 
  * @copyright Copyright (c) 2024  RobotDance Technology Co., Ltd.
- *
+ */
 
 #include "crc16.h"
 

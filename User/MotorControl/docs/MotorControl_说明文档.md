@@ -549,7 +549,7 @@ ctrl->test_phase += 2.0f * (float)M_PI * ctrl->test_freq * ctrl->dt;     // 行1
 └─────────────────────────────────────────────────────────────┘
 ```
 
-> **重要说明**：代码中**不存在** `pid_flash_valid_magic` 字段或 `0xC0DE2014` 常量。PID Flash 有效性检查采用**字段范围检查**（三个 `flash_*_valid` 函数）。整个 `motor_info_t` 的 Flash 校验由 `motor_info_storage.c:54-68` 的四重校验完成：`PARAM_MAGIC = 0x53455256`（"SERVO"）+ config_version + CRC32 + 字段范围校验。
+> **重要说明**：代码中**不存在** `pid_flash_valid_magic` 字段或 `0xC0DE2014` 常量。PID Flash 有效性检查采用**字段范围检查**（三个 `flash_*_valid` 函数）。整个 `motor_info_t` 的 Flash 校验由 `motor_info_storage.c` 的三重校验完成：config_version + CRC32 + 字段范围校验（已移除魔数 `PARAM_MAGIC`）。
 
 ### 6.5 AUTOTUNE 理论估计公式
 

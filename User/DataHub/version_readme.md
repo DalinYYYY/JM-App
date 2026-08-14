@@ -16,3 +16,4 @@
 | 1.1.3 | 2026-08-07 | feat | 删除 VESC/SerialStudio 通信模块（dev_commun_vesc/vesc_proto/serial_studio）并清理冗余注释与死代码 |
 | 1.1.4 | 2026-08-07 | docs+build | 更新 readme 与协议文档（移除 VESC/SerialStudio 引用）、Keil 工程移除 vesc_proto 头文件路径 |
 | 1.1.5 | 2026-08-07 | chore | 同步 pyqt_gui 子模块至 TRACE 主动波形适配版本；清理本地计划/HTML 模式文档并加入 .gitignore，整理 jm_cmd_def.h 注释对齐 |
+| 1.2.0 | 2026-08-14 | feat | motor_info 增加片外 EEPROM 双备份存储（AT24C16，上电优先加载）与 Flash 磨损均衡写入次数保护；新增 SFOC_V2 板级支持；协议新增 EEPROM/写限错误码；同步 pyqt_gui 固化通知与 SFOC_V2 驱动（次版本升级） |

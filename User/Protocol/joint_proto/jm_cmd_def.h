@@ -278,6 +278,9 @@ extern "C"
 		JM_ERR_FLASH_VERIFY = 0x12, /* Flash 校验失败(读回不匹配) */
 		/* 新增 0x13 (预留命令专用) */
 		JM_ERR_NOT_SUPPORTED = 0x13, /* 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC) */
+		JM_ERR_FLASH_LIMIT = 0x14,   /* Flash 写入次数超限(磨损均衡寿命保护) */
+		JM_ERR_EEPROM_WRITE = 0x15,  /* EEPROM 写入失败 */
+		JM_ERR_EEPROM_VERIFY = 0x16, /* EEPROM 回读校验失败 */
 	} jm_err_e;
 
 	/* ===================== 参数类型码(0xE0读应答的 type 字段) ===================== */

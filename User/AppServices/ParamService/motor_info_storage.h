@@ -50,6 +50,9 @@
 
 #include "motor_info.h"
 #include "dev_flash.h" /* 组合子设备:通用 Flash 设备 */
+#if defined(USE_DEV_EEPROM)
+#include "dev_eeprom.h" /* 可选组合子设备:片外 EEPROM(AT24C16) */
+#endif
 
 #ifdef __cplusplus
 extern "C"
@@ -73,6 +76,25 @@ extern "C"
 #endif
 #ifndef MOTORINFO_FLASH_PAGE_SIZE
 #define MOTORINFO_FLASH_PAGE_SIZE  2048U       /* 2KB，双Bank页大小 */
+#endif
+/* Flash 磨损均衡累计写入次数上限：超过则拒绝写入并返回 ERR_WRITE_LIMIT。
+ * STM32G4 片内 Flash 典型擦写寿命 1 万次，取保守值 10000 作为保护阈值。*/
+#ifndef MOTORINFO_FLASH_WRITE_LIMIT
+#define MOTORINFO_FLASH_WRITE_LIMIT 10000U
+#endif
+
+	/* ===== motor_info EEPROM 存储地址定义 =====
+ * 片外 AT24C16(2KB) 与 Flash 双备份，上电优先从 EEPROM 加载。
+ * 布局：EEPROM 起始地址写 4B magic(MOTC) 区分于 Flash，其后偏移 4B 存 motor_info 整块(1024B)。
+ * 总占用 1028B < 2048B；magic 单独存放，不污染 motor_info 的 CRC 计算。*/
+#ifndef MOTORINFO_EEPROM_START_ADDR
+#define MOTORINFO_EEPROM_START_ADDR 0x0000U        /* EEPROM 起始地址 */
+#endif
+#ifndef MOTORINFO_EEPROM_MAGIC
+#define MOTORINFO_EEPROM_MAGIC 0x4D4F5443u         /* "MOTC" 区分于 Flash */
+#endif
+#ifndef MOTORINFO_EEPROM_CFG_OFFSET
+#define MOTORINFO_EEPROM_CFG_OFFSET 4U             /* magic(4B) 之后的 motor_info 数据偏移 */
 #endif
 
 	/**
@@ -102,6 +124,10 @@ extern "C"
 		/* 详细 Flash 错误码(供 0xEA 应答区分擦写/校验失败) */
 		MOTOR_INFO_STORAGE_ERR_FLASH_WRITE = -4,  /* Flash 擦写失败(3 次重试后仍失败) */
 		MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY = -5, /* Flash 回读校验失败(CRC/范围不匹配) */
+		MOTOR_INFO_STORAGE_ERR_WRITE_LIMIT = -6,  /* Flash 写入次数超限(磨损均衡保护) */
+		/* 详细 EEPROM 错误码(供 0xEA 应答区分 EEPROM 写/校验失败) */
+		MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE = -7,  /* EEPROM 写入失败 */
+		MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY = -8, /* EEPROM 回读校验失败 */
 	} motor_info_storage_status_t;
 
 	/* ===== 设备对象前置声明（供 ops 函数指针类型引用） ===== */
@@ -131,6 +157,13 @@ extern "C"
 	{
 		/* 组合子设备：通用 Flash 设备（提供页擦写+磨损均衡） */
 		dev_flash_t flash_dev;
+
+#if defined(USE_DEV_EEPROM)
+		/* 组合子设备（可选）：片外 EEPROM(AT24C16) 双备份。
+		 * 由外部(如 user_interface.c)在 motor_info_storage_init 之前赋值，
+		 * 上电优先从 EEPROM 加载，save 时 Flash+EEPROM 双写。 */
+		dev_eeprom_t *eeprom_dev;
+#endif
 
 		/* 全局唯一 motor_info 实例（外部经 get 方法取句柄） */
 		motor_info_t motor_info;

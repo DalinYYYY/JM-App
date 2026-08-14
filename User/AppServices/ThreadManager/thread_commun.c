@@ -24,6 +24,40 @@
 #include "thread_commun.h"
 #include "main.h"
 #include "jm_host_commun.h"
+#if defined(USE_DEV_COMMUN_CAN)
+#include "drv_can.h"
+#endif
+
+#if defined(USE_DEV_COMMUN_CAN)
+/* CAN 测试接口: 周期发送固定 ID 的原始测试帧, 供外接 CAN 盒子检查物理链路。
+ * 仅用于调试, 确认链路正常后应删除或置 0 关闭。 */
+#define CAN_TEST_ID        0x123u /* 测试帧标准 ID */
+#define CAN_TEST_PERIOD_MS 100u   /* 发送周期(ms) */
+#define CAN_TEST_ENABLED   0u     /* 1=使能周期发送, 0=关闭 */
+
+static void can_test_frame_send(void)
+{
+	static uint32_t s_counter = 0u;
+	drvCanMsg_t msg;
+
+	memset(&msg, 0, sizeof(msg));
+	msg.id = CAN_TEST_ID;
+	msg.ide = 0u; /* 标准帧 */
+	msg.rtr = 0u;
+	msg.len = 8u;
+	msg.is_fd = 0u; /* 经典 CAN 帧 */
+	msg.data[0] = 'T';
+	msg.data[1] = 'E';
+	msg.data[2] = 'S';
+	msg.data[3] = 'T';
+	msg.data[4] = (uint8_t)(s_counter >> 0u);
+	msg.data[5] = (uint8_t)(s_counter >> 8u);
+	msg.data[6] = (uint8_t)(s_counter >> 16u);
+	msg.data[7] = (uint8_t)(s_counter >> 24u);
+	s_counter++;
+	drv_can_send(DRV_CAN1, &msg);
+}
+#endif
 
 void commun_thread(void const *argument)
 {
@@ -49,6 +83,18 @@ void commun_thread(void const *argument)
 #if defined(USE_DEV_COMMUN_CAN)
 		/* CAN 通信周期处理: 诊断刷新 + 通信中断降级检查 */
 		jm_host_commun_can_process();
+
+#if CAN_TEST_ENABLED
+		/* 周期发送原始测试帧, 供外接 CAN 盒子检查物理链路 */
+		{
+			static uint32_t can_test_tick = 0u;
+			if (++can_test_tick >= (CAN_TEST_PERIOD_MS / THREAD_DELAY_COMMUN))
+			{
+				can_test_tick = 0u;
+				can_test_frame_send();
+			}
+		}
+#endif
 #endif
 
 		usr.sys.task_cnt.commun_cnt++;

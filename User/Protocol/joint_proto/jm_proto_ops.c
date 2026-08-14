@@ -64,8 +64,8 @@ motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *c
 #define JM_RATE_MIN_INTERVAL_PARAM_WRITE_MS   100u  /* 0xE1 PARAM_WRITE: 100ms (10Hz) */
 #define JM_RATE_MIN_INTERVAL_PARAM_SAVE_MS    1000u /* 0xE4 PARAM_SAVE: 1s (防 Flash 频繁擦写) */
 #define JM_RATE_MIN_INTERVAL_CALIB_MS         2000u /* 0x90~0x96 CALIB: 2s (防并发启动) */
-#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_W_MS  100u  /* 0xE7/0xE9 MOTOR_INFO_WRITE: 100ms */
-#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS  1000u /* 0xEA MOTOR_INFO_SAVE: 1s */
+#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_W_MS  0u   /* 0xE7/0xE9 MOTOR_INFO_WRITE: 只写 RAM 不耗 Flash/EEPROM, 不限制(支持上位机批量改参) */
+#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS  1000u /* 0xEA MOTOR_INFO_SAVE: 1s (防 Flash 频繁擦写) */
 
 static uint32_t s_last_tick_param_write = 0;
 static uint32_t s_last_tick_param_save = 0;
@@ -1215,6 +1215,12 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 			return JM_ERR_FLASH_WRITE;
 		if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY)
 			return JM_ERR_FLASH_VERIFY;
+		if (rc == MOTOR_INFO_STORAGE_ERR_WRITE_LIMIT)
+			return JM_ERR_FLASH_LIMIT;
+		if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE)
+			return JM_ERR_EEPROM_WRITE;
+		if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY)
+			return JM_ERR_EEPROM_VERIFY;
 		return (rc > 0) ? JM_ERR_OUT_OF_RANGE : JM_ERR_FLASH;
 	}
 #else
@@ -1369,11 +1375,19 @@ static jm_err_e app_motor_info_save(void)
 	 *   rc > 0 = 越界 param_id -> OUT_OF_RANGE
 	 *   rc = ERR_FLASH_WRITE  -> JM_ERR_FLASH_WRITE (0x11, 擦写失败)
 	 *   rc = ERR_FLASH_VERIFY -> JM_ERR_FLASH_VERIFY (0x12, 回读校验失败)
+	 *   rc = ERR_WRITE_LIMIT  -> JM_ERR_FLASH_LIMIT (0x14, 写入次数超限)
+	 *   rc = ERR_EEPROM_*     -> JM_ERR_EEPROM_* (0x15/0x16, EEPROM 写/校验失败)
 	 *   rc = 其他 < 0         -> JM_ERR_FLASH (0x08, 通用 Flash 错误) */
 	if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_WRITE)
 		return JM_ERR_FLASH_WRITE;
 	if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY)
 		return JM_ERR_FLASH_VERIFY;
+	if (rc == MOTOR_INFO_STORAGE_ERR_WRITE_LIMIT)
+		return JM_ERR_FLASH_LIMIT;
+	if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE)
+		return JM_ERR_EEPROM_WRITE;
+	if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY)
+		return JM_ERR_EEPROM_VERIFY;
 	return (rc > 0) ? JM_ERR_OUT_OF_RANGE : JM_ERR_FLASH;
 }
 

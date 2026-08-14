@@ -22,6 +22,10 @@
 #include "dev_dwt_counter.h"
 #include "dev_power_monitor.h"
 #include "dev_commun_uart.h"
+#if defined(USE_DEV_EEPROM)
+#include "dev_eeprom.h"
+/* 注：dev_eeprom 上电自检(dev_eeprom_test)会覆盖 motor_info 的 EEPROM 存储区，此处不启用 */
+#endif
 #if defined(USE_DEV_DRV8301)
 #include "dev_drv8301.h"
 #endif
@@ -44,8 +48,18 @@ static void hardware_init(void)
 	/* 初始化DWT定时器 */
 	dev_dwt_counter_init();
 
-	/* 初始化 motor_info Flash 存储服务（须在 motor_loop_init 之前） */
+#if defined(USE_DEV_EEPROM)
+	/* 片外 EEPROM(AT24C16) 先于存储服务初始化：
+	 * 存储服务在 motor_info_storage_init 加载时优先读 EEPROM，
+	 * 须在此前就绪并绑定到 g_motor_info_storage.eeprom_dev。 */
+	dev_eeprom_init(&dev_eeprom, EEPROM_ID_1);
+#endif
+
+	/* 初始化 motor_info Flash+EEPROM 存储服务（须在 motor_loop_init 之前） */
 #if defined(USE_DEV_FLASH)
+#if defined(USE_DEV_EEPROM)
+	g_motor_info_storage.eeprom_dev = &dev_eeprom; /* 挂接 EEPROM 子设备，上电优先加载 */
+#endif
 	motor_info_storage_init();
 #endif
 
@@ -55,7 +69,7 @@ static void hardware_init(void)
 	(void)dev_power_monitor.start(&dev_power_monitor);
 
 #if defined(USE_DEV_DRV8301)
-	/* DRV8301 SPI 寄存器配置(须在 motor_loop_init/dev_motor_enable 之前)
+	/* DRV8301 SPI 寄存器配置(须在 motor_loop_init/dev_motor_enable 之前) */
 	 * CTRL1=0x003C: GAIN=40V/V(D2:D1=10b), DC_CAL=0(正常模式), OCTW=111(默认保护)
 	 *   注: DRV8301 上电默认 DC_CAL=1(校准模式), SO1/SO2 输出固定电压, 电流采样恒为0,
 	 *       必须通过 SPI 写入 CTRL1 清除 DC_CAL 位才能正常采样电流。

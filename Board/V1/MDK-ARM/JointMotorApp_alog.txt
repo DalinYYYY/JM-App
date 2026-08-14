@@ -6,7 +6,7 @@
 [Found keyword]: ----------Execution Region----------
 [name]:  ER_IROM1 
 [Exec base]: 0x8000000
-[Size]: 0x19fb8
+[Size]: 0x19fc8
 [Max]: 0x80000
 [Found keyword]: ----------Execution Region----------
 [name]:  RW_IRAM1 
@@ -17,7 +17,7 @@
   RW_IRAM1 :0x20000000
   128.00 KB :|¡ö¡ö¡ö¡ö¡ö¡ö¡ö_____________|   35.50 % (   45.45 KB /   128.00 KB) [84536 B]
   ER_IROM1 :0x8000000
-  512.00 KB :|¡ö¡ö¡ö¡ö________________|   20.30 % (  103.93 KB /   512.00 KB) [417864 B]
+  512.00 KB :|¡ö¡ö¡ö¡ö________________|   20.30 % (  103.95 KB /   512.00 KB) [417848 B]
 [export csv]: ./JointMotorApp_sort_by_flash.csv
 [export csv]: ./JointMotorApp_sort_by_ram.csv
 [export xlsx]: JointMotorApp_analysis.xlsx

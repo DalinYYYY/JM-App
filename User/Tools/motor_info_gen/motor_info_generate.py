@@ -39,7 +39,6 @@ for _stream in (sys.stdout, sys.stderr):
 # 布局常量：与 MotorInfo_readme.md 的 1024B 空间分配严格一致
 # ----------------------------------------------------------------------------
 PARAM_AREA_SIZE = 1024
-PARAM_MAGIC = 0x53455256  # "SERVO_V2" 低 32 位
 MAX_BLOCK_COUNT = 6
 HEADER_SIZE = 64
 TAIL_RESERVED_SIZE = 192  # 末尾预留 0x0340-0x03FF
@@ -292,6 +291,9 @@ def generate_h(params, grouped, layout, output_h, module_name, config_type):
     L.append('#ifndef __ALIGNED_4')
     L.append('#define __ALIGNED_4 __attribute__((aligned(4)))')
     L.append('#endif')
+    L.append('#ifndef __ALIGNED_8')
+    L.append('#define __ALIGNED_8 __attribute__((aligned(8)))')
+    L.append('#endif')
     L.append('')
 
     # 元信息
@@ -304,7 +306,6 @@ def generate_h(params, grouped, layout, output_h, module_name, config_type):
 
     # Flash 区域布局常量
     L.append('/* ===== Flash 区域布局常量 ===== */')
-    L.append(f'#define PARAM_MAGIC       0x{PARAM_MAGIC:08X}u  /* "SERVO_V2" */')
     L.append(f'#define PARAM_AREA_SIZE    {PARAM_AREA_SIZE}')
     L.append(f'#define MAX_BLOCK_COUNT    {MAX_BLOCK_COUNT}')
     L.append('')
@@ -328,12 +329,11 @@ def generate_h(params, grouped, layout, output_h, module_name, config_type):
     L.append('')
     L.append('typedef struct __ALIGNED_4')
     L.append('{')
-    L.append('    uint32_t      magic;                     /* 魔数 PARAM_MAGIC */')
     L.append('    uint16_t      version_major;             /* 主版本 */')
     L.append('    uint16_t      version_minor;             /* 次版本 */')
     L.append('    uint32_t      crc32;                     /* 参数区 CRC32(校验范围跳过本字段) */')
     L.append(f'    BlockIndex_t  blocks[MAX_BLOCK_COUNT];   /* {MAX_BLOCK_COUNT}*8 = 48B */')
-    L.append('    uint32_t      reserved;                  /* 4B 填充凑足 64B */')
+    L.append('    uint32_t      reserved[2];               /* 8B 填充凑足 64B */')
     L.append('} ParamHeader_t;  /* 64B */')
     L.append('')
 
@@ -361,7 +361,8 @@ def generate_h(params, grouped, layout, output_h, module_name, config_type):
 
     # 主联合体
     L.append('/* ===== 主参数区联合体：1024B 整块空间 ===== */')
-    L.append('typedef union __ALIGNED_4')
+    L.append('/* 8 字节对齐：被 (u64*) 强转传给 Flash 读写时，保证 u64 访问不产生未对齐故障 */')
+    L.append('typedef union __ALIGNED_8')
     L.append('{')
     L.append('    uint8_t raw[PARAM_AREA_SIZE];  /* 原始字节数组，可直接 memcpy 到 Flash */')
     L.append('    struct __ALIGNED_4')
@@ -387,7 +388,7 @@ def generate_h(params, grouped, layout, output_h, module_name, config_type):
     L.append(' * @brief   基础 API')
     L.append(' ******************************************************************************/')
     L.append('/**')
-    L.append(f' * @brief   初始化为默认值（含头部魔数/版本/块索引表 + 各参数默认值）')
+    L.append(f' * @brief   初始化为默认值（含版本/块索引表 + 各参数默认值）')
     L.append(f' * @param   cfg 参数区指针')
     L.append(' * @return  0=成功, -EINVAL=空指针')
     L.append(' */')
@@ -473,7 +474,6 @@ def generate_c(params, grouped, layout, output_c, output_h, module_name, config_
     L.append('    memset(cfg->raw, 0, PARAM_AREA_SIZE);')
     L.append('')
     L.append('    /* ---- 头部 ---- */')
-    L.append('    cfg->blocks.header.magic = PARAM_MAGIC;')
     L.append(f'    cfg->blocks.header.version_major = {prefix}_VERSION_MAJOR;')
     L.append(f'    cfg->blocks.header.version_minor = {prefix}_VERSION_MINOR;')
     L.append('    cfg->blocks.header.crc32 = 0;')
@@ -481,7 +481,8 @@ def generate_c(params, grouped, layout, output_c, output_h, module_name, config_
         _, _, block_size, block_offset = CATEGORY_MAP[cat]
         L.append(f'    cfg->blocks.header.blocks[{i}].offset = 0x{block_offset:04X}u;')
         L.append(f'    cfg->blocks.header.blocks[{i}].size   = {block_size}u;')
-    L.append('    cfg->blocks.header.reserved = 0;')
+    L.append('    cfg->blocks.header.reserved[0] = 0;')
+    L.append('    cfg->blocks.header.reserved[1] = 0;')
     L.append('')
 
     # 各块默认值
@@ -501,9 +502,6 @@ def generate_c(params, grouped, layout, output_c, output_h, module_name, config_
     L.append(f'int {module_name}_validate(const {config_type} *cfg)')
     L.append('{')
     L.append('    if (cfg == NULL) return -EINVAL;')
-    L.append('')
-    L.append('    /* 头部魔数校验 */')
-    L.append('    if (cfg->blocks.header.magic != PARAM_MAGIC) return -1;')
     L.append('')
     for cat, gp in grouped.items():
         _, member_name, _, _ = CATEGORY_MAP[cat]
@@ -525,8 +523,7 @@ def generate_c(params, grouped, layout, output_c, output_h, module_name, config_
     L.append('    if (cfg == NULL) return;')
     L.append('    printf("========== MotorInfo Config (%d params) ==========\\n",'
              f' {prefix}_PARAM_COUNT);')
-    L.append('    printf("magic=0x%08X  v%d.%d  crc32=0x%08X\\n",')
-    L.append('           (unsigned)cfg->blocks.header.magic,')
+    L.append('    printf("v%d.%d  crc32=0x%08X\\n",')
     L.append('           cfg->blocks.header.version_major,')
     L.append('           cfg->blocks.header.version_minor,')
     L.append('           (unsigned)cfg->blocks.header.crc32);')

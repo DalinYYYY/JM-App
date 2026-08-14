@@ -29,7 +29,7 @@
 #define MOTOR_PROFILE_GM4820H  1
 #define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
 #define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
-#define MOTOR_PROFILE          MOTOR_PROFILE_5010_360
+#define MOTOR_PROFILE          MOTOR_PROFILE_GM4820H
 
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
@@ -37,7 +37,7 @@
  * 结构 12N14P / WYE / SPMSM（表贴式，Ld≈Lq）
  * 时间常数 τ = L/R = 4.8mH/3.6Ω = 1.33ms */
 #define MOTOR_NAME            "GM4820H"
-#define MOTOR_R               3.6f    /* 相电阻(Ω) PDF: Ri */
+#define MOTOR_R               1.8f    /* 相电阻(Ω) PDF: Ri */
 #define MOTOR_LD              4.8e-3f /* d轴电感(H) PDF: 4.8mH */
 #define MOTOR_LQ              4.8e-3f /* q轴电感(H) SPMSM: Ld≈Lq */
 #define MOTOR_FLUX            0.02f   /* 磁链(Wb) KV=66反算: 60/(2π·66·7) */
