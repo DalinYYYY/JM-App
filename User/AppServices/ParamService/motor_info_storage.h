@@ -10,7 +10,8 @@
  *              - 上电时 motor_info_storage_init() 一次性完成：
  *                  dev_flash_init → motor_info_init(默认) → Flash加载 → profile覆盖
  *              - motor_info_storage_get() 返回已初始化的 g_motor_info 句柄
- *              - motor_info_storage_save() 校验后计算 CRC 写入 Flash
+ *              - motor_info_storage_save() 校验后计算 CRC 写入 EEPROM(默认),
+ *                可选追加 Flash 备份(flags 带 MOTORINFO_SAVE_FLAG_FLASH)
  *              - 强符号 jm_app_motor_info_storage_save 覆盖协议层弱符号，接入 0xEA
  *
  * @par 模块契约（C-OOP 设备对象规范）
@@ -77,10 +78,10 @@ extern "C"
 #ifndef MOTORINFO_FLASH_PAGE_SIZE
 #define MOTORINFO_FLASH_PAGE_SIZE  2048U       /* 2KB，双Bank页大小 */
 #endif
-/* Flash 磨损均衡累计写入次数上限：超过则拒绝写入并返回 ERR_WRITE_LIMIT。
+/* 固化次数上限：超过则拒绝保存并返回 ERR_SAVE_LIMIT。
  * STM32G4 片内 Flash 典型擦写寿命 1 万次，取保守值 10000 作为保护阈值。*/
-#ifndef MOTORINFO_FLASH_WRITE_LIMIT
-#define MOTORINFO_FLASH_WRITE_LIMIT 10000U
+#ifndef MOTORINFO_SAVE_LIMIT
+#define MOTORINFO_SAVE_LIMIT 10000U
 #endif
 
 	/* ===== motor_info EEPROM 存储地址定义 =====
@@ -96,6 +97,12 @@ extern "C"
 #ifndef MOTORINFO_EEPROM_CFG_OFFSET
 #define MOTORINFO_EEPROM_CFG_OFFSET 4U             /* magic(4B) 之后的 motor_info 数据偏移 */
 #endif
+
+/* ===== save() 存储目标标志位 =====
+ * 默认(flags=0)仅写 EEPROM(上电优先加载); 带 MOTORINFO_SAVE_FLAG_FLASH 时
+ * 追加写 Flash 备份(手动固化/备份场景, 如上位机勾选"同时写Flash备份")。
+ * EEPROM 设备不可用时自动回退写 Flash, 保证无 EEPROM 的板子数据仍能持久化。*/
+#define MOTORINFO_SAVE_FLAG_FLASH (1u << 0) /* 追加写 Flash 备份 */
 
 	/**
  * @brief  模块状态码枚举
@@ -124,7 +131,7 @@ extern "C"
 		/* 详细 Flash 错误码(供 0xEA 应答区分擦写/校验失败) */
 		MOTOR_INFO_STORAGE_ERR_FLASH_WRITE = -4,  /* Flash 擦写失败(3 次重试后仍失败) */
 		MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY = -5, /* Flash 回读校验失败(CRC/范围不匹配) */
-		MOTOR_INFO_STORAGE_ERR_WRITE_LIMIT = -6,  /* Flash 写入次数超限(磨损均衡保护) */
+		MOTOR_INFO_STORAGE_ERR_SAVE_LIMIT = -6,  /* 固化次数超限(寿命保护) */
 		/* 详细 EEPROM 错误码(供 0xEA 应答区分 EEPROM 写/校验失败) */
 		MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE = -7,  /* EEPROM 写入失败 */
 		MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY = -8, /* EEPROM 回读校验失败 */
@@ -143,7 +150,8 @@ extern "C"
 	{
 		motor_info_t *(*get)(struct motor_info_storage *pobj);                                         /* 取全局 motor_info 句柄 */
 		motor_info_storage_status_t (*load)(struct motor_info_storage *pobj, motor_info_t *cfg);       /* 从 Flash 加载 */
-		motor_info_storage_status_t (*save)(struct motor_info_storage *pobj, const motor_info_t *cfg); /* 保存到 Flash */
+		motor_info_storage_status_t (*save)(struct motor_info_storage *pobj, const motor_info_t *cfg,
+		                                    uint32_t flags);                                            /* 保存: flags 见 MOTORINFO_SAVE_FLAG_* */
 		void (*deinit)(struct motor_info_storage *pobj);                                               /* 反初始化 */
 	} motor_info_storage_ops_t;
 
@@ -232,18 +240,20 @@ extern "C"
 	motor_info_storage_status_t motor_info_storage_load(motor_info_t *cfg);
 
 	/**
- * @brief  将 motor_info 配置保存到 Flash（包装 ops->save）
+ * @brief  将 motor_info 配置保存到 EEPROM/Flash（包装 ops->save）
  * @param  cfg  源参数区指针
+ * @param  flags 存储目标标志(MOTORINFO_SAVE_FLAG_* 位或); 0=仅 EEPROM(默认),
+ *               带 MOTORINFO_SAVE_FLAG_FLASH 追加写 Flash 备份。
  * @return MOTOR_INFO_STORAGE_OK            保存成功;
  *         > 0                                motor_info_validate 返回的首个越界 param_id;
  *         MOTOR_INFO_STORAGE_ERR_ARG       cfg 为空;
  *         MOTOR_INFO_STORAGE_ERR_FLASH     Flash 写入失败;
  *         MOTOR_INFO_STORAGE_ERR_INIT      服务未初始化.
- * @note   **阻塞**:dev_flash_write 内部关中断约 10-30ms，会阻塞所有中断
+ * @note   **阻塞**:写 Flash 时 dev_flash_write 内部关中断约 10-30ms，会阻塞所有中断
  *         (含电机控制等实时中断)。仅在 0xEA 命令处理线程调用，
- *         严禁在 ISR / 电流环 / 控制环调用。
+ *         严禁在 ISR / 电流环 / 控制环调用。仅写 EEPROM 时延时可忽略。
  */
-	motor_info_storage_status_t motor_info_storage_save(const motor_info_t *cfg);
+	motor_info_storage_status_t motor_info_storage_save(const motor_info_t *cfg, uint32_t flags);
 
 #ifdef __cplusplus
 }

@@ -242,6 +242,11 @@ extern "C"
 		JM_TLM_MOTION_TARGET = (1u << 11),  /* velRef,posRef(f32)      8B */
 	} jm_telemetry_bit_e;
 
+	/* ===================== 0xEA MOTOR_INFO_SAVE 载荷 flags 位定义 =====================
+	 * 默认(无载荷或 bit0=0)仅写 EEPROM(上电优先加载); bit0=1 追加写 Flash 备份。
+	 * 其余位保留(上位机应填 0), 固件忽略未定义位。 */
+#define JM_MOTOR_INFO_SAVE_FLAG_FLASH (1u << 0) /* 追加写 Flash 备份 */
+
 	/* ===================== 错误码(NACK 的 err_code) =====================
 	 * NACK 载荷格式: [0xFE][orig_cmd][err_code][seq] (4B)
 	 *   - orig_cmd: 触发 NACK 的原命令码
@@ -278,7 +283,7 @@ extern "C"
 		JM_ERR_FLASH_VERIFY = 0x12, /* Flash 校验失败(读回不匹配) */
 		/* 新增 0x13 (预留命令专用) */
 		JM_ERR_NOT_SUPPORTED = 0x13, /* 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC) */
-		JM_ERR_FLASH_LIMIT = 0x14,   /* Flash 写入次数超限(磨损均衡寿命保护) */
+		JM_ERR_SAVE_LIMIT = 0x14,     /* 固化次数超限(寿命保护) */
 		JM_ERR_EEPROM_WRITE = 0x15,  /* EEPROM 写入失败 */
 		JM_ERR_EEPROM_VERIFY = 0x16, /* EEPROM 回读校验失败 */
 	} jm_err_e;

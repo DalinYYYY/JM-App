@@ -140,7 +140,9 @@ extern "C"
 		jm_err_e (*motor_info_read)(uint16_t param_id, uint8_t *value4,
 		                            uint8_t *out_type, uint8_t *out_len);
 		jm_err_e (*motor_info_write)(uint16_t param_id, const uint8_t *value4, uint8_t len);
-		jm_err_e (*motor_info_save)(void);
+		/* 固化(CMD 0xEA): flags 位见 JM_MOTOR_INFO_SAVE_FLAG_*;
+		 * bit0=1 追加写 Flash 备份, 默认(0)仅写 EEPROM。 */
+		jm_err_e (*motor_info_save)(uint8_t flags);
 		/* 批量读/写(CMD 0xE9/0xEA): 从 start_id 起连续读/写 count 个, 每值固定4B。
 		 * read 把结果写入 out: [start_id:u16][count:u8][value:4B]..., 写回 *out_len;
 		 * write 的 values 为 count*4B 拼接。块内连续ID有效, 跨块间隔返回 BAD_PARAM_ID。

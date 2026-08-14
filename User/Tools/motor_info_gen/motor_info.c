@@ -45,7 +45,7 @@ int motor_info_init(motor_info_t *cfg)
     cfg->blocks.system.enable_bus_sensor = 1U;
     cfg->blocks.system.safety_limit = 1U;
     cfg->blocks.system.total_runtime_s = 0U;
-    cfg->blocks.system.flash_write_count = 0U;
+    cfg->blocks.system.save_count = 0U;
 
     /* ---- 电机标定参数（含减速器/编码器/功率级/电流采样） ---- */
     cfg->blocks.motor_calib.is_calibrated = 0U;
@@ -155,7 +155,7 @@ int motor_info_validate(const motor_info_t *cfg)
     if (cfg->blocks.system.enable_bus_sensor > (uint32_t)1) return 2;  /* enable_bus_sensor */
     if (cfg->blocks.system.safety_limit > (uint32_t)1) return 3;  /* safety_limit */
     if (cfg->blocks.system.total_runtime_s > (uint32_t)4294967295) return 4;  /* total_runtime_s */
-    if (cfg->blocks.system.flash_write_count > (uint32_t)4294967295) return 5;  /* flash_write_count */
+    if (cfg->blocks.system.save_count > (uint32_t)4294967295) return 5;  /* save_count */
 
     /* 电机标定参数（含减速器/编码器/功率级/电流采样） */
     if (cfg->blocks.motor_calib.is_calibrated > (uint32_t)1) return 16;  /* is_calibrated */
@@ -270,7 +270,7 @@ void motor_info_print(const motor_info_t *cfg)
     printf("enable_bus_sensor: %u\n", (unsigned)cfg->blocks.system.enable_bus_sensor);
     printf("safety_limit: %u\n", (unsigned)cfg->blocks.system.safety_limit);
     printf("total_runtime_s: %u s\n", (unsigned)cfg->blocks.system.total_runtime_s);
-    printf("flash_write_count: %u\n", (unsigned)cfg->blocks.system.flash_write_count);
+    printf("save_count: %u\n", (unsigned)cfg->blocks.system.save_count);
 
     printf("\n--- Motor Calibration Parameters ---\n");
     printf("is_calibrated: %u\n", (unsigned)cfg->blocks.motor_calib.is_calibrated);
@@ -425,8 +425,8 @@ static const motor_info_param_desc_t s_motor_info_desc[MOTOR_INFO_PARAM_COUNT] =
     { 3u, (uint16_t)offsetof(motor_info_t, blocks.system.safety_limit), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
     /* total_runtime_s */
     { 4u, (uint16_t)offsetof(motor_info_t, blocks.system.total_runtime_s), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 4294967295U } },
-    /* flash_write_count */
-    { 5u, (uint16_t)offsetof(motor_info_t, blocks.system.flash_write_count), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 4294967295U } },
+    /* save_count */
+    { 5u, (uint16_t)offsetof(motor_info_t, blocks.system.save_count), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 4294967295U } },
     /* is_calibrated */
     { 16u, (uint16_t)offsetof(motor_info_t, blocks.motor_calib.is_calibrated), MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, { .u32 = 0U }, { .u32 = 1U } },
     /* pole_pairs */

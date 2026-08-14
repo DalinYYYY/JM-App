@@ -358,11 +358,14 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			reply_set(p, cmd, &status, 1);
 			return e;
 		}
-		/* 电机配置存Flash 0xEA: 无载荷 -> ACK{status:u8} */
+		/* 电机配置固化 0xEA: {flags:u8 可选} -> ACK{status:u8}
+		 * flags bit0=1 追加写 Flash 备份, 默认(无载荷/bit0=0)仅写 EEPROM */
 		case JM_CMD_MOTOR_INFO_SAVE:
 			if (ops == NULL || ops->motor_info_save == NULL)
 				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
-			e = ops->motor_info_save();
+			if (len > 1)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			e = ops->motor_info_save((len >= 1) ? pl[0] : 0u);
 			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
 		/* 电机配置恢复默认 0xEB: {param_id:u16=0xFFFF全部} -> ACK{status:u8} */
 	case JM_CMD_MOTOR_INFO_RESET:

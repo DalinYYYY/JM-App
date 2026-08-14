@@ -96,7 +96,7 @@ typedef struct __ALIGNED_4 {
     uint32_t enable_bus_sensor;  // 0:禁用 1:启用
     uint32_t safety_limit;       // 0:禁用 1:启用
     uint32_t total_runtime_s;    // 累计运行时间(s) 掉电保存 定期写入避免频繁擦写
-    uint32_t flash_write_count;  // Flash磨损均衡累计写入次数 超过寿命阈值拒绝写入并报错
+    uint32_t save_count;         // 固化累计次数 每次0xEA保存成功自增 超过寿命阈值拒绝写入并报错
     uint32_t reserved[10];       // 40B 预留
 } SystemParam_t;
 ```

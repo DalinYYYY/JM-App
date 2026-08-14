@@ -16,6 +16,7 @@
 #define USE_DEV_COMMUN_CAN    /* 上位机 CAN/CAN-FD 通信 (CA-IS2062A 收发器) */
 #define USE_DEV_LED           /* LED 状态指示 (LED1红=PC14 故障, LED2绿=PC15 运行状态) */
 #define USE_DEV_FLASH         /* Flash 参数存储 (Bank2 末尾 4KB, 供 0xE6-0xEB 命令组) */
+#define USE_DEV_EEPROM        /* 片外 FRAM(MB85RC16) / EEPROM(AT24C16), I2C1: PA15/SCL, PB9/SDA */
 /* 不启用: USE_DEV_AS5047 / USE_DEV_DRV8301 / USE_DEV_RGB_LED (V1 用单色 LED) */
 
 /* ===== 1.1 CAN/FD 通信配置 (CA-IS2062A 收发器, §Q11 已确认支持 FD) =====

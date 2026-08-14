@@ -789,6 +789,11 @@
               <FilePath>..\..\..\User\Devices\dev_commun_can.c</FilePath>
             </File>
             <File>
+              <FileName>dev_eeprom.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_eeprom.c</FilePath>
+            </File>
+            <File>
               <FileName>dev_encoder_mt6701.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\Devices\dev_encoder_mt6701.c</FilePath>

@@ -79,7 +79,7 @@ typedef struct __ALIGNED_4
     uint32_t enable_bus_sensor               ; /* 总线传感器使能  [0:禁用 1:启用] */
     uint32_t safety_limit                    ; /* 安全限制使能  [0:禁用 1:启用 调试期建议关闭] */
     uint32_t total_runtime_s                 ; /* 累计运行时间 (s)  [掉电保存 运维数据 定期写入避免频繁擦写] */
-    uint32_t flash_write_count               ; /* Flash写入次数  [Flash磨损均衡累计写入次数 超过寿命阈值拒绝写入并报错] */
+    uint32_t save_count                      ; /* 固化次数  [固化累计次数 每次0xEA保存成功自增 超过寿命阈值拒绝写入并报错] */
     uint32_t reserved[10];                    /* 预留 40B */
 } SystemParam_t;
 
@@ -237,7 +237,7 @@ typedef union __ALIGNED_8
 #define MOTOR_INFO_PID_ENABLE_BUS_SENSOR                 2u
 #define MOTOR_INFO_PID_SAFETY_LIMIT                      3u
 #define MOTOR_INFO_PID_TOTAL_RUNTIME_S                   4u
-#define MOTOR_INFO_PID_FLASH_WRITE_COUNT                 5u
+#define MOTOR_INFO_PID_SAVE_COUNT                        5u
 #define MOTOR_INFO_PID_IS_CALIBRATED                     16u
 #define MOTOR_INFO_PID_POLE_PAIRS                        17u
 #define MOTOR_INFO_PID_MOTOR_TYPE                        18u

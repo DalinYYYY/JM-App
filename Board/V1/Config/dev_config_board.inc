@@ -20,6 +20,22 @@ const mt6835_config_t mt6835_list[MT6835_ID_MAX] = {
 };
 #endif
 
+#if defined(USE_DEV_EEPROM)
+/* FRAM MB85RC16: I2C1 (PA15/SCL, PB9/SDA), 7bit 基础地址 0x50, 16B 页, 2KB
+ * 与 AT24C16 I2C 寻址时序兼容(块选择位在器件地址 A2A1A0, 按 256B 块切分);
+ * FRAM 无页写限制/写周期, 驱动复用(等待立即返回) */
+const dev_eeprom_config_t eeprom_list[EEPROM_ID_MAX] = {
+    [EEPROM_ID_1] = {
+        .name = "MB85RC16",
+        .i2c = {.hi2c = DRV_I2C1, .mem_size = DRV_I2C_MEMSIZE_8BIT, .timeout = 100},
+        .i2c_addr = 0x50,
+        .page_size = 16,
+        .total_size = 2048,
+        .addr_width = 1,
+    },
+};
+#endif
+
 #if defined(USE_DEV_HALF_BRIDGE)
 const dev_half_bridge_config_t half_bridge_list[BRIDGE_ID_MAX] = {
     [BRIDGE_DEV1] = {

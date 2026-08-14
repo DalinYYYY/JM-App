@@ -51,8 +51,9 @@
 #endif
 
 #if defined(USE_DEV_FLASH)
-/* 强实现位于 motor_info_storage.c, 本文件后部保留弱实现供无存储后端时覆盖。 */
-motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *cfg);
+/* 强实现位于 motor_info_storage.c, 本文件后部保留弱实现供无存储后端时覆盖。
+ * flags: MOTORINFO_SAVE_FLAG_* 位, 0=仅 EEPROM, FLASH=追加 Flash 备份。 */
+motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *cfg, uint32_t flags);
 #endif
 
 /* ============================================================================
@@ -1205,7 +1206,7 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 		if (motor_info_write_u32(cfg, MOTOR_INFO_PID_CAN_ID, new_id) != 0)
 			return JM_ERR_OUT_OF_RANGE;
 
-		rc = jm_app_motor_info_storage_save(cfg);
+		rc = jm_app_motor_info_storage_save(cfg, MOTORINFO_SAVE_FLAG_FLASH);
 		if (rc == MOTOR_INFO_STORAGE_OK)
 			return JM_ERR_OK;
 
@@ -1215,8 +1216,8 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 			return JM_ERR_FLASH_WRITE;
 		if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY)
 			return JM_ERR_FLASH_VERIFY;
-		if (rc == MOTOR_INFO_STORAGE_ERR_WRITE_LIMIT)
-			return JM_ERR_FLASH_LIMIT;
+		if (rc == MOTOR_INFO_STORAGE_ERR_SAVE_LIMIT)
+			return JM_ERR_SAVE_LIMIT;
 		if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE)
 			return JM_ERR_EEPROM_WRITE;
 		if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY)
@@ -1299,8 +1300,9 @@ static jm_err_e app_set_fd_mode(uint8_t enable, uint8_t *out_ack_enable, uint8_t
  *       - motor_info_storage_get() 返回已初始化的句柄
  * ==========================================================================*/
 
-/* motor_info 持久化: 弱实现仅做范围校验, 不落 Flash。
- * 接入 Flash 驱动后在驱动层提供同名强符号覆盖(类比 jm_app_param_storage_save)。
+/* motor_info 持久化: 弱实现仅做范围校验, 不落盘(EEPROM/Flash)。
+ * 接入存储驱动后在驱动层提供同名强符号覆盖(类比 jm_app_param_storage_save)。
+ * flags: MOTORINFO_SAVE_FLAG_* 位, 弱实现忽略。
  * 返回值类型 motor_info_storage_status_t：0=成功, >0=越界 param_id, <0=系统错误。
  * 未启用 USE_DEV_FLASH 时本弱符号不编译: 0xE6-0xEB 整组命令在 ops 表中置 NULL,
  * jm_proto_dispatch 已对 ops->motor_info_xxx 做 NULL 检查并返回 NACK(UNSUPPORT)。*/
@@ -1310,8 +1312,9 @@ __attribute__((weak))
 #elif defined(__CC_ARM) || defined(__ARMCC_VERSION)
 __weak
 #endif
-motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *cfg)
+motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *cfg, uint32_t flags)
 {
+	(void)flags;
 	return (motor_info_storage_status_t)motor_info_validate(cfg); /* 0=全部通过, 否则首个越界 param_id(>0) */
 }
 #endif /* USE_DEV_FLASH */
@@ -1359,14 +1362,18 @@ static jm_err_e app_motor_info_write(uint16_t param_id, const uint8_t *value4, u
 	return mi_dispatch_to_err(rc);
 }
 
-/* ---- 0xEA 把 motor_info 整块写入 Flash ---- */
-static jm_err_e app_motor_info_save(void)
+/* ---- 0xEA 把 motor_info 固化到 EEPROM(默认) / 追加 Flash 备份 ----
+ * flags: 协议载荷字节, bit0(JM_MOTOR_INFO_SAVE_FLAG_FLASH)=1 追加写 Flash 备份,
+ *        默认仅写 EEPROM(上电优先加载)。 */
+static jm_err_e app_motor_info_save(uint8_t flags)
 {
-	/* 速率限制: 0xEA MOTOR_INFO_SAVE 1s 间隔 (防 Flash 频繁擦写) */
+	/* 速率限制: 0xEA MOTOR_INFO_SAVE 1s 间隔 (防存储频繁写入) */
 	if (!JM_RATE_CHECK(&s_last_tick_motor_info_s, JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS))
 		return JM_ERR_RATE_LIMIT;
 
-	motor_info_storage_status_t rc = jm_app_motor_info_storage_save(motor_info_storage_get());
+	uint32_t sf = ((flags & JM_MOTOR_INFO_SAVE_FLAG_FLASH) != 0u)
+		? MOTORINFO_SAVE_FLAG_FLASH : 0u;
+	motor_info_storage_status_t rc = jm_app_motor_info_storage_save(motor_info_storage_get(), sf);
 	if (rc == MOTOR_INFO_STORAGE_OK)
 	{
 		return JM_ERR_OK;
@@ -1375,15 +1382,15 @@ static jm_err_e app_motor_info_save(void)
 	 *   rc > 0 = 越界 param_id -> OUT_OF_RANGE
 	 *   rc = ERR_FLASH_WRITE  -> JM_ERR_FLASH_WRITE (0x11, 擦写失败)
 	 *   rc = ERR_FLASH_VERIFY -> JM_ERR_FLASH_VERIFY (0x12, 回读校验失败)
-	 *   rc = ERR_WRITE_LIMIT  -> JM_ERR_FLASH_LIMIT (0x14, 写入次数超限)
+	 *   rc = ERR_SAVE_LIMIT  -> JM_ERR_SAVE_LIMIT (0x14, 固化次数超限)
 	 *   rc = ERR_EEPROM_*     -> JM_ERR_EEPROM_* (0x15/0x16, EEPROM 写/校验失败)
 	 *   rc = 其他 < 0         -> JM_ERR_FLASH (0x08, 通用 Flash 错误) */
 	if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_WRITE)
 		return JM_ERR_FLASH_WRITE;
 	if (rc == MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY)
 		return JM_ERR_FLASH_VERIFY;
-	if (rc == MOTOR_INFO_STORAGE_ERR_WRITE_LIMIT)
-		return JM_ERR_FLASH_LIMIT;
+	if (rc == MOTOR_INFO_STORAGE_ERR_SAVE_LIMIT)
+		return JM_ERR_SAVE_LIMIT;
 	if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE)
 		return JM_ERR_EEPROM_WRITE;
 	if (rc == MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY)
