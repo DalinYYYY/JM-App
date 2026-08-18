@@ -315,9 +315,9 @@ static void set_update_freq(struct motion_param *pobj, uint32_t freq_hz)
 static void pll_set_gains(struct motion_param *pobj, float bandwidth_hz, float damping)
 {
 	if (bandwidth_hz <= 0.0f)
-		bandwidth_hz = 150.0f;  /* 默认 150Hz: 在 2kHz 解算下兼顾跟随性与噪声抑制 */
+		bandwidth_hz = 100.0f; /* 默认 100Hz: 在 2kHz 解算下兼顾跟随性与噪声抑制 */
 	if (damping <= 0.0f)
-		damping = 1.0f;         /* 临界阻尼，无超调 */
+		damping = 1.0f;        /* 临界阻尼，无超调 */
 	float wn = MOTION_2PI * bandwidth_hz;
 	pobj->pll_kp = 2.0f * damping * wn;
 	pobj->pll_ki = wn * wn;
