@@ -29,7 +29,8 @@
 #define MOTOR_PROFILE_GM4820H  1
 #define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
 #define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
-#define MOTOR_PROFILE          MOTOR_PROFILE_GM4820H
+#define MOTOR_PROFILE_RS03     4 /* RS03 关节电机 */
+#define MOTOR_PROFILE          MOTOR_PROFILE_RS03
 
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
@@ -98,6 +99,31 @@
 #define MOTOR_RATED_TORQUE    1.0f
 #define MOTOR_PEAK_TORQUE     3.0f
 #define MOTOR_INERTIA         1e-5f
+
+#elif MOTOR_PROFILE == MOTOR_PROFILE_RS03
+/* RS03 关节电机（参数来源：RS03使用说明书260428.pdf）
+ * 额定 500W / 1500rpm / 3.183Nm / DC48V / 极对数8
+ * 内部自洽性说明:
+ *   KT = 额定转矩/连续电流 = 3.183/10 ≈ 0.3183 Nm/A
+ *   flux = KT/(1.5·pp) = 0.3183/12 ≈ 0.0265 Wb
+ *   说明书标称磁链 4e-5Wb 与额定转矩/反电势不自洽(按4e-5算KT仅4.8e-4),
+ *   故按 KT 反算校准。时间常数 τ = L/R = 0.114mH/0.22Ω ≈ 0.52ms */
+#define MOTOR_NAME            "RS03"
+#define MOTOR_R               0.22f     /* 相电阻(Ω) 20°C */
+#define MOTOR_LD              0.114e-3f /* d轴电感(H) 0.114mH */
+#define MOTOR_LQ              0.114e-3f /* q轴电感(H) 取同d轴 */
+#define MOTOR_FLUX            0.0265f   /* 磁链(Wb) 由KT反算: KT/(1.5·pp) */
+#define MOTOR_KT              0.3183f   /* 转矩常数(Nm/A) = 额定转矩/连续电流 */
+#define MOTOR_KE              0.2122f   /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      20         /* 极对数 */
+#define MOTOR_RATED_CURRENT   10.0f     /* 连续电流(峰值)(A) */
+#define MOTOR_PEAK_CURRENT    30.0f     /* 峰值电流(短时)(A) */
+#define MOTOR_MAX_SPEED       200.0f    /* 最大转速(rad/s) 额定≈157.1rad/s */
+#define MOTOR_RATED_VOLTAGE   48.0f     /* 直流母线电压(V) */
+#define MOTOR_RATED_SPEED_RPM 1500.0f   /* 额定转速(rpm) */
+#define MOTOR_RATED_TORQUE    3.183f    /* 额定转矩(Nm) */
+#define MOTOR_PEAK_TORQUE     9.55f     /* 峰值转矩(Nm) ≈ KT×峰值电流 */
+#define MOTOR_INERTIA         4.7e-5f   /* 转子惯量(kg·m²) */
 
 #else
 #error "未知 MOTOR_PROFILE，请在 motor_profile.h 中定义有效的电机型号编号"
