@@ -30,7 +30,7 @@
 #define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
 #define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
 #define MOTOR_PROFILE_RS03     4 /* RS03 关节电机 */
-#define MOTOR_PROFILE          MOTOR_PROFILE_RS03
+#define MOTOR_PROFILE          MOTOR_PROFILE_5010_360
 
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
@@ -58,28 +58,31 @@
 /* MKS 5010 360KV 无刷云台电机（参数来源：厂家规格书）
  * 结构 12N14P / WYE / SPMSM（表贴式，Ld≈Lq）
  * 厂家参数: R=120mΩ, L=50μH, Imax=20A, Pmax=300W, 极对数=7, DC12~24V
- * 派生计算:
- *   磁链 flux = 60/(2π·KV·pp) = 60/(2π·360·7) ≈ 3.79e-5 Wb
- *   转矩常数 KT = 1.5·pp·flux ≈ 0.398e-3 Nm/A（注: KV法反算磁链对低KV大电机偏小，
+ * 派生计算（自洽校验: 24V空载转速 = 360KV×24V = 8640rpm = 904.8rad/s,
+ *           电角速度 ωe = 904.8×7 = 6333rad/s, flux = 24/6333 ≈ 3.79e-3 Wb）:
+ *   磁链 flux = 60/(2π·KV·pp) = 60/(2π·360·7) ≈ 3.79e-3 Wb
+ *   转矩常数 KT = 1.5·pp·flux ≈ 0.0398 Nm/A（注: KV法反算磁链对低KV大电机偏小，
  *                实际应以堵转转矩实测为准；此值仅用于首次上电）
- *   反电动势常数 KE = flux·pp ≈ 2.65e-4 V/(rad/s)
- *   时间常数 τ = L/R = 50μH/0.12Ω ≈ 0.42ms */
+ *   反电动势常数 KE = flux·pp ≈ 0.0265 V/(rad/s)
+ *   时间常数 τ = L/R = 50μH/0.12Ω ≈ 0.42ms
+ * KT 数量级自检: 修正前误写为 0.398e-3(小100倍), 力矩模式 iq=τ/kt 被放大100倍,
+ * 0.01Nm 即 25A 电流命令, 现象为母线被拉垮(2026-08 排查修复) */
 #define MOTOR_NAME            "MKS5010_360KV"
-#define MOTOR_R               0.12f     /* 相电阻(Ω) 厂家: 120mΩ */
-#define MOTOR_LD              50e-6f    /* d轴电感(H) 厂家: 50μH */
-#define MOTOR_LQ              50e-6f    /* q轴电感(H) SPMSM: Ld≈Lq */
-#define MOTOR_FLUX            3.79e-5f  /* 磁链(Wb) KV=360反算: 60/(2π·360·7) */
-#define MOTOR_KT              0.398e-3f /* 转矩常数(Nm/A) = 1.5·pp·flux */
-#define MOTOR_KE              2.65e-4f  /* 反电动势常数(V/(rad/s)) = flux·pp */
-#define MOTOR_POLE_PAIRS      7         /* 极对数 厂家: 7 (12N14P) */
-#define MOTOR_RATED_CURRENT   2.0f      /* 额定电流(A) 保守取 Imax/2 */
-#define MOTOR_PEAK_CURRENT    6.0f      /* 峰值电流(A) 厂家: 20A */
-#define MOTOR_MAX_SPEED       150.0f    /* 最大转速(rad/s) ~1432RPM(24V/360KV) */
-#define MOTOR_RATED_VOLTAGE   12.0f     /* 额定电压(V) 厂家: DC12~24V, 取上限 */
-#define MOTOR_RATED_SPEED_RPM 1432.0f   /* 额定转速(rpm) ≈ 24V×360KV */
-#define MOTOR_RATED_TORQUE    0.08f     /* 额定转矩(Nm) 估算: KT×Irated ≈ 4mNm(偏小,待实测) */
-#define MOTOR_PEAK_TORQUE     0.2f      /* 峰值转矩(Nm) 估算 */
-#define MOTOR_INERTIA         5e-6f     /* 转子惯量(kg·m²) 估算: 5010尺寸 */
+#define MOTOR_R               0.12f    /* 相电阻(Ω) 厂家: 120mΩ */
+#define MOTOR_LD              50e-6f   /* d轴电感(H) 厂家: 50μH */
+#define MOTOR_LQ              50e-6f   /* q轴电感(H) SPMSM: Ld≈Lq */
+#define MOTOR_FLUX            3.79e-3f /* 磁链(Wb) KV=360反算: 60/(2π·360·7) */
+#define MOTOR_KT              0.0398f  /* 转矩常数(Nm/A) = 1.5·pp·flux */
+#define MOTOR_KE              0.0265f  /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      7        /* 极对数 厂家: 7 (12N14P) */
+#define MOTOR_RATED_CURRENT   2.0f     /* 额定电流(A) 保守取 Imax/2 */
+#define MOTOR_PEAK_CURRENT    6.0f     /* 峰值电流(A) 厂家: 20A */
+#define MOTOR_MAX_SPEED       150.0f   /* 最大转速(rad/s) 保守限幅(空载可达8640rpm) */
+#define MOTOR_RATED_VOLTAGE   12.0f    /* 额定电压(V) 厂家: DC12~24V, 取上限 */
+#define MOTOR_RATED_SPEED_RPM 1432.0f  /* 额定转速(rpm) 对应 MAX_SPEED 限幅 */
+#define MOTOR_RATED_TORQUE    0.08f    /* 额定转矩(Nm) 估算: KT×Irated = 0.04×2 */
+#define MOTOR_PEAK_TORQUE     0.2f     /* 峰值转矩(Nm) 估算: KT×Ipeak ≈ 0.24 */
+#define MOTOR_INERTIA         5e-6f    /* 转子惯量(kg·m²) 估算: 5010尺寸 */
 
 #elif MOTOR_PROFILE == MOTOR_PROFILE_DEMO
 /* 示例：演示如何添加第二个电机型号（占位，非真实参数）*/
@@ -115,7 +118,7 @@
 #define MOTOR_FLUX            0.0265f   /* 磁链(Wb) 由KT反算: KT/(1.5·pp) */
 #define MOTOR_KT              0.3183f   /* 转矩常数(Nm/A) = 额定转矩/连续电流 */
 #define MOTOR_KE              0.2122f   /* 反电动势常数(V/(rad/s)) = flux·pp */
-#define MOTOR_POLE_PAIRS      20         /* 极对数 */
+#define MOTOR_POLE_PAIRS      20        /* 极对数 */
 #define MOTOR_RATED_CURRENT   10.0f     /* 连续电流(峰值)(A) */
 #define MOTOR_PEAK_CURRENT    30.0f     /* 峰值电流(短时)(A) */
 #define MOTOR_MAX_SPEED       200.0f    /* 最大转速(rad/s) 额定≈157.1rad/s */
