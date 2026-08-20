@@ -69,7 +69,7 @@ static void hardware_init(void)
 	(void)dev_power_monitor.start(&dev_power_monitor);
 
 #if defined(USE_DEV_DRV8301)
-	/* DRV8301 SPI 寄存器配置(须在 motor_loop_init/dev_motor_enable 之前) */
+	/* DRV8301 SPI 寄存器配置(须在 motor_loop_init/dev_motor_enable 之前)
 	 * CTRL1=0x003C: GAIN=40V/V(D2:D1=10b), DC_CAL=0(正常模式), OCTW=111(默认保护)
 	 *   注: DRV8301 上电默认 DC_CAL=1(校准模式), SO1/SO2 输出固定电压, 电流采样恒为0,
 	 *       必须通过 SPI 写入 CTRL1 清除 DC_CAL 位才能正常采样电流。
