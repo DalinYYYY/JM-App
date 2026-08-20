@@ -304,6 +304,16 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 {
 	if (new_state >= RUN_STATE_MAX || new_state == sys->motor.run_state)
 		return;
+	/* 扫频带有内部时序和 TRACE 点边界，不能在普通参考平滑过渡期间
+	 * 被临时 dispatch，否则会消耗 settle/measure 计数而尚未真正输出
+	 * 扫频参考。直接进入子状态，首个控制周期从相位 0 开始。 */
+	if (new_state == RUN_STATE_TEST_SWEEP_FREQ)
+	{
+		transition_force_complete(&sys->trans_mgr.trans);
+		sys->trans_mgr.target_run_state = new_state;
+		sys->motor.run_state = new_state;
+		return;
+	}
 
 	transition_mgr_on_mode_switch(&sys->trans_mgr, new_state, trans_count, &sys->motor.ref);
 }
@@ -315,6 +325,13 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
  */
 void motor_control_loop(system_state_t *sys)
 {
+	/* 故障保护必须位于参考生成之前；扫频在本周期不得再产生新的激励。 */
+	fault_check(sys);
+	if (sys->top_state == TOP_FSM_FAULT || sys->top_state == TOP_FSM_SAFETY)
+	{
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		return;
+	}
 	/* CALIB 态：周期推进标定，不生成运动参考 */
 	if (sys->top_state == TOP_FSM_CALIB)
 	{
@@ -332,6 +349,13 @@ void motor_control_loop(system_state_t *sys)
 
 	// 运行态：所有过渡策略收敛到 transition_mgr_step
 	transition_mgr_step(&sys->trans_mgr, sys);
+	if (sys->motor.run_state == RUN_STATE_TEST_SWEEP_FREQ &&
+		motor_sweep_is_complete(&sys->motor) &&
+		sys->motor.sweep_finish_pending == 0u)
+	{
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		top_fsm_switch(sys, TOP_FSM_READY);
+	}
 }
 
 /**
@@ -358,6 +382,7 @@ void fault_check(system_state_t *sys)
 			sys->fault_count++;
 		sys->last_fault_code = state_first_fault(new_faults);
 	}
+	motor_sweep_abort(&sys->motor);
 	sys->fault_latched |= active;
 	sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
 	top_fsm_switch(sys, TOP_FSM_FAULT);

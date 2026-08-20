@@ -54,12 +54,19 @@ void motor_observer_on_control_isr(const struct motor_loop_s *loop);
 int motor_observer_snapshot_read(motor_observer_snapshot_t *out);
 
 /* 连续波形(TRACE)后端；行数据按通道位顺序紧凑排列。 */
-#define MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES 128u
-#define MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES 8u
+#ifndef MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES
+#define MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES 512u
+#endif
+/* 扫频高速上传允许每包最多24样本(2通道227B载荷<=256B上限);
+ * 普通 TRACE(0xB9) 上位机仍按 1~8 样本/包配置, 不受影响。 */
+#define MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES 24u
 #define MOTOR_OBSERVER_TRACE_PAYLOAD_MAX 256u
 #define MOTOR_OBSERVER_TRACE_FLAG_OVERFLOW       0x01u
 #define MOTOR_OBSERVER_TRACE_FLAG_DISCONTINUITY  0x02u
 #define MOTOR_OBSERVER_TRACE_FLAG_LAST           0x04u
+#define MOTOR_OBSERVER_TRACE_FLAG_SWEEP          0x08u
+#define MOTOR_OBSERVER_TRACE_FLAG_POINT_START    0x10u
+#define MOTOR_OBSERVER_TRACE_FLAG_POINT_END      0x20u
 
 typedef struct
 {
@@ -77,6 +84,9 @@ int motor_observer_trace_start(uint32_t channel_mask, uint32_t rate_hz,
 		uint8_t packet_samples, float control_hz, uint16_t session_id,
 		motor_observer_trace_status_t *status);
 int motor_observer_trace_stop(void);
+/* 停止写入但保留缓存，最后一包置 LAST 后自动转 STOPPED。 */
+int motor_observer_trace_finish(void);
+int motor_observer_trace_is_busy(void);
 int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len);
 
 #ifdef __cplusplus

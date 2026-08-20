@@ -49,6 +49,16 @@ static void jm_host_commun_trace_service(void)
 {
 	uint8_t body[MOTOR_OBSERVER_TRACE_PAYLOAD_MAX];
 	uint16_t len = 0u;
+#if defined(USE_DEV_COMMUN_UART) && !defined(USE_DEV_COMMUN_CAN)
+	/* UART 独占链路: 单周期循环排空(上限4包), 支撑扫频2k~10kHz采样率
+	 * 的实时上传; 稳态下队列每周期0~1包, 上限仅用于突发排空防溢出。 */
+	uint8_t budget = 4u;
+	while (budget-- > 0u && jm_host_commun_trace_pop(body, &len) != 0)
+	{
+		dev_commun_uart.report(&dev_commun_uart, JM_CMD_TRACE_DATA, body, len);
+	}
+#else
+	/* CAN 链路吞吐受限: 维持单周期单包(高频扫频溢出按 OVERFLOW 标志上报)。 */
 	if (jm_host_commun_trace_pop(body, &len) == 0)
 		return;
 #if defined(USE_DEV_COMMUN_UART)
@@ -56,6 +66,7 @@ static void jm_host_commun_trace_service(void)
 #endif
 #if defined(USE_DEV_COMMUN_CAN)
 	dev_commun_can.report(&dev_commun_can, JM_CMD_TRACE_DATA, body, len);
+#endif
 #endif
 }
 

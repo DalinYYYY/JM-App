@@ -13,8 +13,19 @@
 
 #define MOTOR_OBSERVER_DEG_TO_RAD (0.01745329252f)
 #define MOTOR_OBSERVER_CHANNELS_MAX 8u
+#define MOTOR_OBSERVER_SWEEP_POINTS_MAX 1024u
+#define TRACE_STATE_STOPPED  0u
+#define TRACE_STATE_RUNNING  1u
+#define TRACE_STATE_DRAINING 2u
 #define TRACE_BUFFER_WORDS \
 	(MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES * MOTOR_OBSERVER_CHANNELS_MAX)
+
+typedef struct
+{
+	uint16_t point;
+	uint8_t flags;
+	uint8_t reserved;
+} observer_trace_meta_t;
 
 static motor_observer_snapshot_t s_live[2];
 static volatile uint8_t s_live_index;
@@ -23,6 +34,9 @@ static uint16_t s_live_div_count;
 static uint32_t s_control_tick;
 
 static float s_trace[TRACE_BUFFER_WORDS];
+static observer_trace_meta_t s_trace_meta[MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES];
+static uint32_t s_sweep_phase_inc[MOTOR_OBSERVER_SWEEP_POINTS_MAX];
+static uint32_t s_sweep_freq_mhz[MOTOR_OBSERVER_SWEEP_POINTS_MAX];
 static volatile uint16_t s_trace_read;
 static volatile uint16_t s_trace_write;
 static volatile uint16_t s_trace_count;
@@ -151,8 +165,14 @@ static void observer_trace_write(const motor_loop_t *m)
 	uint16_t write_index;
 	float *dst;
 	uint32_t mask;
+	const motor_ctrl_t *ctrl = &m->sys.motor;
+	observer_trace_meta_t *meta;
 
-	if (s_trace_state != 1u || m->sys.top_state != TOP_FSM_RUN)
+	if (s_trace_state != TRACE_STATE_RUNNING || m->sys.top_state != TOP_FSM_RUN)
+		return;
+	/* Bode 会话只采集 MEASURE 段；普通 TRACE 不受影响。 */
+	if (ctrl->run_state == RUN_STATE_TEST_SWEEP_FREQ &&
+		ctrl->sweep_trace_sample_enable == 0u)
 		return;
 	if (++s_trace_decim_count < s_trace_decim)
 		return;
@@ -169,6 +189,36 @@ static void observer_trace_write(const motor_loop_t *m)
 			MOTOR_OBSERVER_TRACE_FLAG_DISCONTINUITY;
 	}
 	dst = &s_trace[(uint32_t)write_index * s_trace_channels];
+	meta = &s_trace_meta[write_index];
+	meta->point = 0u;
+	meta->flags = 0u;
+	meta->reserved = 0u;
+	if (ctrl->run_state == RUN_STATE_TEST_SWEEP_FREQ &&
+		ctrl->sweep_trace_sample_enable != 0u)
+	{
+		uint16_t point = ctrl->sweep_trace_point;
+		meta->point = point;
+		meta->flags = MOTOR_OBSERVER_TRACE_FLAG_SWEEP;
+		if (point < MOTOR_OBSERVER_SWEEP_POINTS_MAX)
+		{
+			s_sweep_phase_inc[point] = ctrl->sweep_trace_phase_inc;
+			s_sweep_freq_mhz[point] = ctrl->sweep_trace_freq_mhz;
+		}
+		if (s_trace_count == 0u)
+			meta->flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_START;
+		else
+		{
+			uint16_t prev = (uint16_t)((write_index +
+				MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES - 1u) %
+				MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+			if ((s_trace_meta[prev].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) == 0u ||
+				s_trace_meta[prev].point != point)
+			{
+				s_trace_meta[prev].flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_END;
+				meta->flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_START;
+			}
+		}
+	}
 	if ((mask & MOTOR_OBS_ID_REF) != 0u)  *dst++ = m->out.id_ref;
 	if ((mask & MOTOR_OBS_ID) != 0u)      *dst++ = m->motor.foc.i_dq.d;
 	if ((mask & MOTOR_OBS_IQ_REF) != 0u)  *dst++ = m->out.iq_ref;
@@ -190,6 +240,11 @@ void motor_observer_on_control_isr(const struct motor_loop_s *loop)
 		return;
 	s_control_tick++;
 	observer_trace_write(m);
+	if (m->sys.motor.sweep_finish_pending != 0u)
+	{
+		motor_observer_trace_finish();
+		((motor_loop_t *)m)->sys.motor.sweep_finish_pending = 0u;
+	}
 	if (s_live_publish_pending)
 	{
 		s_live_publish_pending = 0u;
@@ -236,12 +291,14 @@ int motor_observer_trace_start(uint32_t channel_mask, uint32_t rate_hz,
 	channels = observer_popcount(channel_mask);
 	if (channels == 0u || (float)rate_hz > control_hz || channels > MOTOR_OBSERVER_CHANNELS_MAX)
 		return -1;
+	if (s_trace_state != TRACE_STATE_STOPPED)
+		return -2;
 	div = (uint16_t)(control_hz / (float)rate_hz + 0.5f);
 	if (div == 0u)
 		div = 1u;
 	primask = __get_PRIMASK();
 	__disable_irq();
-	s_trace_state = 0u;
+	s_trace_state = TRACE_STATE_STOPPED;
 	s_trace_read = 0u;
 	s_trace_write = 0u;
 	s_trace_count = 0u;
@@ -256,8 +313,11 @@ int motor_observer_trace_start(uint32_t channel_mask, uint32_t rate_hz,
 	s_trace_channels = channels;
 	s_trace_packet_samples = packet_samples;
 	s_trace_flags = 0u;
+	memset(s_trace_meta, 0, sizeof(s_trace_meta));
+	memset(s_sweep_phase_inc, 0, sizeof(s_sweep_phase_inc));
+	memset(s_sweep_freq_mhz, 0, sizeof(s_sweep_freq_mhz));
 	__DMB();
-	s_trace_state = 1u;
+	s_trace_state = TRACE_STATE_RUNNING;
 	__set_PRIMASK(primask);
 	if (status != NULL)
 	{
@@ -277,13 +337,41 @@ int motor_observer_trace_stop(void)
 {
 	uint32_t primask = __get_PRIMASK();
 	__disable_irq();
-	s_trace_state = 0u;
+	s_trace_state = TRACE_STATE_STOPPED;
 	s_trace_count = 0u;
 	s_trace_read = 0u;
 	s_trace_write = 0u;
 	__DMB();
 	__set_PRIMASK(primask);
 	return 0;
+}
+
+int motor_observer_trace_finish(void)
+{
+	uint32_t primask = __get_PRIMASK();
+	__disable_irq();
+	if (s_trace_state == TRACE_STATE_RUNNING)
+	{
+		if (s_trace_count > 0u)
+		{
+			uint16_t last = (uint16_t)((s_trace_write +
+				MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES - 1u) %
+				MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+			if ((s_trace_meta[last].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) != 0u)
+				s_trace_meta[last].flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_END;
+			s_trace_state = TRACE_STATE_DRAINING;
+		}
+		else
+			s_trace_state = TRACE_STATE_STOPPED;
+	}
+	__DMB();
+	__set_PRIMASK(primask);
+	return 0;
+}
+
+int motor_observer_trace_is_busy(void)
+{
+	return (s_trace_state != TRACE_STATE_STOPPED) ? 1 : 0;
 }
 
 /* 从环形缓冲取出一包采集数据并打包成协议帧(含包头元数据) */
@@ -295,7 +383,8 @@ int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len)
 	uint8_t channels;
 	uint16_t n = 0u;
 	uint16_t read_index;
-	uint16_t bytes;
+	uint16_t bytes_per_sample;
+	uint16_t max_count;
 	uint32_t seq;
 	uint32_t first;
 	uint32_t session;
@@ -303,27 +392,78 @@ int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len)
 	uint32_t rate;
 	uint32_t overflow;
 	uint32_t primask;
+	uint8_t sweep_packet;
+	uint16_t sweep_point = 0u;
+	uint32_t phase_inc = 0u;
+	uint32_t freq_mhz = 0u;
 	if (out == NULL || out_len == NULL)
 		return -1;
 
-	/* 复制期间保持生产者暂停，避免缓冲区在通信任务读取时被覆盖。
-	 * 批量上限为 8 点×8 通道，临界区固定且不包含协议发送。 */
 	primask = __get_PRIMASK();
 	__disable_irq();
-	if (s_trace_state != 1u || s_trace_count < s_trace_packet_samples)
+	if ((s_trace_state != TRACE_STATE_RUNNING && s_trace_state != TRACE_STATE_DRAINING) ||
+		s_trace_count == 0u)
 	{
+		if (s_trace_state == TRACE_STATE_DRAINING && s_trace_count == 0u)
+			s_trace_state = TRACE_STATE_STOPPED;
 		__set_PRIMASK(primask);
 		return -1;
 	}
-	count = s_trace_packet_samples;
-	channels = s_trace_channels;
-	bytes = (uint16_t)count * (uint16_t)channels * 4u;
-	if ((uint16_t)(25u + bytes) > MOTOR_OBSERVER_TRACE_PAYLOAD_MAX)
-	{
-		__set_PRIMASK(primask);
-		return -1;
-	}
+
 	read_index = s_trace_read;
+	channels = s_trace_channels;
+	bytes_per_sample = (uint16_t)channels * 4u;
+	max_count = s_trace_packet_samples;
+	if (max_count == 0u || (uint16_t)(35u + max_count * bytes_per_sample) >
+		MOTOR_OBSERVER_TRACE_PAYLOAD_MAX)
+		max_count = MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES;
+	count = (s_trace_count < max_count) ? (uint8_t)s_trace_count : (uint8_t)max_count;
+	sweep_packet = ((s_trace_meta[read_index].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) != 0u) ? 1u : 0u;
+	if (sweep_packet)
+	{
+		sweep_point = s_trace_meta[read_index].point;
+		if (sweep_point < MOTOR_OBSERVER_SWEEP_POINTS_MAX)
+		{
+			phase_inc = s_sweep_phase_inc[sweep_point];
+			freq_mhz = s_sweep_freq_mhz[sweep_point];
+		}
+		/* Bode 包不得跨越频点，边界不足固定包长时发送部分包。 */
+		for (i = 1u; i < count; i++)
+		{
+			uint16_t idx = (uint16_t)((read_index + i) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+			if ((s_trace_meta[idx].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) == 0u ||
+				s_trace_meta[idx].point != sweep_point)
+			{
+				count = i;
+				break;
+			}
+		}
+	}
+	if (s_trace_state == TRACE_STATE_RUNNING && !sweep_packet &&
+		count < s_trace_packet_samples)
+	{
+		__set_PRIMASK(primask);
+		return -1;
+	}
+	if (s_trace_state == TRACE_STATE_RUNNING && sweep_packet &&
+		count < max_count)
+	{
+		uint16_t last = (uint16_t)((read_index + count - 1u) %
+			MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+		if ((s_trace_meta[last].flags & MOTOR_OBSERVER_TRACE_FLAG_POINT_END) == 0u)
+		{
+			__set_PRIMASK(primask);
+			return -1;
+		}
+	}
+	bytes_per_sample = (uint16_t)channels * 4u;
+	if ((uint16_t)(25u + (sweep_packet ? 10u : 0u) + count * bytes_per_sample) >
+		MOTOR_OBSERVER_TRACE_PAYLOAD_MAX)
+	{
+		__set_PRIMASK(primask);
+		return -1;
+	}
+
 	session = s_trace_session;
 	seq = s_trace_sequence++;
 	first = s_trace_first_index;
@@ -331,10 +471,22 @@ int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len)
 	mask = s_trace_mask;
 	flags = s_trace_flags;
 	overflow = s_trace_overflow;
+	if (sweep_packet)
+		flags |= (uint8_t)(s_trace_meta[read_index].flags &
+			(MOTOR_OBSERVER_TRACE_FLAG_SWEEP | MOTOR_OBSERVER_TRACE_FLAG_POINT_START));
+	{
+		uint16_t last = (uint16_t)((read_index + count - 1u) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+		if (sweep_packet)
+			flags |= (uint8_t)(s_trace_meta[last].flags & MOTOR_OBSERVER_TRACE_FLAG_POINT_END);
+	}
+	if (s_trace_state == TRACE_STATE_DRAINING && count == s_trace_count)
+		flags |= MOTOR_OBSERVER_TRACE_FLAG_LAST;
 	s_trace_flags = 0u;
 	s_trace_read = (uint16_t)((read_index + count) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
 	s_trace_count = (uint16_t)(s_trace_count - count);
 	s_trace_first_index += count;
+	if (s_trace_state == TRACE_STATE_DRAINING && s_trace_count == 0u)
+		s_trace_state = TRACE_STATE_STOPPED;
 	__DMB();
 
 	observer_wr_u16(&out[n], (uint16_t)session); n += 2u;
@@ -346,10 +498,16 @@ int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len)
 	out[n++] = channels;
 	out[n++] = flags;
 	observer_wr_u32(&out[n], overflow); n += 4u;
+	if (sweep_packet)
+	{
+		observer_wr_u16(&out[n], sweep_point); n += 2u;
+		observer_wr_u32(&out[n], phase_inc); n += 4u;
+		observer_wr_u32(&out[n], freq_mhz); n += 4u;
+	}
 	for (i = 0u; i < count; i++)
 	{
-		memcpy(&out[n], &s_trace[(uint32_t)read_index * channels], bytes / count);
-		n = (uint16_t)(n + bytes / count);
+		memcpy(&out[n], &s_trace[(uint32_t)read_index * channels], bytes_per_sample);
+		n = (uint16_t)(n + bytes_per_sample);
 		read_index = (uint16_t)((read_index + 1u) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
 	}
 	__set_PRIMASK(primask);

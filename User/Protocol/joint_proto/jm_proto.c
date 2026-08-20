@@ -539,6 +539,38 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_read_debug(proto, cmd);
 	}
+	/* TEST_SWEEP_FREQ 0x76: 专用 ACK 与严格长度分支，避免通用 set_mode
+	 * 只能返回单字节状态而丢失 session/点数/时长。 */
+	if (cmd == JM_CMD_TEST_SWEEP_FREQ)
+	{
+		uint8_t out[8];
+		uint16_t out_len = 0u;
+		jm_err_e e;
+		uint8_t enable = (len > 0u) ? (payload[0] & JM_SWEEP_CONTROL_ENABLE) : 0u;
+		uint8_t length_ok = 0u;
+
+		if (len == JM_SWEEP_PAYLOAD_LEN)
+			length_ok = 1u;
+		else if (len == JM_SWEEP_STOP_PAYLOAD_LEN && enable == 0u)
+			length_ok = 1u;
+		else if (len == JM_SWEEP_BIAS_PAYLOAD_LEN)
+			length_ok = 1u;
+		if (!length_ok)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+#if (JM_ENABLE_BODE_SWEEP != 1)
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
+#else
+		if (proto->ops == NULL || proto->ops->test_sweep == NULL)
+			return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
+		e = proto->ops->test_sweep(payload, len, out, &out_len);
+		if (e != JM_ERR_OK)
+			return reply_nack(proto, cmd, e);
+		if (out_len > sizeof(out))
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		reply_set(proto, cmd, out, out_len);
+		return JM_ERR_OK;
+#endif
+	}
 	/* TRACE_CONFIG 0xB9: enable + session + mask + rate + packet + flags。 */
 	if (cmd == JM_CMD_TRACE_CONFIG)
 	{

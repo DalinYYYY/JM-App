@@ -33,6 +33,7 @@
 #include "motor_profile.h"      /* motor_profile_apply_param/info 覆盖电机电气身份 */
 #include "version.h"            /* HW_/APP_ 版本号 */
 #include "motor_loop.h"         /* motor_loop_get / motor_loop_set_cmd */
+#include "motor_mode.h"         /* motor_sweep_configure/abort */
 #include "motor_info.h"         /* motor_info_t / motor_info_init / motor_info_dispatch_read/write */
 #include "motor_info_storage.h" /* motor_info_storage_get: 获取全局 motor_info 句柄 */
 #include "motor_info_calib.h"   /* motor_info_calib_reset_for_recalibration: 0xEC 命令实现 */
@@ -239,10 +240,168 @@ static int app_mode_is_supported(uint8_t cmd)
 		case JM_CMD_CALIB_LEVEL7:
 		case JM_CMD_CALIB_ABORT:
 		case JM_CMD_CLEAR_FAULT:
+		case JM_CMD_TEST_SWEEP_FREQ:
 			return 1;
 		default:
 			return 0;
 	}
+}
+
+static uint16_t s_sweep_session_id;
+
+static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
+	uint8_t *out, uint16_t *out_len)
+{
+	motor_loop_t *loop = motor_loop_get();
+	motor_ctrl_t *ctrl = &loop->sys.motor;
+	motor_sweep_config_t cfg;
+	motor_observer_trace_status_t trace_status;
+	uint16_t point_count = 0u;
+	uint32_t duration_x100 = 0u;
+	uint32_t control_hz;
+	uint32_t rate_hz;
+	uint32_t rate_min_hz;
+	uint32_t channel_mask;
+	uint8_t control;
+	uint32_t primask;
+
+	if (pl == NULL || out == NULL || out_len == NULL || len == 0u)
+		return JM_ERR_LENGTH;
+	control = pl[0];
+	if ((control & JM_SWEEP_CONTROL_ENABLE) == 0u)
+	{
+		primask = __get_PRIMASK();
+		__disable_irq();
+		motor_sweep_abort(ctrl);
+		__set_PRIMASK(primask);
+		motor_observer_trace_finish();
+		motor_loop_set_cmd(CONTROL_MODE_STOP);
+		*out_len = 0u;
+		return JM_ERR_OK;
+	}
+	if (loop->sys.top_state != TOP_FSM_READY ||
+		motor_sweep_is_active(ctrl) || motor_observer_trace_is_busy())
+		return (motor_sweep_is_active(ctrl) || motor_observer_trace_is_busy()) ?
+			JM_ERR_BUSY : JM_ERR_STATE_DENY;
+	if (len == JM_SWEEP_PAYLOAD_LEN)
+	{
+		cfg.test_mode = (uint8_t)((control & JM_SWEEP_CONTROL_TEST_MODE_MASK) >> 4);
+		cfg.sweep_mode = (uint8_t)((control & JM_SWEEP_CONTROL_SWEEP_MASK) >> 2);
+		cfg.flags = (uint8_t)(control & JM_SWEEP_CONTROL_FLAGS_MASK);
+		cfg.point_cfg = pl[1];
+		cfg.f_start_x10 = jm_rd_u16(&pl[2]);
+		cfg.f_end_x10 = jm_rd_u16(&pl[4]);
+		cfg.amp_raw = jm_rd_u16(&pl[6]);
+		cfg.bias_raw = 0;
+	}
+	else if (len == JM_SWEEP_BIAS_PAYLOAD_LEN &&
+		jm_rd_u16(&pl[10]) == JM_SWEEP_BIAS_FORMAT_TAG)
+	{
+		cfg.test_mode = (uint8_t)((control & JM_SWEEP_CONTROL_TEST_MODE_MASK) >> 4);
+		cfg.sweep_mode = (uint8_t)((control & JM_SWEEP_CONTROL_SWEEP_MASK) >> 2);
+		cfg.flags = (uint8_t)(control & JM_SWEEP_CONTROL_FLAGS_MASK);
+		cfg.point_cfg = pl[1];
+		cfg.f_start_x10 = jm_rd_u16(&pl[2]);
+		cfg.f_end_x10 = jm_rd_u16(&pl[4]);
+		cfg.amp_raw = jm_rd_u16(&pl[6]);
+		cfg.bias_raw = (int16_t)jm_rd_u16(&pl[8]);
+	}
+#if (JM_SWEEP_LEGACY_FLOAT_COMPAT == 1)
+	else if (len == JM_SWEEP_LEGACY_PAYLOAD_LEN)
+	{
+		float f_start = jm_rd_f32(&pl[0]);
+		float f_end = jm_rd_f32(&pl[4]);
+		float amp = jm_rd_f32(&pl[8]);
+		if (!app_float_is_finite(f_start) || !app_float_is_finite(f_end) ||
+			!app_float_is_finite(amp) || f_start < 0.1f || f_end < f_start ||
+			f_end > 6553.5f || amp <= 0.0f || amp > 65.535f)
+			return JM_ERR_OUT_OF_RANGE;
+		memset(&cfg, 0, sizeof(cfg));
+		cfg.test_mode = JM_SWEEP_TEST_TORQUE_TO_VELOCITY;
+		cfg.sweep_mode = JM_SWEEP_MODE_LOG;
+		cfg.point_cfg = 10u;
+		cfg.f_start_x10 = (uint16_t)(f_start * 10.0f + 0.5f);
+		cfg.f_end_x10 = (uint16_t)(f_end * 10.0f + 0.5f);
+		cfg.amp_raw = (uint16_t)(amp * 1000.0f + 0.5f);
+		cfg.bias_raw = 0;
+	}
+#endif
+	else
+		return JM_ERR_LENGTH;
+	if (cfg.test_mode > JM_SWEEP_TEST_POSITION_TO_POSITION ||
+		cfg.sweep_mode > JM_SWEEP_MODE_STEP || cfg.flags != 0u)
+		return JM_ERR_OUT_OF_RANGE;
+
+	s_sweep_session_id++;
+	if (s_sweep_session_id == 0u)
+		s_sweep_session_id = 1u;
+	cfg.session_id = s_sweep_session_id;
+	control_hz = (uint32_t)(1.0f / loop->current.dt + 0.5f);
+	/* 高速上传采样策略: 电流环对象不低于5kHz, 速度/位置对象不低于2kHz,
+	 * 同时保底 f_end 的20倍采样; 超过控制频率时钳制到控制频率。 */
+	rate_min_hz = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ?
+		5000u : 2000u;
+	rate_hz = (uint32_t)((float)cfg.f_end_x10 * 0.1f * 20.0f + 0.5f);
+	if (rate_hz < rate_min_hz)
+		rate_hz = rate_min_hz;
+	if (rate_hz > control_hz)
+		rate_hz = control_hz;
+	if (rate_hz < (uint32_t)((float)cfg.f_end_x10 * 0.1f * 10.0f + 0.5f))
+		return JM_ERR_OUT_OF_RANGE;
+	channel_mask = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ?
+		(MOTOR_OBS_IQ_REF | MOTOR_OBS_IQ) :
+		((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION) ?
+		(MOTOR_OBS_VEL_REF | MOTOR_OBS_POS) :
+		((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_VELOCITY) ?
+		(MOTOR_OBS_VEL_REF | MOTOR_OBS_VEL) :
+		((cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION) ?
+		(MOTOR_OBS_POS_REF | MOTOR_OBS_POS) :
+		(MOTOR_OBS_IQ_REF | MOTOR_OBS_VEL))));
+	/* 每包24样本(2通道227B载荷): 降低包率, 使2k~10kHz采样率下
+	 * 1ms通信周期+阻塞串口发送也能满足实时排空。 */
+	if (motor_observer_trace_start(channel_mask, rate_hz, 24u,
+		1.0f / loop->current.dt, cfg.session_id, &trace_status) != 0)
+		return motor_observer_trace_is_busy() ? JM_ERR_BUSY : JM_ERR_OUT_OF_RANGE;
+	if (motor_sweep_configure(ctrl, &cfg, &point_count, &duration_x100) != 0)
+	{
+		motor_observer_trace_stop();
+		return JM_ERR_OUT_OF_RANGE;
+	}
+	/* 频点表预计算包含 log10f/powf，必须在开中断状态完成。这里只对
+	 * READY 复核和顶层状态切换做短临界区保护。 */
+	primask = __get_PRIMASK();
+	__disable_irq();
+	if (loop->sys.top_state != TOP_FSM_READY)
+	{
+		motor_sweep_abort(ctrl);
+		__set_PRIMASK(primask);
+		motor_observer_trace_stop();
+		return JM_ERR_STATE_DENY;
+	}
+	/* 位置相关扫频前复位多圈零点: 前序速度/电流扫频累计的大量圈数
+	 * 会使位置反馈带巨大直流偏置(mode 3 波形失真, mode 5 位置环
+	 * 猛拉回零), 复位后位置反馈从当前物理位置重新起算。
+	 * 此时电机 READY 静止, 临界区内复位无并发风险。 */
+	if (cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION ||
+		cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION)
+	{
+		multiturn_t *mt = &loop->motor.multiturn;
+		if (mt->reset_position != NULL)
+			mt->reset_position(mt);
+	}
+	motor_loop_set_cmd(CONTROL_MODE_TEST_SWEEP_FREQ);
+	__set_PRIMASK(primask);
+	if (loop->sys.top_state != TOP_FSM_RUN)
+	{
+		motor_sweep_abort(ctrl);
+		motor_observer_trace_finish();
+		return JM_ERR_STATE_DENY;
+	}
+	jm_wr_u16(&out[0], cfg.session_id);
+	jm_wr_u16(&out[2], point_count);
+	jm_wr_u32(&out[4], duration_x100);
+	*out_len = 8u;
+	return JM_ERR_OK;
 }
 
 static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
@@ -254,6 +413,9 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 
 	if (!app_mode_is_supported(cmd))
 		return JM_ERR_NOT_SUPPORTED;
+	if (cmd != JM_CMD_TEST_SWEEP_FREQ &&
+		motor_sweep_is_active(&motor_loop_get()->sys.motor))
+		motor_sweep_abort(&motor_loop_get()->sys.motor);
 
 	/* 双通道临界区: 保护 motor_cmd 字段写入 + 状态机切换的原子性,
 	 * 防止 UART(通信线程) 和 CAN(ISR) 并发调用 app_set_mode 导致状态混乱。
@@ -1158,13 +1320,18 @@ static jm_err_e app_trace_config(uint8_t enable, uint16_t session_id,
 		return JM_ERR_STATE_DENY;
 	if (!enable)
 	{
+		if (motor_sweep_is_active(&motor_loop_get()->sys.motor))
+			return JM_ERR_BUSY;
 		motor_observer_trace_stop();
 		*out_len = 0u;
 		return JM_ERR_OK;
 	}
+	if (motor_observer_trace_is_busy() ||
+		motor_sweep_is_active(&motor_loop_get()->sys.motor))
+		return JM_ERR_BUSY;
 	if (motor_observer_trace_start(channel_mask, rate_hz, packet_samples,
 		1.0f / loop->current.dt, session_id, &status) != 0)
-		return JM_ERR_OUT_OF_RANGE;
+		return motor_observer_trace_is_busy() ? JM_ERR_BUSY : JM_ERR_OUT_OF_RANGE;
 	jm_wr_u16(&out[0], status.session_id);
 	jm_wr_u32(&out[2], status.actual_rate_hz);
 	out[6] = status.packet_samples;
@@ -1512,6 +1679,7 @@ static jm_err_e app_motor_info_recalib_reset(void)
  * ==========================================================================*/
 static const jm_proto_ops_t s_app_ops = {
 	.set_mode = app_set_mode,
+	.test_sweep = app_test_sweep,
 	.get_feedback = app_get_feedback,
 	.param_read = app_param_read,
 	.param_write = app_param_write,

@@ -93,9 +93,27 @@ DATA = DB 0F C9 3F   (1.57f 小端, 4字节)
 | 0x51 | CUBIC_SPLINE | 请求 18B |
 | 0x52 | TRAPEZOIDAL_TRAJ | 请求 12B |
 | 0x53 | S_CURVE_TRAJ | 请求 16B |
-| 0x76 | TEST_SWEEP_FREQ | 请求 12B |
+| 0x76 | TEST_SWEEP_FREQ | 新格式请求 12B 整数（含直流偏置）；UART优先，经典 CAN 复用已有分包；8B整数格式兼容，旧12B浮点格式可选兼容 |
 
-> 不在白名单的命令在 CAN 上请求方向仅支持 ≤8B 单帧。CSV 备注列标注「CAN需分包」的命令中，请求方向需多帧的（如 0x31/0x50/0xA0/0xB9/0xE1 等）应在此清单内；仅应答方向需多帧的（如 0xBA/0xCA/0xD0/0xD1/0xE8）不在清单中是正常的，由 `can_emit_payload` 自动分包。0xC9 仅保留空载荷通用调试查询，不再承载波形数据。
+> 不在白名单的命令在 CAN 上请求方向仅支持 ≤8B 单帧。CSV 备注列标注「CAN需分包」的命令中，请求方向需多帧的命令应在此清单内；仅应答方向需多帧的命令由 `can_emit_payload` 自动分包。0x76 新整数格式为 12B，UART优先使用；经典 CAN 请求复用已有多帧分包，8B整数格式保留兼容。0xC9 仅保留空载荷通用调试查询，不再承载波形数据。
+
+### 0x76 直流偏置扫频格式
+
+12 字节整数启动载荷如下，小端编码：
+
+| 偏移 | 长度 | 字段 | 说明 |
+|---:|---:|---|---|
+| 0 | 1 | `control` | bit7 enable；bit6..4 测试模式；bit3..2 线性/对数；bit1..0 必须为 0 |
+| 1 | 1 | `point_cfg` | 对数模式为点/十倍频，线性模式为总点数 |
+| 2 | 2 | `f_start_x10` | 起始频率，0.1 Hz |
+| 4 | 2 | `f_end_x10` | 结束频率，0.1 Hz |
+| 6 | 2 | `amp_raw` | 扰动幅值，模式相关定标 |
+| 8 | 2 | `bias_raw` | 有符号直流偏置，模式相关定标 |
+| 10 | 2 | `format_tag` | 固定 `0xB076`，用于区分新12B整数格式和旧12B浮点格式 |
+
+幅值和偏置定标：力矩/电流模式为 `0.001`，速度模式为 `0.01`。例如速度环工作点 `10 rad/s`、扰动幅值 `0.5 rad/s` 时，`bias_raw=1000`、`amp_raw=50`。
+
+新增测试模式 `4: VELOCITY_TO_VELOCITY`：速度参考为 `bias + sweep`，输出采集 `VEL`，用于闭环速度环工作点频响；模式 3 仍为 `VELOCITY_TO_POSITION`。8B整数格式不携带偏置，按 `bias=0` 处理。
 
 ## 4. MIT 控制帧定点压缩（0x13 / 0x30，CAN 专用 8 字节）
 
@@ -218,7 +236,7 @@ CSV 描述应答为 `{hw_ver:u32;fw_ver:u32;uid:bytes12}`（20B），实际固�
 | 0xB7 | HIGH_SPEED_DAQ | 旧版命令，返回 NOT_SUPPORTED |
 | 0xB8 | SINGLE_STEP | 占位：仅切状态 |
 | 0xB9 | TRACE_CONFIG | 配置/停止高速 TRACE：`enable:u8 + session:u16 + mask:u32 + rate:u32 + packet_samples:u8 + flags:u8`；ACK 返回 session、实际采样率、实际打包点数和缓冲容量。LIVE 与 TRACE 配置相互独立 |
-| 0xBA | TRACE_DATA | 设备主动批量上报，无逐包 ACK；固定头25B含 session、sequence、first_sample_index、actual_rate、mask、count、channels、flags、overflow_count，之后为通道位序排列的 float32 样本；控制/ACK > LIVE > TRACE，TRACE 溢出丢旧保新并置 DISCONTINUITY |
+| 0xBA | TRACE_DATA | 设备主动批量上报，无逐包 ACK；固定头25B含 session、sequence、first_sample_index、actual_rate、mask、count、channels、flags、overflow_count，之后为通道位序排列的 float32 样本。`flags&SWEEP` 时追加 `sweep_point:u16 + phase_inc:u32 + f_actual_mHz:u32`（10B），且单包不跨频点；控制/ACK > LIVE > TRACE，TRACE 溢出丢旧保新并置 DISCONTINUITY |
 | 0xD2 | HEARTBEAT | 占位：仅被动应答，未实现主动周期上报 |
 
 ### 11.2 安全隐患（量产前必须补全）

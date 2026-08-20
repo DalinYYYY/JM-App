@@ -83,6 +83,28 @@ typedef struct
 	motor_pid_profile_id_e vel_profile; // 速度环参数配置文件
 } motor_ref_t;
 
+typedef enum
+{
+	MOTOR_SWEEP_STATE_IDLE = 0,
+	MOTOR_SWEEP_STATE_SETTLE,
+	MOTOR_SWEEP_STATE_MEASURE,
+	MOTOR_SWEEP_STATE_DONE,
+	MOTOR_SWEEP_STATE_ABORTED
+} motor_sweep_state_e;
+
+typedef struct
+{
+	uint8_t test_mode;
+	uint8_t sweep_mode;
+	uint8_t point_cfg;
+	uint8_t flags;
+	uint16_t f_start_x10;
+	uint16_t f_end_x10;
+	uint16_t amp_raw;
+	int16_t bias_raw;
+	uint16_t session_id;
+} motor_sweep_config_t;
+
 /**
  * @brief 电机控制核心
  * @details 仅负责运行模式管理与参考目标生成，不包含任何环路计算。
@@ -97,9 +119,30 @@ typedef struct
 	motor_ref_t ref; // 对外参考输出（唯一）
 	float dt;		 // 控制周期(s)
 
-	/* 测试模式运行时状态（避免 static 变量导致的重入性问题）*/
-	float test_phase; /* 扫频测试相位累计 */
-	float test_freq;  /* 扫频测试当前频率 */
+	/* 扫频测试运行时状态（实例化，禁止文件级 static 运行态） */
+	motor_sweep_state_e sweep_state;
+	uint8_t sweep_active;
+	uint8_t sweep_test_mode;
+	uint8_t sweep_mode;
+	uint8_t sweep_trace_sample_enable;
+	uint8_t sweep_trace_flags;
+	uint8_t sweep_finish_pending;
+	uint16_t sweep_session_id;
+	uint16_t sweep_point;
+	uint16_t sweep_point_count;
+	uint16_t sweep_trace_point;
+	uint32_t sweep_phase_acc;
+	uint32_t sweep_phase_inc;
+	uint32_t sweep_trace_phase_inc;
+	uint32_t sweep_trace_freq_mhz;
+	uint32_t sweep_state_ticks;
+	uint32_t sweep_settle_ticks;
+	uint32_t sweep_measure_ticks;
+	uint32_t sweep_total_ticks;
+	float sweep_amp;
+	float sweep_bias;
+	uint32_t sweep_phase_inc_table[1024];
+	uint32_t sweep_freq_mhz_table[1024];
 } motor_ctrl_t;
 
 /**
@@ -117,5 +160,12 @@ void motor_ctrl_init(motor_ctrl_t *ctrl, motor_param_t *param, float dt);
  *          状态机模块只需调用本函数，无需感知具体控制实现。
  */
 void motor_ctrl_dispatch(motor_ctrl_t *ctrl);
+
+/* 扫频配置在通信线程调用，逐拍参考生成由 motor_ctrl_dispatch 调用。 */
+int motor_sweep_configure(motor_ctrl_t *ctrl, const motor_sweep_config_t *cfg,
+	uint16_t *point_count, uint32_t *duration_x100);
+void motor_sweep_abort(motor_ctrl_t *ctrl);
+int motor_sweep_is_active(const motor_ctrl_t *ctrl);
+int motor_sweep_is_complete(const motor_ctrl_t *ctrl);
 
 #endif /* __MOTOR_CONTROL_H__ */

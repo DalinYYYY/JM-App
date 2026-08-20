@@ -50,6 +50,7 @@
 /* 单个 dev_motor 虚拟对象的自引用指针：供无参 FOC 回调访问模型。
  * 工程仅 DEV_MOTOR_1 一路电机，单实例足够。 */
 static dev_motor_t *s_virtual_self = NULL;
+static float s_virtual_mt_offset = 0.0f; /* 虚拟多圈零点偏移(rad) */
 
 /* 反 Clarke 用等幅值系数：由 dq 电流生成模型三相电流（供真实 foc.c 的 clarke 复用） */
 #define VIRT_SQRT3_BY_2 0.8660254037844386f
@@ -211,7 +212,8 @@ static float virt_multiturn_update(struct multiturn *mt, const float *gear_angle
 	(void)count;
 	if (m == NULL)
 		return 0.0f;
-	mt->position = m->model.theta_m; /* 连续累计机械角(rad) 即多圈位置 */
+	/* 连续累计机械角(rad) 减去零点偏移即多圈位置（支持运行时零点复位） */
+	mt->position = m->model.theta_m - s_virtual_mt_offset;
 	mt->multiturn_position = mt->position;
 	mt->turns = (int32_t)(mt->position / (2.0f * 3.14159265358979f));
 	return mt->position;
@@ -226,6 +228,16 @@ static float virt_multiturn_update_single(struct multiturn *mt, float mechanical
 static float virt_multiturn_get_position(struct multiturn *mt)
 {
 	return mt->position;
+}
+
+static void virt_multiturn_reset_position(struct multiturn *mt)
+{
+	dev_motor_t *m = s_virtual_self;
+	(void)mt;
+	if (m == NULL)
+		return;
+	/* 虚拟多圈位置每拍由物理模型 theta_m 覆盖, 置零必须记偏移量 */
+	s_virtual_mt_offset = m->model.theta_m;
 }
 
 /*============================================================================
@@ -323,6 +335,7 @@ void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
 	pobj->multiturn.update = virt_multiturn_update;
 	pobj->multiturn.update_single = virt_multiturn_update_single;
 	pobj->multiturn.get_position = virt_multiturn_get_position;
+	pobj->multiturn.reset_position = virt_multiturn_reset_position;
 
 	s_virtual_self = pobj;
 }

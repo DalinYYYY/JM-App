@@ -47,6 +47,9 @@ extern "C"
 #define JM_TRACE_FLAG_OVERFLOW       0x01u
 #define JM_TRACE_FLAG_DISCONTINUITY  0x02u
 #define JM_TRACE_FLAG_LAST            0x04u
+#define JM_TRACE_FLAG_SWEEP           0x08u
+#define JM_TRACE_FLAG_POINT_START     0x10u
+#define JM_TRACE_FLAG_POINT_END       0x20u
 
 	/* ---------------- 实时反馈数据(读命令的数据源) ---------------- */
 	typedef struct
@@ -84,6 +87,11 @@ extern "C"
 		/* 设置控制模式并下发目标(CMD 0x00~0xB8)。payload/len 为该命令的原始载荷,
 		 * 协议层已用小端助手解析的责任留给应用; 也可在此直接按 cmd 解析。*/
 		jm_err_e (*set_mode)(uint8_t cmd, const uint8_t *payload, uint16_t len);
+
+		/* Bode 扫频专用分发(CMD 0x76): 成功启动时写入 ACK{session:u16,
+		 * point_count:u16,duration_x100:u32}; 停止命令 ACK 为空。 */
+		jm_err_e (*test_sweep)(const uint8_t *payload, uint16_t len,
+		                       uint8_t *out, uint16_t *out_len);
 
 		/* 读实时反馈: 应用填充 fb。 */
 		jm_err_e (*get_feedback)(jm_feedback_t *fb);

@@ -37,7 +37,7 @@ extern "C"
 	/* 主版本: 不兼容变更(命令码重排/载荷语义改); 次版本: 兼容追加(新命令/新字段);
 	 * 补丁: bug 修复。0xD0 READ_DEV_INFO 应答(FD 模式)携带此版本号。 */
 #define JM_PROTO_VERSION_MAJOR 1
-#define JM_PROTO_VERSION_MINOR 2 /* 1.2: LIVE/TRACE 双数据流, TRACE 主动批量上报 */
+#define JM_PROTO_VERSION_MINOR 4 /* 1.4: 0x76偏置扫频12B整数载荷 + 速度闭环模式 */
 #define JM_PROTO_VERSION_PATCH 0
 #define JM_PROTO_VERSION       ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
 
@@ -52,11 +52,49 @@ extern "C"
 #define JM_FEAT_DUAL_ARB       (1u << 4)
 #define JM_FEAT_CAN_LOSS_TIMER (1u << 5)
 
+#ifndef JM_ENABLE_BODE_SWEEP
+#define JM_ENABLE_BODE_SWEEP 1
+#endif
+#ifndef JM_SWEEP_LEGACY_FLOAT_COMPAT
+#define JM_SWEEP_LEGACY_FLOAT_COMPAT 1
+#endif
+
 #if defined(USE_CAN_FD_MODE) && (USE_CAN_FD_MODE == 1)
+#if (JM_ENABLE_BODE_SWEEP == 1)
 #define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
 #else
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER)
 #endif
+#else
+#if (JM_ENABLE_BODE_SWEEP == 1)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
+#else
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER)
+#endif
+#endif
+
+/* 0x76 TEST_SWEEP_FREQ: 12B主格式为 control + point_cfg + f_start_x10 +
+ * f_end_x10 + amp_raw + bias_raw:i16 + format_tag:u16；8B无偏置格式兼容。
+ * 停止可使用 1 字节 control。 */
+#define JM_SWEEP_PAYLOAD_LEN              8u
+#define JM_SWEEP_BIAS_PAYLOAD_LEN        12u
+#define JM_SWEEP_STOP_PAYLOAD_LEN        1u
+#define JM_SWEEP_LEGACY_PAYLOAD_LEN     12u
+#define JM_SWEEP_BIAS_FORMAT_TAG      0xB076u
+#define JM_SWEEP_CONTROL_ENABLE          0x80u
+#define JM_SWEEP_CONTROL_TEST_MODE_MASK  0x70u
+#define JM_SWEEP_CONTROL_SWEEP_MASK      0x0Cu
+#define JM_SWEEP_CONTROL_FLAGS_MASK      0x03u
+#define JM_SWEEP_TEST_TORQUE_TO_VELOCITY 0u
+#define JM_SWEEP_TEST_CURRENT_TO_VELOCITY 1u
+#define JM_SWEEP_TEST_CURRENT_TO_CURRENT  2u
+#define JM_SWEEP_TEST_VELOCITY_TO_POSITION 3u
+#define JM_SWEEP_TEST_VELOCITY_TO_VELOCITY 4u
+#define JM_SWEEP_TEST_POSITION_TO_POSITION 5u /* 方向二: 位置环闭环验证 */
+#define JM_SWEEP_MODE_LINEAR              0u
+#define JM_SWEEP_MODE_LOG                 1u
+#define JM_SWEEP_MODE_STEP                2u  /* 1Hz固定步进, 频点数由起止频率决定 */
+#define JM_SWEEP_MAX_POINTS            1024u
 
 	/* ===================== 命令码 CMD ===================== */
 	typedef enum

@@ -17,3 +17,4 @@
 | 1.1.4 | 2026-08-07 | docs+build | 更新 readme 与协议文档（移除 VESC/SerialStudio 引用）、Keil 工程移除 vesc_proto 头文件路径 |
 | 1.1.5 | 2026-08-07 | chore | 同步 pyqt_gui 子模块至 TRACE 主动波形适配版本；清理本地计划/HTML 模式文档并加入 .gitignore，整理 jm_cmd_def.h 注释对齐 |
 | 1.2.0 | 2026-08-14 | feat | motor_info 增加片外 EEPROM 双备份存储（AT24C16，上电优先加载）与 Flash 磨损均衡写入次数保护；新增 SFOC_V2 板级支持；协议新增 EEPROM/写限错误码；同步 pyqt_gui 固化通知与 SFOC_V2 驱动（次版本升级） |
+| 1.3.0 | 2026-08-14 | feat | 新增 Bode 扫频测试：0x76 改造为偏置扫频 12B 整数载荷（control/point_cfg/起止频率/幅值/偏置/格式标签），支持力矩→速度/电流→速度/电流→电流/速度→位置/速度→速度/位置→位置 6 种闭环模式；多圈零点复位接口；TRACE 扩展 512 样本缓冲与 SWEEP/POINT_START/POINT_END 标志，UART 链路单周期 4 包排空支撑 2k~10kHz 上传；协议升至 1.4（次版本升级） |

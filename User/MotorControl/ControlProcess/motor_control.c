@@ -90,8 +90,7 @@ void motor_ctrl_init(motor_ctrl_t *ctrl, motor_param_t *param, float dt)
 	ctrl->ref.pos_profile = MOTOR_PID_PROFILE_POSITION;
 	ctrl->ref.vel_profile = MOTOR_PID_PROFILE_VELOCITY;
 
-	ctrl->test_phase = 0.0f;
-	ctrl->test_freq = 1.0f;
+	ctrl->sweep_state = MOTOR_SWEEP_STATE_IDLE;
 }
 
 /**
