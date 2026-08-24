@@ -59,6 +59,10 @@ static void apply_stop_cmd(system_state_t *sys)
 			sys->motor.cmd.id = 0.0f;
 			sys->motor.cmd.iq = 0.0f;
 			break;
+		case RUN_STATE_PASSIVE_TORQUE:
+			/* 被动恒转矩: 制动转矩归零, 电机随被测电机自由旋转 */
+			sys->motor.load_sim.t_set = 0.0f;
+			break;
 		default:
 			break;
 	}
@@ -78,6 +82,7 @@ bool transition_mgr_on_stop(transition_mgr_t *mgr, system_state_t *sys)
 		case RUN_STATE_VELOCITY:
 		case RUN_STATE_TORQUE:
 		case RUN_STATE_CURRENT:
+		case RUN_STATE_PASSIVE_TORQUE: /* REF_CTRL_TORQUE 输出, 支持转矩渐减 */
 			break;
 		default:
 			return false;

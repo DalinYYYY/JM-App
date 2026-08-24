@@ -48,6 +48,7 @@ GROUP_STRUCT_NAMES = {
     'ImpedanceControl': ('impedance_ctrl_t', 'impedance_ctrl'),
     'ThermalConfig':    ('thermal_model_t', 'thermal_model'),
     'Protection':       ('protection_param_t', 'protection_param'),
+    'LoadSimConfig':    ('load_sim_param_t', 'load_sim_param'),
 }
 
 GROUP_COMMENTS = {
@@ -62,6 +63,7 @@ GROUP_COMMENTS = {
     'ImpedanceControl': '阻抗控制参数',
     'ThermalConfig':    '热模型参数',
     'Protection':       '保护参数配置',
+    'LoadSimConfig':    '负载模拟参数',
 }
 
 GROUP_COMMENTS_EN = {
@@ -76,6 +78,7 @@ GROUP_COMMENTS_EN = {
     'ImpedanceControl': 'Impedance Control',
     'ThermalConfig':    'Thermal Model',
     'Protection':       'Protection Config',
+    'LoadSimConfig':    'Load Simulation Config',
 }
 
 # CSV 必需列

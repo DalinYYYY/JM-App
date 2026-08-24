@@ -47,8 +47,8 @@
 #include "led_manager.h"
 #endif
 #if defined(USE_DEV_COMMUN_CAN)
-#include "dev_commun_can.h"     /* dev_commun_can: 0xF3 SET_FD_MODE 切换运行期FD模式 */
-#include "jm_proto_can.h"       /* jm_proto_can_set_fd_mode */
+#include "dev_commun_can.h" /* dev_commun_can: 0xF3 SET_FD_MODE 切换运行期FD模式 */
+#include "jm_proto_can.h"   /* jm_proto_can_set_fd_mode */
 #endif
 
 #if defined(USE_DEV_FLASH)
@@ -63,11 +63,11 @@ motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *c
  *   开发期默认关闭 (JM_CAN_AUTH_ENABLE=0 时速率限制也关闭, 便于调试)
  * ==========================================================================*/
 #if defined(JM_RATE_LIMIT_ENABLE) && (JM_RATE_LIMIT_ENABLE == 1)
-#define JM_RATE_MIN_INTERVAL_PARAM_WRITE_MS   100u  /* 0xE1 PARAM_WRITE: 100ms (10Hz) */
-#define JM_RATE_MIN_INTERVAL_PARAM_SAVE_MS    1000u /* 0xE4 PARAM_SAVE: 1s (防 Flash 频繁擦写) */
-#define JM_RATE_MIN_INTERVAL_CALIB_MS         2000u /* 0x90~0x96 CALIB: 2s (防并发启动) */
-#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_W_MS  0u   /* 0xE7/0xE9 MOTOR_INFO_WRITE: 只写 RAM 不耗 Flash/EEPROM, 不限制(支持上位机批量改参) */
-#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS  1000u /* 0xEA MOTOR_INFO_SAVE: 1s (防 Flash 频繁擦写) */
+#define JM_RATE_MIN_INTERVAL_PARAM_WRITE_MS  100u  /* 0xE1 PARAM_WRITE: 100ms (10Hz) */
+#define JM_RATE_MIN_INTERVAL_PARAM_SAVE_MS   1000u /* 0xE4 PARAM_SAVE: 1s (防 Flash 频繁擦写) */
+#define JM_RATE_MIN_INTERVAL_CALIB_MS        2000u /* 0x90~0x96 CALIB: 2s (防并发启动) */
+#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_W_MS 0u    /* 0xE7/0xE9 MOTOR_INFO_WRITE: 只写 RAM 不耗 Flash/EEPROM, 不限制(支持上位机批量改参) */
+#define JM_RATE_MIN_INTERVAL_MOTOR_INFO_S_MS 1000u /* 0xEA MOTOR_INFO_SAVE: 1s (防 Flash 频繁擦写) */
 
 static uint32_t s_last_tick_param_write = 0;
 static uint32_t s_last_tick_param_save = 0;
@@ -88,10 +88,10 @@ static int jm_rate_check(uint32_t *last_tick, uint32_t min_interval_ms)
 	return 1; /* 允许 */
 }
 
-#define JM_RATE_CHECK(last_tick_ptr, min_ms)  jm_rate_check((last_tick_ptr), (min_ms))
+#define JM_RATE_CHECK(last_tick_ptr, min_ms) jm_rate_check((last_tick_ptr), (min_ms))
 #else
-#define JM_RATE_CHECK(last_tick_ptr, min_ms)  (1) /* 速率限制关闭, 始终允许 */
-#endif /* JM_RATE_LIMIT_ENABLE */
+#define JM_RATE_CHECK(last_tick_ptr, min_ms) (1) /* 速率限制关闭, 始终允许 */
+#endif                                           /* JM_RATE_LIMIT_ENABLE */
 
 /* PID DEBUG 会话：A1 首次进入时保存 source/profile；A2 作为心跳续租。
  * 通信中断、STOP/DISABLE 或 2s 无心跳都会恢复快照并让电机回到 IDLE。 */
@@ -135,8 +135,7 @@ void jm_app_pid_debug_poll(void)
 	if (!s_pid_debug.active)
 		return;
 	top_state = motor_loop_get()->sys.top_state;
-	if (top_state == TOP_FSM_FAULT || top_state == TOP_FSM_SAFETY ||
-		(uint32_t)(HAL_GetTick() - s_pid_debug.last_heartbeat) > 2000u)
+	if (top_state == TOP_FSM_FAULT || top_state == TOP_FSM_SAFETY || (uint32_t)(HAL_GetTick() - s_pid_debug.last_heartbeat) > 2000u)
 		app_pid_debug_abort();
 }
 
@@ -172,7 +171,7 @@ static void app_pid_debug_begin(void)
  *     0xEA MOTOR_INFO_SAVE    ✗ TODO
  * ==========================================================================*/
 #if defined(JM_CAN_AUTH_ENABLE) && (JM_CAN_AUTH_ENABLE == 1)
-#define JM_AUTH_CHECK(value_ptr, len_var)  jm_auth_check((value_ptr), (len_var))
+#define JM_AUTH_CHECK(value_ptr, len_var) jm_auth_check((value_ptr), (len_var))
 static int jm_auth_check(const uint8_t *value, uint16_t len)
 {
 	if (len < 4)
@@ -182,11 +181,15 @@ static int jm_auth_check(const uint8_t *value, uint16_t len)
 }
 /* 鉴权通过后, 跳过前 4 字节令牌, 实际载荷从 value+4 开始 */
 #define JM_AUTH_SKIP(value_ptr, len_var) \
-	do { (value_ptr) += 4; (len_var) -= 4; } while (0)
+	do                                   \
+	{                                    \
+		(value_ptr) += 4;                \
+		(len_var) -= 4;                  \
+	} while (0)
 #else
-#define JM_AUTH_CHECK(value_ptr, len_var)  (1) /* 鉴权关闭, 始终通过 */
-#define JM_AUTH_SKIP(value_ptr, len_var)   ((void)0) /* 无令牌跳过 */
-#endif /* JM_CAN_AUTH_ENABLE */
+#define JM_AUTH_CHECK(value_ptr, len_var) (1)       /* 鉴权关闭, 始终通过 */
+#define JM_AUTH_SKIP(value_ptr, len_var)  ((void)0) /* 无令牌跳过 */
+#endif                                              /* JM_CAN_AUTH_ENABLE */
 
 /* ============================================================================
  *  1) 控制/模式: CMD 0x00~0xB8  ->  set_mode
@@ -231,6 +234,8 @@ static int app_mode_is_supported(uint8_t cmd)
 		case JM_CMD_POSITION_TORQUE:
 		case JM_CMD_VELOCITY_TORQUE:
 		case JM_CMD_DUTY_CYCLE:
+		case JM_CMD_ZERO_FORCE:
+		case JM_CMD_PASSIVE_TORQUE:
 		case JM_CMD_CALIB_LEVEL1:
 		case JM_CMD_CALIB_LEVEL2:
 		case JM_CMD_CALIB_LEVEL3:
@@ -250,7 +255,7 @@ static int app_mode_is_supported(uint8_t cmd)
 static uint16_t s_sweep_session_id;
 
 static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
-	uint8_t *out, uint16_t *out_len)
+                               uint8_t *out, uint16_t *out_len)
 {
 	motor_loop_t *loop = motor_loop_get();
 	motor_ctrl_t *ctrl = &loop->sys.motor;
@@ -279,10 +284,8 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 		*out_len = 0u;
 		return JM_ERR_OK;
 	}
-	if (loop->sys.top_state != TOP_FSM_READY ||
-		motor_sweep_is_active(ctrl) || motor_observer_trace_is_busy())
-		return (motor_sweep_is_active(ctrl) || motor_observer_trace_is_busy()) ?
-			JM_ERR_BUSY : JM_ERR_STATE_DENY;
+	if (loop->sys.top_state != TOP_FSM_READY || motor_sweep_is_active(ctrl) || motor_observer_trace_is_busy())
+		return (motor_sweep_is_active(ctrl) || motor_observer_trace_is_busy()) ? JM_ERR_BUSY : JM_ERR_STATE_DENY;
 	if (len == JM_SWEEP_PAYLOAD_LEN)
 	{
 		cfg.test_mode = (uint8_t)((control & JM_SWEEP_CONTROL_TEST_MODE_MASK) >> 4);
@@ -294,8 +297,7 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 		cfg.amp_raw = jm_rd_u16(&pl[6]);
 		cfg.bias_raw = 0;
 	}
-	else if (len == JM_SWEEP_BIAS_PAYLOAD_LEN &&
-		jm_rd_u16(&pl[10]) == JM_SWEEP_BIAS_FORMAT_TAG)
+	else if (len == JM_SWEEP_BIAS_PAYLOAD_LEN && jm_rd_u16(&pl[10]) == JM_SWEEP_BIAS_FORMAT_TAG)
 	{
 		cfg.test_mode = (uint8_t)((control & JM_SWEEP_CONTROL_TEST_MODE_MASK) >> 4);
 		cfg.sweep_mode = (uint8_t)((control & JM_SWEEP_CONTROL_SWEEP_MASK) >> 2);
@@ -312,9 +314,7 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 		float f_start = jm_rd_f32(&pl[0]);
 		float f_end = jm_rd_f32(&pl[4]);
 		float amp = jm_rd_f32(&pl[8]);
-		if (!app_float_is_finite(f_start) || !app_float_is_finite(f_end) ||
-			!app_float_is_finite(amp) || f_start < 0.1f || f_end < f_start ||
-			f_end > 6553.5f || amp <= 0.0f || amp > 65.535f)
+		if (!app_float_is_finite(f_start) || !app_float_is_finite(f_end) || !app_float_is_finite(amp) || f_start < 0.1f || f_end < f_start || f_end > 6553.5f || amp <= 0.0f || amp > 65.535f)
 			return JM_ERR_OUT_OF_RANGE;
 		memset(&cfg, 0, sizeof(cfg));
 		cfg.test_mode = JM_SWEEP_TEST_TORQUE_TO_VELOCITY;
@@ -328,8 +328,7 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 #endif
 	else
 		return JM_ERR_LENGTH;
-	if (cfg.test_mode > JM_SWEEP_TEST_POSITION_TO_POSITION ||
-		cfg.sweep_mode > JM_SWEEP_MODE_STEP || cfg.flags != 0u)
+	if (cfg.test_mode > JM_SWEEP_TEST_POSITION_TO_POSITION || cfg.sweep_mode > JM_SWEEP_MODE_STEP || cfg.flags != 0u)
 		return JM_ERR_OUT_OF_RANGE;
 
 	s_sweep_session_id++;
@@ -339,8 +338,7 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 	control_hz = (uint32_t)(1.0f / loop->current.dt + 0.5f);
 	/* 高速上传采样策略: 电流环对象不低于5kHz, 速度/位置对象不低于2kHz,
 	 * 同时保底 f_end 的20倍采样; 超过控制频率时钳制到控制频率。 */
-	rate_min_hz = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ?
-		5000u : 2000u;
+	rate_min_hz = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ? 5000u : 2000u;
 	rate_hz = (uint32_t)((float)cfg.f_end_x10 * 0.1f * 20.0f + 0.5f);
 	if (rate_hz < rate_min_hz)
 		rate_hz = rate_min_hz;
@@ -348,19 +346,12 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 		rate_hz = control_hz;
 	if (rate_hz < (uint32_t)((float)cfg.f_end_x10 * 0.1f * 10.0f + 0.5f))
 		return JM_ERR_OUT_OF_RANGE;
-	channel_mask = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ?
-		(MOTOR_OBS_IQ_REF | MOTOR_OBS_IQ) :
-		((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION) ?
-		(MOTOR_OBS_VEL_REF | MOTOR_OBS_POS) :
-		((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_VELOCITY) ?
-		(MOTOR_OBS_VEL_REF | MOTOR_OBS_VEL) :
-		((cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION) ?
-		(MOTOR_OBS_POS_REF | MOTOR_OBS_POS) :
-		(MOTOR_OBS_IQ_REF | MOTOR_OBS_VEL))));
+	channel_mask = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ? (MOTOR_OBS_IQ_REF | MOTOR_OBS_IQ) : ((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION) ? (MOTOR_OBS_VEL_REF | MOTOR_OBS_POS) : ((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_VELOCITY) ? (MOTOR_OBS_VEL_REF | MOTOR_OBS_VEL) : ((cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION) ? (MOTOR_OBS_POS_REF | MOTOR_OBS_POS) : (MOTOR_OBS_IQ_REF | MOTOR_OBS_VEL))));
 	/* 每包24样本(2通道227B载荷): 降低包率, 使2k~10kHz采样率下
 	 * 1ms通信周期+阻塞串口发送也能满足实时排空。 */
 	if (motor_observer_trace_start(channel_mask, rate_hz, 24u,
-		1.0f / loop->current.dt, cfg.session_id, &trace_status) != 0)
+	                               1.0f / loop->current.dt, cfg.session_id, &trace_status)
+	    != 0)
 		return motor_observer_trace_is_busy() ? JM_ERR_BUSY : JM_ERR_OUT_OF_RANGE;
 	if (motor_sweep_configure(ctrl, &cfg, &point_count, &duration_x100) != 0)
 	{
@@ -382,8 +373,7 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 	 * 会使位置反馈带巨大直流偏置(mode 3 波形失真, mode 5 位置环
 	 * 猛拉回零), 复位后位置反馈从当前物理位置重新起算。
 	 * 此时电机 READY 静止, 临界区内复位无并发风险。 */
-	if (cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION ||
-		cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION)
+	if (cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION || cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION)
 	{
 		multiturn_t *mt = &loop->motor.multiturn;
 		if (mt->reset_position != NULL)
@@ -413,8 +403,7 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 
 	if (!app_mode_is_supported(cmd))
 		return JM_ERR_NOT_SUPPORTED;
-	if (cmd != JM_CMD_TEST_SWEEP_FREQ &&
-		motor_sweep_is_active(&motor_loop_get()->sys.motor))
+	if (cmd != JM_CMD_TEST_SWEEP_FREQ && motor_sweep_is_active(&motor_loop_get()->sys.motor))
 		motor_sweep_abort(&motor_loop_get()->sys.motor);
 
 	/* 双通道临界区: 保护 motor_cmd 字段写入 + 状态机切换的原子性,
@@ -422,6 +411,21 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 	 * 用 __get_PRIMASK/__set_PRIMASK 保持中断原有使能状态。*/
 	primask = __get_PRIMASK();
 	__disable_irq();
+
+	/* ---- 运动模式命令(0x10~0x7B)需在 READY/RUN 态 ----
+	 * 前置校验: 状态机在 IDLE/FAULT/CALIB 等状态会静默忽略运动命令,
+	 * 若在载荷解析后才校验, 解析写入的副作用(load_sim 直写等)已发生,
+	 * 违背"校验失败不提交"契约。与虚拟引擎行为一致, 回 NACK(STATE_DENY)。 */
+	if (cmd >= JM_CMD_OPEN_LOOP && cmd <= JM_CMD_TEST_VELOCITY_LOOP)
+	{
+		top_fsm_e top = motor_loop_get()->sys.top_state;
+		if (top != TOP_FSM_READY && top != TOP_FSM_RUN)
+		{
+			ret = JM_ERR_STATE_DENY;
+			goto done;
+		}
+	}
+
 	next = *mc;
 
 	switch (cmd)
@@ -435,16 +439,32 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 				app_pid_debug_abort();
 			break;
 
+		/* ---- 上使能 0x04: FAULT/SAFETY/CALIB/CONFIG/BOOTLOADER 态被状态机
+		 * 静默忽略(须先清障/等标定完成), 显式拒绝避免假 ACK 误导 ---- */
+		case JM_CMD_ENABLE:
+		{
+			top_fsm_e top = motor_loop_get()->sys.top_state;
+			if (top != TOP_FSM_IDLE && top != TOP_FSM_READY && top != TOP_FSM_RUN)
+			{
+				ret = (top == TOP_FSM_FAULT || top == TOP_FSM_SAFETY) ? JM_ERR_FAULT_STATE : JM_ERR_STATE_DENY;
+				goto done;
+			}
+			break;
+		}
+
 		/* DEBUG 会话必须跨越上使能并保持到 RUN，才能实际验证 PID。
 		 * HOLD/BRAKE 只改变运动状态，也不退出调试来源。 */
 		case JM_CMD_HOLD:
 		case JM_CMD_BRAKE:
-		case JM_CMD_ENABLE:
 			break;
 
 		/* ---- 开环电压 {ud,uq}: 下游用 cmd.torque 作开环电压目标 ---- */
 		case JM_CMD_OPEN_LOOP:
-			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 8)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.id = jm_rd_f32(&pl[0]);     /* ud(暂存, 预留) */
 			next.torque = jm_rd_f32(&pl[4]); /* uq -> 开环电压 */
 			break;
@@ -452,7 +472,11 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		/* ---- 电流环 {id,iq} ---- */
 		case JM_CMD_CURRENT:
 		case JM_CMD_FIELD_WEAKENING:
-			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 8)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.id = jm_rd_f32(&pl[0]);
 			next.iq = jm_rd_f32(&pl[4]);
 			break;
@@ -461,14 +485,22 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		case JM_CMD_TORQUE:
 		case JM_CMD_FORCE_CONTROL:
 		case JM_CMD_CONSTANT_FORCE:
-			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 4)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.torque = jm_rd_f32(&pl[0]);
 			break;
 
 		/* ---- MIT/阻抗 {pos,vel,kp,kd,tff}: CAN 层已解压成 5*f32 ---- */
 		case JM_CMD_MIT:
 		case JM_CMD_IMPEDANCE:
-			if (len < 20) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 20)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.pos = jm_rd_f32(&pl[0]);
 			next.vel = jm_rd_f32(&pl[4]);
 			next.kp = jm_rd_f32(&pl[8]);
@@ -479,42 +511,94 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		/* ---- 速度环 {vel} ---- */
 		case JM_CMD_VELOCITY:
 		case JM_CMD_SENSORLESS:
-			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 4)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.vel = jm_rd_f32(&pl[0]);
 			break;
 
 		/* ---- 位置环 {pos} ---- */
 		case JM_CMD_POSITION:
-			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 4)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.pos = jm_rd_f32(&pl[0]);
 			break;
 
 		/* ---- 位置+速度前馈 {pos,vel_ff} ---- */
 		case JM_CMD_POSITION_VELOCITY:
-			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 8)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.pos = jm_rd_f32(&pl[0]);
 			next.vel = jm_rd_f32(&pl[4]); /* 作速度前馈 */
 			break;
 
 		/* ---- 位置+力矩限幅 {pos,tq_lim} ---- */
 		case JM_CMD_POSITION_TORQUE:
-			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 8)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.pos = jm_rd_f32(&pl[0]);
 			next.torque = jm_rd_f32(&pl[4]);
 			break;
 
 		/* ---- 速度+力矩限幅 {vel,tq_lim} ---- */
 		case JM_CMD_VELOCITY_TORQUE:
-			if (len < 8) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 8)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.vel = jm_rd_f32(&pl[0]);
 			next.torque = jm_rd_f32(&pl[4]);
 			break;
 
 		/* ---- 占空比 {duty}: 下游用 cmd.torque 作占空比目标 ---- */
 		case JM_CMD_DUTY_CYCLE:
-			if (len < 4) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 4)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			next.torque = jm_rd_f32(&pl[0]);
 			break;
+
+		/* ---- 零力模式 0x36: 无载荷, 电流环闭环 id=iq=0 ---- */
+		case JM_CMD_ZERO_FORCE:
+			break;
+
+		/* ---- 被动恒转矩 0x60 {t_set:f32}: 制动转矩幅值, 方向跟随转速 ----
+		 * 载荷写入 motor_ctrl_t.load_sim(独立于 motor_cmd_t 的模式专用指令),
+		 * 已在临界区内, 直写满足单生产者单消费者无锁约定 */
+		case JM_CMD_PASSIVE_TORQUE:
+		{
+			motor_ctrl_t *ctrl = &motor_loop_get()->sys.motor;
+			float t_set;
+			float peak_t;
+			if (len < 4)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
+			t_set = jm_rd_f32(&pl[0]);
+			peak_t = ctrl->param->motor_base.peak_torque;
+			if (!app_float_is_finite(t_set) || t_set < 0.0f || t_set > peak_t)
+			{
+				ret = JM_ERR_OUT_OF_RANGE;
+				goto done;
+			}
+			ctrl->load_sim.t_set = t_set;
+			break;
+		}
 
 		/* ---- 标定启动 0x90-0x96: payload[0]=子模式 ---- */
 		case JM_CMD_CALIB_LEVEL1:
@@ -525,10 +609,17 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		case JM_CMD_CALIB_LEVEL6:
 		case JM_CMD_CALIB_LEVEL7:
 		{
-			if (len < 1) { ret = JM_ERR_LENGTH; goto done; }
+			if (len < 1)
+			{
+				ret = JM_ERR_LENGTH;
+				goto done;
+			}
 			/* 速率限制: 0x90~0x96 CALIB 2s 间隔 (防并发启动) */
 			if (!JM_RATE_CHECK(&s_last_tick_calib, JM_RATE_MIN_INTERVAL_CALIB_MS))
-			{ ret = JM_ERR_RATE_LIMIT; goto done; }
+			{
+				ret = JM_ERR_RATE_LIMIT;
+				goto done;
+			}
 
 			uint8_t level = cmd - JM_CMD_CALIB_LEVEL1 + 1;
 			uint8_t submode = pl[0];
@@ -538,13 +629,19 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 				 * 其余（submode 越界/不支持）→ OUT_OF_RANGE */
 				calib_status_t st = calib_mgr_get_status();
 				if (st.state == CALIB_STATE_RUNNING)
-				{ ret = JM_ERR_CALIB_BUSY; goto done; }      /* NACK(0x0A) 已在标定中 */
+				{
+					ret = JM_ERR_CALIB_BUSY;
+					goto done;
+				} /* NACK(0x0A) 已在标定中 */
 				if (st.fail_reason == CALIB_FAIL_DEP_NOT_MET)
-				{ ret = JM_ERR_STATE_DENY; goto done; }      /* NACK(0x03) 前置标定未完成 */
-				ret = JM_ERR_OUT_OF_RANGE;                   /* NACK(0x02) submode 不合法 */
+				{
+					ret = JM_ERR_STATE_DENY;
+					goto done;
+				}                          /* NACK(0x03) 前置标定未完成 */
+				ret = JM_ERR_OUT_OF_RANGE; /* NACK(0x02) submode 不合法 */
 				goto done;
 			}
-			break;                            /* 继续走 motor_loop_set_cmd 进入 CALIB 态 */
+			break; /* 继续走 motor_loop_set_cmd 进入 CALIB 态 */
 		}
 
 		/* ---- 标定进度查询 0x97: 由 jm_proto.c dispatch 直接返回 8 字节详细状态 ACK,
@@ -572,11 +669,7 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 			break;
 	}
 
-	if (!app_float_is_finite(next.pos) || !app_float_is_finite(next.vel) ||
-		!app_float_is_finite(next.torque) || !app_float_is_finite(next.id) ||
-		!app_float_is_finite(next.iq) || !app_float_is_finite(next.kp) ||
-		!app_float_is_finite(next.kd) || !app_float_is_finite(next.torque_ff) ||
-		!app_float_is_finite(next.vel_ff))
+	if (!app_float_is_finite(next.pos) || !app_float_is_finite(next.vel) || !app_float_is_finite(next.torque) || !app_float_is_finite(next.id) || !app_float_is_finite(next.iq) || !app_float_is_finite(next.kp) || !app_float_is_finite(next.kd) || !app_float_is_finite(next.torque_ff) || !app_float_is_finite(next.vel_ff))
 	{
 		ret = JM_ERR_OUT_OF_RANGE;
 		goto done;
@@ -706,10 +799,7 @@ static jm_err_e app_pid_source_set(uint8_t ring_select, uint8_t source)
 
 	/* 立即 reload 生效 */
 	motor_pid_reload();
-	if (source != (uint8_t)PID_SOURCE_DEBUG &&
-		motor_pid_get_source(PID_RING_CURRENT) != PID_SOURCE_DEBUG &&
-		motor_pid_get_source(PID_RING_VELOCITY) != PID_SOURCE_DEBUG &&
-		motor_pid_get_source(PID_RING_POSITION) != PID_SOURCE_DEBUG)
+	if (source != (uint8_t)PID_SOURCE_DEBUG && motor_pid_get_source(PID_RING_CURRENT) != PID_SOURCE_DEBUG && motor_pid_get_source(PID_RING_VELOCITY) != PID_SOURCE_DEBUG && motor_pid_get_source(PID_RING_POSITION) != PID_SOURCE_DEBUG)
 	{
 		motor_observer_trace_stop();
 		s_pid_debug.active = 0u; /* 用户主动退出 DEBUG，不触发超时回滚 */
@@ -744,8 +834,10 @@ static jm_err_e app_pid_source_get(uint8_t *out_cur, uint8_t *out_vel, uint8_t *
 static float app_pid_output_limit(uint8_t ring)
 {
 	const motor_param_t *p = &usr.motor_param[M1];
-	if (ring <= 1u) return p->motor_base.rated_voltage;
-	if (ring == 2u) return p->motor_base.peak_current;
+	if (ring <= 1u)
+		return p->motor_base.rated_voltage;
+	if (ring == 2u)
+		return p->motor_base.peak_current;
 	return p->motor_base.max_speed;
 }
 
@@ -753,15 +845,19 @@ static void app_pid_reset_runtime(uint8_t ring)
 {
 	uint32_t primask = __get_PRIMASK();
 	__disable_irq();
-	if (ring == 0u) motor_pid_profile_reset_state(&motor_loop_get()->current.pid_id);
-	else if (ring == 1u) motor_pid_profile_reset_state(&motor_loop_get()->current.pid_iq);
-	else if (ring == 2u) motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_vel);
-	else motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_pos);
+	if (ring == 0u)
+		motor_pid_profile_reset_state(&motor_loop_get()->current.pid_id);
+	else if (ring == 1u)
+		motor_pid_profile_reset_state(&motor_loop_get()->current.pid_iq);
+	else if (ring == 2u)
+		motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_vel);
+	else
+		motor_pid_profile_reset_state(&motor_loop_get()->cascade.pid_pos);
 	__set_PRIMASK(primask);
 }
 
 static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type,
-	const uint8_t *value, uint16_t value_len)
+                                  const uint8_t *value, uint16_t value_len)
 {
 	if (value == NULL || ring > 3u)
 	{
@@ -785,7 +881,8 @@ static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type,
 	if (param_type == 0u)
 	{
 		if (motor_pid_profile_apply_batch(ring, value, value_len,
-				app_pid_output_limit(ring)) != 0)
+		                                  app_pid_output_limit(ring))
+		    != 0)
 			return JM_ERR_OUT_OF_RANGE;
 	}
 	else
@@ -797,7 +894,8 @@ static jm_err_e app_pid_param_set(uint8_t ring, uint8_t param_type,
 		entry[1] = param_type;
 		memcpy(&entry[2], value, 4u);
 		if (motor_pid_profile_apply_batch(ring, entry, sizeof(entry),
-				app_pid_output_limit(ring)) != 0)
+		                                  app_pid_output_limit(ring))
+		    != 0)
 			return JM_ERR_OUT_OF_RANGE;
 	}
 	app_pid_debug_touch();
@@ -845,7 +943,7 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 	fb->vel = (obs_ok == 0) ? obs.vel : m->motion.velocity_rad_s;
 	fb->pos_ref = (obs_ok == 0) ? obs.pos_ref : m->setpoint.pos_rad;
 	fb->vel_ref = (obs_ok == 0) ? obs.vel_ref : m->setpoint.velocity_rad_s;
-	fb->torque = m->power.torque_est;       /* 输出端力矩 Nm(估算) */
+	fb->torque = m->power.torque_est; /* 输出端力矩 Nm(估算) */
 	fb->id = (obs_ok == 0) ? obs.id : m->electrical.id_meas;
 	fb->iq = (obs_ok == 0) ? obs.iq : m->electrical.iq_meas;
 	fb->id_ref = (obs_ok == 0) ? obs.id_ref : m->setpoint.current_id;
@@ -861,7 +959,7 @@ jm_err_e jm_app_get_feedback(jm_feedback_t *fb)
 	fb->single = m->motion.single_turn_rad; /* 单圈机械角 rad [0,2π) -> UI"机械角度"(转°)/电角度计算源 */
 	/* 返回锁存故障，避免瞬态条件消失后 FAULT 状态仍在但上位机显示无故障。 */
 	fb->fault_mask = m->fault.fault_latched;
-	fb->warn_mask = m->fault.warn_mask;     /* 警告掩码 */
+	fb->warn_mask = m->fault.warn_mask; /* 警告掩码 */
 	fb->top_fsm = (uint8_t)m->top_state;
 	fb->run_state = (uint8_t)m->run_state;
 	fb->ctrl_mode = (uint8_t)m->ctrl_mode;
@@ -997,6 +1095,8 @@ static const param_desc_t s_param_tbl[MOTOR_PARAM_PARAM_COUNT] = {
 	PARAM_ENT(protection_param, protection_param_t, protect_under_temp, JM_PT_F32),
 	PARAM_ENT(protection_param, protection_param_t, protect_pos_error, JM_PT_I32),
 	PARAM_ENT(protection_param, protection_param_t, protect_enable_mask, JM_PT_U32),
+	/* 86 负载模拟 */
+	PARAM_ENT(load_sim_param, load_sim_param_t, load_sim_dead_zone_rad_s, JM_PT_F32),
 };
 
 static jm_err_e app_param_read(uint16_t param_id, uint8_t *value,
@@ -1251,11 +1351,7 @@ static uint16_t s_tlm_period_ms = 0u; /* 0 表示沿用绑定层默认周期 */
 
 static jm_err_e app_set_telemetry(uint8_t enable, uint16_t mask, uint16_t period_ms)
 {
-	const uint16_t supported_mask = (uint16_t)(
-		JM_TLM_POS_VEL | JM_TLM_DQ | JM_TLM_PHASE | JM_TLM_BUS |
-		JM_TLM_TEMP | JM_TLM_MULTITURN | JM_TLM_TORQUE | JM_TLM_FAULT |
-		JM_TLM_STATE | JM_TLM_DEBUG | JM_TLM_CURRENT_TARGET |
-		JM_TLM_MOTION_TARGET);
+	const uint16_t supported_mask = (uint16_t)(JM_TLM_POS_VEL | JM_TLM_DQ | JM_TLM_PHASE | JM_TLM_BUS | JM_TLM_TEMP | JM_TLM_MULTITURN | JM_TLM_TORQUE | JM_TLM_FAULT | JM_TLM_STATE | JM_TLM_DEBUG | JM_TLM_CURRENT_TARGET | JM_TLM_MOTION_TARGET);
 	if ((mask & (uint16_t)~supported_mask) != 0u)
 	{
 		return JM_ERR_OUT_OF_RANGE;
@@ -1310,8 +1406,8 @@ static jm_err_e app_get_debug(float *out, uint8_t *out_count, uint8_t max_count)
 }
 
 static jm_err_e app_trace_config(uint8_t enable, uint16_t session_id,
-	uint32_t channel_mask, uint32_t rate_hz, uint8_t packet_samples,
-	uint8_t flags, uint8_t *out, uint16_t *out_len)
+                                 uint32_t channel_mask, uint32_t rate_hz, uint8_t packet_samples,
+                                 uint8_t flags, uint8_t *out, uint16_t *out_len)
 {
 	const motor_loop_t *loop = motor_loop_get();
 	motor_observer_trace_status_t status;
@@ -1326,11 +1422,11 @@ static jm_err_e app_trace_config(uint8_t enable, uint16_t session_id,
 		*out_len = 0u;
 		return JM_ERR_OK;
 	}
-	if (motor_observer_trace_is_busy() ||
-		motor_sweep_is_active(&motor_loop_get()->sys.motor))
+	if (motor_observer_trace_is_busy() || motor_sweep_is_active(&motor_loop_get()->sys.motor))
 		return JM_ERR_BUSY;
 	if (motor_observer_trace_start(channel_mask, rate_hz, packet_samples,
-		1.0f / loop->current.dt, session_id, &status) != 0)
+	                               1.0f / loop->current.dt, session_id, &status)
+	    != 0)
 		return motor_observer_trace_is_busy() ? JM_ERR_BUSY : JM_ERR_OUT_OF_RANGE;
 	jm_wr_u16(&out[0], status.session_id);
 	jm_wr_u32(&out[2], status.actual_rate_hz);
@@ -1342,8 +1438,7 @@ static jm_err_e app_trace_config(uint8_t enable, uint16_t session_id,
 
 jm_err_e jm_app_trace_pop(uint8_t *out, uint16_t *out_len)
 {
-	return (motor_observer_trace_pop(out, out_len) == 0) ?
-		JM_ERR_OK : JM_ERR_STATE_DENY;
+	return (motor_observer_trace_pop(out, out_len) == 0) ? JM_ERR_OK : JM_ERR_STATE_DENY;
 }
 
 /* ============================================================================
@@ -1484,7 +1579,7 @@ motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *c
 	(void)flags;
 	return (motor_info_storage_status_t)motor_info_validate(cfg); /* 0=全部通过, 否则首个越界 param_id(>0) */
 }
-#endif /* USE_DEV_FLASH */
+#endif                                                            /* USE_DEV_FLASH */
 
 /* dispatch 返回码 -> jm_err_e */
 static jm_err_e mi_dispatch_to_err(int rc)
@@ -1539,7 +1634,8 @@ static jm_err_e app_motor_info_save(uint8_t flags)
 		return JM_ERR_RATE_LIMIT;
 
 	uint32_t sf = ((flags & JM_MOTOR_INFO_SAVE_FLAG_FLASH) != 0u)
-		? MOTORINFO_SAVE_FLAG_FLASH : 0u;
+	                  ? MOTORINFO_SAVE_FLAG_FLASH
+	                  : 0u;
 	motor_info_storage_status_t rc = jm_app_motor_info_storage_save(motor_info_storage_get(), sf);
 	if (rc == MOTOR_INFO_STORAGE_OK)
 	{
@@ -1697,7 +1793,7 @@ static const jm_proto_ops_t s_app_ops = {
 	.set_baudrate = app_set_baudrate,
 	.set_fd_mode = app_set_fd_mode,
 	.identify_can_device = app_identify_can_device,
-	/* 电机配置(motor_info) 0xE6-0xEB (未启用 USE_DEV_FLASH 时置 NULL, 命令返回 NACK) */
+/* 电机配置(motor_info) 0xE6-0xEB (未启用 USE_DEV_FLASH 时置 NULL, 命令返回 NACK) */
 #if defined(USE_DEV_FLASH)
 	.motor_info_read = app_motor_info_read,
 	.motor_info_write = app_motor_info_write,

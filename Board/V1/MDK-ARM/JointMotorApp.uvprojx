@@ -579,6 +579,16 @@
               <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_test_sweep.c</FilePath>
             </File>
             <File>
+              <FileName>motor_mode_zero_force.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_zero_force.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_load_sim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_load_sim.c</FilePath>
+            </File>
+            <File>
               <FileName>motor_pid_profile.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorControl\PidManager\motor_pid_profile.c</FilePath>

@@ -1,7 +1,7 @@
 /**
  * @file    motor_param.c
  * @brief   关节电机配置参数API实现
- * @date    2026-08-04
+ * @date    2026-08-21
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_param_generate_v9.py 根据配置表自动生成，
@@ -137,6 +137,10 @@ static const motor_param_t g_default_config =
         .protect_pos_error = 1000,
         .protect_enable_mask = 4294967295,
     },
+    .load_sim_param =
+    {
+        .load_sim_dead_zone_rad_s = 0.5f,
+    },
 };
 
 int motor_param_init(motor_param_t *cfg)
@@ -235,6 +239,7 @@ int motor_param_validate(const motor_param_t *cfg)
     if (!isfinite(cfg->protection_param.protect_under_temp) || cfg->protection_param.protect_under_temp < -40.0f || cfg->protection_param.protect_under_temp > 0.0f) return 84;
     if (cfg->protection_param.protect_pos_error < (int32_t)100 || cfg->protection_param.protect_pos_error > (int32_t)100000) return 85;
     if (cfg->protection_param.protect_enable_mask > (uint32_t)4294967295) return 86;
+    if (!isfinite(cfg->load_sim_param.load_sim_dead_zone_rad_s) || cfg->load_sim_param.load_sim_dead_zone_rad_s < 0.05f || cfg->load_sim_param.load_sim_dead_zone_rad_s > 5.0f) return 87;
 
     return 0;
 }
@@ -351,6 +356,9 @@ void motor_param_print(const motor_param_t *cfg)
     printf("protect_under_temp: %f C\n", cfg->protection_param.protect_under_temp);
     printf("protect_pos_error: %d counts\n", (int)cfg->protection_param.protect_pos_error);
     printf("protect_enable_mask: %u\n", (unsigned)cfg->protection_param.protect_enable_mask);
+
+    printf("\n--- Load Simulation Config ---\n");
+    printf("load_sim_dead_zone_rad_s: %f rad/s\n", cfg->load_sim_param.load_sim_dead_zone_rad_s);
 
     printf("\n==================================\n");
 }

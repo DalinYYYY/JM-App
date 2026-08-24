@@ -13,13 +13,14 @@
  * |------------|------|--------|------------|
  * | 2026-06-18 | 1.0  | Dalin  | 初始创建 |
  * | 2026-07-27 | 1.1  | Dalin  | 协议版本号 + 命令码保留区 + 预留 0x80/0x81/0x82 同步触发, 0xCC~0xCF OTA |
+ * | 2026-08-21 | 1.2  | Dalin  | 新增 0x60~0x67 负载模拟段 + JM_FEAT_LOAD_SIM, 协议版本升至 1.5 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        CMD 0x00~0xB8 段数值与 state_define.h 的 ctrl_mode_e 一致,
  *              固件可直接把 CMD 当控制模式分发。串口/CAN 共用同一套 CMD。
  * @note        命令码保留区分组（编码前固化）:
  *              0x00~0x0F 系统控制 | 0x10~0x2F 运动控制 | 0x30~0x4F 高级力控
- *              0x50~0x6F 轨迹同步 | 0x70~0x7F 特殊应用与测试 | 0x80~0x8F 多电机同步(预留)
+ *              0x50~0x5F 轨迹同步 | 0x60~0x6F 负载模拟 | 0x70~0x7F 特殊应用与测试 | 0x80~0x8F 多电机同步(预留)
  *              0x90~0xAF 校准+PID | 0xB0~0xBF 系统诊断 | 0xC0~0xCF 反馈查询+OTA预留
  *              0xD0~0xDF 设备信息 | 0xE0~0xEF 参数读写 | 0xF0~0xFE CAN管理 | 0xFF 保留
  */
@@ -37,20 +38,21 @@ extern "C"
 	/* 主版本: 不兼容变更(命令码重排/载荷语义改); 次版本: 兼容追加(新命令/新字段);
 	 * 补丁: bug 修复。0xD0 READ_DEV_INFO 应答(FD 模式)携带此版本号。 */
 #define JM_PROTO_VERSION_MAJOR 1
-#define JM_PROTO_VERSION_MINOR 4 /* 1.4: 0x76偏置扫频12B整数载荷 + 速度闭环模式 */
+#define JM_PROTO_VERSION_MINOR 5 /* 1.5: 0x60~0x67 对拖台负载模拟段 */
 #define JM_PROTO_VERSION_PATCH 0
 #define JM_PROTO_VERSION       ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
 
 	/* ===================== feature_flags 位定义 =====================
 	 * 0xD0 READ_DEV_INFO 应答(28B 扩展格式)携带的特性位图(u16), 上位机据此自适应。
 	 * bit0=CAN_FD 支持 | bit1=AUTH 鉴权启用 | bit2=AUTOTUNE 自整定 | bit3=BODE_SWEEP 扫频
-	 * bit4=DUAL_CHANNEL_ARB 双通道仲裁 | bit5=CAN_LOSS_TIMER 通信中断降级 | bit6-7=reserved */
+	 * bit4=DUAL_CHANNEL_ARB 双通道仲裁 | bit5=CAN_LOSS_TIMER 通信中断降级 | bit6=LOAD_SIM 负载模拟 */
 #define JM_FEAT_CAN_FD         (1u << 0)
 #define JM_FEAT_AUTH           (1u << 1)
 #define JM_FEAT_AUTOTUNE       (1u << 2)
 #define JM_FEAT_BODE_SWEEP     (1u << 3)
 #define JM_FEAT_DUAL_ARB       (1u << 4)
 #define JM_FEAT_CAN_LOSS_TIMER (1u << 5)
+#define JM_FEAT_LOAD_SIM       (1u << 6)
 
 #ifndef JM_ENABLE_BODE_SWEEP
 #define JM_ENABLE_BODE_SWEEP 1
@@ -61,40 +63,40 @@ extern "C"
 
 #if defined(USE_CAN_FD_MODE) && (USE_CAN_FD_MODE == 1)
 #if (JM_ENABLE_BODE_SWEEP == 1)
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
 #else
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
 #endif
 #else
 #if (JM_ENABLE_BODE_SWEEP == 1)
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
 #else
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
 #endif
 #endif
 
 /* 0x76 TEST_SWEEP_FREQ: 12B主格式为 control + point_cfg + f_start_x10 +
  * f_end_x10 + amp_raw + bias_raw:i16 + format_tag:u16；8B无偏置格式兼容。
  * 停止可使用 1 字节 control。 */
-#define JM_SWEEP_PAYLOAD_LEN              8u
-#define JM_SWEEP_BIAS_PAYLOAD_LEN        12u
-#define JM_SWEEP_STOP_PAYLOAD_LEN        1u
-#define JM_SWEEP_LEGACY_PAYLOAD_LEN     12u
-#define JM_SWEEP_BIAS_FORMAT_TAG      0xB076u
-#define JM_SWEEP_CONTROL_ENABLE          0x80u
-#define JM_SWEEP_CONTROL_TEST_MODE_MASK  0x70u
-#define JM_SWEEP_CONTROL_SWEEP_MASK      0x0Cu
-#define JM_SWEEP_CONTROL_FLAGS_MASK      0x03u
-#define JM_SWEEP_TEST_TORQUE_TO_VELOCITY 0u
-#define JM_SWEEP_TEST_CURRENT_TO_VELOCITY 1u
-#define JM_SWEEP_TEST_CURRENT_TO_CURRENT  2u
+#define JM_SWEEP_PAYLOAD_LEN               8u
+#define JM_SWEEP_BIAS_PAYLOAD_LEN          12u
+#define JM_SWEEP_STOP_PAYLOAD_LEN          1u
+#define JM_SWEEP_LEGACY_PAYLOAD_LEN        12u
+#define JM_SWEEP_BIAS_FORMAT_TAG           0xB076u
+#define JM_SWEEP_CONTROL_ENABLE            0x80u
+#define JM_SWEEP_CONTROL_TEST_MODE_MASK    0x70u
+#define JM_SWEEP_CONTROL_SWEEP_MASK        0x0Cu
+#define JM_SWEEP_CONTROL_FLAGS_MASK        0x03u
+#define JM_SWEEP_TEST_TORQUE_TO_VELOCITY   0u
+#define JM_SWEEP_TEST_CURRENT_TO_VELOCITY  1u
+#define JM_SWEEP_TEST_CURRENT_TO_CURRENT   2u
 #define JM_SWEEP_TEST_VELOCITY_TO_POSITION 3u
 #define JM_SWEEP_TEST_VELOCITY_TO_VELOCITY 4u
 #define JM_SWEEP_TEST_POSITION_TO_POSITION 5u /* 方向二: 位置环闭环验证 */
-#define JM_SWEEP_MODE_LINEAR              0u
-#define JM_SWEEP_MODE_LOG                 1u
-#define JM_SWEEP_MODE_STEP                2u  /* 1Hz固定步进, 频点数由起止频率决定 */
-#define JM_SWEEP_MAX_POINTS            1024u
+#define JM_SWEEP_MODE_LINEAR               0u
+#define JM_SWEEP_MODE_LOG                  1u
+#define JM_SWEEP_MODE_STEP                 2u /* 1Hz固定步进, 频点数由起止频率决定 */
+#define JM_SWEEP_MAX_POINTS                1024u
 
 	/* ===================== 命令码 CMD ===================== */
 	typedef enum
@@ -136,7 +138,7 @@ extern "C"
 		JM_CMD_ADAPTIVE_GRAVITY_COMP = 0x39,
 		JM_CMD_LANDING_BUFFER = 0x3A,
 
-		/* 轨迹同步 0x50~0x6F */
+		/* 轨迹同步 0x50~0x5F */
 		JM_CMD_PVT = 0x50,
 		JM_CMD_CUBIC_SPLINE = 0x51,
 		JM_CMD_TRAPEZOIDAL_TRAJ = 0x52,
@@ -151,6 +153,17 @@ extern "C"
 		JM_CMD_PT = 0x5B,
 		JM_CMD_ELECTRONIC_GEAR = 0x5C,
 		JM_CMD_ELECTRONIC_CAM = 0x5D,
+
+		/* 负载模拟 0x60~0x6F (0x68~0x6F 预留扩展)
+		 * 码值顺序即实施顺序: 0x60 第一版 → 0x61~0x64 第二版 → 0x65~0x67 按需 */
+		JM_CMD_PASSIVE_TORQUE = 0x60, /* 被动恒转矩: t_set(f32) 方向跟随转速 */
+		JM_CMD_DYNAMIC_TORQUE = 0x61, /* 动态转矩: 阶跃/正弦/方波/单脉冲 */
+		JM_CMD_QUADRATIC_LOAD = 0x62, /* 平方转矩负载(风机/水泵): k(f32) */
+		JM_CMD_CONSTANT_POWER = 0x63, /* 恒功率负载(主轴/卷绕): p(f32) */
+		JM_CMD_FRICTION_LOAD = 0x64,  /* 摩擦负载(库仑+粘性): t_c,b(f32×2) */
+		JM_CMD_INERTIA_SIM = 0x65,    /* 惯量模拟: j_sim,t_bias(f32×2) */
+		JM_CMD_DUTY_PROFILE = 0x66,   /* 工况谱复现: 下载/启动/停止/清空 */
+		JM_CMD_IMPACT_LOAD = 0x67,    /* 冲击/过载: 分层限幅+冷却期 */
 
 		/* 特殊应用与测试 0x70~0x7F */
 		JM_CMD_STEP_DIR = 0x70,
@@ -321,7 +334,7 @@ extern "C"
 		JM_ERR_FLASH_VERIFY = 0x12, /* Flash 校验失败(读回不匹配) */
 		/* 新增 0x13 (预留命令专用) */
 		JM_ERR_NOT_SUPPORTED = 0x13, /* 命令码已定义但当前固件未实现(预留命令如 OTA/SYNC) */
-		JM_ERR_SAVE_LIMIT = 0x14,     /* 固化次数超限(寿命保护) */
+		JM_ERR_SAVE_LIMIT = 0x14,    /* 固化次数超限(寿命保护) */
 		JM_ERR_EEPROM_WRITE = 0x15,  /* EEPROM 写入失败 */
 		JM_ERR_EEPROM_VERIFY = 0x16, /* EEPROM 回读校验失败 */
 	} jm_err_e;

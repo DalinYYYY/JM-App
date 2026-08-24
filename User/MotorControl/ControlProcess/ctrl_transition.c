@@ -168,6 +168,7 @@ static bool ref_smooth_run_state_enabled(run_state_e s)
 		case RUN_STATE_VELOCITY:
 		case RUN_STATE_TORQUE:
 		case RUN_STATE_CURRENT:
+		case RUN_STATE_PASSIVE_TORQUE: /* t_set 热更新经 torque blend 平滑 */
 			return true;
 		default:
 			return false;

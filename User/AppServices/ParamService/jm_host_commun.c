@@ -23,6 +23,7 @@
 #include "thread_config.h" /* THREAD_DELAY_COMMUN */
 #include "jm_proto_ops.h"  /* 共享协议操作与命令定义 */
 #include "motor_observer.h"
+#include "motor_loop.h"   /* motor_loop_get: 调试通道观测 sys.motor 内部量 */
 #if defined(USE_DEV_COMMUN_UART)
 #include "dev_commun_uart.h"
 #endif
@@ -49,24 +50,23 @@ static void jm_host_commun_trace_service(void)
 {
 	uint8_t body[MOTOR_OBSERVER_TRACE_PAYLOAD_MAX];
 	uint16_t len = 0u;
-#if defined(USE_DEV_COMMUN_UART) && !defined(USE_DEV_COMMUN_CAN)
-	/* UART 独占链路: 单周期循环排空(上限4包), 支撑扫频2k~10kHz采样率
-	 * 的实时上传; 稳态下队列每周期0~1包, 上限仅用于突发排空防溢出。 */
+#if defined(USE_DEV_COMMUN_UART)
+	/* UART 链路: 单周期循环排空(上限4包), 支撑扫频2k~10kHz采样率
+	 * 的实时上传; 稳态下队列每周期0~1包, 上限仅用于突发排空防溢出。
+	 * UART+CAN 并存板 TRACE 主走 UART: 经典 CAN 拆帧(一包约30帧)
+	 * 吞吐撑不起高频扫频, 双路串行发送会把排空速率拖到 512 深度
+	 * 缓冲溢出(实测 4900Hz 采样即溢出)。 */
 	uint8_t budget = 4u;
 	while (budget-- > 0u && jm_host_commun_trace_pop(body, &len) != 0)
 	{
 		dev_commun_uart.report(&dev_commun_uart, JM_CMD_TRACE_DATA, body, len);
 	}
-#else
+#elif defined(USE_DEV_COMMUN_CAN)
 	/* CAN 链路吞吐受限: 维持单周期单包(高频扫频溢出按 OVERFLOW 标志上报)。 */
-	if (jm_host_commun_trace_pop(body, &len) == 0)
-		return;
-#if defined(USE_DEV_COMMUN_UART)
-	dev_commun_uart.report(&dev_commun_uart, JM_CMD_TRACE_DATA, body, len);
-#endif
-#if defined(USE_DEV_COMMUN_CAN)
-	dev_commun_can.report(&dev_commun_can, JM_CMD_TRACE_DATA, body, len);
-#endif
+	if (jm_host_commun_trace_pop(body, &len) != 0)
+	{
+		dev_commun_can.report(&dev_commun_can, JM_CMD_TRACE_DATA, body, len);
+	}
 #endif
 }
 
@@ -221,10 +221,11 @@ static void jm_host_commun_update_debug(void)
 	const motor_param_t *param = &usr.motor_param[M1];
 	motor_observer_snapshot_t obs;
 	int obs_ok = motor_observer_snapshot_read(&obs);
+	const motor_ctrl_t *mc = &motor_loop_get()->sys.motor;
 
 	jm_dbg[0] = (obs_ok == 0) ? obs.id_ref : st->setpoint.current_id;
 	jm_dbg[1] = (obs_ok == 0) ? obs.iq_ref : st->setpoint.current_iq;
-	jm_dbg[2] = 0.0f;                                   /* 保留 */
+	jm_dbg[2] = mc->ref.torque; /* 转矩参考(力矩/负载模拟等模式的算法输出, 如 0x60 的 -dir(ω)·t_set) */
 	jm_dbg[3] = (obs_ok == 0) ? obs.id : st->electrical.id_meas;
 	jm_dbg[4] = (obs_ok == 0) ? obs.iq : st->electrical.iq_meas;
 	jm_dbg[5] = st->motion.elec_angle_rad;
@@ -297,9 +298,8 @@ void jm_host_commun_process(void)
 		telemetry_tick = 0;
 		commun_uart_push_telemetry(&dev_commun_uart);
 	}
-#if !defined(USE_DEV_COMMUN_CAN)
+	/* TRACE 排空: UART 使能即主走 UART(见 trace_service 注释) */
 	jm_host_commun_trace_service();
-#endif
 }
 
 #endif /* USE_DEV_COMMUN_UART */
@@ -361,7 +361,10 @@ void jm_host_commun_can_process(void)
 		}
 		telemetry_tick = 0;
 	}
+#if !defined(USE_DEV_COMMUN_UART)
+	/* UART 在位时 TRACE 已由 UART 路径排空, 此处仅 CAN-only 板兜底 */
 	jm_host_commun_trace_service();
+#endif
 }
 
 #endif /* USE_DEV_COMMUN_CAN */
