@@ -21,6 +21,7 @@
 
 #include "system_state.h"
 #include "calib_mgr.h"
+#include "motor_mode.h" /* motor_load_sim_reset: 负载模拟模式进入复位 */
 #include <string.h>
 
 /**
@@ -138,6 +139,15 @@ static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 	[CONTROL_MODE_PT] = RUN_STATE_PROFILE_TORQUE,     /* Profile Torque → 独立模式文件 */
 	[CONTROL_MODE_ELECTRONIC_GEAR] = RUN_STATE_ELECTRONIC_GEAR,
 	[CONTROL_MODE_ELECTRONIC_CAM] = RUN_STATE_ELECTRONIC_CAM,
+
+	[CONTROL_MODE_PASSIVE_TORQUE] = RUN_STATE_PASSIVE_TORQUE,
+	[CONTROL_MODE_DYNAMIC_TORQUE] = RUN_STATE_DYNAMIC_TORQUE,
+	[CONTROL_MODE_QUADRATIC_LOAD] = RUN_STATE_QUADRATIC_LOAD,
+	[CONTROL_MODE_CONSTANT_POWER] = RUN_STATE_CONSTANT_POWER,
+	[CONTROL_MODE_FRICTION_LOAD] = RUN_STATE_FRICTION_LOAD,
+	[CONTROL_MODE_INERTIA_SIM] = RUN_STATE_INERTIA_SIM,
+	[CONTROL_MODE_DUTY_PROFILE] = RUN_STATE_DUTY_PROFILE,
+	[CONTROL_MODE_IMPACT_LOAD] = RUN_STATE_IMPACT_LOAD,
 
 	[CONTROL_MODE_STEP_DIR] = RUN_STATE_STEP_DIR,
 	[CONTROL_MODE_ANALOG_INPUT] = RUN_STATE_ANALOG_INPUT,
@@ -304,9 +314,7 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 {
 	if (new_state >= RUN_STATE_MAX || new_state == sys->motor.run_state)
 		return;
-	/* 扫频带有内部时序和 TRACE 点边界，不能在普通参考平滑过渡期间
-	 * 被临时 dispatch，否则会消耗 settle/measure 计数而尚未真正输出
-	 * 扫频参考。直接进入子状态，首个控制周期从相位 0 开始。 */
+	/* 扫频带有内部时序和 TRACE 点边界，不能在普通参考平滑过渡期间  */
 	if (new_state == RUN_STATE_TEST_SWEEP_FREQ)
 	{
 		transition_force_complete(&sys->trans_mgr.trans);
@@ -314,6 +322,10 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 		sys->motor.run_state = new_state;
 		return;
 	}
+
+	/* 负载模拟模式: 过渡启动前复位运行时状态(相位/计时/加速度估计) */
+	if (new_state >= RUN_STATE_PASSIVE_TORQUE && new_state <= RUN_STATE_IMPACT_LOAD)
+		motor_load_sim_reset(&sys->motor);
 
 	transition_mgr_on_mode_switch(&sys->trans_mgr, new_state, trans_count, &sys->motor.ref);
 }
@@ -349,9 +361,7 @@ void motor_control_loop(system_state_t *sys)
 
 	// 运行态：所有过渡策略收敛到 transition_mgr_step
 	transition_mgr_step(&sys->trans_mgr, sys);
-	if (sys->motor.run_state == RUN_STATE_TEST_SWEEP_FREQ &&
-		motor_sweep_is_complete(&sys->motor) &&
-		sys->motor.sweep_finish_pending == 0u)
+	if (sys->motor.run_state == RUN_STATE_TEST_SWEEP_FREQ && motor_sweep_is_complete(&sys->motor) && sys->motor.sweep_finish_pending == 0u)
 	{
 		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
 		top_fsm_switch(sys, TOP_FSM_READY);
