@@ -46,12 +46,12 @@
 
 // <c1>
 // ENABLE DRIVER ---> I2C
-//#define USE_I2C_DRIVER
+#define USE_I2C_DRIVER
 // </c>
 
 // <c1>
 // ENABLE DRIVER ---> SOFT_I2C
-//#define USE_I2C_DRIVER
+#define USE_I2C_DRIVER
 // </c>
 
 // <c1>
