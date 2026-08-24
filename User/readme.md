@@ -85,8 +85,8 @@ User/
 - `control_config.h`：控制算法参数（环频率、PID 默认值、采样频率等）
 - `protocol_config.h`：通信协议配置（CAN/UART 波特率、设备地址等）
 - `debug_config.h`：调试配置（打印、断言、VOFA 开关等）
-- `motor_profile.c/h`：电机型号档案（唯一真相源）。集中各电机电气身份参数（R/Ld/Lq/flux/pole_pairs/KT/KE 等），三处消费方 `DataHub/motor_param.c`、`DataHub/motor_info.c`、`MotorCalibration/calib_config.h` 通过 `#include` 引用；切换型号只需改 `MOTOR_PROFILE` 宏
-- `board_select.h`：板级选择器。通过 `JM_BOARD_V1` / `JM_BOARD_SFOC` 宏二选一，引入 `Board/<板名>/Config/dev_config_board.h`
+- `motor_profile.c/h`：电机型号参数库（唯一真相源）。集中各电机电气身份参数（R/Ld/Lq/flux/pole_pairs/KT/KE 等），三处消费方 `DataHub/motor_param.c`、`DataHub/motor_info.c`、`MotorCalibration/calib_config.h` 通过 `#include` 引用；型号选择在各板 `Board/<板名>/Config/motor_config_board.h` 的 `MOTOR_PROFILE_BOARD` 宏，未指定的板由 `motor_profile.h` 兜底为 GM4820H
+- `board_select.h`：板级选择器。通过 `JM_BOARD_V1` / `JM_BOARD_SFOC` 宏二选一，引入 `Board/<板名>/Config/dev_config_board.h` 与 `motor_config_board.h`
 
 ---
 

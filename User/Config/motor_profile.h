@@ -3,6 +3,7 @@
 
 #include "motor_param.h" /* motor_param_t：sync_to_param 参数类型 */
 #include "motor_info.h"  /* motor_info_t：sync_to_param 参数类型 */
+#include "board_select.h" /* 板级电机选型 MOTOR_PROFILE_BOARD */
 
 /* ===================== 电机参数配置文件（首次上电 fallback 默认值）=====================
  * 本文件提供电机电气身份参数的编译期默认值，仅在以下场景使用：
@@ -10,27 +11,40 @@
  *   2. 未启用 USE_DEV_FLASH 的板（V1 等）：calib_config_runtime.c 回退到 MOTOR_* 编译期值
  *   3. motor_param_init 后的 apply_param()：写入运行期 motor_param_t 默认值
  *
- * 切换电机型号（启用 Flash 的板）：
- *   上位机通过 0xE7 命令批量写入 motor_info.blocks.motor_calib 字段，0xEA 固化到 Flash。
- *   标定算法通过 calib_config_runtime.h 读取 motor_info 派生标定参数，无需重编译固件。
- *   修改本文件的 MOTOR_PROFILE 宏仅影响首次上电的 fallback 默认值。
+ * 切换电机型号：
+ *   - 编译期选型：在各板 Board/<板>/Config/motor_config_board.h 中定义
+ *     MOTOR_PROFILE_BOARD（由 board_select.h 分发），未定义的板用下方兜底值
+ *   - 运行期换电机（启用 Flash 的板）：上位机通过 0xE7 命令批量写入
+ *     motor_info.blocks.motor_calib 字段，0xEA 固化到 Flash，无需重编译固件
+ *   - 标定算法通过 calib_config_runtime.h 读取 motor_info 派生标定参数
  *
  * 三个消费方：
  *   - User/DataHub/motor_param.c           （控制环运行时默认值）
  *   - User/DataHub/motor_info.c            （协议持久化参数默认值）
  *   - User/MotorCalibration/calib_config_runtime.c（运行期派生标定参数的 fallback）
  *
- * 说明：本文件只含电机电气身份参数（换电机时变的量）。
- *       板级参数（pwm_freq/enc_lines/dead_time）、减速器、PID 增益
- *       不在此文件，留在各自原文件。
+ * 说明：本文件只含电机电气身份参数（换电机时变的量），是型号参数库。
+ *       型号选择权在板级（motor_config_board.h），板级参数（pwm_freq/enc_lines/
+ *       dead_time）、减速器、PID 增益不在此文件，留在各自原文件。
  */
 
-/* ===================== 电机型号选择（修改此行切换）===================== */
+/* ===================== 电机型号编号 ===================== */
 #define MOTOR_PROFILE_GM4820H  1
 #define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
 #define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
 #define MOTOR_PROFILE_RS03     4 /* RS03 关节电机 */
-#define MOTOR_PROFILE          MOTOR_PROFILE_5010_360
+
+/* ===================== 型号选择（板级 motor_config_board.h 覆盖）===================== */
+#ifndef MOTOR_PROFILE_BOARD
+#define MOTOR_PROFILE_BOARD MOTOR_PROFILE_GM4820H /* 板级未指定时兜底 */
+#endif
+#if (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_GM4820H) \
+    && (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_5010_360) \
+    && (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_DEMO) \
+    && (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_RS03)
+#error "MOTOR_PROFILE_BOARD 非法，请检查板级 motor_config_board.h 的型号编号"
+#endif
+#define MOTOR_PROFILE MOTOR_PROFILE_BOARD
 
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
