@@ -78,7 +78,7 @@ uint32_t calib_cfg_ac_inject_sample_count(void);  /* 采样次数 = 200 */
 /* ===================== L2 相序识别参数 ===================== */
 float   calib_cfg_l2_phase_seq_voltage_v(void);            /* 对齐电压 = I×R */
 uint32_t calib_cfg_l2_phase_seq_align_ticks(void);         /* 对齐等待 = 1s×10kHz */
-uint32_t calib_cfg_l2_phase_seq_step_ticks(void);          /* 步进等待 = 0.5s×10kHz */
+float   calib_cfg_l2_phase_seq_scan_target_rad(void);      /* 开环扫描目标 = 2×2π */
 
 /* ===================== L2 极对数辨识参数 ===================== */
 float   calib_cfg_l2_pole_pairs_voltage_v(void);           /* 锁定电压 = I×R */

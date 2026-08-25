@@ -52,7 +52,7 @@
 
 /* ===================== L2 相序/极对数时间（与电机无关）===================== */
 #define CALIB_CFG_L2_PHASE_SEQ_ALIGN_S      1.0f
-#define CALIB_CFG_L2_PHASE_SEQ_STEP_S       0.5f
+#define CALIB_CFG_L2_PHASE_SEQ_SCAN_ELE_CYCLES 2u /* 相序开环扫描电周期数 */
 #define CALIB_CFG_L2_POLE_PAIRS_ALIGN_S     1.0f
 #define CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES  21u
 #define CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ 2.0f

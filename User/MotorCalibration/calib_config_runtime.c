@@ -263,9 +263,9 @@ uint32_t calib_cfg_l2_phase_seq_align_ticks(void)
 	return (uint32_t)(CALIB_CFG_L2_PHASE_SEQ_ALIGN_S * CALIB_TICKS_PER_SEC);
 }
 
-uint32_t calib_cfg_l2_phase_seq_step_ticks(void)
+float calib_cfg_l2_phase_seq_scan_target_rad(void)
 {
-	return (uint32_t)(CALIB_CFG_L2_PHASE_SEQ_STEP_S * CALIB_TICKS_PER_SEC);
+	return 2.0f * PI * (float)CALIB_CFG_L2_PHASE_SEQ_SCAN_ELE_CYCLES;
 }
 
 /* ===================== L2 极对数 ===================== */

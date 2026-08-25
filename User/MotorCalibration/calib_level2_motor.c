@@ -3,7 +3,8 @@
  * @brief L2 电机电气身份辨识（相序/极对数/R/Ld/Lq/flux）
  * @note 六个子模式均已实现：正常阻值电机用 DC 差分法/阶跃响应法/反电势法，
  *       低阻电机自动切换交流注入法。硬件访问通过 calib_hw 共享层，参数由
- *       calib_config.h 集中管理，结果写入 motor_param_set_r/ld/lq/flux/pole_pairs。
+ *       calib_config.h 集中管理，结果写入 motor_param_set_r/ld/lq/flux/pole_pairs，
+ *       相序识别结果写入 encoder_param.enc_direction（开环旋转平均法）。
  */
 #include <math.h>
 #include "calib_types.h"
@@ -25,22 +26,22 @@ static struct
 	calib_step_t step;          /* 统一状态机骨架（cur/tick/sample_cnt/sample_sum）*/
 	calib_hw_session_t session; /* 标定电压会话（替换电角度回调 + 施加电压）*/
 	float prev_i;               /* 前一次采样电流（Ld/Lq 阶跃求 did/dt 用）*/
-	float start_mech_deg;       /* 起始机械角度（相序用）*/
-	float scan_ele_rad;         /* 极对数扫描：当前命令电角度累加值(rad，不折返)*/
-	float accum_mech_deg;       /* 极对数扫描：连续累加的机械角(deg，跨 360° 不 wrap)*/
-	float prev_mech_deg;        /* 极对数扫描：上一 tick 机械角原始读数(deg，用于差分)*/
+	float start_mech_deg;       /* 起始机械角度（极对数用）*/
+	float scan_ele_rad;         /* 开环扫描：当前命令电角度累加值(rad，不折返)，相序/极对数共用*/
+	float accum_mech_deg;       /* 开环扫描：连续累加的机械角(deg，跨 360° 不 wrap)，相序/极对数共用*/
+	float prev_mech_deg;        /* 开环扫描：上一 tick 角度读数(deg，用于差分)，相序/极对数共用*/
 	float test_voltage;         /* 本次施加的测试电压（R/Ld/Lq/flux 算结果时用）*/
 	float r_id_low;             /* R 两点差分法：低电压档稳态 id 均值（高档采样时暂存）*/
 	/* R 标定诊断字段(调试器观察用): 区分 step 4 失败是 id≈0 还是 d_id≈0 */
-	float r_id_high;            /* 高档采样 id 均值 */
-	float r_d_id;               /* d_id = id_high - id_low */
-	float r_d_v;                /* d_v = V2 - V1 */
-	float r_result;             /* R 计算结果(失败时为 0) */
+	float r_id_high; /* 高档采样 id 均值 */
+	float r_d_id;    /* d_id = id_high - id_low */
+	float r_d_v;     /* d_v = V2 - V1 */
+	float r_result;  /* R 计算结果(失败时为 0) */
 	/* 交流注入法上下文（低阻电机 R/Ld 辨识专用）*/
 	calib_ac_injection_t ac_ctx;
-	float ac_r_result;          /* 交流注入法 R 结果(诊断用) */
-	float ac_ld_result;         /* 交流注入法 Ld 结果(诊断用) */
-	uint8_t ac_dir_inverted;    /* 电流方向修正标志: 1=检测到电流反向并已修正 */
+	float ac_r_result;       /* 交流注入法 R 结果(诊断用) */
+	float ac_ld_result;      /* 交流注入法 Ld 结果(诊断用) */
+	uint8_t ac_dir_inverted; /* 电流方向修正标志: 1=检测到电流反向并已修正 */
 } s_l2;
 
 /* ===================== R 辨识 =====================
@@ -183,8 +184,8 @@ static calib_state_e poll_resistance(void)
 			calib_step_accumulate(&s_l2.step, id);
 			if (s_l2.step.sample_cnt < calib_cfg_l2_r_sample_count())
 				return CALIB_STATE_RUNNING;
-			s_l2.r_id_low = calib_step_average(&s_l2.step); /* 暂存 V1 档 id 均值 */
-			s_l2.step.sample_cnt = 0;                       /* 复位累加器供高档复用 */
+			s_l2.r_id_low = calib_step_average(&s_l2.step);      /* 暂存 V1 档 id 均值 */
+			s_l2.step.sample_cnt = 0;                            /* 复位累加器供高档复用 */
 			s_l2.step.sample_sum = 0.0f;
 			s_l2.test_voltage = calib_cfg_l2_r_test_voltage_v(); /* 切到高档 V2 */
 			calib_hw_apply_voltage(&s_l2.session, s_l2.test_voltage, 0.0f, 0.0f);
@@ -681,26 +682,42 @@ static calib_state_e poll_flux_linkage(void)
 	}
 }
 
-/* ===================== 相序识别 =====================
- * STEP 0: 施加 ud（theta=0）让转子对齐 d 轴
- * STEP 1: 等待对齐稳定
- * STEP 2: 记录起始机械角度，施加 ud（theta=120°）让转子转 1/3 电周期
- * STEP 3: 等待转动完成
- * STEP 4: 读结束角度，判定 delta 是否合理（应朝一个方向变化），完成
+/* ===================== 相序识别（开环旋转平均法）=====================
+ * 原理：开环正向扫描强制电角度 N 个整电周期（扫描速度复用极对数辨识的
+ *   2 电周期/秒），转子的 d 轴被锁定跟随。累计编码器"原始角"（不含
+ *   offset/dir 补偿，对二者免疫，避免用补偿后角度判定造成自证）：
+ *     累计原始角 > 0 → 编码器计数方向与正向电角度一致 → enc_direction=+1
+ *     累计原始角 < 0 → 相序接反/计数方向相反 → enc_direction=-1
+ *   整电周期平均天然消除齿槽转矩与摩擦偏置；固件无法区分"UVW 接反"与
+ *   "编码器计数反向"（观测等价），统一用 enc_direction 收敛修正，
+ *   与 ODrive/VESC encoder detect 同思路。
  *
- * 简化版：本版只验证"电机能响应 ud 阶跃并转动"，不持久化结果
- * （motor_param 无相序字段）。若 delta < 阈值视为电机未响应，FAILED。
+ *   STEP 0: 进入会话，施加 ud（theta=0）对齐 d 轴
+ *   STEP 1: 等待对齐稳定
+ *   STEP 2: 记录起始原始角，初始化连续累加器
+ *   STEP 3: 每 tick 递增强制电角度（开环扫描），原始角差分去 ±360° 跳变
+ *           后累加；命令电角度达到 N·2π 结束
+ *   STEP 4: 幅度校验（|累计角| ≥ 理论值 360·N/pole_pairs 的一半，否则
+ *           判堵转），符号判定 enc_direction，写回运行时 + motor_param +
+ *           motor_info，完成
+ *
+ * @note 方向翻转后 enc_offset 语义失效，需重标零位（L7 流程中零位标定
+ *       在相序识别之后，自动覆盖；单步标定时需手动先相序后零位）。
  * ================================================== */
 static calib_state_e poll_phase_seq(void)
 {
 	const calib_io_t *io = calib_mgr_get_io();
 	dev_motor_t *m = io->motor;
-	(void)io;
 
 	switch (s_l2.step.cur)
 	{
 		case 0: /* 对齐 d 轴 */
 			calib_hw_enter(&s_l2.session, m);
+			/* 临时置正向(1)：MT6835 的 get_raw 内部按 running_dir 反转 raw，
+			 * 若上次标定残留 -1 会污染本次累计角符号，导致结果永远与
+			 * 当前配置一致（自证）。与 L3.1/L3.2 的同款防御。
+			 * case 4 会写入判定出的正确方向。*/
+			m->encoder.set_dir(&m->encoder, 1);
 			calib_hw_apply_voltage(&s_l2.session, calib_cfg_l2_phase_seq_voltage_v(), 0.0f, 0.0f);
 			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
@@ -715,38 +732,64 @@ static calib_state_e poll_phase_seq(void)
 			calib_mgr_set_step(2);
 			return CALIB_STATE_RUNNING;
 
-		case 2: /* 记录起始角度，施加 120° 电角度步进 */
-			s_l2.start_mech_deg = calib_hw_get_encoder_mech_angle(m);
-			/* 120° 电角度 = 2*pi/3 rad */
-			calib_hw_apply_voltage(&s_l2.session, calib_cfg_l2_phase_seq_voltage_v(), 0.0f, 2.0F * 3.14159265F / 3.0F);
+		case 2: /* 记录起始原始角，初始化累加器 */
+			s_l2.scan_ele_rad = 0.0f;
+			s_l2.prev_mech_deg = calib_hw_get_encoder_raw_deg(m);
+			s_l2.accum_mech_deg = 0.0f;
 			calib_step_next(&s_l2.step, 3);
 			calib_mgr_set_step(3);
 			return CALIB_STATE_RUNNING;
 
-		case 3: /* 等待转动 */
-			calib_hw_apply_voltage(&s_l2.session, calib_cfg_l2_phase_seq_voltage_v(), 0.0f, 2.0F * 3.14159265F / 3.0F);
-			if (calib_step_wait(&s_l2.step, calib_cfg_l2_phase_seq_step_ticks()))
+		case 3: /* 开环正向扫描：递增强制电角度 + 原始角连续累加（unwrap）*/
+		{
+			s_l2.scan_ele_rad += calib_cfg_l2_pole_pairs_dtheta_rad();
+			calib_hw_apply_voltage(&s_l2.session, calib_cfg_l2_phase_seq_voltage_v(), 0.0f, s_l2.scan_ele_rad);
+
+			float raw_deg = calib_hw_get_encoder_raw_deg(m);
+			float dmech = raw_deg - s_l2.prev_mech_deg;
+			if (dmech > 180.0f)
+				dmech -= 360.0f;
+			else if (dmech < -180.0f)
+				dmech += 360.0f;
+			s_l2.accum_mech_deg += dmech;
+			s_l2.prev_mech_deg = raw_deg;
+
+			if (s_l2.scan_ele_rad < calib_cfg_l2_phase_seq_scan_target_rad())
 				return CALIB_STATE_RUNNING;
 			calib_step_next(&s_l2.step, 4);
 			calib_mgr_set_step(4);
 			return CALIB_STATE_RUNNING;
+		}
 
-		case 4: /* 判定 */
+		case 4: /* 幅度校验 + 符号判定，写回 enc_direction */
 		{
-			float end_deg = calib_hw_get_encoder_mech_angle(m);
-			float delta = end_deg - s_l2.start_mech_deg;
-			if (delta > 180.0f)
-				delta -= 360.0f;
-			else if (delta < -180.0f)
-				delta += 360.0f;
 			calib_hw_exit(&s_l2.session);
-			/* 120° 电角度应对应 120/pole_pairs 机械角度，默认 7 极对 ≈ 17°
-			 * 阈值取 5°（电机应明显转动）*/
-			if (fabsf(delta) < 5.0f)
+
+			/* 理论机械转角 = 360°×N/pole_pairs；不足一半判堵转/失步 */
+			uint32_t pp = calib_motor_ident_get()->pole_pairs;
+			if (pp == 0)
+				pp = 1; /* 防零除（极对数未标定时兜底）*/
+			float expect_deg = 360.0f * (float)CALIB_CFG_L2_PHASE_SEQ_SCAN_ELE_CYCLES / (float)pp;
+			if (fabsf(s_l2.accum_mech_deg) < expect_deg * 0.5f)
 			{
-				calib_mgr_set_fail_reason(CALIB_FAIL_MOTOR_STUCK); /* 电机未响应 */
+				calib_mgr_set_fail_reason(CALIB_FAIL_MOTOR_STUCK); /* 转子未跟随转动 */
 				return CALIB_STATE_FAILED;
 			}
+
+			int8_t enc_dir = (s_l2.accum_mech_deg > 0.0f) ? 1 : -1;
+			if (!calib_validate_enc_direction(enc_dir))
+			{
+				calib_mgr_set_fail_reason(CALIB_FAIL_OUT_OF_RANGE);
+				return CALIB_STATE_FAILED;
+			}
+			/* 写回运行时编码器方向（统一 -1/1 约定）*/
+			m->encoder.set_dir(&m->encoder, enc_dir);
+			/* 写入 motor_param（0xE0 读回 index 26）*/
+			(io->param)->encoder_param.enc_direction = enc_dir;
+			(void)motor_info_calib_submit_enc_direction(enc_dir);
+			/* 写入 motor_info.direction（0xE6 读回 index 19，0=正向 1=反向，
+			 * 上位机 L2.1 标定结果区显示的就是此字段）*/
+			(void)motor_info_calib_submit_direction((enc_dir < 0) ? 1u : 0u);
 			calib_mgr_mark_done(CALIB_LEVEL2_MOTOR, CALIB_L2_PHASE_SEQ);
 			calib_step_reset(&s_l2.step);
 			return CALIB_STATE_DONE;
@@ -771,10 +814,7 @@ static calib_state_e poll_phase_seq(void)
  *   完整电周期（= N·2π，精确已知），转子机械角实际转过 N/pole_pairs 圈。
  *     pole_pairs = 命令电角度总量 / 实测机械角总量
  *   分子由我方开环命令决定（独立精确），分母由编码器实测——两者独立，可真辨识。
- *
- * 【与旧实现的本质区别】旧版读 motor_param.ele_radian 反推，而该量本身 =
- *   机械角 × 已配置极对数，是循环自证的派生量（且被 normalize_angle 折返破坏），
- *   最好情况只把配置值 7 还回来，实测因双重折返坍缩到 2。故彻底改为开环扫描。
+
  * =========================================================================== */
 static calib_state_e poll_pole_pairs(void)
 {

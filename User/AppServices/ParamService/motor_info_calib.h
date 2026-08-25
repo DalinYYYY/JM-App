@@ -96,9 +96,15 @@ extern "C"
 	int motor_info_calib_submit_flux(float flux);
 
 	/**
- * @brief  提交 L2.2 pole_pairs（极对数）标定结果
- * @param  pole_pairs  极对数
- */
+	 * @brief  提交 L2.1 direction（相序方向）标定结果
+	 * @param  direction  电机方向(0=正向 1=反向)，UVW 任意两相互换时为 1
+	 */
+	int motor_info_calib_submit_direction(uint32_t direction);
+
+	/**
+	 * @brief  提交 L2.2 pole_pairs（极对数）标定结果
+	 * @param  pole_pairs  极对数
+	 */
 	int motor_info_calib_submit_pole_pairs(uint32_t pole_pairs);
 
 	/* ===== L3 子模式提交 ===== */
