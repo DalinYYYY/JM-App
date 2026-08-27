@@ -73,6 +73,10 @@ extern "C"
 	/* PID DEBUG 会话租约检查: 通信线程每拍调用，超时自动回滚。 */
 	void jm_app_pid_debug_poll(void);
 
+	/* 软件复位执行检查: 通信线程每拍调用, 0x07 命令置位并到期后 NVIC_SystemReset。
+	 * UART/CAN 双通道各自挂载即可(单例标志, 先到先执行)。 */
+	void jm_app_soft_reset_poll(void);
+
 	/**
 	 * @brief  当前 CAN 波特率码(SET_BAUDRATE 0xF1 写入)
 	 * @return 0=1M(默认) 1=500K 2=250K 3=125K; 由 CAN 绑定层初始化时读取

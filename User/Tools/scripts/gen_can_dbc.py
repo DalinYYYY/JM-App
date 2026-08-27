@@ -27,7 +27,7 @@ def I32(n, s): return (n, s, 32, True,  False, 1, 0, -2147483648, 2147483647, ''
 # 策略: 请求有载荷→定义请求(Host); 请求无载荷但应答有载荷→定义应答(Motor)
 
 CMDS = [
-    # ---- 系统控制 0x00~0x06 ----
+    # ---- 系统控制 0x00~0x07 ----
     (0x00, "IDLE",            "Host", 0, [], "进入待机 IDLE停止输出", False),
     (0x01, "HOLD",            "Host", 0, [], "位置保持 锁定当前位置", False),
     (0x02, "BRAKE",           "Host", 0, [], "机械刹车 短接相线抱闸", False),
@@ -35,6 +35,7 @@ CMDS = [
     (0x04, "ENABLE",          "Host", 0, [], "上使能 IDLE->READY", False),
     (0x05, "DISABLE",         "Host", 0, [], "下使能 READY/RUN->IDLE", False),
     (0x06, "STOP",            "Host", 0, [], "停止运行 RUN->READY", False),
+    (0x07, "SOFT_RESET",      "Host", 4, [U32("magic",0)], "软件复位 magic=0x5E7E7E5E ACK后延迟约200ms复位 广播不开放", False),
 
     # ---- 运动控制 0x10~0x1C ----
     (0x10, "OPEN_LOOP",       "Host", 8, [F("ud",0), F("uq",32)], "开环电压", False),
@@ -129,7 +130,7 @@ CMDS = [
     # ---- 系统诊断 0xB0~0xB8 ----
     (0xB0, "CLEAR_FAULT",     "Host", 0, [], "清除故障 FAULT->IDLE", False),
     (0xB1, "DIAGNOSTIC",      "Host", 0, [], "诊断模式", False),
-    (0xB2, "ENTER_BOOTLOADER","Host", 4, [U32("magic",0)], "进入Bootloader magic=0xB00710AD", False),
+    (0xB2, "ENTER_BOOTLOADER","Host", 4, [U32("magic",0)], "进入Bootloader magic=0xB00710AD 不匹配回NACK(UNAUTHORIZED)", False),
     (0xB3, "SAVE_CONFIG",     "Host", 0, [], "保存配置 参数写入Flash(与0xE4等价)", False),
     (0xB4, "FACTORY_RESET",   "Host", 4, [U32("magic",0)], "恢复出厂 magic=0xFAC70F5F", False),
     (0xB5, "START_LOG",       "Host", 6, [U16("rate_hz",0), U32("mask",16)], "开始日志", False),

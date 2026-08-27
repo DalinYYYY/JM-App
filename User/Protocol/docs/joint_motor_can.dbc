@@ -27,6 +27,9 @@ BO_ 2147484929 DISABLE: 0 Host
 
 BO_ 2147485185 STOP: 0 Host
 
+BO_ 2147485441 SOFT_RESET: 4 Host
+ SG_ magic : 0|32@1+ (1,0) [0|4294967295] "" Motor
+
 BO_ 2147487745 OPEN_LOOP: 8 Host
  SG_ ud : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
  SG_ uq : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
@@ -172,14 +175,7 @@ BO_ 2147513345 SAFE_TEACH: 0 Host
 BO_ 2147513601 TEST_AGING: 4 Host
  SG_ cycles : 0|32@1+ (1,0) [0|4294967295] "" Motor
 
-BO_ 2147513857 TEST_SWEEP_FREQ: 12 Host
- SG_ control : 0|8@1+ (1,0) [0|255] "" Motor
- SG_ point_cfg : 8|8@1+ (1,0) [1|64] "" Motor
- SG_ f_start : 16|16@1+ (0.1,0) [0.1|6553.5] "Hz" Motor
- SG_ f_end : 32|16@1+ (0.1,0) [0.1|6553.5] "Hz" Motor
- SG_ amp_raw : 48|16@1+ (1,0) [1|65535] "" Motor
- SG_ bias_raw : 64|16@1- (1,0) [-32768|32767] "" Motor
- SG_ format_tag : 80|16@1+ (1,0) [45174|45174] "" Motor
+BO_ 2147513857 TEST_SWEEP_FREQ: 8 Host
 
 BO_ 2147514113 TEST_COGGING: 0 Host
 
@@ -402,6 +398,7 @@ CM_ BO_ 2147484417 "紧急停止 最高优先级断输出  CAN_ID=0x03<<8|MotorI
 CM_ BO_ 2147484673 "上使能 IDLE->READY  CAN_ID=0x04<<8|MotorID";
 CM_ BO_ 2147484929 "下使能 READY/RUN->IDLE  CAN_ID=0x05<<8|MotorID";
 CM_ BO_ 2147485185 "停止运行 RUN->READY  CAN_ID=0x06<<8|MotorID";
+CM_ BO_ 2147485441 "软件复位 magic=0x5E7E7E5E ACK后延迟约200ms复位 广播不开放  CAN_ID=0x07<<8|MotorID";
 CM_ BO_ 2147487745 "开环电压  CAN_ID=0x10<<8|MotorID";
 CM_ BO_ 2147488001 "电流环  CAN_ID=0x11<<8|MotorID";
 CM_ BO_ 2147488257 "力矩环 Nm  CAN_ID=0x12<<8|MotorID";
@@ -446,7 +443,7 @@ CM_ BO_ 2147512833 "PWM输入  CAN_ID=0x72<<8|MotorID";
 CM_ BO_ 2147513089 "点动  CAN_ID=0x73<<8|MotorID";
 CM_ BO_ 2147513345 "安全示教  CAN_ID=0x74<<8|MotorID";
 CM_ BO_ 2147513601 "老化测试  CAN_ID=0x75<<8|MotorID";
-CM_ BO_ 2147513857 "扫频测试逻辑载荷为12B整数格式，UART直接发送，经典CAN复用已有多帧分包；amp_raw/bias_raw的物理缩放由test_mode决定：力矩和电流模式x0.001，速度模式x0.01；format_tag固定0xB076；兼容8B无偏置整数格式和可选旧12B浮点格式  CAN_ID=0x76<<8|MotorID";
+CM_ BO_ 2147513857 "[Multi] 扫频测试 多帧(12B): f_start/f_end/amp  CAN_ID=0x76<<8|MotorID";
 CM_ BO_ 2147514113 "齿槽测试  CAN_ID=0x77<<8|MotorID";
 CM_ BO_ 2147514369 "摩擦测试  CAN_ID=0x78<<8|MotorID";
 CM_ BO_ 2147514625 "惯量测试  CAN_ID=0x79<<8|MotorID";
@@ -471,7 +468,7 @@ CM_ BO_ 2147525889 "PID参数实时写 ring:0=D轴 1=Q轴 2=速度 3=位置 type
 CM_ BO_ 2147526145 "PID参数实时读 应答6B: ring/param_type/value(4B)  CAN_ID=0xA6<<8|MotorID";
 CM_ BO_ 2147528705 "清除故障 FAULT->IDLE  CAN_ID=0xB0<<8|MotorID";
 CM_ BO_ 2147528961 "诊断模式  CAN_ID=0xB1<<8|MotorID";
-CM_ BO_ 2147529217 "进入Bootloader magic=0xB00710AD  CAN_ID=0xB2<<8|MotorID";
+CM_ BO_ 2147529217 "进入Bootloader magic=0xB00710AD 不匹配回NACK(UNAUTHORIZED)  CAN_ID=0xB2<<8|MotorID";
 CM_ BO_ 2147529473 "保存配置 参数写入Flash(与0xE4等价)  CAN_ID=0xB3<<8|MotorID";
 CM_ BO_ 2147529729 "恢复出厂 magic=0xFAC70F5F  CAN_ID=0xB4<<8|MotorID";
 CM_ BO_ 2147529985 "开始日志  CAN_ID=0xB5<<8|MotorID";

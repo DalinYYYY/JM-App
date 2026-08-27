@@ -281,6 +281,7 @@ void jm_host_commun_process(void)
 {
 	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
 	jm_app_pid_debug_poll();
+	jm_app_soft_reset_poll();
 
 	/* 刷新调试通道: 从 motor_state 快照填充 jm_dbg[] */
 	jm_host_commun_update_debug();
@@ -327,6 +328,7 @@ void jm_host_commun_can_process(void)
 {
 	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
 	jm_app_pid_debug_poll();
+	jm_app_soft_reset_poll();
 
 	/* 刷新诊断统计(供应用读取总线负载/通信质量) */
 	dev_commun_can.poll(&dev_commun_can);

@@ -13,6 +13,7 @@
  * |------------|------|--------|------------|
  * | 2026-06-23 | 1.0  | Dalin  | 初始创建   |
  * | 2026-06-25 | 1.1  | Dalin  | 补全 0xC9/0xE2/0xE3/0xF0/0xF1 回调实现 |
+ * | 2026-08-27 | 1.2  | Dalin  | 新增 0x07 软件复位(延迟复位); 0xB2 补魔数校验 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        jm_proto_ops_t 全部回调的统一落点。jm_proto_dispatch() 解析出
@@ -246,6 +247,7 @@ static int app_mode_is_supported(uint8_t cmd)
 		case JM_CMD_CALIB_ABORT:
 		case JM_CMD_CLEAR_FAULT:
 		case JM_CMD_TEST_SWEEP_FREQ:
+		case JM_CMD_ENTER_BOOTLOADER:
 			return 1;
 		default:
 			return 0;
@@ -669,6 +671,18 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 		{
 			ret = app_param_save();
 			goto done;
+		}
+
+		/* ---- 进入 Bootloader 0xB2: {magic:u32=0xB00710AD} 防误触(原不校验的隐患已修)
+		 *      校验通过后走 motor_loop_set_cmd, 状态机 IDLE→BOOTLOADER ---- */
+		case JM_CMD_ENTER_BOOTLOADER:
+		{
+			if (len < 4u || jm_rd_u32(&pl[0]) != JM_MAGIC_BOOTLOADER)
+			{
+				ret = JM_ERR_UNAUTHORIZED;
+				goto done;
+			}
+			break;
 		}
 
 		/* ---- 其余模式(力控/轨迹/特殊/测试/诊断): 暂仅切状态 ----
@@ -1780,6 +1794,49 @@ static jm_err_e app_motor_info_recalib_reset(void)
 #endif /* USE_DEV_FLASH */
 
 /* ============================================================================
+ *  软件复位 0x07: ACK 先行、延迟执行的两段式时序
+ *    命令线程校验魔数后立即安全停机(RUN→READY→IDLE, PWM 关断)并回 ACK,
+ *    复位期限由 jm_app_soft_reset_poll() 在通信线程周期检查, 到期执行
+ *    NVIC_SystemReset()。延迟窗口保证:
+ *      1) ACK/DMA 发送完成(否则上位机判定无响应+掉线)
+ *      2) 停机后相电流自然衰减
+ *    复位原因追溯: NVIC_SystemReset 置位 RCC->CSR 的 SFTRSTF, 上电可区分
+ *    命令复位与上电/看门狗复位; 软件复位不触碰 motor_info Flash(无寿命损耗)。
+ * ==========================================================================*/
+#define JM_SOFT_RESET_DELAY_MS 200u
+
+static uint8_t s_reset_pending = 0u;
+static uint32_t s_reset_deadline = 0u;
+
+static jm_err_e app_soft_reset(uint32_t magic)
+{
+	uint32_t primask;
+
+	if (magic != JM_MAGIC_SOFT_RESET)
+		return JM_ERR_UNAUTHORIZED;
+
+	/* 立即安全停机: 临界区内切 IDLE(RUN→READY→IDLE, 逐级许可表)。
+	 * FAULT/SAFETY/CALIB 等态被状态机忽略也无妨, 200ms 后硬复位兜底。 */
+	primask = __get_PRIMASK();
+	__disable_irq();
+	motor_loop_set_cmd(CONTROL_MODE_IDLE);
+	__set_PRIMASK(primask);
+
+	s_reset_deadline = HAL_GetTick() + JM_SOFT_RESET_DELAY_MS;
+	s_reset_pending = 1u;
+	return JM_ERR_OK;
+}
+
+void jm_app_soft_reset_poll(void)
+{
+	if (s_reset_pending && (int32_t)(HAL_GetTick() - s_reset_deadline) >= 0)
+	{
+		s_reset_pending = 0u;
+		NVIC_SystemReset(); /* 不返回 */
+	}
+}
+
+/* ============================================================================
  *  回调集单例
  * ==========================================================================*/
 static const jm_proto_ops_t s_app_ops = {
@@ -1818,6 +1875,8 @@ static const jm_proto_ops_t s_app_ops = {
 	.pid_source_get = app_pid_source_get,
 	.pid_param_set = app_pid_param_set,
 	.pid_param_get = app_pid_param_get,
+	/* 系统控制 0x07 */
+	.soft_reset = app_soft_reset,
 };
 
 const jm_proto_ops_t *jm_app_ops_get(void)

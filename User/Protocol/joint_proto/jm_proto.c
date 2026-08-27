@@ -498,6 +498,26 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	}
 	proto->reply_len = 0; /* 默认无应答 */
 
+	/* 软件复位 0x07: {magic:u32=0x5E7E7E5E} -> ACK, 随后延迟约 200ms 执行复位。
+	 * 回调内已安全停机; 魔数不匹配回 NACK(UNAUTHORIZED)。
+	 * CAN 广播(motor_id=0)对本命令不开放(见 jm_proto_can_broadcast_allowed)。 */
+	if (cmd == JM_CMD_SOFT_RESET)
+	{
+		uint32_t magic;
+		jm_err_e e;
+		if (len < 4u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->soft_reset == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		magic = jm_rd_u32(&payload[0]);
+		e = proto->ops->soft_reset(magic);
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
 	/* 订阅同步遥测 0xCB: payload = enable(u8) + mask(u16) [+ period_ms(u16)], 小端。
 	 * enable=1 启动周期上报, enable=0 停止; 仅本订阅命令回单次 ACK 供上位机确认开关,
 	 * 之后的周期性 0xCA 数据帧由绑定层主动推送, 不要求逐帧应答。*/

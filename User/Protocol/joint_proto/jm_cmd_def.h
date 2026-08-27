@@ -14,6 +14,7 @@
  * | 2026-06-18 | 1.0  | Dalin  | 初始创建 |
  * | 2026-07-27 | 1.1  | Dalin  | 协议版本号 + 命令码保留区 + 预留 0x80/0x81/0x82 同步触发, 0xCC~0xCF OTA |
  * | 2026-08-21 | 1.2  | Dalin  | 新增 0x60~0x67 负载模拟段 + JM_FEAT_LOAD_SIM, 协议版本升至 1.5 |
+ * | 2026-08-27 | 1.3  | Dalin  | 新增 0x07 SOFT_RESET 软件复位(魔数防误触), 协议版本升至 1.6 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        CMD 0x00~0xB8 段数值与 state_define.h 的 ctrl_mode_e 一致,
@@ -38,7 +39,7 @@ extern "C"
 	/* 主版本: 不兼容变更(命令码重排/载荷语义改); 次版本: 兼容追加(新命令/新字段);
 	 * 补丁: bug 修复。0xD0 READ_DEV_INFO 应答(FD 模式)携带此版本号。 */
 #define JM_PROTO_VERSION_MAJOR 1
-#define JM_PROTO_VERSION_MINOR 5 /* 1.5: 0x60~0x67 对拖台负载模拟段 */
+#define JM_PROTO_VERSION_MINOR 6 /* 1.6: 0x07 SOFT_RESET 软件复位 */
 #define JM_PROTO_VERSION_PATCH 0
 #define JM_PROTO_VERSION       ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
 
@@ -110,6 +111,7 @@ extern "C"
 		JM_CMD_ENABLE = 0x04,  /* 上使能 */
 		JM_CMD_DISABLE = 0x05, /* 下使能 */
 		JM_CMD_STOP = 0x06,    /* 停止运行 */
+		JM_CMD_SOFT_RESET = 0x07, /* 软件复位: {magic:u32} 应答ACK后延迟复位(防误触魔数) */
 
 		/* 运动控制 0x10~0x2F */
 		JM_CMD_OPEN_LOOP = 0x10,         /* 开环电压 ud,uq */
@@ -362,9 +364,10 @@ extern "C"
 #define JM_CAN_GET_MOTOR_ID(id)             ((uint8_t)((id) & 0xFF))
 #define JM_CAN_BROADCAST_ID                 0x00 /* 电机ID=0 为广播地址 */
 
-												 /* Bootloader/恢复出厂魔数(防误触) */
+												 /* Bootloader/恢复出厂/软件复位魔数(防误触) */
 #define JM_MAGIC_BOOTLOADER    0xB00710ADu
 #define JM_MAGIC_FACTORY_RESET 0xFAC70F5Fu
+#define JM_MAGIC_SOFT_RESET    0x5E7E7E5Eu
 
 #ifdef __cplusplus
 }

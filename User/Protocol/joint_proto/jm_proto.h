@@ -217,6 +217,11 @@ extern "C"
 		/* PID 参数实时读(CMD 0xA6): 随时可读, 返回当前 profile 中的值(4字节)。
 		 * ring/param_type 同 0xA5。可为 NULL(回 NACK)。*/
 		jm_err_e (*pid_param_get)(uint8_t ring, uint8_t param_type, uint8_t *out_value4);
+
+		/* 软件复位(CMD 0x07): magic 不匹配返回 JM_ERR_UNAUTHORIZED; 匹配则立即
+		 * 安全停机并应答 ACK, 由 jm_app_soft_reset_poll 延迟执行 NVIC_SystemReset,
+		 * 延迟窗口保证 ACK 发送完成与停机电流衰减。可为 NULL(回 NACK)。*/
+		jm_err_e (*soft_reset)(uint32_t magic);
 	} jm_proto_ops_t;
 
 	/* ---------------- 协议实例 ---------------- */

@@ -7,13 +7,13 @@
 >
 > 本协议同时覆盖**串口（USART）**与 **CAN/CAN FD**，逻辑命令码 `CMD` 两者共用，仅封装层不同。
 >
-> **协议版本**: 1.2（§AA1，由 0xD0 READ_DEV_INFO 应答携带，详见 `jm_cmd_def.h`）
+> **协议版本**: 1.6（§AA1，由 0xD0 READ_DEV_INFO 应答携带，详见 `jm_cmd_def.h`。1.6 新增 0x07 SOFT_RESET）
 
 ## 1. 命令码 CMD 分区
 
 | 区间 | 类别 | 说明 |
 |------|------|------|
-| 0x00–0x0F | 系统控制 | 使能/失能/停止/急停等，对应 `ctrl_mode_e` 基础指令 |
+| 0x00–0x0F | 系统控制 | 使能/失能/停止/急停/软件复位(0x07)等，对应 `ctrl_mode_e` 基础指令 |
 | 0x10–0x2F | 运动控制 | 开环/电流/力矩/MIT/速度/位置等闭环模式 |
 | 0x30–0x4F | 高级力控 | 阻抗/导纳/力位混合/重力补偿等 |
 | 0x50–0x6F | 轨迹同步 | PVT/样条/梯形/S型/回零/总线同步 |
@@ -225,6 +225,14 @@ CSV 描述应答为 `{hw_ver:u32;fw_ver:u32;uid:bytes12}`（20B），实际固�
 
 以下命令为占位实现或预留，量产前需评估补全：
 
+### 11.0 软件复位 0x07 SOFT_RESET（协议 1.6 新增）
+
+- 载荷 `{magic:u32=0x5E7E7E5E}`，魔数不匹配回 NACK(UNAUTHORIZED)。
+- 固件先安全停机（RUN→READY→IDLE，PWM 关断）并回 ACK，**延迟约 200ms** 后执行 `NVIC_SystemReset()`：延迟窗口保证 ACK 发送完成且停机后相电流衰减。
+- 上位机流程：发命令 → 等 ACK → 停止心跳判定约 1s → 0xD0 探测重连。
+- CAN 广播（电机ID=0）对本命令不开放（见 `jm_proto_can_broadcast_allowed` 白名单）。
+- 复位原因可从 `RCC->CSR` 的 SFTRSTF 位区分软件复位与上电/看门狗复位。
+
 ### 11.1 占位命令（仅切状态，不解析载荷）
 
 | CMD | 名称 | 状态 |
@@ -243,8 +251,9 @@ CSV 描述应答为 `{hw_ver:u32;fw_ver:u32;uid:bytes12}`（20B），实际固�
 
 | CMD | 名称 | 问题 |
 |-----|------|------|
-| 0xB2 | ENTER_BOOTLOADER | 不校验 magic，任何 0xB2 命令都会切到 BOOTLOADER 状态 |
 | 0xB4 | FACTORY_RESET | 不校验 magic，且不执行恢复出厂参数 |
+
+> 0xB2 ENTER_BOOTLOADER 的 magic 校验已于协议 1.6 补全（不匹配回 NACK UNAUTHORIZED），从本表移除。
 
 ### 11.3 预留命令（仅定义不实现，回 NACK）
 
