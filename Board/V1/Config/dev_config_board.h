@@ -27,45 +27,45 @@
  *   - 速率 ≤8Mbps (FD 数据段)
  *   - 待机功耗 <15µA
  * 详见方案文档 §AC1 收发器选型矩阵 */
-#define USE_CAN_FD_MODE             1   /* 1=启用 CAN FD 模式, 0=仅经典 CAN */
+#define USE_CAN_FD_MODE 1 /* 1=启用 CAN FD 模式, 0=仅经典 CAN */
 
 /* FDCAN 位定时 (FDCANCLK = PCLK1/2 = 85MHz)
  * 标称段 1Mbps: Prescaler=5, Sync(1)+TS1(12)+TS2(4)=17Tq, 采样点 76.5%
  * 数据段 8Mbps: Prescaler=1, Sync(1)+TS1(7)+TS2(3)=11Tq, 采样点 72.7% (§AC4 修正) */
-#define FDCAN_NOMINAL_BAUDRATE      1000000UL  /* 标称段 1Mbps */
-#define FDCAN_DATA_BAUDRATE         8000000UL  /* 数据段 8Mbps */
-#define FDCAN_NOMINAL_PRESCALER     5
-#define FDCAN_NOMINAL_TS1           12
-#define FDCAN_NOMINAL_TS2           4
-#define FDCAN_DATA_PRESCALER        1
-#define FDCAN_DATA_TS1              7
-#define FDCAN_DATA_TS2              3
+#define FDCAN_NOMINAL_BAUDRATE  1000000UL /* 标称段 1Mbps */
+#define FDCAN_DATA_BAUDRATE     8000000UL /* 数据段 8Mbps */
+#define FDCAN_NOMINAL_PRESCALER 5
+#define FDCAN_NOMINAL_TS1       12
+#define FDCAN_NOMINAL_TS2       4
+#define FDCAN_DATA_PRESCALER    1
+#define FDCAN_DATA_TS1          7
+#define FDCAN_DATA_TS2          3
 
-#define MOTOR_ID_DEFAULT            1   /* 本机默认 CAN 地址 (1~127) */
+#define MOTOR_ID_DEFAULT 1 /* 本机默认 CAN 地址 (1~127) */
 
 /* ===== 1.2 通信中断安全降级 (§Q13 已确认 TIMER 模式) =====
  * 收不到任何 CAN 帧 (含广播) 后:
  *   - 500ms 内: 保持最后指令 (HOLD)
  *   - 超过 500ms: 强制 IDLE 停机 */
-#define JM_CAN_LOSS_ACTION          2       /* 0=IDLE立即停, 1=HOLD保持, 2=TIMER超时停 */
-#define JM_CAN_LOSS_TIMEOUT_MS      500     /* TIMER 模式超时阈值 ms */
+#define JM_CAN_LOSS_ACTION     2   /* 0=IDLE立即停, 1=HOLD保持, 2=TIMER超时停 */
+#define JM_CAN_LOSS_TIMEOUT_MS 500 /* TIMER 模式超时阈值 ms */
 
 /* ===== 1.3 双通道主控仲裁 (§Q12 已确认开发期仅 motor_state 临界区) =====
  * 开发期: UART 和 CAN 可同时下发, 后写覆盖前写 (motor_state 临界区保证原子性)
  * 量产期: 改为 1 启用主控仲裁 (5s 超时释放, 首次控制类命令获取主控) */
-#define JM_DUAL_CHANNEL_ARB_ENABLE  0       /* 0=开发期关闭主控仲裁, 1=量产期启用 */
+#define JM_DUAL_CHANNEL_ARB_ENABLE 0 /* 0=开发期关闭主控仲裁, 1=量产期启用 */
 /* 注: motor_state 临界区 (__disable_irq) 始终启用, 与本宏无关 (§AH3) */
 
 /* ===== 1.4 鉴权令牌 (§Q15 已确认开发期关闭) =====
  * 开发期: 关闭鉴权, 便于调试
  * 量产期: 改为 1 启用, 产线工具写入随机令牌到 Flash (§AI1 出厂区扩展后) */
-#define JM_CAN_AUTH_ENABLE          0       /* 0=开发期关闭, 1=量产期启用 */
-#define JM_CAN_AUTH_TOKEN           0xA5A5A5A5UL  /* 占位, 量产时产线工具写入随机值 */
+#define JM_CAN_AUTH_ENABLE 0            /* 0=开发期关闭, 1=量产期启用 */
+#define JM_CAN_AUTH_TOKEN  0xA5A5A5A5UL /* 占位, 量产时产线工具写入随机值 */
 
 /* ===== 1.5 命令速率限制 (§Z2, 开发期默认启用防 Flash 损耗) =====
  * 对危险/高开销命令按类别设最小间隔, 超频返回 NACK(RATE_LIMIT)
  * 调试时若觉得间隔过严可临时设 0 关闭 */
-#define JM_RATE_LIMIT_ENABLE        1       /* 1=启用速率限制, 0=关闭 */
+#define JM_RATE_LIMIT_ENABLE 1 /* 1=启用速率限制, 0=关闭 */
 
 /* ===== 2. 编码器型号 =====
  * V1 板 MT6835 为主编码器接 SPI1, MT6701 为副编码器备料接 SPI3 */
@@ -74,7 +74,7 @@
 /* ===== 3. PWM 时基 (TIM1 中心对齐) =====*/
 #define HALF_BRIDGE_PWM_PERIOD (8500u)
 // TODO: 目前V1版硬件因为原理图设计问题（PWM HL 高度接反了），导致采样的时机反向
-#define HALF_BRIDGE_ADC_TRIG_CCR (200u) /* 谷底前 ~1.18µs 采样(下管导通窗口), 见上 */
+#define HALF_BRIDGE_ADC_TRIG_CCR (20u) /* 谷底前 ~1.18µs 采样(下管导通窗口), 见上 */
 
 /* ===== 4. 相电流采样链路 (外置 INA240A2 运放, GAIN=50V/V, 采样电阻 1mΩ) =====
  * V1 用外置 INA240A2 运放 (U26/U27/U28),采样电阻 R33/R34/R35 = 1mΩ (0.001Ω) */
