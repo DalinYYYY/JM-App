@@ -83,6 +83,8 @@ typedef struct
 int motor_observer_trace_start(uint32_t channel_mask, uint32_t rate_hz,
 		uint8_t packet_samples, float control_hz, uint16_t session_id,
 		motor_observer_trace_status_t *status);
+/* 运行中动态调整采样率(扫频逐频点钳制写入速率, 防缓冲溢出)。 */
+int motor_observer_trace_set_rate(uint32_t rate_hz, float control_hz);
 int motor_observer_trace_stop(void);
 /* 停止写入但保留缓存，最后一包置 LAST 后自动转 STOPPED。 */
 int motor_observer_trace_finish(void);

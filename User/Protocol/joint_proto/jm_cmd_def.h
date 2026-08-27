@@ -88,11 +88,12 @@ extern "C"
 #define JM_SWEEP_CONTROL_SWEEP_MASK        0x0Cu
 #define JM_SWEEP_CONTROL_FLAGS_MASK        0x03u
 #define JM_SWEEP_TEST_TORQUE_TO_VELOCITY   0u
-#define JM_SWEEP_TEST_CURRENT_TO_VELOCITY  1u
+#define JM_SWEEP_TEST_CURRENT_TO_VELOCITY  1u /* 方向一: 目标电流→速度(含电流环, 低频惯量辨识) */
 #define JM_SWEEP_TEST_CURRENT_TO_CURRENT   2u
 #define JM_SWEEP_TEST_VELOCITY_TO_POSITION 3u
 #define JM_SWEEP_TEST_VELOCITY_TO_VELOCITY 4u
 #define JM_SWEEP_TEST_POSITION_TO_POSITION 5u /* 方向二: 位置环闭环验证 */
+#define JM_SWEEP_TEST_CURRENT_MEAS_TO_VELOCITY 6u /* 方向一: 实测电流→速度(纯机械对象, 高频谐振/带宽) */
 #define JM_SWEEP_MODE_LINEAR               0u
 #define JM_SWEEP_MODE_LOG                  1u
 #define JM_SWEEP_MODE_STEP                 2u /* 1Hz固定步进, 频点数由起止频率决定 */

@@ -7,6 +7,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "motor_observer.h" /* motor_observer_trace_set_rate */
+
 #define MOTOR_SWEEP_MAX_POINTS       1024u
 #define MOTOR_SWEEP_SETTLE_CYCLES     3u
 #define MOTOR_SWEEP_MEASURE_CYCLES    8u
@@ -47,6 +49,7 @@ static void sweep_load_point(motor_ctrl_t *ctrl, uint16_t point)
 	float control_hz = 1.0f / ctrl->dt;
 	uint32_t period = sweep_period_ticks(control_hz,
 		ctrl->sweep_freq_mhz_table[point]);
+	uint32_t rate;
 	ctrl->sweep_point = point;
 	ctrl->sweep_phase_acc = 0u;
 	ctrl->sweep_phase_inc = ctrl->sweep_phase_inc_table[point];
@@ -55,17 +58,30 @@ static void sweep_load_point(motor_ctrl_t *ctrl, uint16_t point)
 		ctrl->sweep_freq_mhz_table[point]) * period;
 	ctrl->sweep_state_ticks = 0u;
 	ctrl->sweep_state = MOTOR_SWEEP_STATE_SETTLE;
+	/* 逐频点钳制 TRACE 采样率: 低频点按 16*f 降到下限, 使写入速率匹配
+	 * 通信排空能力, 避免 512 深缓冲溢出丢样; 高频点封顶会话起始采样率。
+	 * 16*f 下突发债务峰值(20*f 场景约 96 样本)压到 512 缓冲的零头,
+	 * 即使排空速率被遥测/链路抖动拉低 20% 仍无溢出。SETTLE 段不写
+	 * 样本, 采样率切换期间缓冲内容不变, 包头 rate 由 observer 按频点
+	 * 记录值打包, 不受切换瞬间的全局值影响。 */
+	rate = ctrl->sweep_freq_mhz_table[point] * 16u / 1000u;
+	if (rate < ctrl->sweep_trace_rate_min)
+		rate = ctrl->sweep_trace_rate_min;
+	if (rate > ctrl->sweep_trace_rate_start)
+		rate = ctrl->sweep_trace_rate_start;
+	(void)motor_observer_trace_set_rate(rate, control_hz);
 }
 
 static float sweep_amp_from_raw(uint8_t test_mode, uint16_t amp_raw)
 {
-	return (test_mode >= 3u) ? ((float)amp_raw * 0.01f) :
+	/* 速度/位置参考类模式(3~5)量纲 0.01; 力矩/电流类(0/1/2/6)量纲 0.001 */
+	return (test_mode >= 3u && test_mode <= 5u) ? ((float)amp_raw * 0.01f) :
 		((float)amp_raw * 0.001f);
 }
 
 static float sweep_bias_from_raw(uint8_t test_mode, int16_t bias_raw)
 {
-	return (test_mode >= 3u) ? ((float)bias_raw * 0.01f) :
+	return (test_mode >= 3u && test_mode <= 5u) ? ((float)bias_raw * 0.01f) :
 		((float)bias_raw * 0.001f);
 }
 
@@ -76,17 +92,18 @@ static int sweep_amp_valid(const motor_ctrl_t *ctrl, uint8_t test_mode,
 		return 0;
 	if (test_mode == 0u)
 		return amp <= ctrl->param->motor_base.peak_torque;
-	if (test_mode == 1u || test_mode == 2u)
+	if (test_mode == 1u || test_mode == 2u || test_mode == 6u)
 		return amp <= ctrl->param->motor_base.peak_current;
 	/* mode 3~5(速度/位置参考)统一按最大转速数值限幅:
 	 * 位置正弦幅值(rad)换算速度峰值 2*pi*f*A 才受真实约束,
 	 * 数值上限只是粗防呆, 行程安全由用户保证 */
-	if (test_mode >= 3u)
+	if (test_mode >= 3u && test_mode <= 5u)
 		return amp <= ctrl->param->motor_base.max_speed;
 	return 0;
 }
 
 int motor_sweep_configure(motor_ctrl_t *ctrl, const motor_sweep_config_t *cfg,
+	uint32_t trace_rate_min, uint32_t trace_rate_start,
 	uint16_t *point_count, uint32_t *duration_x100)
 {
 	float control_hz;
@@ -102,7 +119,7 @@ int motor_sweep_configure(motor_ctrl_t *ctrl, const motor_sweep_config_t *cfg,
 	if (ctrl == NULL || cfg == NULL || point_count == NULL ||
 		duration_x100 == NULL || ctrl->param == NULL || ctrl->dt <= 0.0f)
 		return -1;
-	if (cfg->test_mode > 5u || cfg->sweep_mode > 2u || cfg->flags != 0u ||
+	if (cfg->test_mode > 6u || cfg->sweep_mode > 2u || cfg->flags != 0u ||
 		cfg->point_cfg == 0u || cfg->point_cfg > MOTOR_SWEEP_MAX_POINTS ||
 		cfg->f_start_x10 == 0u || cfg->f_start_x10 > cfg->f_end_x10 ||
 		cfg->amp_raw == 0u)
@@ -114,7 +131,8 @@ int motor_sweep_configure(motor_ctrl_t *ctrl, const motor_sweep_config_t *cfg,
 	amp = sweep_amp_from_raw(cfg->test_mode, cfg->amp_raw);
 	bias = sweep_bias_from_raw(cfg->test_mode, cfg->bias_raw);
 	limit = (cfg->test_mode == 0u) ? ctrl->param->motor_base.peak_torque :
-		((cfg->test_mode <= 2u) ? ctrl->param->motor_base.peak_current :
+		((cfg->test_mode <= 2u || cfg->test_mode == 6u) ?
+		ctrl->param->motor_base.peak_current :
 		ctrl->param->motor_base.max_speed);
 	if (f_end > control_hz * 0.1f ||
 		!sweep_amp_valid(ctrl, cfg->test_mode, amp) ||
@@ -193,6 +211,8 @@ int motor_sweep_configure(motor_ctrl_t *ctrl, const motor_sweep_config_t *cfg,
 	ctrl->sweep_trace_sample_enable = 0u;
 	ctrl->sweep_trace_flags = 0u;
 	ctrl->sweep_finish_pending = 0u;
+	ctrl->sweep_trace_rate_min = trace_rate_min;
+	ctrl->sweep_trace_rate_start = trace_rate_start;
 	ctrl->sweep_active = 1u;
 	sweep_load_point(ctrl, 0u);
 	*point_count = count;
@@ -257,7 +277,8 @@ void motor_mode_test_sweep_run(motor_ctrl_t *ctrl)
 		ref->torque = ctrl->sweep_bias + sine * ctrl->sweep_amp;
 		ref->torque_ff = 0.0f;
 	}
-	else if (ctrl->sweep_test_mode == 1u || ctrl->sweep_test_mode == 2u)
+	else if (ctrl->sweep_test_mode == 1u || ctrl->sweep_test_mode == 2u ||
+		ctrl->sweep_test_mode == 6u)
 	{
 		ref->ctrl_type = REF_CTRL_CURRENT;
 		ref->id = 0.0f;

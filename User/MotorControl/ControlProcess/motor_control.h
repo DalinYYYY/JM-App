@@ -184,6 +184,9 @@ typedef struct
 	uint32_t sweep_settle_ticks;
 	uint32_t sweep_measure_ticks;
 	uint32_t sweep_total_ticks;
+	/* TRACE 采样率逐频点钳制范围: 低频点按 20*f 降到 min, 高频点封顶 start */
+	uint32_t sweep_trace_rate_min;
+	uint32_t sweep_trace_rate_start;
 	float sweep_amp;
 	float sweep_bias;
 	uint32_t sweep_phase_inc_table[1024];
@@ -209,8 +212,10 @@ void motor_ctrl_init(motor_ctrl_t *ctrl, motor_param_t *param, float dt);
  */
 void motor_ctrl_dispatch(motor_ctrl_t *ctrl);
 
-/* 扫频配置在通信线程调用，逐拍参考生成由 motor_ctrl_dispatch 调用。 */
+/* 扫频配置在通信线程调用，逐拍参考生成由 motor_ctrl_dispatch 调用。
+ * trace_rate_min/start 为 TRACE 采样率逐频点钳制范围(协议层按测试对象确定)。 */
 int motor_sweep_configure(motor_ctrl_t *ctrl, const motor_sweep_config_t *cfg,
+                          uint32_t trace_rate_min, uint32_t trace_rate_start,
                           uint16_t *point_count, uint32_t *duration_x100);
 void motor_sweep_abort(motor_ctrl_t *ctrl);
 int motor_sweep_is_active(const motor_ctrl_t *ctrl);

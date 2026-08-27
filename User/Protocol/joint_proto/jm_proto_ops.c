@@ -328,7 +328,7 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 #endif
 	else
 		return JM_ERR_LENGTH;
-	if (cfg.test_mode > JM_SWEEP_TEST_POSITION_TO_POSITION || cfg.sweep_mode > JM_SWEEP_MODE_STEP || cfg.flags != 0u)
+	if (cfg.test_mode > JM_SWEEP_TEST_CURRENT_MEAS_TO_VELOCITY || cfg.sweep_mode > JM_SWEEP_MODE_STEP || cfg.flags != 0u)
 		return JM_ERR_OUT_OF_RANGE;
 
 	s_sweep_session_id++;
@@ -346,14 +346,23 @@ static jm_err_e app_test_sweep(const uint8_t *pl, uint16_t len,
 		rate_hz = control_hz;
 	if (rate_hz < (uint32_t)((float)cfg.f_end_x10 * 0.1f * 10.0f + 0.5f))
 		return JM_ERR_OUT_OF_RANGE;
-	channel_mask = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ? (MOTOR_OBS_IQ_REF | MOTOR_OBS_IQ) : ((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION) ? (MOTOR_OBS_VEL_REF | MOTOR_OBS_POS) : ((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_VELOCITY) ? (MOTOR_OBS_VEL_REF | MOTOR_OBS_VEL) : ((cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION) ? (MOTOR_OBS_POS_REF | MOTOR_OBS_POS) : (MOTOR_OBS_IQ_REF | MOTOR_OBS_VEL))));
-	/* 每包24样本(2通道227B载荷): 降低包率, 使2k~10kHz采样率下
-	 * 1ms通信周期+阻塞串口发送也能满足实时排空。 */
+	/* 机械扫频双模式: 模式0/1输入取目标电流(IQ_REF, 无采样噪声,
+	 * 低频段电流环增益高、实测≈目标, 惯量辨识干净稳定);
+	 * 模式6输入取实测电流(IQ, 高频段电流环跟不上目标时仍反映真正
+	 * 进入机械对象的电流, 谐振/带宽测量不受电流环跟踪误差污染)。
+	 * 模式3输入取实测速度; 验证模式(2/4/5)测闭环传函 T(s)=反馈/参考,
+	 * 输入保持参考通道。 */
+	channel_mask = (cfg.test_mode == JM_SWEEP_TEST_CURRENT_TO_CURRENT) ? (MOTOR_OBS_IQ_REF | MOTOR_OBS_IQ) : ((cfg.test_mode == JM_SWEEP_TEST_CURRENT_MEAS_TO_VELOCITY) ? (MOTOR_OBS_IQ | MOTOR_OBS_VEL) : ((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_POSITION) ? (MOTOR_OBS_VEL | MOTOR_OBS_POS) : ((cfg.test_mode == JM_SWEEP_TEST_VELOCITY_TO_VELOCITY) ? (MOTOR_OBS_VEL_REF | MOTOR_OBS_VEL) : ((cfg.test_mode == JM_SWEEP_TEST_POSITION_TO_POSITION) ? (MOTOR_OBS_POS_REF | MOTOR_OBS_POS) : (MOTOR_OBS_IQ_REF | MOTOR_OBS_VEL)))));
+	/* 每包24样本(2通道227B载荷) + 采样率逐频点钳制(20*f, 下限 rate_min):
+	 * 会话起始采样率仅作用于最高频点, 低频点写入速率降至排空能力内,
+	 * 避免 512 深 TRACE 缓冲溢出在组包前丢样(丢包包序无跳变、仅
+	 * first_sample_index 跳变, 上位机无法归因修复)。 */
 	if (motor_observer_trace_start(channel_mask, rate_hz, 24u,
 	                               1.0f / loop->current.dt, cfg.session_id, &trace_status)
 	    != 0)
 		return motor_observer_trace_is_busy() ? JM_ERR_BUSY : JM_ERR_OUT_OF_RANGE;
-	if (motor_sweep_configure(ctrl, &cfg, &point_count, &duration_x100) != 0)
+	if (motor_sweep_configure(ctrl, &cfg, rate_min_hz, rate_hz,
+		&point_count, &duration_x100) != 0)
 	{
 		motor_observer_trace_stop();
 		return JM_ERR_OUT_OF_RANGE;
@@ -637,7 +646,7 @@ static jm_err_e app_set_mode(uint8_t cmd, const uint8_t *pl, uint16_t len)
 				{
 					ret = JM_ERR_STATE_DENY;
 					goto done;
-				}                          /* NACK(0x03) 前置标定未完成 */
+				} /* NACK(0x03) 前置标定未完成 */
 				ret = JM_ERR_OUT_OF_RANGE; /* NACK(0x02) submode 不合法 */
 				goto done;
 			}
