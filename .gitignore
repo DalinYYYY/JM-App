@@ -42,5 +42,6 @@ JLinkLog.txt
 Board/V1/MDK-ARM/JointMotorApp/
 build_log.txt
 
-# 本地开发计划文档（不入库）
+# 本地开发工作（不入库）
 User/Data/plans/
+User/Tools/SimpleGUI
