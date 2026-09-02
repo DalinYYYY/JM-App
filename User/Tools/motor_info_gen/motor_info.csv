@@ -6,34 +6,34 @@ safety_limit,安全限制使能,SystemParam,RW,uint32_t,1,0,1,,0x0040,3,安全�
 total_runtime_s,累计运行时间,SystemParam,RW,uint32_t,0,0,4294967295,s,0x0040,4,累计运行时间 掉电保存 运维统计 定期写入防频繁擦写
 save_count,固化次数,SystemParam,RW,uint32_t,0,0,4294967295,,0x0040,5,固化(保存)次数 每次0xEA保存成功自增 达寿命阈值拒绝写入
 is_calibrated,电机是否校准,MotorCalibParam,RW,uint32_t,0,0,1,,0x0080,16,电机标定标记 0未校准 1已校准
-pole_pairs,电机极对数,MotorCalibParam,RW,uint32_t,7,1,128,pairs,0x0080,17,电机极对数 电角度=机械角×极对数
+pole_pairs,电机极对数 p,MotorCalibParam,RW,uint32_t,7,1,128,pairs,0x0080,17,电机极对数 电角度=机械角×极对数
 motor_type,电机类型,MotorCalibParam,RW,uint32_t,0,0,2,,0x0080,18,电机类型 0:SPMSM 1:IPMSM 2:BLDC
 direction,电机方向,MotorCalibParam,RW,uint32_t,0,0,1,,0x0080,19,电机输出方向 0正向 1反向
-phase_resistance,相电阻,MotorCalibParam,RW,float,3.6,0.001,50,ohm,0x0080,20,相电阻(标定) 电流环Ki=ωc·R依赖
-phase_inductance_d,d轴相电感,MotorCalibParam,RW,float,0.0048,0.000001,0.1,H,0x0080,21,d轴电感(标定) 电流环Kp=ωc·Ld依赖
-phase_inductance_q,q轴相电感,MotorCalibParam,RW,float,0.0048,0.000001,0.1,H,0x0080,22,q轴电感(标定) 电流环Kp=ωc·Lq依赖 一般略大于Ld
-flux_linkage,永磁体磁链,MotorCalibParam,RW,float,0.02,0.00001,1,Wb,0x0080,23,永磁体磁链 反电势/BEMF前馈计算依赖
-torque_constant,转矩常数,MotorCalibParam,RW,float,0.21,0.00001,50,Nm/A,0x0080,24,转矩常数Kt 速度环Kp=J·ωc/Kt依赖
-rotor_inertia,转子惯量,MotorCalibParam,RW,float,0.00001,0.0000001,1,kg·m²,0x0080,25,转子惯量 速度环Kp/Ki依赖
-friction_coulomb,库仑摩擦力矩,MotorCalibParam,RW,float,0,0,500,Nm,0x0080,26,库仑摩擦力矩 摩擦前馈/辨识
-friction_viscous,粘滞摩擦系数,MotorCalibParam,RW,float,0,0,100,Nm/(rad/s),0x0080,27,粘滞摩擦系数 摩擦前馈/辨识
-gear_ratio,减速比,MotorCalibParam,RW,float,100,1,10000,,0x0080,28,减速比 输入转速/输出转速 惯量与力矩折算依赖
-gear_efficiency,减速器效率,MotorCalibParam,RW,float,0.85,0.1,1,,0x0080,29,减速器效率 输出力矩折算
+phase_resistance,相电阻 Rs,MotorCalibParam,RW,float,3.6,0.001,50,ohm,0x0080,20,相电阻(标定) 电流环Ki=ωc·R依赖
+phase_inductance_d,d轴相电感 Ld,MotorCalibParam,RW,float,0.0048,0.000001,0.1,H,0x0080,21,d轴电感(标定) 电流环Kp=ωc·Ld依赖
+phase_inductance_q,q轴相电感 Lq,MotorCalibParam,RW,float,0.0048,0.000001,0.1,H,0x0080,22,q轴电感(标定) 电流环Kp=ωc·Lq依赖 一般略大于Ld
+flux_linkage,永磁体磁链 ψf,MotorCalibParam,RW,float,0.02,0.00001,1,Wb,0x0080,23,永磁体磁链 反电势/BEMF前馈计算依赖
+torque_constant,转矩常数 Kt,MotorCalibParam,RW,float,0.21,0.00001,50,Nm/A,0x0080,24,转矩常数Kt 速度环Kp=J·ωc/Kt依赖
+rotor_inertia,转子惯量 J,MotorCalibParam,RW,float,0.00001,0.0000001,1,kg·m²,0x0080,25,转子惯量 速度环Kp/Ki依赖
+friction_coulomb,库仑摩擦力矩 Tf,MotorCalibParam,RW,float,0,0,500,Nm,0x0080,26,库仑摩擦力矩 摩擦前馈/辨识
+friction_viscous,粘滞摩擦系数 B,MotorCalibParam,RW,float,0,0,100,Nm/(rad/s),0x0080,27,粘滞摩擦系数 摩擦前馈/辨识
+gear_ratio,减速比 i,MotorCalibParam,RW,float,100,1,10000,,0x0080,28,减速比 输入转速/输出转速 惯量与力矩折算依赖
+gear_efficiency,减速器效率 η,MotorCalibParam,RW,float,0.85,0.1,1,,0x0080,29,减速器效率 输出力矩折算
 calibration_current,校准电流,MotorCalibParam,RW,float,0.5,0.1,50,A,0x0080,30,R/L标定施加电流 注意发热
 resistance_calib_max_voltage,电阻校准最大电压,MotorCalibParam,RW,float,3,0.1,60,V,0x0080,31,R标定电压限幅 防过流
-current_lim,峰值电流限制,MotorCalibParam,RW,float,3.7,0.1,500,A,0x0080,32,硬件峰值电流限幅 瞬时保护
-current_control_bandwidth,电流环带宽,MotorCalibParam,RW,float,500,50,20000,Hz,0x0080,33,电流环带宽 autotune据此计算电流环PID
+current_lim,峰值电流限制 Imax,MotorCalibParam,RW,float,3.7,0.1,500,A,0x0080,32,硬件峰值电流限幅 瞬时保护
+current_control_bandwidth,电流环带宽 ωc,MotorCalibParam,RW,float,500,50,20000,Hz,0x0080,33,电流环带宽 autotune据此计算电流环PID
 enc_type,编码器类型,MotorCalibParam,RW,uint32_t,1,0,10,,0x0080,34,编码器类型 0:ABZ 1:MT6701 2:MT6835 3:霍尔
 enc_lines,编码器分辨率,MotorCalibParam,RW,uint32_t,16384,100,10000000,CPR,0x0080,35,编码器分辨率 SPI绝对值为分辨率 增量式CPR
 enc_direction,编码器计数方向,MotorCalibParam,RW,int32_t,1,-1,1,,0x0080,36,编码器计数方向 1正向 -1反向
-enc_offset,编码器位置偏移,MotorCalibParam,RW,float,0,-360.0,360.0,deg,0x0080,37,编码器零点偏移 校准后保存
-elec_angle_bias,电角度偏移,MotorCalibParam,RW,float,0,-3.1416,3.1416,rad,0x0080,38,电角度偏置 FOC换相对齐 校准后保存
-pwm_freq_hz,PWM载波频率,MotorCalibParam,RW,uint32_t,20000,1000,200000,Hz,0x0080,39,PWM载波频率 决定开关与电流采样频率
-dead_time_ns,PWM死区时间,MotorCalibParam,RW,float,500,50,5000,ns,0x0080,40,PWM死区时间 防桥臂直通
-shunt_resistance,电流采样电阻,MotorCalibParam,RW,float,0.01,0.0001,1,ohm,0x0080,41,电流采样电阻阻值 电流计算依赖
-current_amp_gain,电流放大增益,MotorCalibParam,RW,float,50,1,10000,,0x0080,42,电流采样运放增益 电流计算依赖
-peak_current,峰值电流,MotorCalibParam,RW,float,3.7,0.1,200,A,0x0080,43,电机峰值电流限幅 切换电机型号需同步
-max_speed,最大转速,MotorCalibParam,RW,float,200,10,1000,rad/s,0x0080,44,电机最大转速限幅 切换电机型号需同步
+enc_offset,编码器位置偏移 θ0,MotorCalibParam,RW,float,0,-360.0,360.0,deg,0x0080,37,编码器零点偏移 校准后保存
+elec_angle_bias,电角度偏置 θe0,MotorCalibParam,RW,float,0,-3.1416,3.1416,rad,0x0080,38,电角度偏置 FOC换相对齐 校准后保存
+pwm_freq_hz,PWM载波频率 fpwm,MotorCalibParam,RW,uint32_t,20000,1000,200000,Hz,0x0080,39,PWM载波频率 决定开关与电流采样频率
+dead_time_ns,PWM死区时间 Td,MotorCalibParam,RW,float,500,50,5000,ns,0x0080,40,PWM死区时间 防桥臂直通
+shunt_resistance,电流采样电阻 Rsh,MotorCalibParam,RW,float,0.01,0.0001,1,ohm,0x0080,41,电流采样电阻阻值 电流计算依赖
+current_amp_gain,电流放大增益 G,MotorCalibParam,RW,float,50,1,10000,,0x0080,42,电流采样运放增益 电流计算依赖
+peak_current,峰值电流 Ipk,MotorCalibParam,RW,float,3.7,0.1,200,A,0x0080,43,电机峰值电流限幅 切换电机型号需同步
+max_speed,最大转速 ωmax,MotorCalibParam,RW,float,200,10,1000,rad/s,0x0080,44,电机最大转速限幅 切换电机型号需同步
 device_zero,设备零度,DeviceParam,RW,float,0,-12.566,12.566,rad,0x0100,48,设备机械零点位置
 device_time,设备生产日期,DeviceParam,RW,uint32_t,0,0,99999999,,0x0100,49,设备生产日期 YYYYMMDD格式
 can_id,CAN节点ID,DeviceParam,RW,uint32_t,1,1,127,,0x0100,50,CAN节点ID 0保留为广播
@@ -42,26 +42,26 @@ can_timeout_s,CAN通信超时,DeviceParam,RW,float,0.5,0,60,s,0x0100,52,CAN通�
 can_fd_enable,CAN FD使能,DeviceParam,RW,uint32_t,0,0,1,,0x0100,53,CAN FD使能 0传统CAN 1:CAN FD
 can_fd_baudrate,CAN FD数据波特率,DeviceParam,RW,uint32_t,8000000,100000,8000000,bps,0x0100,54,CAN FD数据段波特率
 uart_baudrate,UART波特率,DeviceParam,RW,uint32_t,115200,1200,8000000,bps,0x0100,55,UART串口波特率
-kp_ld,d轴比例增益,ControlParam,RW,float,0.5,0,1000,V/A,0x0140,64,电流环d轴P增益 autotune默认Kp=ωc·Ld
-ki_ld,d轴积分增益,ControlParam,RW,float,10,0,100000,V/(A·s),0x0140,65,电流环d轴I增益 autotune默认Ki=ωc·R
-kp_lq,q轴比例增益,ControlParam,RW,float,0.5,0,1000,V/A,0x0140,66,电流环q轴P增益 autotune默认Kp=ωc·Lq
-ki_lq,q轴积分增益,ControlParam,RW,float,10,0,100000,V/(A·s),0x0140,67,电流环q轴I增益 autotune默认Ki=ωc·R
+kp_ld,d轴比例增益 Kp_d,ControlParam,RW,float,0.5,0,1000,V/A,0x0140,64,电流环d轴P增益 autotune默认Kp=ωc·Ld
+ki_ld,d轴积分增益 Ki_d,ControlParam,RW,float,10,0,100000,V/(A·s),0x0140,65,电流环d轴I增益 autotune默认Ki=ωc·R
+kp_lq,q轴比例增益 Kp_q,ControlParam,RW,float,0.5,0,1000,V/A,0x0140,66,电流环q轴P增益 autotune默认Kp=ωc·Lq
+ki_lq,q轴积分增益 Ki_q,ControlParam,RW,float,10,0,100000,V/(A·s),0x0140,67,电流环q轴I增益 autotune默认Ki=ωc·R
 integral_limit,积分限幅,ControlParam,RW,float,12,0,1000,V,0x0140,68,电流环积分输出限幅 建议Kp_q×额定电流×1.5
 decoupling_gain,dq轴解耦增益,ControlParam,RW,float,1,0,5,,0x0140,69,dq轴解耦增益 0~1 调试期可适当增大
-comp_du_V,死区补偿电压,ControlParam,RW,float,0,0,20,V,0x0140,70,死区补偿电压 补偿死区非线性
-pwm_duty_max,PWM最大占空比,ControlParam,RW,float,0.9,0.1,0.99,,0x0140,71,PWM最大占空比 防过调制
-kp_s,速度环比例增益,ControlParam,RW,float,0.1,0,10000,A/(rad/s),0x0140,72,速度环P增益 autotune默认Kp=J·ωc/Kt
-ki_s,速度环积分增益,ControlParam,RW,float,1,0,100000,A/rad,0x0140,73,速度环I增益 autotune默认Ki=J·ωc²/(4Kt)
+comp_du_V,死区补偿电压 Δu,ControlParam,RW,float,0,0,20,V,0x0140,70,死区补偿电压 补偿死区非线性
+pwm_duty_max,PWM最大占空比 Dmax,ControlParam,RW,float,0.9,0.1,0.99,,0x0140,71,PWM最大占空比 防过调制
+kp_s,速度环比例增益 Kp_s,ControlParam,RW,float,0.1,0,10000,A/(rad/s),0x0140,72,速度环P增益 autotune默认Kp=J·ωc/Kt
+ki_s,速度环积分增益 Ki_s,ControlParam,RW,float,1,0,100000,A/rad,0x0140,73,速度环I增益 autotune默认Ki=J·ωc²/(4Kt)
 speed_integral_limit,速度环积分限幅,ControlParam,RW,float,10,0,1000,A,0x0140,74,速度环积分限幅 建议额定电流×0.5
 vff,速度前馈系数,ControlParam,RW,float,1,0,5,,0x0140,75,速度前馈系数 0~1 减小跟随误差
 aff,加速度前馈系数,ControlParam,RW,float,0,0,5,,0x0140,76,加速度前馈系数 0~1 改善动态性能
 jerk_ff,加加速度前馈系数,ControlParam,RW,float,0,0,5,,0x0140,77,加加速度前馈系数 0~1
-speed_filter_alpha,速度滤波系数,ControlParam,RW,float,0.1,0,1,,0x0140,78,速度一阶低通滤波系数 越大滤波越弱
+speed_filter_alpha,速度滤波系数 α,ControlParam,RW,float,0.1,0,1,,0x0140,78,速度一阶低通滤波系数 越大滤波越弱
 speed_filter_enable,速度滤波使能,ControlParam,RW,uint32_t,0,0,1,,0x0140,79,速度滤波使能 0禁1启
-kp_p,位置环比例增益,ControlParam,RW,float,10,0,10000,Hz,0x0140,80,位置环P增益(带宽Hz) autotune默认Kp=2π·f
-ki_p,位置环积分增益,ControlParam,RW,float,0,0,10000,1/s,0x0140,81,位置环I增益 一般为0
+kp_p,位置环比例增益 Kp_p,ControlParam,RW,float,10,0,10000,Hz,0x0140,80,位置环P增益(带宽Hz) autotune默认Kp=2π·f
+ki_p,位置环积分增益 Ki_p,ControlParam,RW,float,0,0,10000,1/s,0x0140,81,位置环I增益 一般为0
 position_integral_limit,位置环积分限幅,ControlParam,RW,float,0,0,1000,rad,0x0140,82,位置环积分输出限幅
-position_filter_alpha,位置滤波系数,ControlParam,RW,float,0.1,0,1,,0x0140,83,位置一阶低通滤波系数
+position_filter_alpha,位置滤波系数 α,ControlParam,RW,float,0.1,0,1,,0x0140,83,位置一阶低通滤波系数
 position_filter_enable,位置滤波使能,ControlParam,RW,uint32_t,0,0,1,,0x0140,84,位置滤波使能 0禁1启
 following_error_limit,跟随误差限制,ControlParam,RW,float,1000,0,1000000,P,0x0140,85,位置跟随误差保护阈值 调试期可放大
 decouple_algo,交叉解耦算法,ControlParam,RW,uint32_t,1,0,2,,0x0140,86,交叉解耦算法 0:NONE 1:FEEDFORWARD 2:FEEDBACK
@@ -79,10 +79,10 @@ position_following_error_p,位置跟随误差保护,ProtectCommParam,RW,int32_t,
 pos_limit_min,位置下限,ProtectCommParam,RW,int32_t,-1000000,-10000000,0,P,0x0280,136,硬件位置下限
 pos_limit_max,位置上限,ProtectCommParam,RW,int32_t,1000000,0,10000000,P,0x0280,137,硬件位置上限
 error_enable_mask,保护使能掩码,ProtectCommParam,RW,uint32_t,4294967295,0,4294967295,,0x0280,138,保护使能掩码 bit0过流 bit1过压 bit2欠压 bit3过温 bit4过速 bit5跟随误差
-mit_kp,MIT位置刚度,AdvancedAlgoParam,RW,float,10,0,10000,Nm/rad,0x0300,160,MIT模式位置刚度 Kp 决定弹性力矩Kp·Δθ
-mit_kd,MIT速度阻尼,AdvancedAlgoParam,RW,float,0.1,0,1000,Nm/(rad/s),0x0300,161,MIT模式速度阻尼 Kd 决定阻尼力矩Kd·ω
-mit_max_current,MIT最大电流,AdvancedAlgoParam,RW,float,10,0,500,A,0x0300,162,MIT模式输出电流上限
-mit_feedforward_torque,MIT前馈力矩,AdvancedAlgoParam,RW,float,0,0,500,Nm,0x0300,163,MIT模式前馈力矩偏置
+mit_kp,MIT位置刚度 Kp,AdvancedAlgoParam,RW,float,10,0,10000,Nm/rad,0x0300,160,MIT模式位置刚度 Kp 决定弹性力矩Kp·Δθ
+mit_kd,MIT速度阻尼 Kd,AdvancedAlgoParam,RW,float,0.1,0,1000,Nm/(rad/s),0x0300,161,MIT模式速度阻尼 Kd 决定阻尼力矩Kd·ω
+mit_max_current,MIT最大电流 Imax,AdvancedAlgoParam,RW,float,10,0,500,A,0x0300,162,MIT模式输出电流上限
+mit_feedforward_torque,MIT前馈力矩 τff,AdvancedAlgoParam,RW,float,0,0,500,Nm,0x0300,163,MIT模式前馈力矩偏置
 force_kp,力控比例增益,AdvancedAlgoParam,RW,float,1,0,10000,A/Nm,0x0300,164,力控比例增益 力矩误差→电流
 force_ki,力控积分增益,AdvancedAlgoParam,RW,float,0.1,0,10000,A/(Nm·s),0x0300,165,力控积分增益 消除稳态力矩误差
 force_limit,力控力矩限制,AdvancedAlgoParam,RW,float,10,0,1000,Nm,0x0300,166,力控输出力矩上限

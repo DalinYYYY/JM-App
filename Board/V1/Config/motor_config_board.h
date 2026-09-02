@@ -7,6 +7,6 @@
  *   - 启用 Flash 的板运行期可通过 0xE7/0xEA 在线换电机，无需改此处
  *   - 未定义本宏的板由 motor_profile.h 兜底为 GM4820H
  * ====================================================================== */
-#define MOTOR_PROFILE_BOARD MOTOR_PROFILE_RS03 /* V1 对拖台用 RS03 关节电机 */
+#define MOTOR_PROFILE_BOARD MOTOR_PROFILE_QH8919 /* V1 台架现配强和 QH8919 关节电机 */
 
 #endif /* __MOTOR_CONFIG_BOARD_V1_H__ */

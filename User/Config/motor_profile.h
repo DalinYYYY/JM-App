@@ -1,8 +1,8 @@
 #ifndef __MOTOR_PROFILE_H__
 #define __MOTOR_PROFILE_H__
 
-#include "motor_param.h" /* motor_param_t：sync_to_param 参数类型 */
-#include "motor_info.h"  /* motor_info_t：sync_to_param 参数类型 */
+#include "motor_param.h"  /* motor_param_t：sync_to_param 参数类型 */
+#include "motor_info.h"   /* motor_info_t：sync_to_param 参数类型 */
 #include "board_select.h" /* 板级电机选型 MOTOR_PROFILE_BOARD */
 
 /* ===================== 电机参数配置文件（首次上电 fallback 默认值）=====================
@@ -33,15 +33,17 @@
 #define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
 #define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
 #define MOTOR_PROFILE_RS03     4 /* RS03 关节电机 */
+#define MOTOR_PROFILE_QH8919   5 /* 强和 QH8919 关节电机 */
 
 /* ===================== 型号选择（板级 motor_config_board.h 覆盖）===================== */
 #ifndef MOTOR_PROFILE_BOARD
 #define MOTOR_PROFILE_BOARD MOTOR_PROFILE_GM4820H /* 板级未指定时兜底 */
 #endif
-#if (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_GM4820H) \
-    && (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_5010_360) \
-    && (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_DEMO) \
-    && (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_RS03)
+#if (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_GM4820H)     \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_5010_360) \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_DEMO)     \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_RS03)     \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_QH8919)
 #error "MOTOR_PROFILE_BOARD 非法，请检查板级 motor_config_board.h 的型号编号"
 #endif
 #define MOTOR_PROFILE MOTOR_PROFILE_BOARD
@@ -141,6 +143,32 @@
 #define MOTOR_RATED_TORQUE    3.183f    /* 额定转矩(Nm) */
 #define MOTOR_PEAK_TORQUE     9.55f     /* 峰值转矩(Nm) ≈ KT×峰值电流 */
 #define MOTOR_INERTIA         4.7e-5f   /* 转子惯量(kg·m²) */
+
+#elif MOTOR_PROFILE == MOTOR_PROFILE_QH8919
+/* 强和 QH8919 关节电机（参数来源：本机实测标定 2026-08，台架：V1板+MT6835+磁滞对拖台）
+ * 额定 3500rpm / 1.6Nm / 13A / DC48V / 极对数14 / 直连无减速器
+ * 标定链自洽性（已验证：堵转功率账 + 50rad/s@1Nm 带载功率账均闭合）:
+ *   KT = 额定转矩/额定电流 = 1.6/13 ≈ 0.126 Nm/A（与实测 0.126 一致）
+ *   flux = KT/(1.5·pp) = 0.126/21 ≈ 6.01e-3 Wb（实测 6.012e-3）
+ *   KE = flux·pp ≈ 0.0842 V/(rad/s)
+ * 48V 电压极限（SVPWM 线性区 48/√3 ≈ 27.7V，含 R·I 压降与交叉项）:
+ * 时间常数 τ = L/R = 0.175mH/0.085Ω ≈ 2.1ms */
+#define MOTOR_NAME            "QH8919"
+#define MOTOR_R               0.085f    /* 相电阻(Ω) 实测 0.0852 */
+#define MOTOR_LD              0.165e-3f /* d轴电感(H) 实测 165µH */
+#define MOTOR_LQ              0.175e-3f /* q轴电感(H) 实测 175µH */
+#define MOTOR_FLUX            6.012e-3f /* 磁链(Wb) 实测，与KT自洽 */
+#define MOTOR_KT              0.106f    /* 转矩常数(Nm/A) = 额定转矩/额定电流 */
+#define MOTOR_KE              0.0842f   /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      14        /* 极对数 开环扫描实测 */
+#define MOTOR_RATED_CURRENT   15.0f     /* 额定电流(A) = 额定转矩/KT */
+#define MOTOR_PEAK_CURRENT    20.0f     /* 峰值电流(A) 运行期限幅(与 id 43 配置一致) */
+#define MOTOR_MAX_SPEED       330.0f    /* 最大转速(rad/s) 48V线性区极限 ~3150rpm */
+#define MOTOR_RATED_VOLTAGE   48.0f     /* 直流母线电压(V) */
+#define MOTOR_RATED_SPEED_RPM 2830.0f   /* 额定转速(rpm) 48V下13A带载极限 */
+#define MOTOR_RATED_TORQUE    1.6f      /* 额定转矩(Nm) */
+#define MOTOR_PEAK_TORQUE     2.52f     /* 峰值转矩(Nm) = KT×峰值电流 */
+#define MOTOR_INERTIA         1.26e-3f  /* 惯量(kg·m²) 扫频辨识值(含磁滞台转子)，装机后应重估 */
 
 #else
 #error "未知 MOTOR_PROFILE，请在 motor_profile.h 中定义有效的电机型号编号"
