@@ -91,7 +91,10 @@
  * V1 无独立 IBUS 采样硬件 , 使用三相电流 + SVPWM 占空比合成
  * 合成公式: Ibus = da*Ia + db*Ib + dc*Ic (功率守恒推导, 详见 dev_power_monitor.c)
  * IBUS 来源由配置表 type=PM_CH_IBUS_SYNTH 表达, 不再用 PM_IBUS_SOURCE 宏 */
-/* NTC1(PB0)/NTC2(PB1) 温度采样通道硬件已布线, 驱动层暂返回0占位 (计算逻辑待实现) */
+/* NTC1(PB0=CH15)→驱动器(PCB)温度, NTC2(PB1=CH12)→电机温度
+ * 电路: NTC 接 3.3V + 10kΩ 下拉到地(PM_NTC_PULLDOWN_KOHM), 驱动层查表解算
+ * 板载 NTC_FET 为 10k 规格(默认表); 电机 NTC 为领技 CA-NTC24C018(100k@25℃, B=3950),
+ * 配置表经 ntc_table 字段指定 100k 分度表 */
 
 /* ===== 7. 电源监控通道数 =====
  * V1: VBUS + IBUS_SYNTH + NTC1(TEMP_DRIVER) + NTC2(TEMP_MOTOR) = 4 通道 */

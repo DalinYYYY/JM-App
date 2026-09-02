@@ -33,7 +33,18 @@
 #define PM_VREF          (3.3f)  /* ADC 参考电压 */
 #define PM_RESOLUTION    (4096.0f) /* 12-bit ADC */
 #define PM_IBUS_OFFSET_V (1.65f) /* INA199B1 REF=VREF/2, 零电流偏置电压 */
-#define PM_TEMP_RATIO    (10.0f) /* 温度采样分压比 */
+/* NTC 电路接地侧电阻(kΩ): NTC 接 3.3V、该电阻下拉到地(通道 scale 字段引用)
+ * 换算公式还原接 VREF 侧 NTC 阻值: r = (VREF-v)/v * R_pulldown
+ * 分度表见 dev_power_monitor.c: 10k 表(-40~125℃) / 100k 表(领技CA-NTC24C018, -30~230℃),
+ * 板级配置表经 ntc_table 字段选用, 默认 10k 表 */
+#ifndef PM_NTC_PULLDOWN_KOHM
+#define PM_NTC_PULLDOWN_KOHM (10.0f)
+#endif
+/* 温度一阶低通滤波系数(20ms 周期线程, alpha=0.25 → 时间常数约 60ms)
+ * NTC 热惯性为秒级, 此滤波仅抑制 ADC 噪声与查表量化毛刺 */
+#ifndef PM_TEMP_LPF_ALPHA
+#define PM_TEMP_LPF_ALPHA (0.25f)
+#endif
 /* 合成母线电流低通滤波系数 (SYNTH 源专用)
  * 抑制小电流时三相采样噪声叠加导致的波动, alpha=0.05 时 10kHz 采样下时间常数约 2ms */
 #ifndef PM_IBUS_LPF_ALPHA

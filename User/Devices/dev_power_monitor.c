@@ -3,8 +3,8 @@
  * @brief       电源监控设备(ADC规则组DMA采样: 母线电压/电流/温度等板级监控量)
  *
  * @author      Dalin (dalinyy@163.com)
- * @version     1.2
- * @date        2026-07-21
+ * @version     1.4
+ * @date        2026-08-28
  *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
  *
@@ -14,6 +14,8 @@
  * | 2024-10-31 | 1.0  | Dalin  | 初始创建(dev_adc)                          |
  * | 2026-06-17 | 1.1  | Dalin  | 更名dev_power_monitor; 复用共享配置表; 去魔数 |
  * | 2026-07-21 | 1.2  | Dalin  | 通用化改造: type字段+switch-case集中换算     |
+ * | 2026-08-27 | 1.3  | Dalin  | 实现NTC温度解算(查表+插值+钳制+LPF, V1两通道)|
+ * | 2026-08-28 | 1.4  | Dalin  | NTC分度表板级可选(新增100k表); 修正拓扑注释与插值段选择 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
@@ -24,6 +26,154 @@
 #include <string.h>
 
 dev_power_monitor_t dev_power_monitor;
+
+/* NTC 分度表(单位: kΩ, 降序), 索引 i 对应温度 t_min + i*5 ℃, 板级经 ntc_table 字段选用
+ * 10k 表: 与源工程 JointMotor_driver(therimal_resitant_table)一致, -40~125℃(34点) */
+static const float pm_ntc_r_10k[] = {
+	195.652f,
+	148.171f,
+	113.347f,
+	87.559f,
+	68.237f,
+	53.650f,
+	42.506f,
+	33.892f,
+	27.219f,
+	22.021f,
+	17.926f,
+	14.674f,
+	12.081f,
+	10.000f,
+	8.315f,
+	6.948f,
+	5.834f,
+	4.917f,
+	4.161f,
+	3.535f,
+	3.014f,
+	2.586f,
+	2.228f,
+	1.925f,
+	1.669f,
+	1.452f,
+	1.268f,
+	1.110f,
+	0.974f,
+	0.858f,
+	0.758f,
+	0.672f,
+	0.596f,
+	0.531f,
+};
+
+/* 100k 表: 领技 CA-NTC24C018 (R25=100kΩ±5%, B25/50=3950±1%) 规格书 Rnor 列,
+ * -30~230℃ 为传感器工作温度范围(53点)。注: 传感器规格书优先于 B 值公式,
+ * B 公式单指数在两端偏差大(-30℃ 实测 1733k vs 公式外推 2002k) */
+static const float pm_ntc_r_100k[] = {
+	1733.200f,
+	1283.000f,
+	959.050f,
+	724.800f,
+	551.410f,
+	423.700f,
+	327.240f,
+	254.800f,
+	199.990f,
+	157.600f,
+	125.245f,
+	100.000f,
+	81.000f,
+	65.650f,
+	53.500f,
+	43.780f,
+	35.900f,
+	29.990f,
+	25.000f,
+	20.900f,
+	17.550f,
+	14.760f,
+	12.540f,
+	10.660f,
+	9.100f,
+	7.784f,
+	6.710f,
+	5.850f,
+	5.070f,
+	4.410f,
+	3.850f,
+	3.340f,
+	2.940f,
+	2.580f,
+	2.271f,
+	2.000f,
+	1.770f,
+	1.589f,
+	1.414f,
+	1.259f,
+	1.122f,
+	0.997f,
+	0.896f,
+	0.797f,
+	0.719f,
+	0.643f,
+	0.582f,
+	0.533f,
+	0.483f,
+	0.437f,
+	0.396f,
+	0.360f,
+	0.328f,
+};
+
+const pm_ntc_table_t pm_ntc_table_10k = {
+	.r_kohm = pm_ntc_r_10k,
+	.t_min = -40,
+	.size = (uint8_t)(sizeof(pm_ntc_r_10k) / sizeof(pm_ntc_r_10k[0])),
+};
+
+const pm_ntc_table_t pm_ntc_table_100k = {
+	.r_kohm = pm_ntc_r_100k,
+	.t_min = -30,
+	.size = (uint8_t)(sizeof(pm_ntc_r_100k) / sizeof(pm_ntc_r_100k[0])),
+};
+
+/* NTC 采样电压 -> 温度(℃): 阻值换算 + 查表线性插值
+ * 分压网络(NTC 在 VREF 侧): 3.3V -- NTC -- ADC节点 -- R_gnd(kΩ) -- GND
+ * 公式还原接 VREF 一侧的 NTC 阻值: r_ntc = ((VREF - v) / v) * r_gnd
+ * 区间边界钳制(传感器故障语义):
+ *   v 过小(NTC 开路)或 r >= 表首 → 钳表首温度; r <= 表尾(NTC 短路/超温) → 钳表尾温度 */
+static float pm_ntc_voltage_to_temp(float voltage, float r_gnd_kohm, const pm_ntc_table_t *tbl)
+{
+	/* 开路/未上电: 电压近零, 阻值发散, 直接钳表首温度 */
+	if (voltage < 0.01f)
+	{
+		return (float)tbl->t_min;
+	}
+
+	float r_ntc = ((PM_VREF - voltage) / voltage) * r_gnd_kohm;
+
+	/* 阻值 >= 表首: 温度低于表下限 (含开路), 钳表首 */
+	if (r_ntc >= tbl->r_kohm[0])
+	{
+		return (float)tbl->t_min;
+	}
+
+	/* 表内插值: r_ntc 落在 [r_kohm[i+1], r_kohm[i]] 区间, 在该 5℃ 步进段内线性插值
+	 * 条件取 r_ntc >= r_kohm[i+1] 保证插值区间正确覆盖 r_ntc(恰落表点时取表点温度) */
+	for (int i = 0; i < tbl->size - 1; i++)
+	{
+		if (r_ntc >= tbl->r_kohm[i + 1])
+		{
+			float r1 = tbl->r_kohm[i];
+			float r2 = tbl->r_kohm[i + 1];
+			float compensate = (r1 - r_ntc) / (r1 - r2) * 5.0f;
+			return (float)(tbl->t_min + i * 5) + compensate;
+		}
+	}
+
+	/* 阻值 <= 表尾: 温度高于表上限 (含短路), 钳表尾 */
+	return (float)(tbl->t_min + (tbl->size - 1) * 5);
+}
 
 /* 按 type 查找通道在 power_monitor_list 中的索引, 未配置返回 -1
  * 配置表是 const 数组, 编译器可内联+常量折叠, 运行期无开销 */
@@ -37,6 +187,20 @@ static int pm_find_channel(pm_channel_type_e type)
 		}
 	}
 	return -1;
+}
+
+/* TEMP_* 通道通用处理: NTC 查表解算 + 一阶LPF
+ * scale = NTC 电路接地侧电阻(kΩ), <=0 表示板级未启用(占位通道, 保持不动)
+ * ntc_table 为 NULL 时用默认 10k 表(传感器规格见 dev_power_monitor.h) */
+static void pm_update_temp(float *dst, float voltage, const dev_power_monitor_config_t *cfg)
+{
+	if (cfg->scale <= 0.0f)
+	{
+		return;
+	}
+	const pm_ntc_table_t *tbl = (cfg->ntc_table != NULL) ? cfg->ntc_table : &pm_ntc_table_10k;
+	float temp = pm_ntc_voltage_to_temp(voltage, cfg->scale, tbl);
+	*dst = PM_TEMP_LPF_ALPHA * temp + (1.0f - PM_TEMP_LPF_ALPHA) * *dst;
 }
 
 /* 各通道电压值按 type 换算为物理量, 写入对象对应字段
@@ -71,14 +235,15 @@ static void pm_convert_channel(struct dev_power_monitor *pobj, int idx)
 			/* 合成源: 由 motor_loop_isr 调用 synthesize_ibus 写入, 此处不动 */
 			break;
 		case PM_CH_TEMP_DRIVER:
-			/* NTC 占位: 硬件采样已启动, 计算逻辑待实现(Beta公式或查表法) */
-			pobj->temp_driver = 0.0f;
+			/* NTC 解算: scale>0 启用, 分度表经 ntc_table 选用(NULL=默认10k表)
+			 * (SFOC_V2 等未填 scale 的板保持 0 占位, 行为不变) */
+			pm_update_temp(&pobj->temp_driver, voltage, cfg);
 			break;
 		case PM_CH_TEMP_MOTOR:
-			pobj->temp_motor = 0.0f;
+			pm_update_temp(&pobj->temp_motor, voltage, cfg);
 			break;
 		case PM_CH_TEMP_MCU:
-			pobj->temp_mcu = 0.0f;
+			pm_update_temp(&pobj->temp_mcu, voltage, cfg);
 			break;
 		case PM_CH_ENPR:
 			/* 使能信号: 返回原始电压, 调用方按阈值判断 */

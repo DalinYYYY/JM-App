@@ -58,10 +58,10 @@ const dev_half_bridge_config_t half_bridge_list[BRIDGE_ID_MAX] = {
 
 #if defined(USE_DEV_POWER_MONITOR)
 const dev_power_monitor_config_t power_monitor_list[PM_CH_MAX] = {
-    [0] = {.name = "VBUS",    .id = DRV_ADC_1,    .channel = DRV_ADC_CH1,  .type = PM_CH_VBUS,        .scale = PM_VBUS_RATIO, .offset = 0.0f},
-    [1] = {.name = "IBUS",    .id = DRV_ADC_INIT, .channel = DRV_ADC_CH0,  .type = PM_CH_IBUS_SYNTH,  .scale = 0.0f,          .offset = 0.0f},
-    [2] = {.name = "NTC_FET", .id = DRV_ADC_1,    .channel = DRV_ADC_CH15, .type = PM_CH_TEMP_DRIVER, .scale = 0.0f,          .offset = 0.0f},
-    [3] = {.name = "NTC_MOT", .id = DRV_ADC_1,    .channel = DRV_ADC_CH12, .type = PM_CH_TEMP_MOTOR,  .scale = 0.0f,          .offset = 0.0f},
+    [0] = {.name = "VBUS",    .id = DRV_ADC_1,    .channel = DRV_ADC_CH1,  .type = PM_CH_VBUS,        .scale = PM_VBUS_RATIO,     .offset = 0.0f},
+    [1] = {.name = "IBUS",    .id = DRV_ADC_INIT, .channel = DRV_ADC_CH0,  .type = PM_CH_IBUS_SYNTH,  .scale = 0.0f,              .offset = 0.0f},
+    [2] = {.name = "NTC_FET", .id = DRV_ADC_1, .channel = DRV_ADC_CH15, .type = PM_CH_TEMP_DRIVER, .scale = PM_NTC_PULLDOWN_KOHM, .offset = 0.0f},
+    [3] = {.name = "NTC_MOT", .id = DRV_ADC_1, .channel = DRV_ADC_CH12, .type = PM_CH_TEMP_MOTOR, .scale = PM_NTC_PULLDOWN_KOHM, .offset = 0.0f, .ntc_table = &pm_ntc_table_100k},
 };
 #endif
 
