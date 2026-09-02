@@ -6,15 +6,15 @@
  *
  * @par 算法原理
  *   ud = R·id + Ld·(did/dt)
- *   稳态时 id = I_dc + I_ac·sin(ωt - φ)
- *   φ = atan(ω·Ld / R)
- *   R = U_ac·cos(φ) / I_ac
- *   Ld = U_ac·sin(φ) / (ω·I_ac)
- *
- * @par 相敏检测
- *   I_ac·cos 分量 = (2/N)·Σ id·cos(ωt)
- *   I_ac·sin 分量 = (2/N)·Σ id·sin(ωt)
- *   φ = atan2(I_sin, I_cos)
+ *   稳态时 id = I_dc + I_ac·sin(ωt - φ)，φ = atan(ω·Ld / R)
+ *   相敏相关（对 sin/cos 直接分解，注入电压参考为 sin）：
+ *     i_sin = 2·<id·sin(ωt)> = I_ac·cosφ   → 阻性分量
+ *     i_cos = 2·<id·cos(ωt)> = -I_ac·sinφ  → 感性分量(取反为正)
+ *   R  = U_ac·i_sin / I_ac²
+ *   Ld = U_ac·(-i_cos) / (ω·I_ac²)
+ *   注入频率取 ωL = R（φ=45°）使感性分量信噪比最优（见 calib_config_runtime.c）。
+ *   相关参考相位补偿采样链延迟（控制 1 拍 + LPF 群延迟，见
+ *   CALIB_AC_DELAY_COMPENSATION_S），消除 R 偏低 / Ld 偏高的系统偏差。
  */
 #ifndef __CALIB_AC_INJECTION_H__
 #define __CALIB_AC_INJECTION_H__

@@ -30,6 +30,8 @@ typedef struct
 	uint32_t pole_pairs;  /* 极对数 */
 	float peak_current;   /* 峰值电流(A) */
 	float max_speed;      /* 最大转速(rad/s) */
+	float dead_time_s;    /* PWM死区时间(秒) 死区电压派生用 */
+	float pwm_freq_hz;    /* PWM载波频率(Hz) 死区电压派生用 */
 } calib_motor_ident_t;
 
 /* 获取当前电机身份快照（const 指针，全局单例，无需释放）。
@@ -42,6 +44,7 @@ float calib_tau_s(void);                /* 时间常数 τ = Ld/R (秒) */
 bool  calib_is_low_r(void);             /* 低阻电机判断 R < 0.5Ω */
 float calib_test_current_a(void);       /* 标准测试电流 = min(peak×0.3, 1.5A) */
 float calib_test_current_actual_a(void); /* 实际测试电流(低阻电机提高至 peak×0.5) */
+float calib_deadtime_voltage_v(void);   /* 实测死区电压 = t_dt×f_pwm×Vbus (V) */
 
 /* ===================== L2 R 辨识参数 ===================== */
 float   calib_cfg_l2_r_test_voltage_v(void);      /* 高档电压 V2 = I×R */
@@ -92,6 +95,10 @@ uint32_t calib_cfg_l3_align_ticks(void);          /* 对齐时间 = 2s×10kHz */
 uint32_t calib_cfg_l3_sample_count(void);         /* 零位采样次数 = 100 */
 float   calib_cfg_l3_dir_voltage_v(void);         /* 方向电压 = I×R×0.7 */
 uint32_t calib_cfg_l3_dir_ticks(void);            /* 方向测试时间 = 1s×10kHz */
+
+/* ===================== L6 惯量辨识参数 ===================== */
+float calib_cfg_l6_inertia_test_current_a(void);   /* 测试电流 = clamp(peak×0.3, 0.3, 6A) */
+float calib_cfg_l6_inertia_speed_limit_rad_s(void); /* 加速目标转速 = clamp(max_speed×0.3, 5, 50) */
 
 /* ===================== 标定结果合理性范围 ===================== */
 float calib_cfg_r_min_ohm(void);     /* R 下限 = max(R×0.2, 0.01) */

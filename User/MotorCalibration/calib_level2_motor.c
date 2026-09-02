@@ -542,6 +542,12 @@ static calib_state_e poll_inductance_q(void)
 	}
 }
 
+/* flux 标定用的死区电压（实测派生，替代固定 0.75V 估计）*/
+static float flux_deadtime_v(void)
+{
+	return calib_deadtime_voltage_v();
+}
+
 /* ===================== flux 辨识（反电势法）=====================
  * 正常阻值电机(R ≥ 0.5Ω)：开环电压驱动稳速 + 反电势法
  *   STEP 0: 施加 uq 驱动电机转动（theta 跟随实时电角度，不替换回调）
@@ -555,25 +561,27 @@ static calib_state_e poll_inductance_q(void)
  * 低阻电机(R < 0.5Ω)：死区补偿驱动 + 反电势法 + 失败回退默认值
  *   低阻电机 spin_voltage ≈ R*iq + flux*pp*omega ≈ 0.38V < 死区 0.5V，
  *   电机无法转起，omega_e≈0，flux 计算除零或负值。
- *   修复：spin_voltage 加死区补偿 V_dead，使实际加到绕组的电压进入线性区。
+ *   修复：spin_voltage 加实测死区电压（V_dt = t_dt×f_pwm×Vbus），
+ *   使实际加到绕组的电压进入线性区；flux 计算时对称扣除。
+ *   旧实现固定扣 0.75V（按 24V 母线估计），48V 母线下实际死区仅 0.24V，
+ *   多扣 0.51V 直接把 flux 读数压低 ~44%（0.006→0.0033 实测）。
  *   若仍失败（电机未转起或 flux 计算异常），回退 motor_info 默认 flux。
  *
  *   注意：本子模式不调 calib_hw_enter（需保留实时电角度回调让电机转动），
  *         直接用 calib_hw_apply_voltage 传 m->motor_param.ele_radian 作为 theta。
+ *         标定期间关闭运行期死区补偿（param->current_loop.deadtime_comp_enable），
+ *         保持"标定环境 = 无补偿原始系统"与显式扣除模型匹配，退出时恢复。
  * ============================================================ */
 static calib_state_e poll_flux_linkage(void)
 {
 	const calib_io_t *io = calib_mgr_get_io();
 	dev_motor_t *m = io->motor;
+	uint8_t dt_comp_saved = 0;
 
-	/* 低阻电机 spin_voltage 加死区补偿 */
+	/* 低阻电机 spin_voltage 加实测死区电压（对称扣除见 STEP 2）*/
 	float spin_v = calib_cfg_l2_flux_spin_voltage_v();
 	if (calib_is_low_r())
-	{
-		/* ud_dc 已在 R/Ld 标定中证明：低阻电机需 V_dead*1.5 才能进入线性区。
-		 * flux 标定同样需要补偿死区，否则电机不转。*/
-		spin_v += CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 1.5f; /* +0.75V */
-	}
+		spin_v += flux_deadtime_v();
 
 	switch (s_l2.step.cur)
 	{
@@ -582,6 +590,9 @@ static calib_state_e poll_flux_linkage(void)
 			s_l2.session.orig_ele_cb = NULL; /* 标记不替换 */
 			s_l2.session.forced_ele_angle = 0.0f;
 			s_l2.test_voltage = spin_v;
+			/* 标定期间关闭运行期死区补偿（若开启会与显式扣除模型重复计账）*/
+			dt_comp_saved = io->param->current_loop.deadtime_comp_enable;
+			io->param->current_loop.deadtime_comp_enable = 0;
 			calib_mgr_set_step(0);
 			calib_step_next(&s_l2.step, 1);
 			calib_mgr_set_step(1);
@@ -613,11 +624,17 @@ static calib_state_e poll_flux_linkage(void)
 			if (isfinite(omega_e) && fabsf(omega_e) > 1.0f && isfinite(iq))
 			{
 				float R = calib_motor_ident_get()->r;
-				/* 低阻电机需扣除死区补偿电压，否则 flux 偏大 */
+				/* 完整稳态方程 uq = R·iq + ωe·Ld·id + ωe·flux:
+				 * 开环电压驱动下电流滞后电压 γ=atan(ωe·L/R), 产生
+				 * id ≈ +0.25·iq 的 d 轴分量, 漏扣 ωe·Ld·id 项会把
+				 * flux 读数拉低 Ld·id(实测约 3e-4, 占读数 ~7%)。
+				 * id 取本拍 park 实测值, Ld 用标定值。*/
 				float uq_eff = s_l2.test_voltage;
 				if (calib_is_low_r())
-					uq_eff -= CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 1.5f;
-				float flux_k = (uq_eff - R * iq) / omega_e;
+					uq_eff -= flux_deadtime_v();
+				float id_m = m->foc.i_dq.d;
+				float Ld = calib_motor_ident_get()->ld;
+				float flux_k = (uq_eff - R * iq) / omega_e - Ld * id_m;
 				if (isfinite(flux_k) && flux_k > 0.0f)
 					calib_step_accumulate(&s_l2.step, flux_k);
 			}
@@ -631,6 +648,7 @@ static calib_state_e poll_flux_linkage(void)
 		case 3:                     /* 校验，写入，撤销电压 */
 		{
 			calib_hw_apply_zero(m); /* 直接置零 PWM（未替换回调，无需 exit 恢复）*/
+			io->param->current_loop.deadtime_comp_enable = dt_comp_saved; /* 恢复死区补偿 */
 			if (s_l2.step.sample_cnt == 0)
 			{
 				/* 低阻电机可能因未转起导致无采样，回退默认 flux */
@@ -678,6 +696,7 @@ static calib_state_e poll_flux_linkage(void)
 		default:
 			calib_mgr_set_fail_reason(CALIB_FAIL_TIMEOUT);
 			calib_hw_apply_zero(m);
+			io->param->current_loop.deadtime_comp_enable = dt_comp_saved; /* 恢复死区补偿 */
 			return CALIB_STATE_FAILED;
 	}
 }

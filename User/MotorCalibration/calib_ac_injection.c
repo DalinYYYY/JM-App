@@ -29,12 +29,24 @@ void calib_ac_injection_init(calib_ac_injection_t *ctx, calib_hw_session_t *sess
 	ctx->sample_cnt = 0;
 }
 
+/* 采样链总延迟(秒): 三数据点联合反解实际延迟 ≈1.5~1.9 拍(152Hz 下 R/Ld
+ * 联立欠补角反推), 取 1.4 拍。构成: 1 拍 PWM 更新(CCR 写入→下周期输出)
+ * + 0.11 拍 abc 相电流 LPF(α=0.9) 群延迟 + ~0.3 拍 ADC 注入组触发
+ * (TIM1_CC4) 到 JEOC 中断读 JDR 的间隔。
+ * 未补偿时电流相位滞后 Δ=ω·t_d, R 偏低 tanφ·Δ 且 Ld 偏高——实测
+ * 0.071(无补偿)→0.080(真值)即此效应; Ld 偏差还叠加工作点漂移(饱和
+ * 电机 L(I,T) 本身是变量)与 Flash 污染链(见 calib_config_runtime.c
+ * 注入频率派生), 修正 Flash 后以多次中值评估残余。*/
+#define CALIB_AC_DELAY_COMPENSATION_S (1.4f / CALIB_TICKS_PER_SEC)
+
 void calib_ac_injection_poll(calib_ac_injection_t *ctx)
 {
 	struct dev_motor *m = ctx->session->motor;
 	float t = (float)ctx->tick / CALIB_TICKS_PER_SEC;
 	float omega = 2.0f * PI * ctx->freq_hz;
-	float phase = omega * t;
+	/* 参考相位回退采样链延迟: 用 sin(ω(t-t_d)) 对齐实际采样到的电流,
+	 * 消除延迟引起的 R 偏低 / Ld 偏高 */
+	float phase = omega * (t - CALIB_AC_DELAY_COMPENSATION_S);
 	float cos_wt = arm_cos_f32(phase);
 	float sin_wt = arm_sin_f32(phase);
 
@@ -79,23 +91,26 @@ void calib_ac_injection_result(const calib_ac_injection_t *ctx, float *r, float 
 		return;
 	}
 	float n = (float)ctx->sample_cnt;
-	/* I_ac 的 cos/sin 分量（去 DC 后的交流幅值的正交分解）*/
+	/* 相敏分解：注入电压基波为 U_ac·sin(ωt)，电流滞后 φ=atan(ωL/R)。
+	 * 对 sin/cos 的相关直接得到电流的两个正交分量：
+	 *   i_sin = 2·<i·sin(ωt)> = I·cosφ  → 与电压同相的阻性分量
+	 *   i_cos = 2·<i·cos(ωt)> = -I·sinφ → 滞后 90° 的感性分量(取反为正)
+	 * 阻抗恢复：R = U·i_res/I²，Ld = U·i_rea/(ω·I²)。
+	 * 注: 旧实现按 atan2(i_sin, i_cos) 取相角再 cos/sin 分解，相位参考
+	 *     含 90° 旋转，输出实为 R↔ωLd 互换（低阻电机两者差数倍，
+	 *     且随 Flash 值被污染后级联越界）。*/
 	float i_cos = 2.0f * ctx->sum_id_cos / n;
 	float i_sin = 2.0f * ctx->sum_id_sin / n;
-	/* 电流交流幅值 */
-	float i_ac = sqrtf(i_cos * i_cos + i_sin * i_sin);
-	if (i_ac < 1e-6f)
+	float i2 = i_cos * i_cos + i_sin * i_sin;
+	if (i2 < 1e-12f)
 	{
 		*r = 0.0f;
 		*ld = 0.0f;
 		return;
 	}
-	/* φ = atan2(i_sin, i_cos)，电流滞后电压的角度
-	 * 纯阻性: φ=0, i_sin=0; 纯感性: φ=90°, i_cos=0 */
-	float phi = atan2f(i_sin, i_cos);
+	float i_res = i_sin;  /* 阻性分量 */
+	float i_rea = -i_cos; /* 感性分量(电流滞后为正) */
 	float omega = 2.0f * PI * ctx->freq_hz;
-	/* R = U_ac·cos(φ) / I_ac */
-	*r = (ctx->ud_ac * cosf(phi)) / i_ac;
-	/* Ld = U_ac·sin(φ) / (ω·I_ac) */
-	*ld = (ctx->ud_ac * sinf(phi)) / (omega * i_ac);
+	*r = (ctx->ud_ac * i_res) / i2;
+	*ld = (ctx->ud_ac * i_rea) / (omega * i2);
 }

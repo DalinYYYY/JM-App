@@ -107,6 +107,13 @@ extern "C"
 	 */
 	int motor_info_calib_submit_pole_pairs(uint32_t pole_pairs);
 
+	/**
+	 * @brief  提交 L6.1 rotor_inertia（轴系转动惯量）标定结果
+	 * @param  inertia  轴系总转动惯量(kg·m²)（电机转子+负载折算）
+	 * @note   速度环自整定(L6.4)按 Kp=J·ωc/Kt 依赖此值
+	 */
+	int motor_info_calib_submit_inertia(float inertia);
+
 	/* ===== L3 子模式提交 ===== */
 
 	/**

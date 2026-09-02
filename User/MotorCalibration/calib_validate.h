@@ -54,4 +54,14 @@ static inline bool calib_validate_enc_direction(int8_t dir)
 	return dir == 1 || dir == -1;
 }
 
+/* J 轴系转动惯量(kg·m²)
+ * 用绝对物理范围而非电机相对值：L6.1 测的是带载轴系总惯量，
+ * 可远大于电机转子惯量（外接飞轮/磁滞测功机转子），相对范围会误杀。
+ * 下限与 motor_pid_autotune 的就绪阈值一致(1e-7)，上限 1kg·m² 覆盖
+ * 各类关节电机+台架负载的物理量级。*/
+static inline bool calib_validate_inertia(float j)
+{
+	return isfinite(j) && j >= 1.0e-7f && j <= 1.0f;
+}
+
 #endif /* __CALIB_VALIDATE_H__ */

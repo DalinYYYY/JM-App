@@ -47,7 +47,9 @@
 #define CALIB_CFG_L2_FLUX_SPIN_TIME_S         2.0f
 
 /* ===================== 交流注入采样次数（与电机无关）===================== */
-#define CALIB_CFG_AC_INJECT_CYCLES       5u
+/* 平均周期数: 噪声按 √N 压缩。5 周期(旧值)对 Ld 小信号方差抑制不足,
+ * 提升到 20 周期(约 0.13s @153Hz), 方差再降 2 倍 */
+#define CALIB_CFG_AC_INJECT_CYCLES       20u
 #define CALIB_CFG_AC_INJECT_SAMPLE_COUNT 200
 
 /* ===================== L2 相序/极对数时间（与电机无关）===================== */
@@ -73,12 +75,30 @@
  * 3A 时力矩不足导致极对数辨识偏低(实测21→20), 提升至 6A 修复 */
 #define CALIB_CFG_ALIGN_CURRENT_MAX_A 6.0f
 
-/* 最小标定电压保底(伏特), 确保低阻电机有足够标定电流
- * 开环电压标定: V = I_test × R, 当 motor_info 中 R 值偏小(如 RS03 R=0.1Ω)时
- * 6A×0.1=0.6V 远低于死区压降0.5V, 实际绕组电压几乎为零。
- * 保底3.0V确保: 3.0V - 死区0.5V = 2.5V 实际绕组电压, RS03电流25A(<峰值43A)
- * 24V电源下占空比12.5%, 死区占比从33%(1.5V时)降到17%(3.0V时)
- * 受 CALIB_CFG_MAX_VOLTAGE_MAG_V=7V 限幅保护, 3.0V 远低于上限 */
-#define CALIB_CFG_MIN_CALIB_VOLTAGE_V 3.0f
+/* ===================== L6 惯量辨识参数（与电机无关）===================== */
+/* 双向恒流加速法：恒流 ±I 往返加速，在速度窗 [v_a,v_b] 内 LSQ 回归斜率，
+ * 往返取和抵消摩擦/磁滞负载转矩。开窗由运动触发（|v| 进入窗口），
+ * 测试电流按飞行时长自适应缩放（小惯量自动减小电流拉长斜坡保证采样窗）。
+ * 电流/转速上限派生见 calib_config_runtime.c。*/
+#define CALIB_CFG_L6_INERTIA_SPEED_FRAC      0.3f    /* v_b = max_speed×0.3 再 clamp */
+#define CALIB_CFG_L6_INERTIA_SPEED_MIN_RAD_S 5.0f    /* v_b 下限(rad/s) */
+#define CALIB_CFG_L6_INERTIA_SPEED_MAX_RAD_S 50.0f   /* v_b 上限(rad/s 台架机械约束) */
+#define CALIB_CFG_L6_INERTIA_VSTART_RAD_S    1.0f    /* v_a 开窗速度(rad/s) */
+#define CALIB_CFG_L6_INERTIA_VSTOP_RAD_S     0.5f    /* 尝试间停机判定速度(rad/s) */
+#define CALIB_CFG_L6_INERTIA_VHARD_FRAC      0.5f    /* 硬超速中止 = max_speed×0.5 */
+#define CALIB_CFG_L6_INERTIA_CURRENT_FRAC    0.3f    /* 初始测试电流 = peak×0.3 */
+#define CALIB_CFG_L6_INERTIA_CURRENT_MIN_A   0.3f    /* 初始电流下限(A) */
+#define CALIB_CFG_L6_INERTIA_CURRENT_FLOOR_A 0.05f   /* 自适应电流下限(A) */
+#define CALIB_CFG_L6_INERTIA_MAX_ATTEMPTS    4u      /* 最大测量尝试次数 */
+#define CALIB_CFG_L6_INERTIA_LEAD_TICKS      500u    /* 相1开窗前导 50ms(PLL/电流环整定) */
+#define CALIB_CFG_L6_INERTIA_PRE_TIMEOUT_TICKS  15000u /* 起动段超时 1.5s */
+#define CALIB_CFG_L6_INERTIA_WIN_TIMEOUT_TICKS  15000u /* 采样窗超时 1.5s */
+#define CALIB_CFG_L6_INERTIA_SETTLE_TICKS    15000u /* 尝试间停机等待上限 1.5s */
+#define CALIB_CFG_L6_INERTIA_FLIGHT_TARGET_TICKS 3000u /* 目标飞行时长 300ms */
+#define CALIB_CFG_L6_INERTIA_MIN_SAMPLES     200u   /* 每窗最小样本数(10kHz→20ms) */
+#define CALIB_CFG_L6_INERTIA_MIN_ACCEL_RAD_S2 2.0f  /* 最小可辨识加速度(rad/s²) */
+#define CALIB_CFG_L6_INERTIA_IQ_TRACK_RATIO  0.5f   /* iq̄/I 最低跟踪比(电压饱和检测) */
+#define CALIB_CFG_L6_INERTIA_CURLOOP_BW_HZ   500.0f /* 标定用本地电流环带宽(Hz) */
+#define CALIB_CFG_L6_INERTIA_PI_INTEG_MAX_V  5.0f   /* 电流 PI 积分限幅(V 抗饱和) */
 
 #endif /* __CALIB_CONFIG_H__ */

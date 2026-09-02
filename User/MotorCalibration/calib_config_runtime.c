@@ -16,6 +16,9 @@
 #include "motor_info_storage.h"
 #include "motor_info.h"
 #endif
+#if defined(USE_DEV_POWER_MONITOR)
+#include "dev_power_monitor.h" /* Vbus 实测（死区电压派生用） */
+#endif
 
 #ifndef PI
 #define PI 3.14159265358979f
@@ -38,6 +41,8 @@ const calib_motor_ident_t *calib_motor_ident_get(void)
 		ident.pole_pairs = c->pole_pairs;
 		ident.peak_current = c->peak_current; /* 从 motor_info 读取（Index 43）*/
 		ident.max_speed = c->max_speed;       /* 从 motor_info 读取（Index 44）*/
+		ident.dead_time_s = c->dead_time_ns * 1e-9f;  /* Index 40 */
+		ident.pwm_freq_hz = (float)c->pwm_freq_hz;    /* Index 39 */
 		return &ident;
 	}
 	/* motor_info 不可用时回退到编译期值（不应发生，仅防御性处理）*/
@@ -52,6 +57,8 @@ const calib_motor_ident_t *calib_motor_ident_get(void)
 			.pole_pairs = MOTOR_POLE_PAIRS,
 			.peak_current = MOTOR_PEAK_CURRENT,
 			.max_speed = MOTOR_MAX_SPEED,
+			.dead_time_s = 500.0f * 1e-9f,  /* 500ns 板级通用值(无 Flash 板兜底) */
+			.pwm_freq_hz = 10000.0f,        /* 10kHz 板级通用值(无 Flash 板兜底) */
 		};
 		return &s_fallback;
 	}
@@ -75,9 +82,8 @@ float calib_test_current_a(void)
 	const calib_motor_ident_t *id = calib_motor_ident_get();
 	float cur = id->peak_current * 0.3f;
 	/* 低阻电机(R<0.5Ω): 突破 1.5A 默认上限, 用 6A 保证足够对齐力矩
-	 * RS03: R=0.1Ω, test_current=6A, 但 6A×0.1=0.6V < 3.0V 保底
-	 *       实际标定电压由 CALIB_CFG_MIN_CALIB_VOLTAGE_V=3.0V 主导
-	 *       3.0V - 死区0.5V = 2.5V 实际绕组电压, 电流 25A, 力矩 5.0Nm(电机端)
+	 * 实际标定电压 = I×R + 2×死区(见 calib_voltage_floor_v()),
+	 * 标定电流收敛到本函数设计值附近(QH8919≈12A, RS03≈8A)
 	 * 普通电机: 保持原 1.5A 上限不变 */
 	if (calib_is_low_r())
 	{
@@ -165,16 +171,33 @@ uint32_t calib_cfg_l2_lq_skip_ticks(void)
 }
 
 /* ===================== L2 flux ===================== */
+/* 实测派生死区电压: V_dt = t_dt × f_pwm × Vbus
+ * 旧固定估计 0.5V(×1.5=0.75V) 按 24V 母线设计, 48V 母线下实际仅 0.24V,
+ * flux 标定多扣 0.51V 直接压低磁链读数(实测 0.006→0.0033)。
+ * t_dt/f_pwm 从 motor_info 读取(id 39/40), Vbus 运行期实测, 母线无关自适应。*/
+float calib_deadtime_voltage_v(void)
+{
+	const calib_motor_ident_t *id = calib_motor_ident_get();
+	float vbus = 24.0f; /* 无电源监控时回退标称值 */
+#if defined(USE_DEV_POWER_MONITOR)
+	if (dev_power_monitor.vbus > 1.0f)
+		vbus = dev_power_monitor.vbus;
+#endif
+	return id->dead_time_s * id->pwm_freq_hz * vbus;
+}
+
 float calib_cfg_l2_flux_target_speed_clamped_rad_s(void)
 {
 	const calib_motor_ident_t *id = calib_motor_ident_get();
-	float v_target = (CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 3.0f > 0.5f)
-	                     ? CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 3.0f
-	                     : 0.5f;
-	float speed = v_target / (id->flux * (float)id->pole_pairs);
-	float max_clamp = id->max_speed * 0.3f;
-	if (speed > max_clamp)
-		speed = max_clamp;
+	/* 目标转速: 逼近台架机械上限(50rad/s), 最大化 ωe 信噪比——
+	 * flux = (uq_eff - R·iq)/ωe 中死区/电阻项误差占比 ∝ 1/ωe,
+	 * 16.7rad/s(ωe=234)时死区残余误差占 ±6%, 50rad/s(ωe=700)时仅 ±2%。
+	 * spin 电压按 Flash flux 派生, 实际转速由真实 flux 自限,
+	 * 不会超压失控(转速 < uq/(flux_true×pp) 恒成立)。*/
+	float max_clamp = 50.0f; /* 台架机械转速上限 */
+	if (id->max_speed * 0.3f < max_clamp)
+		max_clamp = id->max_speed * 0.3f; /* 电机能力防护 */
+	float speed = max_clamp;
 	if (speed < 5.0f)
 		speed = 5.0f;
 	return speed;
@@ -200,7 +223,17 @@ uint32_t calib_cfg_l2_flux_sample_count(void)
 /* ===================== 交流注入 ===================== */
 float calib_cfg_ac_inject_freq_hz(void)
 {
-	return 0.3f / (2.0f * PI * calib_tau_s());
+	/* 注入频率取 ω·L = R（φ=45°）：相敏分解中感性分量 i_rea = I·sinφ 达到
+	 * 最大（0.707），Ld 信噪比最优；阻性分量 cosφ=0.707 仅降 26%（R 本来
+	 * 信噪比就富余）。旧值 0.3/(2πτ) 时 φ=16.7°，感性信号只占 29%，
+	 * Ld 重复测量方差大（R 稳定而 Ld 抖的根因之一）。
+	 * 限幅: 上限 200Hz 保证每周期 ≥50 个采样点；下限 5Hz 防过慢。*/
+	float f = 1.0f / (2.0f * PI * calib_tau_s());
+	if (f > 200.0f)
+		f = 200.0f;
+	if (f < 5.0f)
+		f = 5.0f;
+	return f;
 }
 
 float calib_cfg_ac_inject_amp_v(void)
@@ -242,7 +275,16 @@ uint32_t calib_cfg_ac_inject_warmup_ticks(void)
 
 uint32_t calib_cfg_ac_inject_total_ticks(void)
 {
-	return (uint32_t)((float)CALIB_CFG_AC_INJECT_CYCLES / calib_cfg_ac_inject_freq_hz() * CALIB_TICKS_PER_SEC);
+	/* 采样窗口整周期量化: N = round(CYCLES × f_sample/f_inject)。
+	 * 非整周期窗口会让 DC 偏置(~8A)通过 Σsin(ωt)≠0 泄漏进相关器，
+	 * 直接污染小信号感性分量——Ld 方差的第二个来源。
+	 * 量化后一个采样拍以内的残余相位，泄漏可忽略。*/
+	float f = calib_cfg_ac_inject_freq_hz();
+	if (f <= 0.0f)
+		return (uint32_t)CALIB_CFG_AC_INJECT_CYCLES * (uint32_t)CALIB_TICKS_PER_SEC;
+	float n = (float)CALIB_CFG_AC_INJECT_CYCLES * CALIB_TICKS_PER_SEC / f;
+	uint32_t ticks = (uint32_t)(n + 0.5f);
+	return (ticks < 1u) ? 1u : ticks;
 }
 
 uint32_t calib_cfg_ac_inject_sample_count(void)
@@ -250,12 +292,21 @@ uint32_t calib_cfg_ac_inject_sample_count(void)
 	return CALIB_CFG_AC_INJECT_SAMPLE_COUNT;
 }
 
+/* ===================== 标定电压自适应保底 ===================== */
+/* 相序/极对数/零位/方向四项开环电压标定共用的保底电压。
+ * 自适应保底 = 测试电流需求电压(I×R) + 2×死区压降估计：
+ *   - 死区余量保证有效绕组电压 ≥ I×R，标定电流收敛到设计值附近
+ *   - 力矩 = I×kt(QH8919≈12A/1.5Nm, RS03≈8A/2.6Nm)，拖动转子余量充足 */
+static float calib_voltage_floor_v(void)
+{
+	return calib_test_current_a() * calib_motor_ident_get()->r
+	       + CALIB_CFG_L2_R_V_DT_ESTIMATE_V * 2.0f;
+}
+
 /* ===================== L2 相序 ===================== */
 float calib_cfg_l2_phase_seq_voltage_v(void)
 {
-	/* 最小电压保底: 确保相序标定有足够力矩拖动转子 */
-	float v = calib_test_current_a() * calib_motor_ident_get()->r;
-	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
+	return calib_voltage_floor_v();
 }
 
 uint32_t calib_cfg_l2_phase_seq_align_ticks(void)
@@ -271,10 +322,8 @@ float calib_cfg_l2_phase_seq_scan_target_rad(void)
 /* ===================== L2 极对数 ===================== */
 float calib_cfg_l2_pole_pairs_voltage_v(void)
 {
-	/* 最小电压保底: R 估算偏小时确保足够电流拖动转子
-	 * R 标定不用保底(两点差分法需精确电压), 极对数/零位/方向可用保底 */
-	float v = calib_test_current_a() * calib_motor_ident_get()->r;
-	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
+	/* 与相序标定同源：保底见 calib_voltage_floor_v() 说明 */
+	return calib_voltage_floor_v();
 }
 
 uint32_t calib_cfg_l2_pole_pairs_align_ticks(void)
@@ -301,9 +350,8 @@ float calib_cfg_l2_pole_pairs_target_rad(void)
 /* ===================== L3 编码器 ===================== */
 float calib_cfg_l3_align_voltage_v(void)
 {
-	/* 最小电压保底: 确保零位对齐/方向标定有足够力矩拖动转子 */
-	float v = calib_test_current_a() * calib_motor_ident_get()->r;
-	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
+	/* 零位对齐电压：保底见 calib_voltage_floor_v() 说明 */
+	return calib_voltage_floor_v();
 }
 
 uint32_t calib_cfg_l3_align_ticks(void)
@@ -318,17 +366,41 @@ uint32_t calib_cfg_l3_sample_count(void)
 
 float calib_cfg_l3_dir_voltage_v(void)
 {
-	/* 最小电压保底: 确保方向标定有足够力矩拖动转子
-	 * 方向标定用 uq 施加力矩, 需克服静摩擦+齿槽转矩
-	 * 无保底时 6A×0.1×0.7=0.42V < 死区0.5V, 电流仅0.06A, 电机不转
-	 * 保底3.0V: 3.0V-死区0.5V=2.5V, 电流25A, 力矩充足 */
-	float v = calib_test_current_a() * calib_motor_ident_get()->r * 0.7f;
-	return (v < CALIB_CFG_MIN_CALIB_VOLTAGE_V) ? CALIB_CFG_MIN_CALIB_VOLTAGE_V : v;
+	/* 方向标定用 uq 施加力矩, 需克服静摩擦+齿槽转矩,
+	 * 保底与零位对齐同源: 见 calib_voltage_floor_v() 说明 */
+	return calib_voltage_floor_v();
 }
 
 uint32_t calib_cfg_l3_dir_ticks(void)
 {
 	return (uint32_t)(CALIB_CFG_L3_DIR_TIME_S * CALIB_TICKS_PER_SEC);
+}
+
+/* ===================== L6 惯量辨识 ===================== */
+/* 测试电流: 转矩 SNR 与绕组发热折中。上限复用对齐电流安全上限 6A
+ * (短时标定安全值, 惯量辨识两段合计 <6s 远短于对齐扫描 10s)。*/
+float calib_cfg_l6_inertia_test_current_a(void)
+{
+	const calib_motor_ident_t *id = calib_motor_ident_get();
+	float cur = id->peak_current * CALIB_CFG_L6_INERTIA_CURRENT_FRAC;
+	if (cur > CALIB_CFG_ALIGN_CURRENT_MAX_A)
+		cur = CALIB_CFG_ALIGN_CURRENT_MAX_A;
+	if (cur < CALIB_CFG_L6_INERTIA_CURRENT_MIN_A)
+		cur = CALIB_CFG_L6_INERTIA_CURRENT_MIN_A;
+	return cur;
+}
+
+/* 加速目标转速: 上限 50rad/s 与 flux 标定同源(台架机械约束),
+ * 换向时速度越低位置漂移越小; 下限 5rad/s 保证回归窗口速度信噪比。*/
+float calib_cfg_l6_inertia_speed_limit_rad_s(void)
+{
+	const calib_motor_ident_t *id = calib_motor_ident_get();
+	float v = id->max_speed * CALIB_CFG_L6_INERTIA_SPEED_FRAC;
+	if (v > CALIB_CFG_L6_INERTIA_SPEED_MAX_RAD_S)
+		v = CALIB_CFG_L6_INERTIA_SPEED_MAX_RAD_S;
+	if (v < CALIB_CFG_L6_INERTIA_SPEED_MIN_RAD_S)
+		v = CALIB_CFG_L6_INERTIA_SPEED_MIN_RAD_S;
+	return v;
 }
 
 /* ===================== 合理性范围 ===================== */

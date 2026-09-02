@@ -62,6 +62,15 @@ int motor_info_calib_submit_pole_pairs(uint32_t pole_pairs)
 	return motor_info_write_u32(p, MOTOR_INFO_PID_POLE_PAIRS, pole_pairs);
 }
 
+/* ===== L6.1 rotor_inertia（轴系转动惯量）===== */
+int motor_info_calib_submit_inertia(float inertia)
+{
+	motor_info_t *p = get_info_checked();
+	if (p == NULL)
+		return -1;
+	return motor_info_write_f32(p, MOTOR_INFO_PID_ROTOR_INERTIA, inertia);
+}
+
 /* ===== L2.1 direction（相序辨识产出，0=正向 1=反向）===== */
 int motor_info_calib_submit_direction(uint32_t direction)
 {
@@ -159,6 +168,7 @@ int motor_info_calib_submit_ld(float ld)               { (void)ld; return 0; }
 int motor_info_calib_submit_lq(float lq)               { (void)lq; return 0; }
 int motor_info_calib_submit_flux(float flux)           { (void)flux; return 0; }
 int motor_info_calib_submit_pole_pairs(uint32_t pp)    { (void)pp; return 0; }
+int motor_info_calib_submit_inertia(float inertia)     { (void)inertia; return 0; }
 int motor_info_calib_submit_direction(uint32_t dir)   { (void)dir; return 0; }
 int motor_info_calib_submit_enc_zero(float bias, float off, int32_t dir)
 { (void)bias; (void)off; (void)dir; return 0; }
