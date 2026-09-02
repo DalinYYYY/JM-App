@@ -50,11 +50,21 @@
 		}                  \
 	} while (0)
 
-/* 把角度归一化到 [0, 360) */
+/* 把角度归一化到 [0, 360)
+ * 热路径优化: fmodf 为软浮点库调用(商较大时内部多次迭代), 电流环每拍
+ * 调用 3 次(电角度×2 + PLL 归一化); 改为一次乘法取整+减法, 再做一次
+ * 浮点舍入修正。输入为有限值即可保证正确, 极端大角度由取整自然覆盖。 */
 static float normalize_angle(float angle)
 {
-	float remainder = fmodf(angle, 360.0f);
-	return remainder >= 0.0f ? remainder : (remainder + 360.0f);
+	if (angle >= 360.0f || angle < 0.0f)
+	{
+		angle -= (float)(int)(angle * (1.0f / 360.0f)) * 360.0f;
+		if (angle >= 360.0f)
+			angle -= 360.0f;
+		else if (angle < 0.0f)
+			angle += 360.0f;
+	}
+	return angle;
 }
 
 /* ------------------------------------------------------------------ */

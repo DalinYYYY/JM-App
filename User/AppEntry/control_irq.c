@@ -18,7 +18,9 @@ void CURRENT_LOOP_IRQ_TASK(ADC_HandleTypeDef *hadc)
 		// 三环控制入口（电流10kHz / 速度2kHz / 位置1kHz 分频）
 		motor_loop_isr();
 		/* 控制完成后的唯一观察点：按需高速采样，并按位置环分频发布实时快照。 */
+		dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_4); /* 分段耗时: 观察者 */
 		motor_observer_on_control_isr(motor_loop_get());
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_4);
 
 		dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_TIME);
 	}

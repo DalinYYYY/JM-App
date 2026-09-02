@@ -20,6 +20,7 @@
 #include "motor_param.h"        /* motor_param_init 加载默认电机参数 */
 #include "motor_profile.h"      /* motor_profile_apply_param / sync_to_param */
 #include "motor_info_storage.h" /* motor_info_storage_get：Flash 加载的标定参数 */
+#include "dev_dwt_counter.h"   /* ISR 分段耗时打点(调试期) */
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR)
 #include "dev_power_monitor.h"  /* 母线电流合成: 配置表检测 SYNTH 通道时 ISR 调用 */
 #endif
@@ -224,15 +225,22 @@ void motor_loop_isr(void)
 		m->pos_cnt = 0;
 
 	// step0: 刷新编码器与电角度（所有模式统一执行，确保上位机随时可读角度）
+	// 电角度去重: vel/pos 拍的电角度在 step1 的 ELE_VEL/ALL 解算内已刷新
+	// (同输入同结果), 仅非解算拍(每拍大多数)需要此处单独刷新
+	dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_1); /* 分段耗时: 编码器+电角度 */
 	m->motor.encoder.update(&m->motor.encoder);
-	m->motor.motor_param.update(&m->motor.motor_param, MOTION_TYPE_ELE_RADIAN, m->motor.encoder.mechanical_angle);
+	if (!vel_tick && !pos_tick)
+		m->motor.motor_param.update(&m->motor.motor_param, MOTION_TYPE_ELE_RADIAN, m->motor.encoder.mechanical_angle);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_1);
 
 	// step1: 解算运动反馈（使用本拍刷新的角度）
+	dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_2); /* 分段耗时: 反馈解算+状态机 */
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);
 
 	// step2: 状态机生成参考输出 motor.ref（含模式管理与平滑过渡）
 	motor_control_loop(&m->sys);
 	motor_loop_sync_state(m);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_2);
 
 	// CALIB 态：标定模块在 calib_mgr_poll() 中直接操作 FOC 链路施加电压，
 	// 不走 cur_loop_run（避免被 IDLE 直通覆盖为零 PWM）
@@ -273,6 +281,7 @@ void motor_loop_isr(void)
 	}
 
 	// step3: 位置环（分频）——仅 POSITION 模式需要
+	dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_3); /* 分段耗时: 外环+电流环(RUN 主路径) */
 	if (pos_tick && m->sys.motor.ref.ctrl_type == REF_CTRL_POSITION)
 		cascade_control_run_position(&m->cascade, &m->sys.motor.ref, &fb);
 
@@ -297,6 +306,8 @@ void motor_loop_isr(void)
 		                                  foc->svpwm.ta, foc->svpwm.tb, foc->svpwm.tc);
 	}
 #endif
+
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_3);
 }
 
 void motor_loop_set_cmd(ctrl_mode_e cmd)

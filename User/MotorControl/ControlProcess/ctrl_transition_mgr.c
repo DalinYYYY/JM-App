@@ -28,7 +28,7 @@ void transition_mgr_on_mode_switch(transition_mgr_t *mgr,
 	if (new_state >= RUN_STATE_MAX)
 		return;
 	mgr->target_run_state = new_state;
-	transition_start(&mgr->trans, trans_count, cur_ref);
+	transition_start(&mgr->trans, trans_count, cur_ref, mgr->smooth_cfg.shape);
 }
 
 /**
