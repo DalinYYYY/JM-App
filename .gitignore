@@ -32,11 +32,16 @@ MDK-ARM/JointMotorApp
 #JLINK file
 JLinkLog.txt
 *.dbgconf
+*.log
 
+# 开发环境
 .trae
 .agents
 .claude
+.workbuddy
 .uploads
+.archify
+.pytest_cache
 
 # V1 板级编译产物与构建日志
 Board/V1/MDK-ARM/JointMotorApp/
