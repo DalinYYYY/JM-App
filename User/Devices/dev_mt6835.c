@@ -64,6 +64,8 @@
 #define MT6835_FRAME_LEN          (3u)
 /* 连续读角度: 命令 2 字节 + 4 字节数据(ANGLE3/2/1/CRC) = 6 字节 */
 #define MT6835_CONT_READ_FRAME_LEN (6u)
+/* 21bit 原始值 → 角度换算系数(编译期常量, 乘法替代除法省一次 VDIV) */
+#define MT6835_RAW_TO_DEG (360.0F / (float)MT6835_ANGLE_RESOLUTION)
 
 /* 片选控制 */
 static void dev_mt6835_csn_ctrl(struct dev_mt6835 *pobj, mt6835State_e state)
@@ -177,41 +179,49 @@ static bool mt6835_set_zero_point(dev_mt6835_t *pobj)
 }
 
 /*
- * @brief 读取 21bit 原始角度值 (3 次独立单字节读, 按运行方向做正反向)
- * @note  使用 3 次独立的单字节读寄存器操作, 分别读取 ANGLE3/2/1。
- *        相比连续读模式, 单字节读更可靠, 不依赖连续读时序的复杂性。
+ * @brief 读取 21bit 原始角度值 (连续读模式, 一帧 6 字节, 寄存器直操作)
+ * @note  电流环热路径: 3 次独立单字节读(3×CS 周期+3×HAL 阻塞开销)实测 37us,
+ *        改用连续读命令 0xA0 一帧读回 ANGLE3/2/1, SPI 启停开销降为 1 次;
+ *        传输走 drv_spi_transfer_fast(寄存器直操作), 绕过 HAL 阻塞框架开销。
  *
- *        手册角度寄存器布局:
- *          0x003 (ANGLE3): ANGLE[20:13] (8bit, 全部有效)
- *          0x004 (ANGLE2): ANGLE[12:5]  (8bit, 全部有效)
- *          0x005 (ANGLE1): bit[7:3]=ANGLE[4:0], bit[2:0]=STATUS[2:0] (需剔除)
+ *        手册时序(连续读, 起始地址 0x003):
+ *          MOSI = [0xA0][0x03][dummy ×4], 共 6 字节
+ *          MISO = [?][?][A3][A2][A1][CRC], 数据从第 3 字节开始
+ *        拼接公式与单字节读一致(手册权威):
+ *          raw = (rx[2] << 13) | (rx[3] << 5) | (rx[4] >> 3)
+ *          rx[4]>>3 剔除低 3bit STATUS, 保留高 5bit ANGLE[4:0]
  *
- *        拼接公式(手册权威):
- *          raw = (angle3 << 13) | (angle2 << 5) | (angle1 >> 3)
- *          其中 angle1>>3 用于剔除低 3bit STATUS, 保留高 5bit ANGLE[4:0]
- *
- *        注意: 3 次读取之间角度可能变化, 但对静止电机无影响;
- *        对运动电机会有微小不一致, 可通过快速连续读取减小误差。
+ *        附带收益: 21bit 角度在同一帧内采样, 消除 3 次独立读之间
+ *        的角度撕裂(高速旋转时三次读数不一致导致的非线性误差)。
+ *        rx[5] 为 CRC 寄存器(0x006), CRC 功能默认关闭, 不做校验。
  *
  * @return 21bit 原始角度值 [0, 2097151]
  */
 static uint32_t dev_mt6835_get_raw(struct dev_mt6835 *pobj)
 {
-	uint8_t angle3;
-	uint8_t angle2;
-	uint8_t angle1;
+	uint8_t tx[MT6835_CONT_READ_FRAME_LEN] = {
+		(uint8_t)(MT6835_CONTINUOUSREAD >> 8), /* 0xA0 连续读命令 */
+		(uint8_t)(MT6835_CONTINUOUSREAD | MT6835_REG_ANGLE3), /* 起始地址 0x003 */
+		0xFFu, 0xFFu, 0xFFu, 0xFFu,             /* dummy ×4, 期间 MT6835 输出数据 */
+	};
+	uint8_t rx[MT6835_CONT_READ_FRAME_LEN] = {0};
+	int status;
 
-	if (!mt6835_read_reg(pobj, MT6835_REG_ANGLE3, &angle3) ||
-		!mt6835_read_reg(pobj, MT6835_REG_ANGLE2, &angle2) ||
-		!mt6835_read_reg(pobj, MT6835_REG_ANGLE1, &angle1))
+	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
+	status = drv_spi_transfer_fast(mt6835_list[pobj->id].spi_num, tx, rx,
+	                               MT6835_CONT_READ_FRAME_LEN);
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+
+	if (status != DRV_EOK)
 	{
-		return pobj->raw; /* 任一帧失败均保留上一有效角度 */
+		pobj->read_error_count++;
+		return pobj->raw; /* 传输失败保留上一有效角度 */
 	}
 
 	/* 21bit 角度拼接 (手册权威公式) */
-	uint32_t raw = ((uint32_t)angle3 << 13)
-	             | ((uint32_t)angle2 << 5)
-	             | ((uint32_t)angle1 >> 3);
+	uint32_t raw = ((uint32_t)rx[2] << 13)
+	             | ((uint32_t)rx[3] << 5)
+	             | ((uint32_t)rx[4] >> 3);
 	pobj->raw = raw & MT6835_ANGLE_MASK;
 
 	if (pobj->running_dir < 0) /* 反向: -1/1 约定, <0 表示反向 */
@@ -224,7 +234,7 @@ static uint32_t dev_mt6835_get_raw(struct dev_mt6835 *pobj)
 /* 由 21bit 原始值算机械角度, 去偏移并归一化到 [0,360) */
 static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
 {
-	float angle_org = (float)pobj->raw / MT6835_ANGLE_RESOLUTION * 360.0F;
+	float angle_org = (float)pobj->raw * MT6835_RAW_TO_DEG;
 	float angle = angle_org - pobj->offset;
 
 	pobj->mech_angle_org = angle_org;
