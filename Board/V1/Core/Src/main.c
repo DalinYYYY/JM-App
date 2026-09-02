@@ -91,7 +91,10 @@ int main(void)
   SystemClock_Config();
 
   /* USER CODE BEGIN SysInit */
-
+	/* Flash 预取 + 指令/数据缓存使能*/
+	__HAL_FLASH_PREFETCH_BUFFER_ENABLE();
+	__HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
+	__HAL_FLASH_DATA_CACHE_ENABLE();
   /* USER CODE END SysInit */
 
   /* Initialize all configured peripherals */
