@@ -54,6 +54,34 @@ static void dev_motor_disable(void)
 #endif
 }
 
+/* 配置栅极驱动器 nFAULT 输入引脚(内部上拉): nFAULT 为开漏输出, 需上拉电阻;
+ * 未连接 nFAULT 的板型(gpiox==DRV_GPIO_INIT, 如 ODrive 走 dev_drv8301)跳过 */
+static void dev_motor_nfault_init(void)
+{
+#if defined(USE_DEV_MOTOR)
+	const gpioDrv_t nfault = motor_enable_list[DEV_MOTOR_1].nfault_gpio;
+	if (nfault.gpiox != DRV_GPIO_INIT)
+	{
+		gpioInit_t init = {DRV_INPUT, DRV_PULLUP, DRV_LOW, 0u};
+		drv_gpio_init(nfault, init);
+	}
+#endif
+}
+
+/* 读取栅极驱动器硬件故障: nFAULT 低电平有效(DRV8350 OCP/UVLO/TSD 锁存拉低);
+ * 未连接该信号的板型恒返回 0(无故障) */
+uint8_t dev_motor_gate_driver_fault(void)
+{
+#if defined(USE_DEV_MOTOR)
+	const gpioDrv_t nfault = motor_enable_list[DEV_MOTOR_1].nfault_gpio;
+	if (nfault.gpiox == DRV_GPIO_INIT)
+		return 0u;
+	return (drv_gpio_read(nfault) == DRV_PIN_LOW) ? 1u : 0u;
+#else
+	return 0u;
+#endif
+}
+
 /* 设备角度补偿回调(注入多圈计数) TODO: 接入 motor_info 后返回实际补偿值 */
 static float device_compensation(void)
 {
@@ -90,6 +118,7 @@ void dev_motor_init(dev_motor_t *pobj,
 	memset(pobj, 0, sizeof(dev_motor_t));
 
 	dev_motor_disable(); // 默认上电禁能
+	dev_motor_nfault_init(); // nFAULT 故障输入引脚(上拉输入, 未连接板型空操作)
 
 	pobj->id = id;
 	pobj->poles = dev_motor_get_poles((motor_id_e)id);

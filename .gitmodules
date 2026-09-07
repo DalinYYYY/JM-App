@@ -1,9 +1,6 @@
 [submodule "User/Tools/pyqt_gui"]
 	path = User/Tools/pyqt_gui
 	url = ./User/Tools/pyqt_gui
-[submodule "Board/SFOC"]
-	path = Board/SFOC
-	url = ./Board/SFOC
 [submodule "Board/ODriveMKS"]
 	path = Board/ODriveMKS
 	url = ./Board/ODriveMKS

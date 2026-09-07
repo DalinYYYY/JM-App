@@ -83,6 +83,7 @@ typedef struct
 	float bus_voltage;
 	float temperature;
 	float torque;
+	uint8_t gate_driver_fault; /*!< 栅极驱动器硬件故障(nFAULT): 1=故障, 0=正常; 无此硬件的板型恒 0 */
 } motor_fb_t;
 
 /**
@@ -112,6 +113,7 @@ typedef struct
 	ref_ctrl_type_e ctrl_type; // 入环层级
 	float pos;                 // 目标位置(rad)
 	float vel;                 // 目标速度(rad/s)
+	float accel;               // 参考加速度(rad/s²) 解析生成(PV斜坡/过渡导数/扫频)，速度环惯量前馈用
 	float torque;              // 目标力矩(N·m)
 	float id;                  // 目标d轴电流(A)
 	float iq;                  // 目标q轴电流(A)
@@ -149,6 +151,18 @@ typedef struct
 	int16_t bias_raw;
 	uint16_t session_id;
 } motor_sweep_config_t;
+
+/**
+ * @brief PV 速度轮廓运行时状态（斜坡发生器）
+ * @details 斜坡输出与解析加速度同拍生成（accel=±rate 或 0），
+ *          供速度环惯量前馈使用。模式进入时经 motor_profile_vel_reset
+ *          复位，下次调用从实测速度无扰起步。
+ */
+typedef struct
+{
+	float vel;      /* 当前斜坡输出(rad/s) */
+	uint8_t active; /* 模式激活标志：0=下次调用从 fb.vel 起步 */
+} motor_profile_vel_t;
 
 /**
  * @brief 电机控制核心
@@ -194,6 +208,9 @@ typedef struct
 
 	/* 负载模拟 (0x60~0x67): 指令参数 + 运行时状态内聚, 见 motor_load_sim_t */
 	motor_load_sim_t load_sim;
+
+	/* PV 速度轮廓斜坡状态（实例化，禁止文件级 static 运行态） */
+	motor_profile_vel_t profile_vel;
 } motor_ctrl_t;
 
 /**

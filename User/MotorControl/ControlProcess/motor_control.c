@@ -83,6 +83,10 @@ void motor_ctrl_dispatch(motor_ctrl_t *ctrl)
 	if (ctrl->run_state >= RUN_STATE_MAX)
 		return;
 
+	/* 加速度参考每拍清零，由模式显式生成（PV斜坡/扫频），防止跨模式残留
+	 * （过渡混合期间的加速度由 transition_update 解析覆盖）*/
+	ctrl->ref.accel = 0.0f;
+
 	motor_mode_fn handler = s_mode_table[ctrl->run_state];
 	if (handler != NULL)
 		handler(ctrl);

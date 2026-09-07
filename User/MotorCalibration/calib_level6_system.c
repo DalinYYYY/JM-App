@@ -521,6 +521,16 @@ static calib_state_e poll_pid_autotune(void)
 		return CALIB_STATE_FAILED;
 	}
 
+	/* 惯量加速度前馈增益 aff = J/Kt（A/(rad/s²)）：与 PID 同源写入 Flash 控制段，
+	 * 重载后经 motor_pid_load 生效。越界(>1，超大惯量小 Kt)时跳过，前馈保持原值。*/
+	{
+		float j = info->blocks.motor_calib.rotor_inertia;
+		float kt = info->blocks.motor_calib.torque_constant;
+		float gain = (kt > 0.0f) ? j / kt : 0.0f;
+		if (isfinite(gain) && gain > 0.0f && gain <= 1.0f)
+			info->blocks.control.aff = gain;
+	}
+
 	/* 整定值已在 info->blocks.control（与 0xE7 Flash 写入同字段），
 	 * 切换来源为 FLASH 并加载。CALIB 态控制环未运行，无并发冲突。*/
 	motor_pid_set_source(PID_RING_VELOCITY, PID_SOURCE_FLASH);

@@ -38,6 +38,9 @@ void motor_mode_load_sim_run(motor_ctrl_t *ctrl);         /* 负载模拟 0x60~0
 /* 负载模拟运行时状态复位，模式进入时由 run_state_switch 调用 */
 void motor_load_sim_reset(motor_ctrl_t *ctrl);
 
+/* PV 速度轮廓斜坡状态复位，模式进入时由 run_state_switch 调用 */
+void motor_profile_vel_reset(motor_ctrl_t *ctrl);
+
 /* ===== Legacy fallback（未拆分模式的统一入口）===== */
 void motor_mode_legacy_run(motor_ctrl_t *ctrl); /* 力控/轨迹/特殊/其他测试模式 */
 

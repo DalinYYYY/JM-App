@@ -25,10 +25,12 @@
 #include <string.h>
 
 /**
- * @brief 运行模式平滑过渡的调用次数
+ * @brief 运行模式平滑过渡的调用次数（rate 不适用时的兜底时长）
  * @details 过渡时长以 motor_control_loop（建议置于电流环）的调用次数计，
  *          而非软件定时器。可在运行期配置：调用次数 = 期望过渡时长 / 电流环周期。
  *          例：电流环 50us，期望过渡 5ms，则置为 100。
+ *          注意：smooth_cfg 任一 rate>0 时模式切换过渡首拍会按速率重算时长，
+ *          覆盖此值（=|Δ目标|/rate）；rate 全<=0 时才使用此固定时长。
  */
 uint32_t g_run_state_trans_count = 1000;
 
@@ -86,6 +88,12 @@ static uint32_t state_active_faults(system_state_t *sys)
 	 * 仅在输出已使能且启动保护窗口结束后检测超速，避免 IDLE 态误锁存。 */
 	if (sys->speed_guard_cycles == 0u && (sys->top_state == TOP_FSM_READY || sys->top_state == TOP_FSM_RUN) && (enable & SYSTEM_PROTECT_OVER_SPEED) != 0u && state_float_is_finite(fb->vel) && state_absf(fb->vel) > p->protect_over_speed)
 		active |= SYSTEM_FAULT_OVER_SPEED;
+
+	/* 栅极驱动器硬件故障(nFAULT): DRV8350 OCP/UVLO/TSD 等保护触发后开漏拉低并锁存,
+	 * 软件不做自恢复(需 EN 复位/重新上电清除硬件锁存); 启动保护窗口内不武装, 避免上电时序误报。
+	 * 未连接 nFAULT 的板型 fb->gate_driver_fault 恒 0, 使能位打开也不会误报。 */
+	if (sys->speed_guard_cycles == 0u && (enable & SYSTEM_PROTECT_GATE_DRIVER) != 0u && fb->gate_driver_fault != 0u)
+		active |= SYSTEM_FAULT_GATE_DRIVER;
 
 	return active;
 }
@@ -312,8 +320,21 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
  */
 void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans_count)
 {
-	if (new_state >= RUN_STATE_MAX || new_state == sys->motor.run_state)
+	if (new_state >= RUN_STATE_MAX)
 		return;
+
+	/* 切换过渡进行中：run_state 仍为旧值，判据改用 target_run_state。
+	 * 目标相同=重复指令，忽略（重启过渡会使渐变斜率归零造成顿挫）；
+	 * 目标不同（含切回旧模式）=从当前混合输出重启过渡 */
+	if (sys->trans_mgr.trans.state == TRANSITION_IN_PROGRESS)
+	{
+		if (new_state == sys->trans_mgr.target_run_state)
+			return;
+	}
+	else if (new_state == sys->motor.run_state)
+	{
+		return;
+	}
 	/* 扫频带有内部时序和 TRACE 点边界，不能在普通参考平滑过渡期间  */
 	if (new_state == RUN_STATE_TEST_SWEEP_FREQ)
 	{
@@ -326,6 +347,10 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 	/* 负载模拟模式: 过渡启动前复位运行时状态(相位/计时/加速度估计) */
 	if (new_state >= RUN_STATE_PASSIVE_TORQUE && new_state <= RUN_STATE_IMPACT_LOAD)
 		motor_load_sim_reset(&sys->motor);
+
+	/* PV 速度轮廓: 复位斜坡状态, 下拍从实测速度无扰起步 */
+	if (new_state == RUN_STATE_PROFILE_VELOCITY)
+		motor_profile_vel_reset(&sys->motor);
 
 	transition_mgr_on_mode_switch(&sys->trans_mgr, new_state, trans_count, &sys->motor.ref);
 }
@@ -564,6 +589,12 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	}
 	else if (sys->top_state == TOP_FSM_RUN)
 	{
+		/* 停机渐变中收到新运动指令：取消停机，新目标经渐变逻辑平滑接管
+		 * （同模式：目标再变化重启渐变；不同模式：模式切换过渡）。
+		 * 不取消则同模式指令被 apply_stop_cmd 吞掉，切模式的过渡
+		 * 完成后会被残留 stop_pending 立即停机 */
+		transition_mgr_cancel_stop(&sys->trans_mgr);
+
 		// RUN 态内运动模式切换：走平滑过渡，时长由全局调用次数配置
 		run_state_e target = s_ctrl_mode_to_run_state[cmd];
 		run_state_switch(sys, target, g_run_state_trans_count);

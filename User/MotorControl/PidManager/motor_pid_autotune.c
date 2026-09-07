@@ -12,10 +12,14 @@
 #define M_PI 3.14159265358979323846f
 #endif
 
-/* 推荐带宽默认值 (Hz) */
+/* 推荐带宽默认值 (Hz)
+ * 速度环 30Hz：级联规则 ≤ 电流环带宽/10。本固件电流环典型 ~500Hz、速度环
+ * 2kHz 采样 + PLL 速度观测器(默认 ~50Hz)滞后，100Hz 穿越时相位滞后 >90°
+ * 裕度为负必然自激（实测：带载 autotune 后速度环剧烈抖动的根因）。
+ * 位置环 5Hz：≤ 速度环/5，满足 apply 交叉校验 pos_bw ≤ vel_bw×0.2。*/
 #define AUTOTUNE_DEFAULT_CURRENT_BW  1000.0f
-#define AUTOTUNE_DEFAULT_VELOCITY_BW 100.0f
-#define AUTOTUNE_DEFAULT_POSITION_BW 20.0f
+#define AUTOTUNE_DEFAULT_VELOCITY_BW 30.0f
+#define AUTOTUNE_DEFAULT_POSITION_BW 5.0f
 
 /* 就绪阈值与 motor_info_validate() 保持一致 */
 #define AUTOTUNE_MIN_PHASE_RESISTANCE 0.001f

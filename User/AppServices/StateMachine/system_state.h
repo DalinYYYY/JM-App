@@ -31,17 +31,19 @@
 /* 前向声明，避免 system_state.h 直接依赖 dev_motor.h */
 struct dev_motor;
 
-#define SYSTEM_PROTECT_OVER_CURRENT (1u << 0)
-#define SYSTEM_PROTECT_OVER_VOLTAGE (1u << 1)
+#define SYSTEM_PROTECT_OVER_CURRENT  (1u << 0)
+#define SYSTEM_PROTECT_OVER_VOLTAGE  (1u << 1)
 #define SYSTEM_PROTECT_UNDER_VOLTAGE (1u << 2)
-#define SYSTEM_PROTECT_OVER_TEMP    (1u << 3)
-#define SYSTEM_PROTECT_OVER_SPEED   (1u << 4)
+#define SYSTEM_PROTECT_OVER_TEMP     (1u << 3)
+#define SYSTEM_PROTECT_OVER_SPEED    (1u << 4)
+#define SYSTEM_PROTECT_GATE_DRIVER   (1u << 5) /* 栅极驱动器硬件故障保护(nFAULT) */
 
 #define SYSTEM_FAULT_OVER_CURRENT   (1u << 0)
 #define SYSTEM_FAULT_OVER_VOLTAGE   (1u << 1)
 #define SYSTEM_FAULT_UNDER_VOLTAGE  (1u << 2)
 #define SYSTEM_FAULT_OVER_SPEED     (1u << 10)
 #define SYSTEM_FAULT_NUMERIC        (1u << 11)
+#define SYSTEM_FAULT_GATE_DRIVER    (1u << 12) /* 栅极驱动器故障(nFAULT 拉低, OCP/UVLO/TSD) */
 
 typedef struct system_state_s
 {
@@ -59,9 +61,10 @@ typedef struct system_state_s
 } system_state_t;
 
 /**
- * @brief 运行模式平滑过渡的调用次数（可配置）
+ * @brief 运行模式平滑过渡的调用次数（可配置，rate 不适用时的兜底时长）
  * @details 过渡时长以 motor_control_loop（建议在电流环中调用）的调用次数计，
  *          而非软件定时器。配置值 = 期望过渡时长 / 电流环周期。
+ *          smooth_cfg 任一 rate>0 时模式切换过渡按速率重算时长，覆盖此值。
  */
 extern uint32_t g_run_state_trans_count;
 

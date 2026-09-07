@@ -192,6 +192,12 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 	m->sys.motor.fb.id = fb->id;
 	m->sys.motor.fb.iq = fb->iq;
 	m->sys.motor.fb.bus_voltage = st->power.v_bus;
+	/* 栅极驱动器硬件故障(nFAULT): 真实驱动每拍读引脚; 虚拟电机/未连接引脚的板型恒 0 */
+#if (MOTOR_LOOP_ENABLE_DEV_DRIVER)
+	m->sys.motor.fb.gate_driver_fault = dev_motor_gate_driver_fault();
+#else
+	m->sys.motor.fb.gate_driver_fault = 0u;
+#endif
 }
 
 static void motor_loop_sync_state(motor_loop_t *m)
@@ -225,12 +231,12 @@ void motor_loop_isr(void)
 		m->pos_cnt = 0;
 
 	// step0: 刷新编码器与电角度（所有模式统一执行，确保上位机随时可读角度）
-	// 电角度去重: vel/pos 拍的电角度在 step1 的 ELE_VEL/ALL 解算内已刷新
-	// (同输入同结果), 仅非解算拍(每拍大多数)需要此处单独刷新
+	// 每拍必须无条件刷新: step1 的 ELE_VEL/ALL 解算传入的是 mp->mechanical_angle
+	// (motion_param 内部缓存的上拍值), 依赖本拍此处写入最新编码器角度,
+	// 跳过刷新会导致 vel/pos 拍电角度滞后一拍(高速时>25°电角度错位, FOC失控过流)
 	dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_1); /* 分段耗时: 编码器+电角度 */
 	m->motor.encoder.update(&m->motor.encoder);
-	if (!vel_tick && !pos_tick)
-		m->motor.motor_param.update(&m->motor.motor_param, MOTION_TYPE_ELE_RADIAN, m->motor.encoder.mechanical_angle);
+	m->motor.motor_param.update(&m->motor.motor_param, MOTION_TYPE_ELE_RADIAN, m->motor.encoder.mechanical_angle);
 	dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_1);
 
 	// step1: 解算运动反馈（使用本拍刷新的角度）

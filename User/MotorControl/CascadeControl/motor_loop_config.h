@@ -63,4 +63,17 @@
 #error "MOTOR_LOOP_POS_DIV 必须为 MOTOR_LOOP_VEL_DIV 的整数倍"
 #endif
 
+/*============================================================================
+ * 速度环惯量加速度前馈开关（iq_ff += accel_ff_gain * ref->accel）
+ *   - 0：关闭（默认）。实测空载速度闭环受前馈扰动失稳，待排查
+ *        （疑点：Flash aff 字段无有效性校验，旧数据/自整定值可直接生效；
+ *         过渡期 blend_vel_accel 生成的解析加速度量级偏大）。
+ *        关闭后 Flash 中 aff 参数照常读写，仅不参与前馈计算。
+ *   - 1：启用。前馈增益来源 motor_param position_loop.accel_ff_gain
+ *        （Flash ctl->aff / L6.4 自整定写入）。
+ *==========================================================================*/
+#ifndef MOTOR_LOOP_VEL_ACCEL_FF_ENABLE
+#define MOTOR_LOOP_VEL_ACCEL_FF_ENABLE 0u
+#endif
+
 #endif /* __MOTOR_LOOP_CONFIG_H__ */

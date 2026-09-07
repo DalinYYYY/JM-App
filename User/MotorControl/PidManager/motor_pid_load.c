@@ -79,6 +79,8 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 			param->position_loop.speed_kp = ctl->kp_s;
 			param->position_loop.speed_ki = ctl->ki_s;
 			param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
+			/* 惯量加速度前馈增益(J/Kt)：L6.4 autotune 与 PID 同源写入 */
+			param->position_loop.accel_ff_gain = ctl->aff;
 			break;
 		case PID_SOURCE_DEBUG:
 			/* 不覆盖 motor_param_t，保留 0xA5 直接写入 s_motor_pid_profiles 的值 */
@@ -166,6 +168,7 @@ void motor_pid_load_boot(motor_param_t *param, const motor_info_t *info)
 		param->position_loop.speed_kp = ctl->kp_s;
 		param->position_loop.speed_ki = ctl->ki_s;
 		param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
+		param->position_loop.accel_ff_gain = ctl->aff;
 	}
 	else
 	{

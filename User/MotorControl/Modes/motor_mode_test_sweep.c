@@ -293,8 +293,13 @@ void motor_mode_test_sweep_run(motor_ctrl_t *ctrl)
 	}
 	else
 	{
+		/* 速度模式扫频：解析加速度 d/dt[bias+A·sin(φ)] = A·ω·cos(φ)，
+		 * 供惯量前馈抵消高频段速度环跟踪滞后（相位/幅值失真）*/
 		ref->ctrl_type = REF_CTRL_VELOCITY;
 		ref->vel = ctrl->sweep_bias + sine * ctrl->sweep_amp;
+		float omega_rad_s = (float)ctrl->sweep_phase_inc * MOTOR_SWEEP_PHASE_SCALE / ctrl->dt;
+		ref->accel = ctrl->sweep_amp * omega_rad_s
+		             * cosf((float)ctrl->sweep_phase_acc * MOTOR_SWEEP_PHASE_SCALE);
 		ref->torque_ff = 0.0f;
 	}
 

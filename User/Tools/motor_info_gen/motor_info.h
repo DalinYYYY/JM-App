@@ -189,7 +189,7 @@ typedef struct __ALIGNED_4
     int32_t  position_following_error_p      ; /* 位置跟随误差保护 (P) */
     int32_t  pos_limit_min                   ; /* 位置下限 (P)  [硬件位置下限] */
     int32_t  pos_limit_max                   ; /* 位置上限 (P)  [硬件位置上限] */
-    uint32_t error_enable_mask               ; /* 保护使能掩码  [bit0:过流 bit1:过压 bit2:欠压 bit3:过温 bit4:过速 bit5:跟随误差] */
+    uint32_t error_enable_mask               ; /* 保护使能掩码  [bit0:过流 bit1:过压 bit2:欠压 bit3:过温 bit4:过速 bit5:栅极驱动故障(nFAULT)] */
     uint32_t reserved[21];                    /* 预留 84B */
 } ProtectCommParam_t;
 

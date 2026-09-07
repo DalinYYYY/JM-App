@@ -42,6 +42,7 @@ typedef struct
 	uint32_t duration;	 // 过渡总时长，以调用次数计
 	transition_shape_e shape; // 渐变形状（启动时由配置指定）
 	motor_ref_t old_ref; // 过渡起点参考（源模式）
+	motor_ref_t target_ref; // 渐变朝向的目标（首拍登记，目标再变化检测用）
 	float ratio;
 } transition_t;
 
@@ -64,10 +65,14 @@ void transition_start(transition_t *trans, uint32_t duration, const motor_ref_t 
  * @brief 更新过渡引擎状态
  * @param trans 过渡引擎指针
  * @param new_ref 目标模式当前参考输出
- * @param out_ref 混合后的参考输出
+ * @param out_ref 混合后的参考输出（含解析加速度 accel）
+ * @param dt 控制周期(s)，用于把每拍混合斜率换算为加速度(rad/s²)
  * @return true: 过渡完成; false: 过渡进行中
+ * @note 过渡进行中 out_ref->accel 为混合速度的解析导数：
+ *       LINEAR 恒斜率 Δv/T；SCURVE 按 smoothstep 导数 6r(1-r)·Δv/T。
+ *       过渡完成/空闲时 accel 透传目标参考值（由模式生成）。
  */
-bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_ref_t *out_ref);
+bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_ref_t *out_ref, float dt);
 
 /**
  * @brief 强制完成过渡
@@ -123,11 +128,28 @@ typedef struct
  * @note 默认: enable=true, smooth_duration=500,
  *             pos_thresh=0.1rad, vel_thresh=1rad/s, torque_thresh=0.1Nm,
  *             current_thresh=0.5A, voltage_thresh=1V, duty_thresh=0.1,
- *             pos_rate=50rad/s, vel_rate=500rad/s²,
+ *             pos_rate=100rad/s, vel_rate=500rad/s²,
  *             torque_rate=20Nm/s, current_rate=100A/s, shape=LINEAR
  *       （rate 模式默认启用，覆盖 smooth_duration）
  */
 void ref_smooth_cfg_init_defaults(ref_smooth_cfg_t *cfg);
+
+/**
+ * @brief 按速率配置计算过渡时长(transition_update 调用次数)
+ * @param raw 目标参考
+ * @param prev 起点参考
+ * @param cfg 渐变配置
+ * @param dt 控制周期(s)
+ * @return 过渡时长；0 表示速率模式不适用（rate 全<=0 或无差异）
+ * @note duration_i = ceil(|delta_i| / (rate_i × dt))，取各字段最大值，
+ *       SCURVE 自动 ×1.5 补偿峰值斜率。
+ *       同模式渐变与模式切换过渡共用：后者在首拍调用，
+ *       使使能/切模式的目标阶跃也遵循 rate 斜坡。
+ */
+uint32_t transition_calc_duration_by_rate(const motor_ref_t *raw,
+                                          const motor_ref_t *prev,
+                                          const ref_smooth_cfg_t *cfg,
+                                          float dt);
 
 /**
  * @brief 检测同模式内目标值突变，超阈值时启动参考层渐变

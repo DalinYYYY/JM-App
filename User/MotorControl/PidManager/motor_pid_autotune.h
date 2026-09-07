@@ -10,7 +10,7 @@
  *
  *          前置条件：电机辨识已完成（is_calibrated == 1 且 R/L 非默认值）。
  *          事务语义：motor_pid_autotune_apply 任一环失败则全部不写入。
- *          带宽参数 = 0 时用推荐默认值（电流环 1kHz / 速度环 100Hz / 位置环 20Hz）。
+ *          带宽参数 = 0 时用推荐默认值（电流环 1kHz / 速度环 30Hz / 位置环 5Hz）。
  */
 #ifndef __MOTOR_PID_AUTOTUNE_H__
 #define __MOTOR_PID_AUTOTUNE_H__
@@ -42,7 +42,7 @@ int motor_pid_autotune_current(const motor_info_t *info, float bandwidth_hz,
 /**
  * @brief  速度环理论估计（二阶最佳阻尼 ξ=0.707）
  * @param  info         motor_info 指针（读取 J/Kt）
- * @param  bandwidth_hz 期望速度环带宽 (Hz)，≤0 时用默认 100Hz
+ * @param  bandwidth_hz 期望速度环带宽 (Hz)，≤0 时用默认 30Hz
  * @param  out          结果输出
  * @retval 0=成功, -1=参数无效, -2=辨识数据未就绪
  */
@@ -52,7 +52,7 @@ int motor_pid_autotune_velocity(const motor_info_t *info, float bandwidth_hz,
 /**
  * @brief  位置环理论估计（纯比例，带宽 = Kp）
  * @param  info         motor_info 指针
- * @param  bandwidth_hz 期望位置环带宽 (Hz)，≤0 时用默认 20Hz
+ * @param  bandwidth_hz 期望位置环带宽 (Hz)，≤0 时用默认 5Hz
  * @param  out          结果输出
  * @retval 0=成功, -1=参数无效
  */

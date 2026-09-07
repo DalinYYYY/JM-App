@@ -12,6 +12,7 @@
  */
 
 #include "cascade_control.h"
+#include "motor_loop_config.h" /* MOTOR_LOOP_VEL_ACCEL_FF_ENABLE: 惯量加速度前馈总开关 */
 #include <string.h>
 
 static float clamp(float value, float min, float max)
@@ -115,10 +116,21 @@ void cascade_control_run(cascade_ctrl_t *c, const motor_ref_t *ref, const cascad
 			break;
 		}
 
-		// 速度模式：速度环 + 力矩前馈（前馈以电流形式叠加）
+		// 速度模式：速度环 + 前馈（前馈以电流形式叠加）
 		case REF_CTRL_VELOCITY:
 		{
-			float iq_ff = (kt > 0.0f) ? (ref->torque_ff / kt) : 0.0f;
+			/* 力矩前馈(N·m→A) + 惯量加速度前馈(accel_ff_gain=J/Kt)。
+			 * accel 为解析参考加速度(PV斜坡/过渡导数/扫频)，无差分噪声；
+			 * 前馈在环外叠加，不改变环路特征方程，经 calculate_with_ff
+			 * 统一限幅+抗饱和。
+			 * 惯量前馈经 MOTOR_LOOP_VEL_ACCEL_FF_ENABLE 门控: 空载速度闭环
+			 * 失稳问题排查期间默认关闭, 见 motor_loop_config.h。 */
+			float iq_ff = 0.0f;
+			if (kt > 0.0f)
+				iq_ff += ref->torque_ff / kt;
+#if (MOTOR_LOOP_VEL_ACCEL_FF_ENABLE)
+			iq_ff += p->position_loop.accel_ff_gain * ref->accel;
+#endif
 			float iq = motor_pid_profile_calculate_with_ff(&c->pid_vel, ref->vel_profile, ref->vel, fb->vel, iq_ff, c->dt_vel);
 			out->iq_ref = clamp(iq, -peak_i, peak_i);
 			break;
