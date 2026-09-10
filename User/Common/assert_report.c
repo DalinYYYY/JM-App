@@ -19,7 +19,7 @@
 #include "board_select.h"
 
 #ifndef ASSERT_REPORT_ENABLE_PRINTF
-#define ASSERT_REPORT_ENABLE_PRINTF 1
+#define ASSERT_REPORT_ENABLE_PRINTF 0 /* 默认裁剪断言打印(省 printfa 链约2.2KB), 置1恢复 */
 #endif
 
 #if ASSERT_REPORT_ENABLE_PRINTF
@@ -27,17 +27,6 @@
 #endif
 
 /* public function ------------------------------------------------------------------------------ */
-
-/**
-  * @brief  断言失败后进入死循环，供用户自定义错误处理
-  * @retval 无
-  */
-static void assert_func(void)
-{
-	while (1)
-	{
-	}
-}
 
 /**
  * @brief  断言失败时调用的内部回调函数

@@ -50,7 +50,7 @@
 #if defined(USE_DEV_FLASH)
 
 #include "motor_info.h"
-#include "dev_flash.h" /* 组合子设备:通用 Flash 设备 */
+#include "dev_flash.h"  /* 组合子设备:通用 Flash 设备 */
 #if defined(USE_DEV_EEPROM)
 #include "dev_eeprom.h" /* 可选组合子设备:片外 EEPROM(AT24C16) */
 #endif
@@ -58,6 +58,15 @@
 #ifdef __cplusplus
 extern "C"
 {
+#endif
+
+/* ===== motor_info Flash 备份存储开关 =====
+ * 0 = 屏蔽(默认): 配置存储仅走 EEPROM, dev_flash 子设备不初始化,
+ *     0xEA 的 Flash 备份标志位被忽略(仅写 EEPROM), 片内 Flash 擦写寿命不再消耗;
+ * 1 = 启用: EEPROM 主存储 + 0xEA flags bit0 追加写 Flash 备份。
+ * 板级 dev_config_board.h 可覆盖。下述 Flash 地址宏仅在 =1 时生效。 */
+#ifndef MOTORINFO_FLASH_BACKUP_ENABLE
+#define MOTORINFO_FLASH_BACKUP_ENABLE 0
 #endif
 
 /* ===== motor_info Flash 存储地址定义 =====
@@ -76,7 +85,7 @@ extern "C"
 #define MOTORINFO_FLASH_TOTAL_SIZE 0x00001000U /* 4KB */
 #endif
 #ifndef MOTORINFO_FLASH_PAGE_SIZE
-#define MOTORINFO_FLASH_PAGE_SIZE  2048U       /* 2KB，双Bank页大小 */
+#define MOTORINFO_FLASH_PAGE_SIZE 2048U /* 2KB，双Bank页大小 */
 #endif
 /* 固化次数上限：超过则拒绝保存并返回 ERR_SAVE_LIMIT。
  * STM32G4 片内 Flash 典型擦写寿命 1 万次，取保守值 10000 作为保护阈值。*/
@@ -85,18 +94,17 @@ extern "C"
 #endif
 
 	/* ===== motor_info EEPROM 存储地址定义 =====
- * 片外 AT24C16(2KB) 与 Flash 双备份，上电优先从 EEPROM 加载。
- * 布局：EEPROM 起始地址写 4B magic(MOTC) 区分于 Flash，其后偏移 4B 存 motor_info 整块(1024B)。
- * 总占用 1028B < 2048B；magic 单独存放，不污染 motor_info 的 CRC 计算。*/
-#ifndef MOTORINFO_EEPROM_START_ADDR
-#define MOTORINFO_EEPROM_START_ADDR 0x0000U        /* EEPROM 起始地址 */
-#endif
-#ifndef MOTORINFO_EEPROM_MAGIC
-#define MOTORINFO_EEPROM_MAGIC 0x4D4F5443u         /* "MOTC" 区分于 Flash */
-#endif
-#ifndef MOTORINFO_EEPROM_CFG_OFFSET
-#define MOTORINFO_EEPROM_CFG_OFFSET 4U             /* magic(4B) 之后的 motor_info 数据偏移 */
-#endif
+	 * 片外 AT24C16(2KB) 与 Flash 双备份，上电优先从 EEPROM 加载。
+	 * 布局(v2)：EEPROM 地址 0 起整块存 motor_info(1024B)，无独立 magic。
+	 * magic 内嵌于 ParamHeader.reserved[0](入 CRC 覆盖区)，加载时据此区分
+	 * 空片(全 0xFF)与已写入数据。旧"独立 magic+4B 偏移"布局数据在新布局
+	 * 下校验不过，上电自动走默认重建路径(等效格式化)。*/
+	#ifndef MOTORINFO_EEPROM_START_ADDR
+	#define MOTORINFO_EEPROM_START_ADDR 0x0000U /* EEPROM 起始地址 */
+	#endif
+	#ifndef MOTORINFO_EEPROM_MAGIC
+	#define MOTORINFO_EEPROM_MAGIC 0x4D4F5443u /* "MOTC" 内嵌于 header.reserved[0] */
+	#endif
 
 /* ===== save() 存储目标标志位 =====
  * 默认(flags=0)仅写 EEPROM(上电优先加载); 带 MOTORINFO_SAVE_FLAG_FLASH 时
@@ -125,16 +133,20 @@ extern "C"
 		/* 注: >3 区间预留给 motor_info_validate 透传的 param_id (save 路径) */
 
 		/* ===== 系统错误 (<0)：致命，调用方不应继续使用 ===== */
-		MOTOR_INFO_STORAGE_ERR_ARG = -1,    /* 空指针/非法参数 */
-		MOTOR_INFO_STORAGE_ERR_FLASH = -2,  /* Flash 读/写失败(通用, 兼容旧代码) */
-		MOTOR_INFO_STORAGE_ERR_INIT = -3,   /* 服务未初始化 */
+		MOTOR_INFO_STORAGE_ERR_ARG = -1,   /* 空指针/非法参数 */
+		MOTOR_INFO_STORAGE_ERR_FLASH = -2, /* Flash 读/写失败(通用, 兼容旧代码) */
+		MOTOR_INFO_STORAGE_ERR_INIT = -3,  /* 服务未初始化 */
 		/* 详细 Flash 错误码(供 0xEA 应答区分擦写/校验失败) */
 		MOTOR_INFO_STORAGE_ERR_FLASH_WRITE = -4,  /* Flash 擦写失败(3 次重试后仍失败) */
 		MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY = -5, /* Flash 回读校验失败(CRC/范围不匹配) */
-		MOTOR_INFO_STORAGE_ERR_SAVE_LIMIT = -6,  /* 固化次数超限(寿命保护) */
+		MOTOR_INFO_STORAGE_ERR_SAVE_LIMIT = -6,   /* 固化次数超限(寿命保护) */
 		/* 详细 EEPROM 错误码(供 0xEA 应答区分 EEPROM 写/校验失败) */
 		MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE = -7,  /* EEPROM 写入失败 */
 		MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY = -8, /* EEPROM 回读校验失败 */
+		/* 强制枚举底层为 int32: AC5 按值域(-8~3)选 int8, 而本枚举还承载
+		 * motor_info_validate 透传的 param_id(1~222), >127 时 int8 截断为负值
+		 * 落入 0x08 兜底(219→-37)。此成员不参与任何逻辑判断 */
+		MOTOR_INFO_STORAGE_FORCE_INT32 = 0x7FFFFFFF
 	} motor_info_storage_status_t;
 
 	/* ===== 设备对象前置声明（供 ops 函数指针类型引用） ===== */
@@ -148,11 +160,11 @@ extern "C"
  */
 	typedef struct
 	{
-		motor_info_t *(*get)(struct motor_info_storage *pobj);                                         /* 取全局 motor_info 句柄 */
-		motor_info_storage_status_t (*load)(struct motor_info_storage *pobj, motor_info_t *cfg);       /* 从 Flash 加载 */
+		motor_info_t *(*get)(struct motor_info_storage *pobj);                                   /* 取全局 motor_info 句柄 */
+		motor_info_storage_status_t (*load)(struct motor_info_storage *pobj, motor_info_t *cfg); /* 从 Flash 加载 */
 		motor_info_storage_status_t (*save)(struct motor_info_storage *pobj, const motor_info_t *cfg,
-		                                    uint32_t flags);                                            /* 保存: flags 见 MOTORINFO_SAVE_FLAG_* */
-		void (*deinit)(struct motor_info_storage *pobj);                                               /* 反初始化 */
+		                                    uint32_t flags);                                     /* 保存: flags 见 MOTORINFO_SAVE_FLAG_* */
+		void (*deinit)(struct motor_info_storage *pobj);                                         /* 反初始化 */
 	} motor_info_storage_ops_t;
 
 	/**

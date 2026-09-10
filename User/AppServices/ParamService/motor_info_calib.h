@@ -114,6 +114,17 @@ extern "C"
 	 */
 	int motor_info_calib_submit_inertia(float inertia);
 
+	/* ===== L5 子模式提交 ===== */
+
+	/**
+	 * @brief  提交 L5.3 死区补偿标定结果
+	 * @param  v_dt    死区等效压降(V)，0~2V
+	 * @param  enable  死区补偿使能(0禁/1启)，标定成功后恒为 1
+	 * @note   与运行期 RAM 状态保持一致：重启后经 motor_profile_sync_control_to_param
+	 *         恢复 enable + comp_du_V，须随后 0xEA 固化才持久化
+	 */
+	int motor_info_calib_submit_deadtime_comp(float v_dt, uint32_t enable);
+
 	/* ===== L3 子模式提交 ===== */
 
 	/**

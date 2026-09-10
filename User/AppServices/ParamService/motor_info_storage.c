@@ -42,6 +42,10 @@ motor_info_storage_t g_motor_info_storage;
  * 单线程使用(初始化阶段 + 命令处理), 无需重入保护。*/
 static motor_info_t s_crc_tmp;
 
+/* EEPROM 回读校验独立缓冲: 与 s_crc_tmp(写入源)分离, 使全量比对成为可能——
+ * 若复用 s_crc_tmp, 回读会覆盖写入意图, 静默写失败时校验对旧数据自洽通过 */
+static motor_info_t s_readback;
+
 /**
  * @brief  计算 motor_info_t 的 CRC32（跳过 header.crc32 字段）
  * @details 拷贝到静态缓冲 → crc32 置零 → 对 1024B 用 utils_crc32c 求值
@@ -79,9 +83,10 @@ static motor_info_storage_status_t motorinfo_verify(const motor_info_t *cfg)
 
 #if defined(USE_DEV_EEPROM)
 /**
- * @brief  从 EEPROM 加载 motor_info 配置（含 magic + 三重校验）
- * @details 布局: [0:4)=MOTC magic, [4:1028)=motor_info 整块(含 CRC)。
- *          magic 单独存放，不污染 motor_info 的 CRC 计算。
+ * @brief  从 EEPROM 加载 motor_info 配置（内嵌 magic + 三重校验）
+ * @details 布局: [0:1024)=motor_info 整块(含 CRC)，无独立 magic。
+ *          magic 内嵌于 ParamHeader.reserved[0](入 CRC 覆盖区)，
+ *          用于区分空片(全 0xFF)与已写入数据。
  * @return OK(数据有效) / NO_DATA(magic 不符或读失败) / CRC_FAIL / RANGE_FAIL
  */
 static motor_info_storage_status_t motorinfo_eeprom_load(dev_eeprom_t *dev, motor_info_t *cfg)
@@ -89,22 +94,18 @@ static motor_info_storage_status_t motorinfo_eeprom_load(dev_eeprom_t *dev, moto
 	if (dev == NULL || cfg == NULL)
 		return MOTOR_INFO_STORAGE_ERR_ARG;
 
-	uint32_t magic = 0U;
-	if (dev->read(dev, MOTORINFO_EEPROM_START_ADDR, (uint8_t *)&magic, sizeof(magic)) != DEV_EOK)
+	if (dev->read(dev, MOTORINFO_EEPROM_START_ADDR, (uint8_t *)cfg, PARAM_AREA_SIZE) != DEV_EOK)
 		return MOTOR_INFO_STORAGE_NO_DATA; /* 读失败视为无有效数据 */
 
-	if (magic != MOTORINFO_EEPROM_MAGIC)
+	if (cfg->blocks.header.reserved[0] != MOTORINFO_EEPROM_MAGIC)
 		return MOTOR_INFO_STORAGE_NO_DATA; /* 未写入过 EEPROM */
-
-	if (dev->read(dev, MOTORINFO_EEPROM_START_ADDR + MOTORINFO_EEPROM_CFG_OFFSET,
-	              (uint8_t *)cfg, PARAM_AREA_SIZE) != DEV_EOK)
-		return MOTOR_INFO_STORAGE_NO_DATA;
 
 	return motorinfo_verify(cfg);
 }
 
 /**
- * @brief  将 motor_info 配置写入 EEPROM（magic + 数据 + 回读校验）
+ * @brief  将 motor_info 配置整块写入 EEPROM（地址 0 起 1024B + 回读校验）
+ * @details magic 已由调用方内嵌于 header.reserved[0] 随数据一并落盘。
  * @return OK / ERR_EEPROM_WRITE / ERR_EEPROM_VERIFY
  */
 static motor_info_storage_status_t motorinfo_eeprom_save(dev_eeprom_t *dev, const motor_info_t *cfg)
@@ -112,18 +113,17 @@ static motor_info_storage_status_t motorinfo_eeprom_save(dev_eeprom_t *dev, cons
 	if (dev == NULL || cfg == NULL)
 		return MOTOR_INFO_STORAGE_ERR_ARG;
 
-	uint32_t magic = MOTORINFO_EEPROM_MAGIC;
-	if (dev->write(dev, MOTORINFO_EEPROM_START_ADDR, (uint8_t *)&magic, sizeof(magic)) != DEV_EOK)
-		return MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE;
-	if (dev->write(dev, MOTORINFO_EEPROM_START_ADDR + MOTORINFO_EEPROM_CFG_OFFSET,
-	               (uint8_t *)cfg, PARAM_AREA_SIZE) != DEV_EOK)
+	if (dev->write(dev, MOTORINFO_EEPROM_START_ADDR, (uint8_t *)cfg, PARAM_AREA_SIZE) != DEV_EOK)
 		return MOTOR_INFO_STORAGE_ERR_EEPROM_WRITE;
 
-	/* 回读校验：复用静态缓冲避免 1024B 栈分配，校验链与 Flash 一致 */
-	if (dev->read(dev, MOTORINFO_EEPROM_START_ADDR + MOTORINFO_EEPROM_CFG_OFFSET,
-	              s_crc_tmp.raw, PARAM_AREA_SIZE) != DEV_EOK)
+	/* 回读校验: 读进独立缓冲, 与写入源 s_crc_tmp 全量比对后再走校验链。
+	 * 全量比对可捕获"I2C 层 ACK 但数据未落盘"的静默失败(此时回读得到
+	 * 旧记录, 旧 CRC 配旧数据自洽通过, 仅靠 CRC 校验无法发现) */
+	if (dev->read(dev, MOTORINFO_EEPROM_START_ADDR, s_readback.raw, PARAM_AREA_SIZE) != DEV_EOK)
 		return MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY;
-	if (motorinfo_verify(&s_crc_tmp) != MOTOR_INFO_STORAGE_OK)
+	if (memcmp(s_readback.raw, s_crc_tmp.raw, PARAM_AREA_SIZE) != 0)
+		return MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY;
+	if (motorinfo_verify(&s_readback) != MOTOR_INFO_STORAGE_OK)
 		return MOTOR_INFO_STORAGE_ERR_EEPROM_VERIFY;
 
 	return MOTOR_INFO_STORAGE_OK;
@@ -142,7 +142,7 @@ static motor_info_t *motorinfo_ops_get(struct motor_info_storage *pobj)
 }
 
 /**
- * @brief  从 Flash 加载 motor_info 配置（覆盖传入 cfg）
+ * @brief  加载 motor_info 配置(EEPROM 优先, Flash 备份回退由宏门控)
  * @details 调用 dev_flash->flash_read 读 1024B → 三重校验(config_version+CRC+范围)
  */
 static motor_info_storage_status_t motorinfo_ops_load(struct motor_info_storage *pobj, motor_info_t *cfg)
@@ -164,6 +164,7 @@ static motor_info_storage_status_t motorinfo_ops_load(struct motor_info_storage 
 	}
 #endif
 
+#if MOTORINFO_FLASH_BACKUP_ENABLE
 	/* 从 dev_flash 读 1024B = 128 u64，offset=0 */
 	int rc = pobj->flash_dev.flash_read(&pobj->flash_dev, 0, (u64 *)cfg, MOTORINFO_LEN_U64);
 	if (rc != DEV_EOK)
@@ -171,6 +172,10 @@ static motor_info_storage_status_t motorinfo_ops_load(struct motor_info_storage 
 
 	/* 三重校验：config_version → CRC32 → 字段范围 */
 	return motorinfo_verify(cfg);
+#else
+	/* Flash 备份屏蔽: EEPROM 无有效数据即视为未写入, 上电走默认初始化路径 */
+	return MOTOR_INFO_STORAGE_NO_DATA;
+#endif
 }
 
 /**
@@ -178,8 +183,8 @@ static motor_info_storage_status_t motorinfo_ops_load(struct motor_info_storage 
  *
  * @param  flags 存储目标标志(MOTORINFO_SAVE_FLAG_* 位或):
  *               0 = 仅写 EEPROM(上电优先加载, 默认);
- *               MOTORINFO_SAVE_FLAG_FLASH = 追加写 Flash 备份。
- *               EEPROM 设备不可用时自动回退写 Flash, 保证无 EEPROM 的板子仍能持久化。
+ *               MOTORINFO_SAVE_FLAG_FLASH = 追加写 Flash 备份
+ *               (由 MOTORINFO_FLASH_BACKUP_ENABLE 门控, 屏蔽时该位被忽略仅写 EEPROM)。
  *
  * @details 固化次数 save_count 每次固化(0xEA 保存)都递增, 记录固化总次数;
  *          无论是否写 Flash 备份都计数(默认 EEPROM 保存也算一次固化)。
@@ -192,16 +197,14 @@ static motor_info_storage_status_t motorinfo_ops_load(struct motor_info_storage 
  *         EEPROM 写/回读校验失败返回 ERR_EEPROM_WRITE / ERR_EEPROM_VERIFY。
  *         重试间隔约 1ms(给 Flash 控制器恢复时间), 总最坏耗时约 90ms(3*30ms)。
  */
-static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage *pobj,
-                                                      const motor_info_t *cfg, uint32_t flags)
+
+static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage *pobj, const motor_info_t *cfg, uint32_t flags)
 {
-	/* 最大重试次数 */
-	#define MOTOR_INFO_SAVE_MAX_RETRY  3u
+/* 最大重试次数 */
+#define MOTOR_INFO_SAVE_MAX_RETRY 3u
 
 	if (cfg == NULL)
 		return MOTOR_INFO_STORAGE_ERR_ARG;
-	if (!pobj->inited)
-		return MOTOR_INFO_STORAGE_ERR_INIT;
 
 	/* 1. 保存前必须通过范围校验。若允许无效数据落盘，本次 save
 	 *    虽会成功，但下次上电必然在 motorinfo_verify() 中失败并重走默认路径。 */
@@ -218,7 +221,18 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 #else
 	bool eeprom_ready = false;
 #endif
-	bool write_flash = ((flags & MOTORINFO_SAVE_FLAG_FLASH) != 0u) || !eeprom_ready;
+#if MOTORINFO_FLASH_BACKUP_ENABLE
+	/* Flash 与 EEPROM 均不可用才拒绝: EEPROM 主存储不应被 Flash 状态连坐
+	 * (dev_flash init 失败时 EEPROM 仍可独立完成固化) */
+	if (!pobj->inited && !eeprom_ready)
+		return MOTOR_INFO_STORAGE_ERR_INIT;
+	bool write_flash = (((flags & MOTORINFO_SAVE_FLAG_FLASH) != 0u) || !eeprom_ready) && pobj->inited;
+#else
+	/* Flash 备份屏蔽: 仅 EEPROM 存储, EEPROM 不可用直接失败;
+	 * flags 的 FLASH 备份位被忽略 */
+	if (!eeprom_ready)
+		return MOTOR_INFO_STORAGE_ERR_INIT;
+#endif
 
 	/* 2. 固化次数自增并超限保护: 每次固化(0xEA 保存)都递增, 记录固化总次数。
 	 *    (无论是否写 Flash 备份, 默认 EEPROM 保存也算一次固化) */
@@ -229,10 +243,15 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 	new_save_count += 1u;
 
 	/* 3. 构造待落盘数据（单次构造，EEPROM/Flash 共用）：
-	 *    固化次数自增 + 原地重算 CRC32
+	 *    固化次数自增 + config_version 由存储层强制当前版本(与 save_count
+	 *    同为存储元数据, 不依赖调用方 RAM 状态; 否则恢复默认/写参数路径
+	 *    清掉版本号后, 固化数据会在回读校验中版本不符) + magic 内嵌于
+	 *    header.reserved[0](入 CRC, 加载时据此区分空片) + 原地重算 CRC32
 	 *    (复用 s_crc_tmp 避免栈上 1024B 分配) */
 	memcpy(&s_crc_tmp, cfg, PARAM_AREA_SIZE);
 	s_crc_tmp.blocks.system.save_count = new_save_count;
+	s_crc_tmp.blocks.system.config_version = MOTOR_PROFILE_CONFIG_VERSION;
+	s_crc_tmp.blocks.header.reserved[0] = MOTORINFO_EEPROM_MAGIC;
 	s_crc_tmp.blocks.header.crc32 = 0U;
 	s_crc_tmp.blocks.header.crc32 = utils_crc32c(s_crc_tmp.raw, PARAM_AREA_SIZE);
 
@@ -246,15 +265,18 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 	}
 #endif
 
+#if MOTORINFO_FLASH_BACKUP_ENABLE
 	/* 5. 写 Flash（备份，3 次重试；结果记录到 flash_ret，不阻断 EEPROM 结果） */
 	motor_info_storage_status_t flash_ret = MOTOR_INFO_STORAGE_OK;
 	if (write_flash)
 	{
 		for (uint8_t attempt = 0u; attempt < MOTOR_INFO_SAVE_MAX_RETRY; attempt++)
 		{
-			/* 重新构造 s_crc_tmp（固化计数 + 重算 CRC），EEPROM 已完成的写入不受影响 */
+			/* 重新构造 s_crc_tmp（固化计数 + 版本强制 + 内嵌 magic + 重算 CRC），EEPROM 已完成的写入不受影响 */
 			memcpy(&s_crc_tmp, cfg, PARAM_AREA_SIZE);
 			s_crc_tmp.blocks.system.save_count = new_save_count;
+			s_crc_tmp.blocks.system.config_version = MOTOR_PROFILE_CONFIG_VERSION;
+			s_crc_tmp.blocks.header.reserved[0] = MOTORINFO_EEPROM_MAGIC;
 			s_crc_tmp.blocks.header.crc32 = 0U;
 			s_crc_tmp.blocks.header.crc32 = utils_crc32c(s_crc_tmp.raw, PARAM_AREA_SIZE);
 
@@ -266,7 +288,9 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 				if (attempt + 1u < MOTOR_INFO_SAVE_MAX_RETRY)
 				{
 					/* 重试间隔: 给 Flash 控制器恢复时间, 避免连续失败 */
-					for (volatile uint32_t d = 0u; d < 1000u * SystemCoreClock / 1000000u; d++) { }
+					for (volatile uint32_t d = 0u; d < 1000u * SystemCoreClock / 1000000u; d++)
+					{
+					}
 					continue;
 				}
 				flash_ret = MOTOR_INFO_STORAGE_ERR_FLASH_WRITE;
@@ -280,11 +304,11 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 				flash_ret = MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY;
 				break;
 			}
-			flash_ret = (motorinfo_verify(&s_crc_tmp) == MOTOR_INFO_STORAGE_OK)
-				? MOTOR_INFO_STORAGE_OK : MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY;
+			flash_ret = (motorinfo_verify(&s_crc_tmp) == MOTOR_INFO_STORAGE_OK) ? MOTOR_INFO_STORAGE_OK : MOTOR_INFO_STORAGE_ERR_FLASH_VERIFY;
 			break;
 		}
 	}
+#endif /* MOTORINFO_FLASH_BACKUP_ENABLE */
 
 	/* 6. 把本次固化次数回写 RAM，保证上位机 0xE6 读到的计数与存储一致。 */
 	pobj->motor_info.blocks.system.save_count = new_save_count;
@@ -293,7 +317,11 @@ static motor_info_storage_status_t motorinfo_ops_save(struct motor_info_storage 
 	 *    未启用时回退 Flash 结果。 */
 	if (eeprom_ready)
 		return eeprom_ret;
+#if MOTORINFO_FLASH_BACKUP_ENABLE
 	return flash_ret;
+#else
+	return MOTOR_INFO_STORAGE_ERR_INIT; /* 不可达: eeprom_ready=false 已提前拦截 */
+#endif
 }
 
 /**
@@ -305,7 +333,9 @@ static void motorinfo_ops_deinit(struct motor_info_storage *pobj)
 {
 	pobj->inited = false;
 	pobj->motor_info_loaded = false;
+#if MOTORINFO_FLASH_BACKUP_ENABLE
 	pobj->flash_dev.inited = false;
+#endif
 }
 
 /* ===== 共享 static const ops 方法表（进 Flash 只读，所有实例共享） ===== */
@@ -325,14 +355,15 @@ motor_info_storage_status_t motor_info_storage_init(void)
 	/* 1. 装配 ops 方法表指针（一行装配所有方法） */
 	pobj->ops = &s_motorinfo_ops;
 
-	/* 2. 初始化 dev_flash 子设备（单扇区配置：total_size=page_size=2048）
-	 *    sector_count=1，写入时 next=(0+1)%1=0 始终写扇区0，固定地址
-	 *    dev_flash_init 扫描扇区 flag，last_sequence>0 表示有写入过的数据 */
-	dev_flash_init(&pobj->flash_dev,
-	               MOTORINFO_FLASH_START_ADDR,
-	               MOTORINFO_FLASH_TOTAL_SIZE,
-	               MOTORINFO_FLASH_PAGE_SIZE);
+	/* 2. 初始化 dev_flash 子设备(Flash 备份存储, 由 MOTORINFO_FLASH_BACKUP_ENABLE 门控) */
+#if MOTORINFO_FLASH_BACKUP_ENABLE
+	dev_flash_init(&pobj->flash_dev, MOTORINFO_FLASH_START_ADDR, MOTORINFO_FLASH_TOTAL_SIZE, MOTORINFO_FLASH_PAGE_SIZE);
 	pobj->inited = pobj->flash_dev.inited ? true : false;
+#else
+	/* Flash 备份屏蔽: dev_flash 子设备不初始化, 存储仅走 EEPROM。
+	 * inited 仅代表存储服务已装配, EEPROM 实际可用性由 save/load 运行期判定 */
+	pobj->inited = true;
+#endif
 
 	/* 3. 加载全局 motor_info（上电自动加载，仅一次） */
 	if (!pobj->motor_info_loaded)
@@ -429,6 +460,5 @@ motor_info_storage_status_t jm_app_motor_info_storage_save(const motor_info_t *c
 {
 	return motor_info_storage_save(cfg, flags);
 }
-
 
 #endif /* USE_DEV_FLASH */

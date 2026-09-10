@@ -181,14 +181,21 @@ int drv_adc_start_dma(adcNumber_e adcx, uint32_t *pdata, uint16_t size)
 int drv_adc_injected_start(adcNumber_e adcx)
 {
 	ADC_HandleTypeDef *handle;
+	HAL_StatusTypeDef status;
 
 	handle = get_adc_handle(adcx);
 	if (handle == NULL)
 	{
 		return DRV_ERROR;
 	}
-	HAL_ADCEx_InjectedStart(handle);
-	__HAL_ADC_ENABLE_IT(handle, ADC_IT_JEOC);
+	/* Let the family HAL select JEOS/JEOC from EOCSelection.  This is JEOS
+	 * for a multi-rank G4 sequence configured as ADC_EOC_SEQ_CONV, while
+	 * F4 and single-conversion configurations keep their JEOC behavior. */
+	status = HAL_ADCEx_InjectedStart_IT(handle);
+	if (status != HAL_OK)
+	{
+		return DRV_ERROR;
+	}
 
 	return DRV_EOK;
 }

@@ -71,6 +71,18 @@ int motor_info_calib_submit_inertia(float inertia)
 	return motor_info_write_f32(p, MOTOR_INFO_PID_ROTOR_INERTIA, inertia);
 }
 
+/* ===== L5.3 死区补偿（压降 + 使能，两项与运行期 RAM 状态一致）===== */
+int motor_info_calib_submit_deadtime_comp(float v_dt, uint32_t enable)
+{
+	motor_info_t *p = get_info_checked();
+	if (p == NULL)
+		return -1;
+	int rc = motor_info_write_f32(p, MOTOR_INFO_PID_COMP_DU_V, v_dt);
+	if (rc != 0)
+		return rc;
+	return motor_info_write_u32(p, MOTOR_INFO_PID_DEADTIME_COMP_ENABLE, enable);
+}
+
 /* ===== L2.1 direction（相序辨识产出，0=正向 1=反向）===== */
 int motor_info_calib_submit_direction(uint32_t direction)
 {
@@ -169,6 +181,8 @@ int motor_info_calib_submit_lq(float lq)               { (void)lq; return 0; }
 int motor_info_calib_submit_flux(float flux)           { (void)flux; return 0; }
 int motor_info_calib_submit_pole_pairs(uint32_t pp)    { (void)pp; return 0; }
 int motor_info_calib_submit_inertia(float inertia)     { (void)inertia; return 0; }
+int motor_info_calib_submit_deadtime_comp(float v_dt, uint32_t en)
+{ (void)v_dt; (void)en; return 0; }
 int motor_info_calib_submit_direction(uint32_t dir)   { (void)dir; return 0; }
 int motor_info_calib_submit_enc_zero(float bias, float off, int32_t dir)
 { (void)bias; (void)off; (void)dir; return 0; }

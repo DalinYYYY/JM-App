@@ -247,6 +247,17 @@ def generate_h(params, groups, output_h, module_name, config_type):
     L.append('#include <stdint.h>')
     L.append('#include <stdbool.h>')
     L.append('')
+    L.append('/* ===== 功能裁剪开关（默认 0=裁剪以节省 Flash，置 1 恢复完整功能，可外部覆盖）===== */')
+    L.append(f'#ifndef {prefix}_EN_INIT_DEFAULTS')
+    L.append(f'#define {prefix}_EN_INIT_DEFAULTS 0  /* init: 1=拷贝默认配置, 0=全零 */')
+    L.append('#endif')
+    L.append(f'#ifndef {prefix}_EN_VALIDATE')
+    L.append(f'#define {prefix}_EN_VALIDATE 0  /* validate: 1=完整范围校验, 0=直接返回通过 */')
+    L.append('#endif')
+    L.append(f'#ifndef {prefix}_EN_PRINT')
+    L.append(f'#define {prefix}_EN_PRINT 0  /* print: 1=打印全部参数, 0=空实现 */')
+    L.append('#endif')
+    L.append('')
 
     # 元信息宏
     L.append('/* ===== 自动生成元信息 ===== */')
@@ -296,7 +307,9 @@ def generate_h(params, groups, output_h, module_name, config_type):
     L.append(' ******************************************************************************/')
     L.append('')
     L.append('/**')
-    L.append(' * @brief   初始化电机配置为默认值')
+    L.append(' * @brief   初始化电机配置')
+    L.append(f' * @note    默认裁剪（{prefix}_EN_INIT_DEFAULTS=0，仅全零，由 profile/上位机配置参数）；')
+    L.append(' *          置 1 后拷贝默认配置表')
     L.append(' * @param   cfg 电机配置指针')
     L.append(' * @return  0=成功, -EINVAL=参数错误')
     L.append(' */')
@@ -304,6 +317,7 @@ def generate_h(params, groups, output_h, module_name, config_type):
     L.append('')
     L.append('/**')
     L.append(' * @brief   校验电机配置参数范围')
+    L.append(f' * @note    默认裁剪（{prefix}_EN_VALIDATE=0，恒返回 0=通过）；置 1 后执行完整范围校验')
     L.append(' * @param   cfg 电机配置指针')
     L.append(' * @return  0=全部通过, >0=首个越界参数的 id(见CSV), -EINVAL=空指针')
     L.append(' */')
@@ -311,6 +325,7 @@ def generate_h(params, groups, output_h, module_name, config_type):
     L.append('')
     L.append('/**')
     L.append(' * @brief   打印电机配置所有参数')
+    L.append(f' * @note    默认裁剪（{prefix}_EN_PRINT=0，空实现）；置 1 后输出全部参数')
     L.append(' * @param   cfg 电机配置指针')
     L.append(' */')
     L.append(f'void {module_name}_print(const {config_type} *cfg);')
@@ -392,18 +407,23 @@ def generate_h(params, groups, output_h, module_name, config_type):
 # ----------------------------------------------------------------------------
 def generate_c(params, groups, output_c, output_h, module_name, config_type):
     L = []
+    prefix = module_name.upper()
 
     L += file_banner(os.path.basename(output_c), '关节电机配置参数API实现')
     L.append('')
     L.append(f'#include "{os.path.basename(output_h)}"')
+    L.append(f'#if {prefix}_EN_PRINT')
     L.append('#include <stdio.h>')
+    L.append('#endif')
     L.append('#include <string.h>')
     L.append('#include <errno.h>')
+    L.append(f'#if {prefix}_EN_VALIDATE')
     L.append('#include <math.h>')
+    L.append('#endif')
     L.append('')
 
     # 默认值常量
-    L.append('/* 默认值常量 */')
+    L.append(f'#if {prefix}_EN_INIT_DEFAULTS  /* 默认值常量(裁剪时不生成) */')
     L.append(f'static const {config_type} g_default_config =')
     L.append('{')
     for group_name, gp in groups.items():
@@ -423,13 +443,18 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
             L.append(f'        .{p["param_name"]} = {val},')
         L.append('    },')
     L.append('};')
+    L.append('#endif')
     L.append('')
 
     # init
     L.append(f'int {module_name}_init({config_type} *cfg)')
     L.append('{')
     L.append('    if (cfg == NULL) return -EINVAL;')
-    L.append(f'    memcpy(cfg, &g_default_config, sizeof({config_type}));')
+    L.append(f'#if {prefix}_EN_INIT_DEFAULTS')
+    L.append(f'    memcpy(cfg, &g_default_config, sizeof({config_type}));  /* 完整默认值 */')
+    L.append('#else')
+    L.append(f'    memset(cfg, 0, sizeof({config_type}));  /* 裁剪: 仅全零 */')
+    L.append('#endif')
     L.append('    return 0;')
     L.append('}')
     L.append('')
@@ -437,6 +462,7 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
     # validate（返回首个越界参数 id）
     L.append(f'int {module_name}_validate(const {config_type} *cfg)')
     L.append('{')
+    L.append(f'#if {prefix}_EN_VALIDATE  /* 完整范围校验 */')
     L.append('    if (cfg == NULL) return -EINVAL;')
     L.append('')
     for group_name, gp in groups.items():
@@ -454,12 +480,17 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
             L.append(f'    if ({cond}) return {int(p["id"])};')
     L.append('')
     L.append('    return 0;')
+    L.append('#else')
+    L.append('    (void)cfg;  /* 范围校验已裁剪, 恒通过 */')
+    L.append('    return 0;')
+    L.append('#endif')
     L.append('}')
     L.append('')
 
     # print
     L.append(f'void {module_name}_print(const {config_type} *cfg)')
     L.append('{')
+    L.append(f'#if {prefix}_EN_PRINT  /* 打印全部参数 */')
     L.append('    if (cfg == NULL) return;')
     L.append('    printf("========== Motor Config ==========\\n");')
     for group_name, gp in groups.items():
@@ -484,6 +515,9 @@ def generate_c(params, groups, output_c, output_h, module_name, config_type):
                 L.append(f'    printf("{name}: {fmt}{unit_str}\\n", {arg});')
     L.append('')
     L.append('    printf("\\n==================================\\n");')
+    L.append('#else')
+    L.append('    (void)cfg;  /* 参数打印已裁剪 */')
+    L.append('#endif')
     L.append('}')
     L.append('')
 

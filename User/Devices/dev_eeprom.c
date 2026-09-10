@@ -127,12 +127,21 @@ int dev_eeprom_write(struct dev_eeprom *pobj, uint32_t addr, const uint8_t *data
 	{
 		uint16_t word = 0;
 		i2cDrv_t drv = dev_eeprom_build_drv(pobj, addr, &word);
-		/* 一次写不超过一页, 且不跨页(EEPROM 页内地址自动回绕, 必须页对齐切分) */
+		/* 计算块大小：与读取函数保持一致 */
+		uint32_t block_size = (eeprom_list[pobj->id].addr_width == 2) ? DEV_EEPROM_BLOCK_16BIT : DEV_EEPROM_BLOCK_8BIT;
+		/* 一次写不超过一页, 且不跨页(EEPROM 页内地址自动回绕, 必须页对齐切分)
+		 * 同时不跨块边界(AT24C16 块切换需要重新计算器件地址) */
 		uint16_t chunk = pobj->page_size - (word % pobj->page_size);
-		if (chunk > len) chunk = len;
+		uint16_t block_remain = (uint16_t)(block_size - (addr % block_size));
+		if (chunk > block_remain) 
+			chunk = block_remain;  /* 限制在块边界内 */
+		if (chunk > len) 
+			chunk = len;
 
-		if (drv_i2c_send(drv, (uint8_t *)data, chunk) != DRV_EOK) return DEV_ERROR;
-		if (!dev_eeprom_wait_write(drv)) return DEV_ERROR;
+		if (drv_i2c_send(drv, (uint8_t *)data, chunk) != DRV_EOK) 
+			return DEV_ERROR;
+		if (!dev_eeprom_wait_write(drv)) 
+			return DEV_ERROR;
 
 		addr += chunk;
 		data += chunk;
@@ -188,10 +197,20 @@ int dev_eeprom_erase_all(struct dev_eeprom *pobj)
 	return DEV_EOK;
 }
 
+/* 自检可写区起始地址: 必须避开 [0, 1024) 的 motor_info 参数区
+ * (motor_info_storage 从地址 0 起整块存放 1024B 含 CRC, 自检写入会破坏
+ * 整块 CRC, 下次上电校验失败 → 参数全部回落默认值)。
+ * 1024 = PARAM_AREA_SIZE, 即 8bit 内部地址器件的第 4 块起始, 同时保留
+ * "块0跨页 / 跨块边界 / 末尾块" 三种覆盖场景。 */
+#define DEV_EEPROM_TEST_BASE_ADDR   (1024U)
+
 /*
- * @brief  芯片自检: 多块写入回读校验(覆盖块0跨页边界/块1/末尾块)
+ * @brief  芯片自检: 多块写入回读校验(跨页边界/跨块边界/末尾块)
  * @param  *pobj : eeprom设备句柄
  * @retval 校验结果 ：DEV_EOK通过，其他则错误
+ * @note   仅在 [DEV_EEPROM_TEST_BASE_ADDR, total_size) 内读写,
+ *         不触碰 [0, 1024) 的 motor_info 参数区。
+ *         容量不足以腾出自检区时返回 DEV_ERROR 而不是踩参数区。
  */
 int dev_eeprom_test(struct dev_eeprom *pobj)
 {
@@ -200,19 +219,26 @@ int dev_eeprom_test(struct dev_eeprom *pobj)
 	uint8_t rbuf[32];
 	uint32_t i, addr;
 
-	/* 1) 块0 跨页写入 (addr 8..39, 跨 16B 页边界, 验证分页写) */
-	addr = 8;
+	/* 容量校验: 自检区至少要容纳三段测试, 否则拒绝自检(不退回参数区) */
+	if (pobj == NULL || pobj->total_size < (DEV_EEPROM_TEST_BASE_ADDR + 3U * N))
+		return DEV_ERROR;
+
+	/* 1) 跨页写入 (base+8 起 32B, 跨 16B 页边界, 验证分页写) */
+	addr = DEV_EEPROM_TEST_BASE_ADDR + 8U;
 	for (i = 0; i < N; i++) wbuf[i] = (uint8_t)(0x10 + i);
 	if (dev_eeprom_write(pobj, addr, wbuf, N) != DEV_EOK) return DEV_ERROR;
 	if (dev_eeprom_read(pobj, addr, rbuf, N) != DEV_EOK) return DEV_ERROR;
 	if (memcmp(wbuf, rbuf, N) != 0) return DEV_ERROR;
 
-	/* 2) 块1 起始 (addr=256, 验证器件地址块选择位) */
-	addr = 256;
-	for (i = 0; i < N; i++) wbuf[i] = (uint8_t)(0x40 + i);
-	if (dev_eeprom_write(pobj, addr, wbuf, N) != DEV_EOK) return DEV_ERROR;
-	if (dev_eeprom_read(pobj, addr, rbuf, N) != DEV_EOK) return DEV_ERROR;
-	if (memcmp(wbuf, rbuf, N) != 0) return DEV_ERROR;
+	/* 2) 下一块起始 (base+256, 验证器件地址块选择位切换) */
+	addr = DEV_EEPROM_TEST_BASE_ADDR + 256U;
+	if ((addr + N) <= pobj->total_size)
+	{
+		for (i = 0; i < N; i++) wbuf[i] = (uint8_t)(0x40 + i);
+		if (dev_eeprom_write(pobj, addr, wbuf, N) != DEV_EOK) return DEV_ERROR;
+		if (dev_eeprom_read(pobj, addr, rbuf, N) != DEV_EOK) return DEV_ERROR;
+		if (memcmp(wbuf, rbuf, N) != 0) return DEV_ERROR;
+	}
 
 	/* 3) 末尾块末尾 (addr=total_size-N, 验证最后一块) */
 	addr = pobj->total_size - N;
