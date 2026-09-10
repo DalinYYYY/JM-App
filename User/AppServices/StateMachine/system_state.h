@@ -38,26 +38,24 @@ struct dev_motor;
 #define SYSTEM_PROTECT_OVER_SPEED    (1u << 4)
 #define SYSTEM_PROTECT_GATE_DRIVER   (1u << 5) /* 栅极驱动器硬件故障保护(nFAULT) */
 
-#define SYSTEM_FAULT_OVER_CURRENT   (1u << 0)
-#define SYSTEM_FAULT_OVER_VOLTAGE   (1u << 1)
-#define SYSTEM_FAULT_UNDER_VOLTAGE  (1u << 2)
-#define SYSTEM_FAULT_OVER_SPEED     (1u << 10)
-#define SYSTEM_FAULT_NUMERIC        (1u << 11)
-#define SYSTEM_FAULT_GATE_DRIVER    (1u << 12) /* 栅极驱动器故障(nFAULT 拉低, OCP/UVLO/TSD) */
+#define SYSTEM_FAULT_OVER_CURRENT  (1u << 0)
+#define SYSTEM_FAULT_OVER_VOLTAGE  (1u << 1)
+#define SYSTEM_FAULT_UNDER_VOLTAGE (1u << 2)
+#define SYSTEM_FAULT_OVER_SPEED    (1u << 10)
+#define SYSTEM_FAULT_NUMERIC       (1u << 11)
+#define SYSTEM_FAULT_GATE_DRIVER   (1u << 12) /* 栅极驱动器故障(nFAULT 拉低, OCP/UVLO/TSD) */
 
 typedef struct system_state_s
 {
-	top_fsm_e top_state;		  /*!< 顶层有限状态机状态 */
-	ctrl_mode_e ctrl_mode;	  /*!< 当前控制模式 */
-	uint32_t fault_code;		  /*!< 系统故障码 */
-	motor_ctrl_t motor;			  /*!< 电机控制核心上下文 */
+	top_fsm_e top_state;        /*!< 顶层有限状态机状态 */
+	ctrl_mode_e ctrl_mode;      /*!< 当前控制模式 */
+	uint32_t fault_code;        /*!< 系统故障码(fault_mgr 兼容掩码派生) */
+	motor_ctrl_t motor;         /*!< 电机控制核心上下文 */
 	transition_mgr_t trans_mgr; /*!< 过渡管理器（内含 transition_t + ref_smooth_cfg） */
-	calib_state_e calib_state;	/*!< 标定子状态（仅 CALIB 态有效）*/
-	uint32_t fault_latched; /*!< 已锁存故障掩码（清除前持续生效） */
-	uint16_t fault_count;   /*!< 故障累积计数 */
-	uint8_t last_fault_code; /*!< 最近一次故障编号 */
-	uint8_t power_sample_valid; /*!< 母线电压采样有效标志 */
-	uint32_t speed_guard_cycles; /*!< 启动后超速保护延迟武装计数 */
+	calib_state_e calib_state;  /*!< 标定子状态（仅 CALIB 态有效）*/
+	uint32_t fault_latched;     /*!< 已锁存故障掩码（清除前持续生效, fault_mgr 派生） */
+	uint16_t fault_count;       /*!< 故障累积计数 */
+	uint8_t last_fault_code;    /*!< 最近一次故障编号 */
 } system_state_t;
 
 /**

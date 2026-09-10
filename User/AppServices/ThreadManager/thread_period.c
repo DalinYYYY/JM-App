@@ -23,31 +23,38 @@
 #include "thread_period.h"
 #include "thread_config.h"
 #include "dev_power_monitor.h"
+#include "fault_manager.h"
 
 void power_monitor_update(void)
 {
-	/* 电源监控刷新(20ms 周期, THREAD_DELAY_PERIOD=20)
-	 * vbus 字段供 SVPWM 归一化(calib_hw)使用。
-	 * 规则组为单次转换(不干扰共用 ADC1 的相电流注入组), 转一轮即停,
-	 * 时序: 先 update 读上一周期已完成的采样, 再 restart 触发下一周期转换,
-	 * 20ms 周期远大于 ADC 转换耗时(<100µs), 下一周期读时数据必已就绪, 无需忙等。*/
-	dev_power_monitor.update(&dev_power_monitor);
-	dev_power_monitor.restart(&dev_power_monitor);
-	(void)dev_power_monitor.get_vbus(&dev_power_monitor);
-	/* 母线电流读取: 驱动层按配置表 type 路由
-	 * - IBUS_HW: 现场采样解算; IBUS_SYNTH: 仅返回 motor_loop_isr 写入的缓存值 */
-	(void)dev_power_monitor.get_ibus(&dev_power_monitor);
+	static uint8_t pmon_div = 0u;
 
-	/* 同步电源监控到电机实时参数(usr.motor_state.power)
-	 * 任务层直接写 usr, 与中断 publish_power_thermal 解耦, 100ms 足够遥测 */
+	/* 电源监控刷新(5ms 基础拍 4 分频 = 20ms 周期, 与 ADC 驱动时序假设一致) */
+	if (++pmon_div >= PERIOD_PMON_DIV)
 	{
-		motor_power_t *p = &usr.motor_state[M1].power;
-		p->v_bus = dev_power_monitor.vbus;
-		p->i_bus = dev_power_monitor.ibus;
-		p->power_elec_w = dev_power_monitor.vbus * dev_power_monitor.ibus;
+		pmon_div = 0u;
+
+		dev_power_monitor.update(&dev_power_monitor);
+		dev_power_monitor.restart(&dev_power_monitor);
+		(void)dev_power_monitor.get_vbus(&dev_power_monitor);
+		/* 母线电流读取: 驱动层按配置表 type 路由
+		 * - IBUS_HW: 现场采样解算; IBUS_SYNTH: 仅返回 motor_loop_isr 写入的缓存值 */
+		(void)dev_power_monitor.get_ibus(&dev_power_monitor);
+
+		/* 同步电源监控到电机实时参数(usr.motor_state.power)
+		 * 任务层直接写 usr, 与中断 publish_power_thermal 解耦, 100ms 足够遥测 */
+		{
+			motor_power_t *p = &usr.motor_state[M1].power;
+			p->v_bus = dev_power_monitor.vbus;
+			p->i_bus = dev_power_monitor.ibus;
+			p->power_elec_w = dev_power_monitor.vbus * dev_power_monitor.ibus;
+		}
+		usr.motor_state[M1].thermal.temp_fet = dev_power_monitor.temp_driver;
+		usr.motor_state[M1].thermal.temp_motor = dev_power_monitor.temp_motor;
 	}
-	usr.motor_state[M1].thermal.temp_fet = dev_power_monitor.temp_driver;
-	usr.motor_state[M1].thermal.temp_motor = dev_power_monitor.temp_motor;
+
+	/* 慢速故障检测(5ms 节拍: 温度分级/NTC有效性/持续过流/堵转) */
+	fault_mgr_poll_slow();
 }
 
 void period_thread(void const *argument)

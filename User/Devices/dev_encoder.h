@@ -41,6 +41,9 @@ typedef struct dev_encoder
     void (*set_dir)(struct dev_encoder *pobj, int8_t dir);           /* 设置方向: 1=CW, -1=CCW */
     int8_t (*get_dir)(struct dev_encoder *pobj);                    /* 读取方向: 1/-1 */
     float (*get_raw_deg)(struct dev_encoder *pobj);                 /* 原始角度(deg)，未补偿 */
+    /* 健康查询接口(供故障检测; 无对应能力的芯片/虚拟模式为 NULL, 调用方判空) */
+    uint16_t (*get_err_cnt)(struct dev_encoder *pobj);              /* 连续坏帧计数(有效帧清零) */
+    uint8_t (*get_health)(struct dev_encoder *pobj);                /* 健康位图: bit0=位置无效 bit1=磁场过弱 bit2=磁场过强 */
 } dev_encoder_t;
 
 #ifdef __cplusplus

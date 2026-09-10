@@ -15,6 +15,7 @@
  * | 2026-07-27 | 1.1  | Dalin  | 协议版本号 + 命令码保留区 + 预留 0x80/0x81/0x82 同步触发, 0xCC~0xCF OTA |
  * | 2026-08-21 | 1.2  | Dalin  | 新增 0x60~0x67 负载模拟段 + JM_FEAT_LOAD_SIM, 协议版本升至 1.5 |
  * | 2026-08-27 | 1.3  | Dalin  | 新增 0x07 SOFT_RESET 软件复位(魔数防误触), 协议版本升至 1.6 |
+ * | 2026-09-03 | 1.4  | Dalin  | 新增 0xA3/0xA4 缓启动渐变配置读写, 协议版本升至 1.7 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  * @note        CMD 0x00~0xB8 段数值与 state_define.h 的 ctrl_mode_e 一致,
@@ -39,14 +40,15 @@ extern "C"
 	/* 主版本: 不兼容变更(命令码重排/载荷语义改); 次版本: 兼容追加(新命令/新字段);
 	 * 补丁: bug 修复。0xD0 READ_DEV_INFO 应答(FD 模式)携带此版本号。 */
 #define JM_PROTO_VERSION_MAJOR 1
-#define JM_PROTO_VERSION_MINOR 6 /* 1.6: 0x07 SOFT_RESET 软件复位 */
+#define JM_PROTO_VERSION_MINOR 12 /* 1.12: 新增 JM_PT_U64, 0xE6/0xE7 value 按类型定长(1/2/4/8B); FaultParam 块取消, 阈值/三级使能掩码(低/高32位对 PID148~153)融合进 ProtectComm; softstart 精简 */
 #define JM_PROTO_VERSION_PATCH 0
 #define JM_PROTO_VERSION       ((uint16_t)(((JM_PROTO_VERSION_MAJOR) << 8) | (JM_PROTO_VERSION_MINOR)))
 
 	/* ===================== feature_flags 位定义 =====================
 	 * 0xD0 READ_DEV_INFO 应答(28B 扩展格式)携带的特性位图(u16), 上位机据此自适应。
 	 * bit0=CAN_FD 支持 | bit1=AUTH 鉴权启用 | bit2=AUTOTUNE 自整定 | bit3=BODE_SWEEP 扫频
-	 * bit4=DUAL_CHANNEL_ARB 双通道仲裁 | bit5=CAN_LOSS_TIMER 通信中断降级 | bit6=LOAD_SIM 负载模拟 */
+	 * bit4=DUAL_CHANNEL_ARB 双通道仲裁 | bit5=CAN_LOSS_TIMER 通信中断降级 | bit6=LOAD_SIM 负载模拟
+	 bit7=FAULT_MGR 故障管理器(0xAA/0xAB 诊断+三级使能掩码) */
 #define JM_FEAT_CAN_FD         (1u << 0)
 #define JM_FEAT_AUTH           (1u << 1)
 #define JM_FEAT_AUTOTUNE       (1u << 2)
@@ -54,6 +56,7 @@ extern "C"
 #define JM_FEAT_DUAL_ARB       (1u << 4)
 #define JM_FEAT_CAN_LOSS_TIMER (1u << 5)
 #define JM_FEAT_LOAD_SIM       (1u << 6)
+#define JM_FEAT_FAULT_MGR      (1u << 7)
 
 #ifndef JM_ENABLE_BODE_SWEEP
 #define JM_ENABLE_BODE_SWEEP 1
@@ -64,15 +67,15 @@ extern "C"
 
 #if defined(USE_CAN_FD_MODE) && (USE_CAN_FD_MODE == 1)
 #if (JM_ENABLE_BODE_SWEEP == 1)
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM | JM_FEAT_FAULT_MGR)
 #else
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_CAN_FD | JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM | JM_FEAT_FAULT_MGR)
 #endif
 #else
 #if (JM_ENABLE_BODE_SWEEP == 1)
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_BODE_SWEEP | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM | JM_FEAT_FAULT_MGR)
 #else
-#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM)
+#define JM_FEATURE_FLAGS_LO (JM_FEAT_AUTOTUNE | JM_FEAT_CAN_LOSS_TIMER | JM_FEAT_LOAD_SIM | JM_FEAT_FAULT_MGR)
 #endif
 #endif
 
@@ -203,14 +206,23 @@ extern "C"
 		JM_CMD_CALIB_ABORT = 0x98,  /* 中止标定 */
 
 		/* PID 管理 0xA0~0xAF: 三环独立参数来源管理 + 实时调试*/
-		JM_CMD_PID_AUTOTUNE = 0xA0,   /* PID 理论估计 */
-		JM_CMD_PID_SOURCE_SET = 0xA1, /* PID 来源切换 */
-		JM_CMD_PID_SOURCE_GET = 0xA2, /* 读 PID 来源状态 */
-		JM_CMD_PID_PARAM_SET = 0xA5,  /* 实时写PID参数 */
-		JM_CMD_PID_PARAM_GET = 0xA6,  /* 实时读PID参数 */
+         JM_CMD_PID_AUTOTUNE = 0xA0,   /* PID 理论估计 */
+         JM_CMD_PID_SOURCE_SET = 0xA1, /* PID 来源切换 */
+         JM_CMD_PID_SOURCE_GET = 0xA2, /* 读 PID 来源状态 */
+         JM_CMD_SMOOTH_CFG_SET = 0xA3, /* 缓启动渐变配置写(RAM立即生效+镜像motor_info) */
+         JM_CMD_SMOOTH_CFG_GET = 0xA4, /* 缓启动渐变配置读(单字段/0xFF整块) */
+         JM_CMD_PID_PARAM_SET = 0xA5,  /* 实时写PID参数 */
+         JM_CMD_PID_PARAM_GET = 0xA6,  /* 实时读PID参数 */
+
+		/* 故障诊断 0xAA~0xAF (fault_mgr 分级故障管理) */
+		JM_CMD_FAULT_SUMMARY = 0xAA, /* 故障摘要: 无载荷; 回18B 掩码/级别活动/最高优先级/降功率档 */
+		JM_CMD_FAULT_DETAIL = 0xAB,  /* 故障详情: type(0=活动优先级序/1=历史时间倒序)+idx; 回20B 记录 */
+		JM_CMD_FAULT_EVENT = 0xAC,   /* 故障事件主动上报(M->H 无应答, 二期实现): 8B code+count+ts */
+		JM_CMD_FAULT_DEBUG_SET = 0xAD, /* 保留: 逐故障调试屏蔽已废弃，统一使用 PID191~193 */
+		JM_CMD_FAULT_DEBUG_GET = 0xAE, /* 保留: 逐故障调试屏蔽已废弃，统一使用 PID191~193 */
 
 		/* 系统诊断 0xB0~0xBF */
-		JM_CMD_CLEAR_FAULT = 0xB0,
+		JM_CMD_CLEAR_FAULT = 0xB0, /* 清除故障: 无载荷(默认清锁存)或1B flags bit0=锁存 bit1=历史 */
 		JM_CMD_DIAGNOSTIC = 0xB1,
 		JM_CMD_ENTER_BOOTLOADER = 0xB2,
 		JM_CMD_SAVE_CONFIG = 0xB3,
@@ -232,7 +244,8 @@ extern "C"
 		JM_CMD_READ_TEMPERATURE = 0xC5,
 		JM_CMD_READ_POS_VEL = 0xC6,
 		JM_CMD_READ_MULTITURN = 0xC7,
-		JM_CMD_READ_FAULT = 0xC8,
+		/* 0xC8 READ_FAULT 已废弃(v1.8): 故障查询迁移至 0xAA/0xAB(分级诊断),
+		 * 码值保留不复用; 周期遥测的故障组仍经 0xCA JM_TLM_FAULT 下发 */
 		JM_CMD_READ_DEBUG = 0xC9,    /* 通用调试通道: float[] 任意挂载量, 免改协议加观测点 */
 		JM_CMD_TELEMETRY = 0xCA,     /* 周期遥测帧(下位机->上位机, 无应答): mask(u16) + 按位序拼接所选数据组 */
 		JM_CMD_SET_TELEMETRY = 0xCB, /* 遥控开关(上位机->下位机): enable(u8)+mask(u16)[+period_ms(u16)], 回单次ACK */
@@ -263,6 +276,7 @@ extern "C"
 		JM_CMD_MOTOR_INFO_SAVE = 0xEA,          /* 把motor_info整块写入Flash */
 		JM_CMD_MOTOR_INFO_RESET = 0xEB,         /* 恢复默认(param_id=0xFFFF全部) */
 		JM_CMD_MOTOR_INFO_RECALIB_RESET = 0xEC, /* 清除标定状态以便重新标定(保留电机本体参数) */
+		JM_CMD_MOTOR_INFO_ERASE = 0xED,         /* 固化清零: {magic:u32} 擦除EEPROM全部参数(RAM同回默认) */
 
 		/* CAN管理与通用 0xF0~0xFF */
 		JM_CMD_SET_CAN_ID = 0xF0,
@@ -274,6 +288,27 @@ extern "C"
 		JM_CMD_CAN_DI_IDENTIFY = 0xF6, /* 按CAN-DI触发物理设备指示 */
 		JM_CMD_NACK = 0xFE,            /* 错误应答 */
 	} jm_cmd_e;
+
+	/* ===================== 缓启动渐变配置参数 ID (0xA3/0xA4 共用) =====================
+	 * SET 0xA3 载荷: param_id(1) + value(4)，逐字段写(RAM 立即生效 + 镜像 motor_info)。
+	 * GET 0xA4 载荷: param_id(1)；单字段回 value(4)；0xFF 回整块(定长 52B，CAN 层自动多帧)。
+	 * 语义同 ref_smooth_cfg_t：rate>0 时按速率自适应时长(|Δ|/rate)，全 0 回退 duration。 */
+#define JM_SMOOTH_PID_ENABLE          0x00u /* u8  总开关 0禁用 1启用 */
+#define JM_SMOOTH_PID_SHAPE           0x01u /* u8  渐变形状 0线性 1S曲线 */
+#define JM_SMOOTH_PID_DURATION        0x02u /* u32 兜底时长(控制环调用次数) */
+#define JM_SMOOTH_PID_POS_RATE        0x03u /* f32 位置目标变化速率上限 rad/s */
+#define JM_SMOOTH_PID_VEL_RATE        0x04u /* f32 速度目标变化速率上限 rad/s² */
+#define JM_SMOOTH_PID_TORQUE_RATE     0x05u /* f32 力矩目标变化速率上限 Nm/s */
+#define JM_SMOOTH_PID_CURRENT_RATE    0x06u /* f32 电流目标变化速率上限 A/s */
+#define JM_SMOOTH_PID_POS_THRESH      0x07u /* f32 位置目标突变触发阈值 rad */
+#define JM_SMOOTH_PID_VEL_THRESH      0x08u /* f32 速度目标突变触发阈值 rad/s */
+#define JM_SMOOTH_PID_TORQUE_THRESH   0x09u /* f32 力矩目标突变触发阈值 Nm */
+#define JM_SMOOTH_PID_CURRENT_THRESH  0x0Au /* f32 电流目标突变触发阈值 A */
+#define JM_SMOOTH_PID_VOLTAGE_THRESH  0x0Bu /* f32 电压目标突变触发阈值 V */
+#define JM_SMOOTH_PID_DUTY_THRESH     0x0Cu /* f32 占空比目标突变触发阈值 */
+#define JM_SMOOTH_PID_MODE_SW_FALLBACK 0x0Du /* u32 跨模式切换兜底时长(调用次数) */
+#define JM_SMOOTH_PID_ALL             0xFFu /* 仅GET: 整块读取(52B) */
+	/* 整块布局(52B): enable(u8)+shape(u8)+rsv(2)+duration(u32)+rate[4](f32)+thresh[6](f32)+fallback(u32) */
 
 	/* ===================== 同步遥测分组位掩码(0xCA/0xCB 共用) =====================
 	 * 上位机用 SET_TELEMETRY(0xCB) 选择订阅哪些组; 下位机把所选组在同一拍打包成
@@ -340,9 +375,12 @@ extern "C"
 		JM_ERR_SAVE_LIMIT = 0x14,    /* 固化次数超限(寿命保护) */
 		JM_ERR_EEPROM_WRITE = 0x15,  /* EEPROM 写入失败 */
 		JM_ERR_EEPROM_VERIFY = 0x16, /* EEPROM 回读校验失败 */
+		/* 新增 0x17 (v1.10 存储状态细分) */
+		JM_ERR_STORAGE_NOT_INIT = 0x17, /* 存储服务未初始化(dev_flash init 失败/未执行) */
 	} jm_err_e;
 
-	/* ===================== 参数类型码(0xE0读应答的 type 字段) ===================== */
+	/* ===================== 参数类型码(0xE0/0xE6 读应答的 type 字段) =====================
+	 * v1.12 起 0xE6/0xE7 的 value 长度随类型: U8/I8=1B U16/I16=2B U32/I32/F32=4B U64=8B */
 	typedef enum
 	{
 		JM_PT_U8 = 0,
@@ -353,6 +391,7 @@ extern "C"
 		JM_PT_I32 = 5,
 		JM_PT_F32 = 6,
 		JM_PT_STR = 7, /* char[] */
+		JM_PT_U64 = 8, /* 64bit (v1.12 预留类型码, 当前参数表未使用) */
 	} jm_param_type_e;
 
 	/* CAN 仲裁ID编解码: ID = (CMD<<8) | 电机ID */
@@ -366,6 +405,7 @@ extern "C"
 
 												 /* Bootloader/恢复出厂/软件复位魔数(防误触) */
 #define JM_MAGIC_BOOTLOADER    0xB00710ADu
+#define JM_MAGIC_STORAGE_ERASE 0x0AEA0001u /* 0xED 固化清零防误触魔数 */
 #define JM_MAGIC_FACTORY_RESET 0xFAC70F5Fu
 #define JM_MAGIC_SOFT_RESET    0x5E7E7E5Eu
 

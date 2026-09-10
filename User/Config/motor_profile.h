@@ -48,6 +48,15 @@
 #endif
 #define MOTOR_PROFILE MOTOR_PROFILE_BOARD
 
+/* V1/SFOC_V2 的 TIM1 中心对齐 PWM 默认载波为 10 kHz，外部参数为零或
+ * 裁剪构建时用于自动死区补偿的回退值；有效 motor_info 标定值优先。 */
+#ifndef MOTOR_PROFILE_PWM_FREQ_HZ
+#define MOTOR_PROFILE_PWM_FREQ_HZ 10000U
+#endif
+#ifndef MOTOR_PROFILE_DEAD_TIME_NS
+#define MOTOR_PROFILE_DEAD_TIME_NS 500.0f
+#endif
+
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
 /* GM4820H 无刷云台电机（参数来源：GM4820H参数_2024.pdf）
@@ -194,8 +203,10 @@ void motor_profile_apply_info(void *cfg);
  * 版本历史：
  *   v1: 初始版本
  *   v2: 增加 pid_flash_valid_magic 字段
- *   v3: MotorCalibParam 段增加 peak_current/max_speed 字段（Index 43/44）*/
-#define MOTOR_PROFILE_CONFIG_VERSION 3U
+ *   v3: MotorCalibParam 段增加 peak_current/max_speed 字段（Index 43/44）
+ *   v4: ProtectComm 块移除旧温度参数（温度保护迁移至 FaultParam 块）
+ *   v5: FaultParam 块取消, 故障阈值/三级使能掩码(拆低/高32位对)融合进 ProtectCommParam(协议 v1.12)*/
+#define MOTOR_PROFILE_CONFIG_VERSION 5U /* v5: ProtectCommParam 块布局变更(旧存储作废重建) */
 
 void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上电用 */
 
@@ -218,5 +229,11 @@ void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上
  * @param info   Flash 加载的 motor_info 句柄（motor_info_storage_get() 返回值）
  */
 void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info);
+
+/* 将 motor_info 中的电流环补偿配置同步到 ISR 实际读取的 motor_param。 */
+void motor_profile_sync_control_to_param(motor_param_t *param, const motor_info_t *info);
+
+/* 重新加载故障管理配置到 fault_mgr（补偿 fault_mgr_init 覆盖） */
+void motor_profile_sync_fault_cfg_reload(const motor_info_t *info);
 
 #endif /* __MOTOR_PROFILE_H__ */

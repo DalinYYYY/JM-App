@@ -30,99 +30,15 @@ dev_power_monitor_t dev_power_monitor;
 /* NTC 分度表(单位: kΩ, 降序), 索引 i 对应温度 t_min + i*5 ℃, 板级经 ntc_table 字段选用
  * 10k 表: 与源工程 JointMotor_driver(therimal_resitant_table)一致, -40~125℃(34点) */
 static const float pm_ntc_r_10k[] = {
-	195.652f,
-	148.171f,
-	113.347f,
-	87.559f,
-	68.237f,
-	53.650f,
-	42.506f,
-	33.892f,
-	27.219f,
-	22.021f,
-	17.926f,
-	14.674f,
-	12.081f,
-	10.000f,
-	8.315f,
-	6.948f,
-	5.834f,
-	4.917f,
-	4.161f,
-	3.535f,
-	3.014f,
-	2.586f,
-	2.228f,
-	1.925f,
-	1.669f,
-	1.452f,
-	1.268f,
-	1.110f,
-	0.974f,
-	0.858f,
-	0.758f,
-	0.672f,
-	0.596f,
-	0.531f,
+	195.652f, 148.171f, 113.347f, 87.559f, 68.237f, 53.650f, 42.506f, 33.892f, 27.219f, 22.021f, 17.926f, 14.674f, 12.081f, 10.000f, 8.315f, 6.948f, 5.834f,
+	4.917f,   4.161f,   3.535f,   3.014f,  2.586f,  2.228f,  1.925f,  1.669f,  1.452f,  1.268f,  1.110f,  0.974f,  0.858f,  0.758f,  0.672f, 0.596f, 0.531f,
 };
 
-/* 100k 表: 领技 CA-NTC24C018 (R25=100kΩ±5%, B25/50=3950±1%) 规格书 Rnor 列,
- * -30~230℃ 为传感器工作温度范围(53点)。注: 传感器规格书优先于 B 值公式,
- * B 公式单指数在两端偏差大(-30℃ 实测 1733k vs 公式外推 2002k) */
+/* 100k 表: 领技 CA-NTC24C018 (R25=100kΩ±5%, B25/50=3950±1%) */
 static const float pm_ntc_r_100k[] = {
-	1733.200f,
-	1283.000f,
-	959.050f,
-	724.800f,
-	551.410f,
-	423.700f,
-	327.240f,
-	254.800f,
-	199.990f,
-	157.600f,
-	125.245f,
-	100.000f,
-	81.000f,
-	65.650f,
-	53.500f,
-	43.780f,
-	35.900f,
-	29.990f,
-	25.000f,
-	20.900f,
-	17.550f,
-	14.760f,
-	12.540f,
-	10.660f,
-	9.100f,
-	7.784f,
-	6.710f,
-	5.850f,
-	5.070f,
-	4.410f,
-	3.850f,
-	3.340f,
-	2.940f,
-	2.580f,
-	2.271f,
-	2.000f,
-	1.770f,
-	1.589f,
-	1.414f,
-	1.259f,
-	1.122f,
-	0.997f,
-	0.896f,
-	0.797f,
-	0.719f,
-	0.643f,
-	0.582f,
-	0.533f,
-	0.483f,
-	0.437f,
-	0.396f,
-	0.360f,
-	0.328f,
+	1733.200f, 1283.000f, 959.050f, 724.800f, 551.410f, 423.700f, 327.240f, 254.800f, 199.990f, 157.600f, 125.245f, 100.000f, 81.000f, 65.650f, 53.500f, 43.780f, 35.900f, 29.990f,
+	25.000f,   20.900f,   17.550f,  14.760f,  12.540f,  10.660f,  9.100f,   7.784f,   6.710f,   5.850f,   5.070f,   4.410f,   3.850f,  3.340f,  2.940f,  2.580f,  2.271f,  2.000f,
+	1.770f,    1.589f,    1.414f,   1.259f,   1.122f,   0.997f,   0.896f,   0.797f,   0.719f,   0.643f,   0.582f,   0.533f,   0.483f,  0.437f,  0.396f,  0.360f,  0.328f,
 };
 
 const pm_ntc_table_t pm_ntc_table_10k = {
@@ -239,12 +155,8 @@ static void pm_convert_channel(struct dev_power_monitor *pobj, int idx)
 			 * (SFOC_V2 等未填 scale 的板保持 0 占位, 行为不变) */
 			pm_update_temp(&pobj->temp_driver, voltage, cfg);
 			break;
-		case PM_CH_TEMP_MOTOR:
-			pm_update_temp(&pobj->temp_motor, voltage, cfg);
-			break;
-		case PM_CH_TEMP_MCU:
-			pm_update_temp(&pobj->temp_mcu, voltage, cfg);
-			break;
+		case PM_CH_TEMP_MOTOR: pm_update_temp(&pobj->temp_motor, voltage, cfg); break;
+		case PM_CH_TEMP_MCU: pm_update_temp(&pobj->temp_mcu, voltage, cfg); break;
 		case PM_CH_ENPR:
 			/* 使能信号: 返回原始电压, 调用方按阈值判断 */
 			pobj->enpr = voltage;
@@ -473,8 +385,7 @@ int dev_power_monitor_has_channel(pm_channel_type_e type)
  *         仅板级配置了 PM_CH_IBUS_SYNTH 通道时调用 (由 has_channel 检测)
  *         CALIB/IDLE 态不调用, ibus 保持上次值
  */
-void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic,
-                                       float da, float db, float dc)
+void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic, float da, float db, float dc)
 {
 	/* da/db/dc 已归一化为 0~1, ia/ib/ic 单位 A
 	 * 流入电机为正 (与硬件 INA199B1 极性约定一致: ibus_offset 减去后取反)
@@ -483,8 +394,7 @@ void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic,
 	float ibus_raw = da * ia + db * ib + dc * ic;
 	/* 一阶低通滤波, 抑制小电流时三相采样噪声叠加导致的波动
 	 * 硬件 INA199B1 自带 RC 滤波, 合成方法无对应物, 这里数字补偿 */
-	dev_power_monitor.ibus = PM_IBUS_LPF_ALPHA * ibus_raw
-	                         + (1.0f - PM_IBUS_LPF_ALPHA) * dev_power_monitor.ibus;
+	dev_power_monitor.ibus = PM_IBUS_LPF_ALPHA * ibus_raw + (1.0f - PM_IBUS_LPF_ALPHA) * dev_power_monitor.ibus;
 }
 
 void dev_power_monitor_init(dev_power_monitor_t *pobj)

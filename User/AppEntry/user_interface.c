@@ -33,6 +33,7 @@
 #include "led_manager.h"
 #endif
 #include "motor_info_storage.h"
+#include "fault_manager.h"
 #include "motor_loop.h"
 #include "motor_observer.h"
 #include "motor_loop_config.h"
@@ -78,6 +79,9 @@ static void hardware_init(void)
 	g_dev_drv8301.init(&g_dev_drv8301);
 #endif
 
+	/* 初始化故障管理器，必须早于 motor_loop_init 及控制中断启动。 */
+	fault_mgr_init();
+
 	/* 初始化电机三环控制（dev_motor + 状态机 + 级联控制）
      * 电流环频率由 ADC 注入转换中断决定，此处传入实际中断频率 */
 	motor_loop_init(10000.0f);
@@ -92,15 +96,15 @@ static void hardware_init(void)
 	 * 须在上述各 init 完成后绑定，此时对象地址与内容均已就绪，
 	 * 调试时通过 usr.p_xxx 实时反映对象最新值。
 	 * s_motor_loop 经 getter 绑定，避免直接访问伪私有变量。 */
-	usr.p_dwt_timer          = &dwt_timer;
-	usr.p_motor_loop         = motor_loop_get();
+	usr.p_dwt_timer = &dwt_timer;
+	usr.p_motor_loop = motor_loop_get();
 #if defined(USE_DEV_FLASH)
 	usr.p_motor_info_storage = &g_motor_info_storage;
 #else
 	usr.p_motor_info_storage = NULL;
 #endif
-	usr.p_dev_power_monitor  = &dev_power_monitor;
-	usr.p_dev_commun_uart    = &dev_commun_uart;
+	usr.p_dev_power_monitor = &dev_power_monitor;
+	usr.p_dev_commun_uart = &dev_commun_uart;
 }
 
 void user_init(void)

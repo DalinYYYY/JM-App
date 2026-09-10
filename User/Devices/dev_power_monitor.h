@@ -182,8 +182,7 @@ extern "C"
 	 *         仅板级配置了 PM_CH_IBUS_SYNTH 通道时调用 (由 has_channel 检测)
 	 *         CALIB/IDLE 态不调用, ibus 保持上次值
 	 */
-	void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic,
-	                                       float da, float db, float dc);
+	void dev_power_monitor_synthesize_ibus(float ia, float ib, float ic, float da, float db, float dc);
 
 	extern dev_power_monitor_t dev_power_monitor;
 

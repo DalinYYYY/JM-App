@@ -21,6 +21,7 @@
 
 #include "system_state.h"
 #include "calib_mgr.h"
+#include "fault_manager.h"
 #include "motor_mode.h" /* motor_load_sim_reset: 负载模拟模式进入复位 */
 #include <string.h>
 
@@ -33,70 +34,6 @@
  *          覆盖此值（=|Δ目标|/rate）；rate 全<=0 时才使用此固定时长。
  */
 uint32_t g_run_state_trans_count = 1000;
-
-#define SYSTEM_SPEED_GUARD_SECONDS (0.020f)
-
-static int state_float_is_finite(float value)
-{
-	uint32_t bits;
-	memcpy(&bits, &value, sizeof(bits));
-	return (bits & 0x7F800000u) != 0x7F800000u;
-}
-
-static float state_absf(float value)
-{
-	return (value < 0.0f) ? -value : value;
-}
-
-static uint8_t state_first_fault(uint32_t mask)
-{
-	uint8_t bit;
-	for (bit = 0u; bit < 32u; bit++)
-	{
-		if ((mask & (1u << bit)) != 0u)
-			return bit;
-	}
-	return 0u;
-}
-
-static uint32_t state_active_faults(system_state_t *sys)
-{
-	const protection_param_t *p = &sys->motor.param->protection_param;
-	const motor_fb_t *fb = &sys->motor.fb;
-	uint32_t active = 0u;
-	uint32_t enable = p->protect_enable_mask;
-	float current_limit = p->protect_over_current;
-	float bus = fb->bus_voltage;
-
-	if (!state_float_is_finite(fb->id) || !state_float_is_finite(fb->iq) || !state_float_is_finite(fb->vel) || !state_float_is_finite(bus))
-		active |= SYSTEM_FAULT_NUMERIC;
-
-	if ((enable & SYSTEM_PROTECT_OVER_CURRENT) != 0u && state_float_is_finite(fb->id) && state_float_is_finite(fb->iq) && (fb->id * fb->id + fb->iq * fb->iq) > current_limit * current_limit)
-		active |= SYSTEM_FAULT_OVER_CURRENT;
-
-	if (state_float_is_finite(bus) && bus > 1.0f)
-		sys->power_sample_valid = 1u;
-	if (sys->power_sample_valid)
-	{
-		if ((enable & SYSTEM_PROTECT_OVER_VOLTAGE) != 0u && bus > p->protect_over_voltage)
-			active |= SYSTEM_FAULT_OVER_VOLTAGE;
-		if ((enable & SYSTEM_PROTECT_UNDER_VOLTAGE) != 0u && sys->top_state != TOP_FSM_IDLE && bus < p->protect_under_voltage)
-			active |= SYSTEM_FAULT_UNDER_VOLTAGE;
-	}
-
-	/* 编码器冷启动阶段可能先返回无效角度，随后跳到真实角度。
-	 * 仅在输出已使能且启动保护窗口结束后检测超速，避免 IDLE 态误锁存。 */
-	if (sys->speed_guard_cycles == 0u && (sys->top_state == TOP_FSM_READY || sys->top_state == TOP_FSM_RUN) && (enable & SYSTEM_PROTECT_OVER_SPEED) != 0u && state_float_is_finite(fb->vel) && state_absf(fb->vel) > p->protect_over_speed)
-		active |= SYSTEM_FAULT_OVER_SPEED;
-
-	/* 栅极驱动器硬件故障(nFAULT): DRV8350 OCP/UVLO/TSD 等保护触发后开漏拉低并锁存,
-	 * 软件不做自恢复(需 EN 复位/重新上电清除硬件锁存); 启动保护窗口内不武装, 避免上电时序误报。
-	 * 未连接 nFAULT 的板型 fb->gate_driver_fault 恒 0, 使能位打开也不会误报。 */
-	if (sys->speed_guard_cycles == 0u && (enable & SYSTEM_PROTECT_GATE_DRIVER) != 0u && fb->gate_driver_fault != 0u)
-		active |= SYSTEM_FAULT_GATE_DRIVER;
-
-	return active;
-}
 
 /**
  * @brief 控制指令到运行状态的映射表
@@ -235,14 +172,9 @@ void system_state_init(system_state_t *sys, struct dev_motor *motor, motor_param
 	sys->top_state = TOP_FSM_INIT;
 	sys->ctrl_mode = CONTROL_MODE_IDLE;
 	sys->fault_code = 0;
-	if (dt > 0.0f)
-	{
-		sys->speed_guard_cycles = (uint32_t)(SYSTEM_SPEED_GUARD_SECONDS / dt + 0.5f);
-	}
-	if (sys->speed_guard_cycles == 0u)
-	{
-		sys->speed_guard_cycles = 1u;
-	}
+
+	/* 故障管理器绑定状态机(检测/仲裁/动作统一委托, 消抖阈值按 dt 换算) */
+	fault_mgr_attach(sys);
 
 	top_fsm_switch(sys, TOP_FSM_IDLE);
 }
@@ -394,33 +326,26 @@ void motor_control_loop(system_state_t *sys)
 }
 
 /**
- * @brief 系统故障检测（具体实现，预留）
+ * @brief 系统故障检测（委托故障管理器）
+ * @details 检测/记录/仲裁/级别动作统一在 fault_mgr_poll_fast 内完成
+ *          (电气类快检测 + 停机类故障切 FAULT 态)。本函数保留:
+ *          1. 同步兼容字段到 sys(fault_code/fault_latched 等旧路径);
+ *          2. 扫频中止与失能输出兜底(fault_mgr 不依赖 sweep 模块)。
  */
 void fault_check(system_state_t *sys)
 {
-	uint32_t active;
-	uint32_t new_faults;
-
 	if (sys == NULL || sys->motor.param == NULL)
 		return;
-	if (sys->speed_guard_cycles > 0u)
-		sys->speed_guard_cycles--;
-	active = state_active_faults(sys);
-	new_faults = active & ~sys->fault_latched;
-	sys->fault_code = active;
-	if (active == 0u)
-		return;
 
-	if (new_faults != 0u)
+	fault_mgr_poll_fast();
+	fault_mgr_sync_compat(sys);
+
+	if (sys->fault_code != 0u)
 	{
-		if (sys->fault_count != 0xFFFFu)
-			sys->fault_count++;
-		sys->last_fault_code = state_first_fault(new_faults);
+		motor_sweep_abort(&sys->motor);
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		top_fsm_switch(sys, TOP_FSM_FAULT);
 	}
-	motor_sweep_abort(&sys->motor);
-	sys->fault_latched |= active;
-	sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
-	top_fsm_switch(sys, TOP_FSM_FAULT);
 }
 
 /**
@@ -453,6 +378,10 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
 		{
+			/* 放行 fm 侧锁存记录: 条件已消失的清为 CLEARED, 仍触发的
+			 * 下拍检测重新置 ACTIVE(与旧"条件消失才可清障"语义一致)。
+			 * 无此步则 fault_code 恒派生自锁存记录, 清障死锁 */
+			fault_mgr_clear(FAULT_CLEAR_LATCHED);
 			fault_check(sys);
 			if (sys->fault_code == 0u)
 			{
@@ -469,6 +398,7 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
 		{
+			fault_mgr_clear(FAULT_CLEAR_LATCHED);
 			fault_check(sys);
 			if (sys->fault_code == 0u)
 			{
@@ -495,6 +425,9 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 
 		case CONTROL_MODE_ENABLE:
 			// 上使能：IDLE → READY
+			/* DENY 类故障活动(低温等)时拒绝使能, 故障码经 0xAB 查询 */
+			if (fault_mgr_deny_enable() != 0u)
+				return;
 			top_fsm_switch(sys, TOP_FSM_READY);
 			if (sys->top_state == TOP_FSM_READY)
 				sys->ctrl_mode = cmd;

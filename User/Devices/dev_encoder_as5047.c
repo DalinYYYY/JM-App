@@ -54,6 +54,18 @@ static float encoder_as5047_get_raw_deg(struct dev_encoder *enc)
 	return (float)chip->raw * 360.0F / (float)AS5047_ANGLE_RESOLUTION;
 }
 
+static uint16_t encoder_as5047_get_err_cnt(struct dev_encoder *enc)
+{
+	dev_as5047_t *chip = (dev_as5047_t *)enc->ctx;
+	return (uint16_t)(chip->err_cnt + chip->spi_err_cnt);
+}
+
+static uint8_t encoder_as5047_get_health(struct dev_encoder *enc)
+{
+	(void)enc; /* 磁编码器专属位图, 光学编码器无磁场状态, 恒健康 */
+	return 0u;
+}
+
 void dev_encoder_as5047_create(dev_encoder_t *enc, as5047_id_e id)
 {
 	assert_report(enc != NULL);
@@ -70,6 +82,8 @@ void dev_encoder_as5047_create(dev_encoder_t *enc, as5047_id_e id)
 	enc->set_dir = encoder_as5047_set_dir;
 	enc->get_dir = encoder_as5047_get_dir;
 	enc->get_raw_deg = encoder_as5047_get_raw_deg;
+	enc->get_err_cnt = encoder_as5047_get_err_cnt;
+	enc->get_health = encoder_as5047_get_health;
 }
 
 #endif /* USE_DEV_AS5047 */

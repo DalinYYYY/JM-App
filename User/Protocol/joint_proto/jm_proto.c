@@ -19,6 +19,8 @@
 #include <string.h>
 #include "jm_proto.h"
 #include "calib_mgr.h"
+#include "fault_manager.h" /* 0xAA/0xAB 故障诊断 + 0xB0 历史清除 */
+#include "motor_info_storage.h" /* g_motor_info_storage: 0xD0[25] 存储状态位图 */
 
 /* 组织应答: reply[0]=cmd, 其后拷贝 body(可空), 设置 reply_len */
 static void reply_set(jm_proto_t *p, uint8_t cmd, const uint8_t *body, uint16_t body_len)
@@ -195,11 +197,6 @@ static jm_err_e handle_read(jm_proto_t *p, uint8_t cmd)
 			jm_wr_f32(&o[4], fb.single);
 			n = 8;
 			break;
-		case JM_CMD_READ_FAULT:
-			jm_wr_u32(&o[0], fb.fault_mask);
-			jm_wr_u32(&o[4], fb.warn_mask);
-			n = 8;
-			break;
 		default:
 			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 	}
@@ -292,10 +289,11 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			reply_set(p, cmd, &status, 1);
 			return e;
 		}
-		/* 电机配置读 0xE6: {param_id:u16} -> {param_id:u16;type:u8;value:4B} (固定4字节值) */
+		/* 电机配置读 0xE6: {param_id:u16} -> {param_id:u16;type:u8;value:nB}
+		 * v1.12: value 长度随类型(1/2/4/8B, u64 参数回 8B) */
 		case JM_CMD_MOTOR_INFO_READ:
 		{
-			uint8_t o[3 + 4];
+			uint8_t o[3 + 8];
 			uint8_t type = 0, vlen = 0;
 			if (len < 2)
 				return reply_nack(p, cmd, JM_ERR_LENGTH);
@@ -310,7 +308,8 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			reply_set(p, cmd, o, (uint16_t)(3 + vlen));
 			return JM_ERR_OK;
 		}
-		/* 电机配置写 0xE7: {param_id:u16;value:4B} -> ACK{param_id:u16;status:u8} (固定4字节值) */
+		/* 电机配置写 0xE7: {param_id:u16;value:nB} -> ACK{param_id:u16;status:u8}
+		 * v1.12: value 长度随参数类型(1/2/4/8B), 长度校验在 ops 层查 desc->size */
 		case JM_CMD_MOTOR_INFO_WRITE:
 		{
 			uint8_t o[3];
@@ -383,6 +382,15 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 		e = ops->motor_info_recalib_reset();
 		return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+	/* 固化清零 0xED: {magic:u32=JM_MAGIC_STORAGE_ERASE} -> ACK{status:u8}
+	 * 擦除 EEPROM 全部参数, RAM 同步恢复默认; 魔数不符回 NACK(防误触)。*/
+	case JM_CMD_MOTOR_INFO_ERASE:
+		if (len < 4 || jm_rd_u32(&pl[0]) != JM_MAGIC_STORAGE_ERASE)
+			return reply_nack(p, cmd, JM_ERR_UNAUTHORIZED);
+		if (ops == NULL || ops->motor_info_erase == NULL)
+			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+		e = ops->motor_info_erase();
+		return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
 		default:
 			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 	}
@@ -392,7 +400,7 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
  * 0xD0 READ_DEV_INFO 应答格式 (向后兼容追加, 协议层不依赖板级宏):
  *   原始格式 (20B, 老上位机): [0-3]hw [4-7]fw [8-19]uid[12]
  *   扩展格式 (28B, 新上位机): 追加 [20]motor_id_default [21]proto_major [22]proto_minor
- *                                  [23]feat_lo [24]feat_hi [25-27]reserved
+ *                                  [23]feat_lo [24]feat_hi [25]存储诊断位图 [26-27]reserved
  * 协议层始终返回 28B 扩展格式; 老上位机读前 20B 即可, 后 8B 自动忽略。
  * JM_FEATURE_FLAGS_LO 在 jm_cmd_def.h 中根据 USE_CAN_FD_MODE 编译期决定,
  * 若板级未启用 FD, bit0(CAN_FD)=0, 上位机据此关闭 FD 模式适配。 */
@@ -419,10 +427,23 @@ static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 			o[22] = JM_PROTO_VERSION_MINOR;
 			o[23] = (uint8_t)(JM_FEATURE_FLAGS_LO & 0xFF);
 			o[24] = (uint8_t)((JM_FEATURE_FLAGS_LO >> 8) & 0xFF);
-			o[25] = 0; /* reserved */
+			/* [25] 存储状态位图(v1.10): bit0=storage.inited
+			 * bit1=eeprom_dev 已挂接 bit2=预留(EEPROM 应答由 0xEA 错误码揭示)
+			 * bit3=dev_flash 子设备 inited */
+			o[25] = 0;
+#if defined(USE_DEV_FLASH)
+			if (g_motor_info_storage.inited)
+				o[25] |= 0x01u;
+#if defined(USE_DEV_EEPROM)
+			if (g_motor_info_storage.eeprom_dev != NULL)
+				o[25] |= 0x02u;
+#endif
+			if (g_motor_info_storage.flash_dev.inited)
+				o[25] |= 0x08u;
+#endif
 			o[26] = 0;
 			o[27] = 0;
-			reply_set(p, cmd, o, 28); /* 始终 28B (向后兼容追加) */
+			reply_set(p, cmd, o, sizeof(o)); /* 始终 28B (向后兼容追加) */
 			return JM_ERR_OK;
 		}
 		case JM_CMD_READ_DEV_NAME:
@@ -545,8 +566,8 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 	}
 
-	/* 反馈查询 0xC0~0xC8 */
-	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_FAULT)
+	/* 反馈查询 0xC0~0xC7 (0xC8 已废弃: 故障查询走 0xAA/0xAB) */
+	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_MULTITURN)
 	{
 		if (len != 0u)
 			return reply_nack(proto, cmd, JM_ERR_LENGTH);
@@ -620,8 +641,8 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_dev(proto, cmd);
 	}
-	/* 参数读写 0xE0~0xEF */
-	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_MOTOR_INFO_RECALIB_RESET)
+	/* 参数读写 0xE0~0xED */
+	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_MOTOR_INFO_ERASE)
 	{
 		return handle_param(proto, cmd, payload, len);
 	}
@@ -813,6 +834,131 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		reply_set(proto, cmd, o, 3);
 		return JM_ERR_OK;
 	}
+
+	/* 缓启动渐变配置写 0xA3: param_id(1) + value(4)，逐字段写 RAM+镜像。
+	 * ACK: 简单成功应答; 非法 param_id/值走 NACK。 */
+	if (cmd == JM_CMD_SMOOTH_CFG_SET)
+	{
+		if (len < 5u) /* param_id(1) + value(4) */
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->smooth_cfg_set == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		jm_err_e e = proto->ops->smooth_cfg_set(payload[0], &payload[1]);
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
+	/* 缓启动渐变配置读 0xA4: param_id(1)。单字段回4B; 0xFF 整块回52B(CAN层自动多帧) */
+	if (cmd == JM_CMD_SMOOTH_CFG_GET)
+	{
+		uint8_t out[52];
+		uint16_t out_len = 0;
+		if (len != 1u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->smooth_cfg_get == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		jm_err_e e = proto->ops->smooth_cfg_get(payload[0], out, &out_len);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		reply_set(proto, cmd, out, out_len);
+		return JM_ERR_OK;
+	}
+
+	/* ---- 故障诊断 0xAA~0xAC (fault_mgr 分级故障管理, v1.8) ---- */
+
+	/* 清除故障 0xB0 可选载荷预处理: flags bit1=清历史(锁存清除仍由状态机路径处理) */
+	if (cmd == JM_CMD_CLEAR_FAULT && len == 1u && (payload[0] & 0x02u) != 0u)
+	{
+		fault_mgr_clear(FAULT_CLEAR_HISTORY);
+	}
+
+	/* 故障摘要 0xAA: 无载荷; 应答 18B
+	 * fault_mask(u32) + warn_mask(u32) + level_active(u32)
+	 * + top_code(u16) + active_cnt(u8) + derate_pct(u8) */
+	if (cmd == JM_CMD_FAULT_SUMMARY)
+	{
+		uint8_t out[18];
+		if (len != 0u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		jm_wr_u32(&out[0], g_fault_mgr.compat_mask);
+		jm_wr_u32(&out[4], g_fault_mgr.warn_mask);
+		jm_wr_u32(&out[8], g_fault_mgr.level_active);
+		jm_wr_u16(&out[12], g_fault_mgr.top_fault);
+		out[14] = (uint8_t)g_fault_mgr.active_cnt;
+		out[15] = (uint8_t)(g_fault_mgr.derate * 100.0f + 0.5f);
+		out[16] = (uint8_t)fault_mgr_history_count();
+		out[17] = 0u; /* 预留 */
+		reply_set(proto, cmd, out, 18);
+		return JM_ERR_OK;
+	}
+
+	/* 故障详情 0xAB: type(1)+idx(1); 应答 20B
+	 * code(u16) + status(u8) + rsv(u8) + count(u32)
+	 * + first_ms(u32) + last_ms(u32) + value(f32)
+	 * type: 0=活动记录(优先级序) 1=历史记录(时间倒序); 越界回 NACK(NOT_FOUND) */
+	if (cmd == JM_CMD_FAULT_DETAIL)
+	{
+		uint8_t out[20];
+		if (len != 2u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (payload[0] == 0u)
+		{
+			uint16_t code = 0u;
+			const fault_rec_t *rec = fault_mgr_get_active(payload[1], &code);
+			if (rec == NULL)
+			{
+				return reply_nack(proto, cmd, JM_ERR_NOT_FOUND);
+			}
+			jm_wr_u16(&out[0], code);
+			out[2] = rec->status;
+			out[3] = 0u;
+			jm_wr_u32(&out[4], rec->count);
+			jm_wr_u32(&out[8], rec->first_ms);
+			jm_wr_u32(&out[12], rec->last_ms);
+			memcpy(&out[16], &rec->value, 4);
+		}
+		else if (payload[0] == 1u)
+		{
+			const fault_hist_t *h = fault_mgr_get_history(payload[1]);
+			if (h == NULL)
+			{
+				return reply_nack(proto, cmd, JM_ERR_NOT_FOUND);
+			}
+			jm_wr_u16(&out[0], h->code);
+			out[2] = FAULT_STATUS_CLEARED; /* 历史记录无活动语义 */
+			out[3] = 0u;
+			jm_wr_u32(&out[4], h->count);
+			jm_wr_u32(&out[8], h->first_ms);
+			jm_wr_u32(&out[12], h->last_ms);
+			memcpy(&out[16], &h->value, 4);
+		}
+		else
+		{
+			return reply_nack(proto, cmd, JM_ERR_OUT_OF_RANGE);
+		}
+		reply_set(proto, cmd, out, 20);
+		return JM_ERR_OK;
+	}
+
+	/* 故障事件主动上报 0xAC: M->H 无应答, 二期实现(需通信线程轮询 pending 事件) */
+	if (cmd == JM_CMD_FAULT_EVENT)
+	{
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
+	}
+
 
 	/* PID 参数实时写 0xA5: 仅 DEBUG source 下允许, 直接写 profile, ISR 下一拍生效。
 	 * 载荷: ring(1) + param_type(1) + value(4)  = 6 字节

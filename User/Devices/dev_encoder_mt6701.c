@@ -66,6 +66,26 @@ static float encoder_mt6701_get_raw_deg(struct dev_encoder *enc)
     return (float)chip->raw / MT6701_ANGLE_RESOLUTION * 360.0F;
 }
 
+static uint16_t encoder_mt6701_get_err_cnt(struct dev_encoder *enc)
+{
+    dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+    return chip->err_cnt;
+}
+
+static uint8_t encoder_mt6701_get_health(struct dev_encoder *enc)
+{
+    dev_mt6701_t *chip = (dev_mt6701_t *)enc->ctx;
+    uint8_t h = 0u;
+
+    if (chip->mg_state == MT6701_MG_INVALID)
+        h |= 0x01u;
+    if (chip->mg_state == MT6701_MG_TOO_WEAK)
+        h |= 0x02u;
+    if (chip->mg_state == MT6701_MG_TOO_STRONG)
+        h |= 0x04u;
+    return h;
+}
+
 /*============================================================================
  * 工厂函数：初始化实体 + 装配抽象接口
  *==========================================================================*/
@@ -88,6 +108,8 @@ void dev_encoder_mt6701_create(dev_encoder_t *enc, mt6701_id_e id)
     enc->set_dir = encoder_mt6701_set_dir;
     enc->get_dir = encoder_mt6701_get_dir;
     enc->get_raw_deg = encoder_mt6701_get_raw_deg;
+    enc->get_err_cnt = encoder_mt6701_get_err_cnt;
+    enc->get_health = encoder_mt6701_get_health;
 }
 
 #endif /* USE_DEV_MT6701 */

@@ -166,6 +166,10 @@ extern "C"
 		 * 仅清 RAM，不自动落盘，需随后发 0xEA 固化。可为 NULL(回 NACK)。*/
 		jm_err_e (*motor_info_recalib_reset)(void);
 
+		/* 固化清零(CMD 0xED): 擦除 EEPROM 全部参数, RAM 同步恢复默认。
+		 * 协议层先校验魔数 JM_MAGIC_STORAGE_ERASE。可为 NULL(回 NACK)。*/
+		jm_err_e (*motor_info_erase)(void);
+
 		/* 设置本机 CAN 地址(CMD 0xF0): new_id 范围 1~127, 需由实现层持久化。
 		 * 协议层在成功后同步更新 proto->motor_id; CAN 滤波地址重启后由绑定层重新加载生效。
 		 * 可为 NULL(回 NACK)。*/
@@ -205,6 +209,17 @@ extern "C"
 		 * 输出 3 字节: cur_src/vel_src/pos_src (0=默认 1=Flash 2=理论估计 3=调试)
 		 * 返回 JM_ERR_OK 成功, 其余失败。可为 NULL(回 NACK)。*/
 		jm_err_e (*pid_source_get)(uint8_t *out_cur, uint8_t *out_vel, uint8_t *out_pos);
+
+		/* 缓启动渐变配置写(CMD 0xA3): param_id 见 jm_cmd_def.h JM_SMOOTH_PID_*。
+		 * 写运行时 smooth_cfg 立即生效(下次渐变启动用新值) + 镜像 motor_info(0xEA固化)。
+		 * 未知 param_id 返回 JM_ERR_BAD_PARAM_ID, 非法值返回 JM_ERR_OUT_OF_RANGE。
+		 * 可为 NULL(回 NACK)。*/
+		jm_err_e (*smooth_cfg_set)(uint8_t param_id, const uint8_t value4[4]);
+
+		/* 缓启动渐变配置读(CMD 0xA4): 单字段(0x00~0x0D)回4B到 out_value;
+		 * 0xFF 整块回 52B 定长(enable+shape+rsv2+duration+rate[4]+thresh[6]+fallback)。
+		 * 未知 param_id 返回 JM_ERR_BAD_PARAM_ID。可为 NULL(回 NACK)。*/
+		jm_err_e (*smooth_cfg_get)(uint8_t param_id, uint8_t *out_value, uint16_t *out_len);
 
 		/* PID 参数实时写(CMD 0xA5): 仅 DEBUG source 下允许写, 直接写 profile。
 		 * ring: 0=D轴 1=Q轴 2=速度 3=位置; param_type: 1=kp 2=ki 3=kd

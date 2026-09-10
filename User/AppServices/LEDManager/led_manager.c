@@ -21,6 +21,7 @@
 #include "dev_led.h"
 #include "motor_loop.h"
 #include "state_define.h"
+#include "fault_manager.h"
 #include "main.h"
 
 /* LED 行为类型 */
@@ -124,6 +125,14 @@ void led_manager_update(void)
 	dev_led_t *led1 = dev_led_get(LED_ID_1);
 	dev_led_t *led2 = dev_led_get(LED_ID_2);
 	uint32_t now_ms = HAL_GetTick();
+
+	/* 异常级故障活动(降功率运行, 无故障级停机): LED1 慢闪提示 */
+	if (act_fault == LED_ACT_OFF)
+	{
+		uint32_t lv = fault_mgr_level_active();
+		if ((lv & 0x2u) != 0u && (lv & 0x1u) == 0u)
+			act_fault = LED_ACT_BLINK_SLOW;
+	}
 
 	if (s_identify_until_ms != 0u && (int32_t)(s_identify_until_ms - now_ms) > 0)
 	{
