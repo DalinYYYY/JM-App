@@ -70,9 +70,9 @@
             <nStopU2X>0</nStopU2X>
           </BeforeCompile>
           <BeforeMake>
-            <RunUserProg1>0</RunUserProg1>
+            <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name></UserProg1Name>
+            <UserProg1Name>python "..\..\..\User\Tools\scripts\incr_build.py"</UserProg1Name>
             <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
@@ -82,7 +82,7 @@
           <AfterMake>
             <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name>D:\AAWorkSpace\001_JointMotor\SW\JointMotor-MKS\Board\V1\MDK-ARM\keil5_disp_size_bar.exe</UserProg1Name>
+            <UserProg1Name>keil5_disp_size_bar.exe</UserProg1Name>
             <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
@@ -301,7 +301,7 @@
               <OCR_RVCT9>
                 <Type>0</Type>
                 <StartAddress>0x20000000</StartAddress>
-                <Size>0x20000</Size>
+                <Size>0x17fff</Size>
               </OCR_RVCT9>
               <OCR_RVCT10>
                 <Type>0</Type>
@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx,JM_BOARD_V1</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/LEDManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorCalibration;../../../User/Protocol;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl;../../../User/MotorControl/PidManager</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/FaultManager;../../../User/AppServices/LEDManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorCalibration;../../../User/Protocol;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl;../../../User/MotorControl/PidManager</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -442,6 +442,31 @@
               <FileName>system_state.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\AppServices\StateMachine\system_state.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>AppServices/FaultManager</GroupName>
+          <Files>
+            <File>
+              <FileName>fault_def.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_def.c</FilePath>
+            </File>
+            <File>
+              <FileName>fault_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>fault_detect_fast.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_detect_fast.c</FilePath>
+            </File>
+            <File>
+              <FileName>fault_detect_slow.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_detect_slow.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -732,6 +757,11 @@
               <FileName>motor_info.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\DataHub\motor_info.c</FilePath>
+            </File>
+            <File>
+              <FileName>version.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\User\DataHub\version.h</FilePath>
             </File>
           </Files>
         </Group>

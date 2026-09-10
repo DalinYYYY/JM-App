@@ -42,6 +42,7 @@ JLinkLog.txt
 .uploads
 .archify
 .pytest_cache
+.doc
 
 # V1 板级编译产物与构建日志
 Board/V1/MDK-ARM/JointMotorApp/
@@ -50,3 +51,4 @@ build_log.txt
 # 本地开发工作（不入库）
 User/Data/plans/
 User/Tools/SimpleGUI
+User/Tools/TwinMotor

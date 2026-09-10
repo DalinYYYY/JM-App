@@ -168,7 +168,7 @@ BreakConstructorInitializers: BeforeColon
 # BreakStringLiterals: false
 
 # # 每行字符长度的限制，0表示没有限制
-ColumnLimit:     0
+ColumnLimit:     200
 
 # # 用于匹配注释信息的正则表达式，被匹配的行不会做任何修改
 # CommentPragmas:  '^ IWYU pragma:'
