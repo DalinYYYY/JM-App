@@ -98,12 +98,12 @@ static void park_transfer(struct foc *pobj)
 	float id = ia * c + ib * s;
 	float iq = ib * c - ia * s;
 
-	/* calib_raw_mode：标定期间旁路 LPF，消除 α=0.8 滤波对阶跃响应的延迟污染。
+	/* calib_raw_mode：标定期间旁路 LPF，消除滤波对阶跃响应的延迟污染。
 	 * 两种模式的滤波状态更新一致，故合并写回。*/
 	if (!pobj->calib_raw_mode)
 	{
-		id = _lpfilter(0.8F, id, pobj->calib_prev_id);
-		iq = _lpfilter(0.8F, iq, pobj->calib_prev_iq);
+		id = _lpfilter(FOC_DQ_LPF_ALPHA, id, pobj->calib_prev_id);
+		iq = _lpfilter(FOC_DQ_LPF_ALPHA, iq, pobj->calib_prev_iq);
 	}
 
 	pobj->i_dq.d = id;

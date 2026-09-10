@@ -47,9 +47,18 @@ static uint32_t cur_pwm_compare(float duty)
 
 void cur_loop_init(cur_loop_t *cl, dev_motor_t *motor, motor_param_t *param, float dt)
 {
+	cl->diag_ud_pi = 0.0f;
+	cl->diag_ud_cross = 0.0f;
+	cl->diag_uq_bemf = 0.0f;
 	cl->motor = motor;
 	cl->param = param;
 	cl->dt = dt;
+	cl->diag_uq_pi = 0.0f;
+	cl->diag_ud = 0.0f;
+	cl->diag_uq = 0.0f;
+	cl->diag_omega_mech = 0.0f;
+	cl->diag_vbus = 0.0f;
+	cl->diag_config = 0.0f;
 
 	motor_pid_profile_init_state(&cl->pid_id);
 	motor_pid_profile_init_state(&cl->pid_iq);
@@ -85,6 +94,18 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 {
 	dev_motor_t *m = cl->motor;
 
+	/* 直通模式没有 PI/补偿输出。清零诊断量，避免上位机把上一拍闭环
+	 * 快照误认为当前有效值；模式编码保留在 diag_config 的低字节。 */
+	cl->diag_ud_pi = 0.0f;
+	cl->diag_uq_pi = 0.0f;
+	cl->diag_ud_cross = 0.0f;
+	cl->diag_uq_bemf = 0.0f;
+	cl->diag_ud = 0.0f;
+	cl->diag_uq = 0.0f;
+	cl->diag_omega_mech = m->motor_param.slide_rad_s;
+	cl->diag_vbus = 0.0f;
+	cl->diag_config = (float)ref->ctrl_type;
+
 	/* ===== 直通模式：不经过 FOC 电流环 PI ===== */
 	/* 注：编码器与角度解算已在 motor_loop_isr 开头统一刷新，所有模式均可获取角度 */
 
@@ -97,8 +118,10 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 			m->half_bridge.set_3pwm(&m->half_bridge, 0, 0, 0);
 			return;
 		}
-		if (duty < -1.0f) duty = -1.0f;
-		if (duty > 1.0f) duty = 1.0f;
+		if (duty < -1.0f)
+			duty = -1.0f;
+		if (duty > 1.0f)
+			duty = 1.0f;
 		uint32_t ccr = cur_pwm_compare(0.5f + 0.5f * duty);
 		m->half_bridge.set_3pwm(&m->half_bridge, ccr, ccr, ccr);
 		return;
@@ -149,7 +172,7 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	{
 		/* 电流闭环 PI（CURRENT / TORQUE / VELOCITY / POSITION）*/
 		dev_dwt_counter_start(SYS_TIMER_RECORD_POSITION_LOOP_TIME); /* 细分: PI+解耦+SVPWM+PWM */
-		dev_dwt_counter_start(SYS_TIMER_RECORD_TIM_1MS_CYCLE); /* 细分: PI+解耦 开始 */
+		dev_dwt_counter_start(SYS_TIMER_RECORD_TIM_1MS_CYCLE);      /* 细分: PI+解耦 开始 */
 		/* 每拍从 param 同步解耦配置，确保 0xE1/0xE7 修改立即生效（3 字段赋值，开销可忽略）*/
 		cur_loop_set_decoupling_config(cl);
 
@@ -174,10 +197,24 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 			.id_ref = out->id_ref,
 			.iq_ref = out->iq_ref,
 			.omega_mech = m->motor_param.slide_rad_s, /* PLL 滤波后机械角速度 */
-			.vbus = vbus, /* 死区补偿自动计算用 */
+			.vbus = vbus,                             /* 死区补偿自动计算用 */
 		};
 		foc_decoupling_out_t dout;
 		foc_decoupling_run(&din, &dout, &cl->decoupling, cl->param);
+		/* 保存 V 域量，必须在真实硬件除以 Vbus 之前记录。 */
+		cl->diag_ud_pi = din.ud_pi;
+		cl->diag_uq_pi = din.uq_pi;
+		cl->diag_ud_cross = dout.ud_cross;
+		cl->diag_uq_bemf = dout.uq_bemf;
+		cl->diag_ud = dout.ud;
+		cl->diag_uq = dout.uq;
+		cl->diag_omega_mech = din.omega_mech;
+		cl->diag_vbus = din.vbus;
+		/* bit0~1: algo, bit2: BEMF, bit3: deadtime, 高位: gain×1000。 */
+		cl->diag_config = (float)((uint32_t)cl->decoupling.algo |
+			((uint32_t)cl->decoupling.bemf_ff_enable << 2) |
+			((uint32_t)cl->decoupling.deadtime_comp_enable << 3)) +
+			cl->param->current_loop.decoupling_gain * 1000.0f;
 		ud = dout.ud;
 		uq = dout.uq;
 		dev_dwt_counter_stop(SYS_TIMER_RECORD_TIM_1MS_CYCLE); /* 细分: PI+解耦 结束 */
@@ -204,17 +241,12 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	m->foc.pfsvpwm(&m->foc);
 
 	// step8: PWM 输出
-	if (!cur_float_is_finite(m->foc.svpwm.ta) ||
-		!cur_float_is_finite(m->foc.svpwm.tb) ||
-		!cur_float_is_finite(m->foc.svpwm.tc))
+	if (!cur_float_is_finite(m->foc.svpwm.ta) || !cur_float_is_finite(m->foc.svpwm.tb) || !cur_float_is_finite(m->foc.svpwm.tc))
 	{
 		m->half_bridge.set_3pwm(&m->half_bridge, 0, 0, 0);
 		return;
 	}
-	m->half_bridge.set_3pwm(&m->half_bridge,
-		cur_pwm_compare(m->foc.svpwm.ta),
-		cur_pwm_compare(m->foc.svpwm.tb),
-		cur_pwm_compare(m->foc.svpwm.tc));
+	m->half_bridge.set_3pwm(&m->half_bridge, cur_pwm_compare(m->foc.svpwm.ta), cur_pwm_compare(m->foc.svpwm.tb), cur_pwm_compare(m->foc.svpwm.tc));
 	dev_dwt_counter_stop(SYS_TIMER_RECORD_TIM_1MS_TIME); /* 细分: 反Park+SVPWM+PWM 结束 */
 	dev_dwt_counter_stop(SYS_TIMER_RECORD_POSITION_LOOP_TIME);
 }

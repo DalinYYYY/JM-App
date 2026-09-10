@@ -62,6 +62,10 @@ typedef struct
 {
     float ud;
     float uq;
+    /* 诊断用的独立补偿项（V），不参与控制计算。 */
+    float ud_cross;
+    float uq_cross;
+    float uq_bemf;
 } foc_decoupling_out_t;
 
 /**

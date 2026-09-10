@@ -3,6 +3,7 @@
 
 #include "ctrl_transition.h"
 #include "motor_control.h"
+#include "motor_info.h" /* motor_info_t: softstart 持久化镜像 */
 
 /* 前向声明打破与 system_state.h 的循环依赖。
  * 前提：system_state.h 需把匿名 typedef 改为带 tag 的
@@ -74,6 +75,16 @@ bool transition_mgr_on_stop(transition_mgr_t *mgr, system_state_t *sys);
  *          模式切换过渡（不同模式）。
  */
 void transition_mgr_cancel_stop(transition_mgr_t *mgr);
+
+/**
+ * @brief motor_info → 运行时 smooth_cfg 全量应用
+ * @details 启动加载 / 0xA3 镜像写 / 0xE7 写 softstart PID 后的同步 hook 三方共用。
+ *          softstart_valid=0（老配置迁移或未配置）时跳过，保持编译期默认。
+ *          含 g_run_state_trans_count（跨模式兜底时长）。
+ * @param mgr 管理器指针
+ * @param info motor_info 持久化镜像（读 advanced 块 softstart 字段）
+ */
+void transition_mgr_apply_softstart(transition_mgr_t *mgr, const motor_info_t *info);
 
 /**
  * @brief 每拍步进（替代 motor_control_loop 的 if/else 分支 + 同模式渐变逻辑）

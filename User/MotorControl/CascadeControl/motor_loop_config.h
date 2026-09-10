@@ -76,4 +76,18 @@
 #define MOTOR_LOOP_VEL_ACCEL_FF_ENABLE 0u
 #endif
 
+/*============================================================================
+ * 电角度超前补偿（采样→PWM 生效管线延迟补偿）
+ *   电流采样到新 PWM 电压生效存在约 1~1.5 个 PWM 周期延迟（ISR 计算 +
+ *   CCR 预装载时机），期间转子继续转过 we×Td 电角度。未补偿时高速下
+ *   电压矢量错相（816Hz 电频率@3500rpm 时滞后 30~44°），uq 泄漏进 d 轴
+ *   激励 Id 振荡发散。
+ *   补偿在 motor_loop_ele_radian_cb 内实施：theta += we × 系数 × T_pwm。
+ *   静止/低速 we≈0 补偿量≈0，对标定路径无影响。
+ *   精调方法：固定转速看 ud_PI——补偿不足 ud_PI 偏负，过补偏正，居中即准。
+ *==========================================================================*/
+#ifndef FOC_ELE_ANGLE_LEAD_CYCLES
+#define FOC_ELE_ANGLE_LEAD_CYCLES (1.5f)
+#endif
+
 #endif /* __MOTOR_LOOP_CONFIG_H__ */

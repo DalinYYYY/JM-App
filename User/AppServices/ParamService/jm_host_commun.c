@@ -23,7 +23,7 @@
 #include "thread_config.h" /* THREAD_DELAY_COMMUN */
 #include "jm_proto_ops.h"  /* 共享协议操作与命令定义 */
 #include "motor_observer.h"
-#include "motor_loop.h"   /* motor_loop_get: 调试通道观测 sys.motor 内部量 */
+#include "motor_loop.h"    /* motor_loop_get: 调试通道观测 sys.motor 内部量 */
 #if defined(USE_DEV_COMMUN_UART)
 #include "dev_commun_uart.h"
 #endif
@@ -41,8 +41,7 @@
 #if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
 static int jm_host_commun_trace_pop(uint8_t *body, uint16_t *len)
 {
-	return (body != NULL && len != NULL &&
-		jm_app_trace_pop(body, len) == JM_ERR_OK) ? 1 : 0;
+	return (body != NULL && len != NULL && jm_app_trace_pop(body, len) == JM_ERR_OK) ? 1 : 0;
 }
 #endif
 
@@ -230,7 +229,23 @@ static void jm_host_commun_update_debug(void)
 	jm_dbg[4] = (obs_ok == 0) ? obs.iq : st->electrical.iq_meas;
 	jm_dbg[5] = st->motion.elec_angle_rad;
 	jm_dbg[6] = st->motion.mech_angle_rad * 57.2957795f; /* 机械角(deg) */
-	jm_dbg[7] = (float)param->encoder_param.enc_offset; /* 编码器机械零位偏移(deg) */
+	jm_dbg[7] = (float)param->encoder_param.enc_offset;  /* 编码器机械零位偏移(deg) */
+
+	/* FOC 补偿诊断(8~15), 单位为 V / rad/s, 由电流环 V 域快照提供。
+	 * [10] 是交叉解耦 d 轴项，[11] 是反电势 q 轴项；
+	 * [12]/[13] 仍是全部补偿叠加后的 ud/uq。
+	 * diag_config: 低4位为 algo/BEMF/deadtime, 高位为 decoupling_gain×1000。 */
+	{
+		const cur_loop_t *cl = &motor_loop_get()->current;
+		jm_dbg[8] = cl->diag_ud_pi;                    /* PI 原始 ud (V) */
+		jm_dbg[9] = cl->diag_uq_pi;                    /* PI 原始 uq (V) */
+		jm_dbg[10] = cl->diag_ud_cross;                /* 交叉解耦 d轴项 (V) */
+		jm_dbg[11] = cl->diag_uq_bemf;                 /* 反电势 q轴项 (V) */
+		jm_dbg[12] = cl->diag_ud;                      /* 补偿后 ud (V) */
+		jm_dbg[13] = cl->diag_uq;                      /* 补偿后 uq (V) */
+		jm_dbg[14] = cl->diag_omega_mech;              /* 实际补偿机械速度 (rad/s) */
+		jm_dbg[15] = cl->diag_config;                  /* 开关编码 + 解耦增益×1000 */
+	}
 }
 
 /* ---------------- 对外接口 ---------------- */
@@ -329,6 +344,9 @@ void jm_host_commun_can_process(void)
 	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
 	jm_app_pid_debug_poll();
 	jm_app_soft_reset_poll();
+	/* CAN 路径也必须刷新通用调试通道；否则 0xC9/0xCA 读到的是
+	 * UART 线程上一次更新的快照，CAN-only 或 UART低频时无法判断补偿是否生效。 */
+	jm_host_commun_update_debug();
 
 	/* 刷新诊断统计(供应用读取总线负载/通信质量) */
 	dev_commun_can.poll(&dev_commun_can);
@@ -339,8 +357,7 @@ void jm_host_commun_can_process(void)
 	}
 
 	/* CAN-DI扫描窗口暂停所有主动数据，避免TRACE/LIVE干扰发现时隙。 */
-	if (dev_commun_can.id_switch_pending ||
-	    (int32_t)(HAL_GetTick() - dev_commun_can.commissioning_quiet_until) < 0)
+	if (dev_commun_can.id_switch_pending || (int32_t)(HAL_GetTick() - dev_commun_can.commissioning_quiet_until) < 0)
 	{
 		telemetry_tick = 0;
 		return;

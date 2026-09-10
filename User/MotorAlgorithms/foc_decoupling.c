@@ -39,8 +39,10 @@ static void decouple_feedforward(const foc_decoupling_in_t *in,
     float Ld       = (param)->motor_base.ld;
     float we       = (float)(param)->motor_base.pole_pairs * in->omega_mech;
     /* PMSM 方程：ud += -we*Lq*iq (q→d 耦合)，uq += +we*Ld*id (d→q 耦合) */
-    out->ud += -we * Lq * in->iq * k_decoup * k_dff;
-    out->uq +=  we * Ld * in->id * k_decoup;
+    out->ud_cross = -we * Lq * in->iq * k_decoup * k_dff;
+    out->uq_cross =  we * Ld * in->id * k_decoup;
+    out->ud += out->ud_cross;
+    out->uq += out->uq_cross;
 }
 
 /**
@@ -56,8 +58,10 @@ static void decouple_feedback(const foc_decoupling_in_t *in,
     float Lq       = (param)->motor_base.lq;
     float Ld       = (param)->motor_base.ld;
     float we       = (float)(param)->motor_base.pole_pairs * in->omega_mech;
-    out->ud += -we * Lq * in->iq_ref * k_decoup * k_dff;
-    out->uq +=  we * Ld * in->id_ref * k_decoup;
+    out->ud_cross = -we * Lq * in->iq_ref * k_decoup * k_dff;
+    out->uq_cross =  we * Ld * in->id_ref * k_decoup;
+    out->ud += out->ud_cross;
+    out->uq += out->uq_cross;
 }
 
 /* ops 表实例：静态常量，运行期不可变 */
@@ -151,6 +155,9 @@ void foc_decoupling_run(const foc_decoupling_in_t *in,
     /* step1: 初始输出 = PI 输出（V 域） */
     out->ud = in->ud_pi;
     out->uq = in->uq_pi;
+    out->ud_cross = 0.0f;
+    out->uq_cross = 0.0f;
+    out->uq_bemf = 0.0f;
 
     /* step2: 交叉解耦（按 algo 选择 ops，NONE 时跳过） */
     const foc_decouple_ops_t *ops = foc_decouple_get_ops(config->algo);
@@ -164,7 +171,8 @@ void foc_decoupling_run(const foc_decoupling_in_t *in,
         float k_qff = (param)->current_loop.q_feedforward_gain;
         float flux  = (param)->motor_base.flux;
         float we    = (float)(param)->motor_base.pole_pairs * in->omega_mech;
-        out->uq += we * flux * k_qff;
+        out->uq_bemf = we * flux * k_qff;
+        out->uq += out->uq_bemf;
     }
 
     /* step4: 死区补偿（配置值优先 + 自动计算回退 + 过零平滑）*/

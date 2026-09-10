@@ -57,6 +57,20 @@ int motor_observer_snapshot_read(motor_observer_snapshot_t *out);
 #ifndef MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES
 #define MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES 512u
 #endif
+
+/* ---- 大缓冲 RAM 放置开关 ----
+ * 1(默认): s_trace、s_trace_meta、s_sweep_*、s_live 约28KB 放入 CCM-SRAM
+ *   (0x10000000; G474 32KB / F405 64KB, 仅 CPU 可访问, 本模块缓冲全部
+ *   CPU 读写无 DMA), 主 SRAM 释放约28KB。要求链接 scatter 含 RW_CCMRAM
+ *   region(匹配 .ccm_observer 段, 见各板 MDK-ARM 下 .sct)。
+ * 0: 常规主 SRAM。无 CCM 或 CCM 另作他用的板子用此值。链接时会提示
+ *   一条 L6314W(无 .ccm_observer 段匹配), 属预期, 表示缓冲已回主 SRAM。
+ * 覆盖方式: Keil target Define 加 MOTOR_OBSERVER_USE_CCM_RAM=0, 或在
+ * 包含本头文件之前定义。 */
+#ifndef MOTOR_OBSERVER_USE_CCM_RAM
+#define MOTOR_OBSERVER_USE_CCM_RAM 1
+#endif
+
 /* 扫频高速上传允许每包最多24样本(2通道227B载荷<=256B上限);
  * 普通 TRACE(0xB9) 上位机仍按 1~8 样本/包配置, 不受影响。 */
 #define MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES 24u

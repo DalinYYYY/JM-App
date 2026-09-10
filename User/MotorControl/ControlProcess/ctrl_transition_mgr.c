@@ -1,6 +1,7 @@
 /* ctrl_transition_mgr.c */
 #include "ctrl_transition_mgr.h"
 #include "system_state.h" /* 完整定义 system_state_t（头文件仅前向声明） */
+#include "motor_info.h"	 /* motor_info_t: softstart 持久化镜像 */
 #include <string.h>
 
 void transition_mgr_init(transition_mgr_t *mgr, float dt)
@@ -115,6 +116,27 @@ bool transition_mgr_on_stop(transition_mgr_t *mgr, system_state_t *sys)
 void transition_mgr_cancel_stop(transition_mgr_t *mgr)
 {
 	mgr->stop_pending = false;
+}
+
+/* motor_info → 运行时 smooth_cfg 全量应用（启动加载 / 0xA3 镜像写 / 0xE7 hook 共用）。
+ * softstart_valid=0（老配置迁移或未配置）时跳过，保持编译期默认。 */
+void transition_mgr_apply_softstart(transition_mgr_t *mgr, const motor_info_t *info)
+{
+	const AdvancedAlgoParam_t *ss = &info->blocks.advanced;
+
+	if (mgr == NULL || info == NULL || ss->softstart_valid == 0u)
+		return;
+
+	ref_smooth_cfg_t *cfg = &mgr->smooth_cfg;
+	cfg->enable = (ss->softstart_enable != 0u);
+	cfg->shape = (ss->softstart_shape != 0u) ? TRANSITION_SHAPE_SCURVE : TRANSITION_SHAPE_LINEAR;
+	cfg->smooth_duration = ss->softstart_duration;
+	cfg->pos_rate = ss->softstart_pos_rate;
+	cfg->vel_rate = ss->softstart_vel_rate;
+	cfg->torque_rate = ss->softstart_torque_rate;
+	cfg->current_rate = ss->softstart_current_rate;
+	/* v1.12: thresh/fallback 已从 motor_info 精简,
+	 * 运行时保持 ref_smooth_cfg_init_defaults 的编译期默认值 */
 }
 
 static float mgr_absf(float v)

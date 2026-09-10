@@ -51,7 +51,10 @@ void MX_ADC1_Init(void)
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.GainCompensation = 0;
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  /* 三相电流在 injected rank 1~3 组成一个完整序列；控制 ISR 必须在
+   * sequence end 只触发一次，否则 SINGLE_CONV 会在每个 rank 触发 JEOC，
+   * ISR 读取到新旧 JDR 混合值并把电流环频率放大为约 3 倍。 */
+  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
   /* 规则组(vbus/NTC)与注入组(相电流)共用 ADC1。
    * ContinuousConvMode 必须为 DISABLE: 若开连续转换, 规则组会持续霸占 ADC,

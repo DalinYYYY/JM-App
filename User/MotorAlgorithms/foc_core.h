@@ -33,6 +33,12 @@
 // 低通滤波器系数计算
 #define _lpfilter(alpha, cur_val, prev_val) ((alpha) * (cur_val) + (1 - alpha) * (prev_val))
 #define PWM_PERIOD 8500.0F
+/* Park 变换后 dq 电流反馈 LPF 系数: 1.0=直通。
+ * <1.0 会吃电流环相位裕度(α=0.8 在 1kHz 交越处滞后约 21°), 高电频率下
+ * (3500rpm@14对极=816Hz)加速失稳; 采样点信噪比+PI 积分平均已够, 无需额外滤波。 */
+#ifndef FOC_DQ_LPF_ALPHA
+#define FOC_DQ_LPF_ALPHA (1.0f)
+#endif
 
 typedef struct
 {

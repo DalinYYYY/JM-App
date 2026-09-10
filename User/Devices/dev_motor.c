@@ -106,10 +106,7 @@ static uint8_t dev_motor_get_poles(motor_id_e id)
  *   本文件通过工厂函数 dev_encoder_xxx_create() 装配，不再内联实现。
  *==========================================================================*/
 
-void dev_motor_init(dev_motor_t *pobj,
-                    motor_id_e id,
-                    focCurrent_t (*current_callback)(void),
-                    float (*ele_radian_callback)(void))
+void dev_motor_init(dev_motor_t *pobj, motor_id_e id, focCurrent_t (*current_callback)(void), float (*ele_radian_callback)(void))
 {
 	assert_report(pobj != NULL);
 	assert_report(current_callback != NULL);
@@ -117,7 +114,7 @@ void dev_motor_init(dev_motor_t *pobj,
 	assert_report(id < DEV_MOTOR_MAX);
 	memset(pobj, 0, sizeof(dev_motor_t));
 
-	dev_motor_disable(); // 默认上电禁能
+	dev_motor_disable();     // 默认上电禁能
 	dev_motor_nfault_init(); // nFAULT 故障输入引脚(上拉输入, 未连接板型空操作)
 
 	pobj->id = id;
@@ -144,13 +141,8 @@ void dev_motor_init(dev_motor_t *pobj,
 		const encoder_param_t *enc_cfg = &mp->encoder_param;
 		pobj->encoder.set_offset(&pobj->encoder, enc_cfg->enc_offset);
 		pobj->encoder.set_dir(&pobj->encoder, enc_cfg->enc_direction);
-		/* 极对数从已标定/Flash 参数加载，替代 dev_motor_get_poles() 的硬编码 7。
-		 * motor_loop_init 已先执行 motor_profile_apply_param + sync_to_param，
-		 * 故此处 motor_base.pole_pairs 为标定值(或 profile 默认值兜底)。
-		 * 【关键修复】FOC 电角度 = 机械角 × poles(motion_param.c)。此前 poles 恒为 7，
-		 * 与真实极对数(如 RS03=21)不符：转子一动，FOC 电角度按 7 倍算、真实按 21 倍走，
-		 * 比例失配导致开环施加 UQ 有电流却无有效力矩。与 dev_motor_virtual 的 poles
-		 * 同步逻辑对称(dev_motor_virtual.c:281)。*/
+
+		/* 极对数从已标定/Flash 参数加载*/
 		if (mp->motor_base.pole_pairs != 0u)
 			pobj->poles = mp->motor_base.pole_pairs;
 	}
@@ -171,9 +163,7 @@ void dev_motor_init(dev_motor_t *pobj,
 	// 初始化三相adc电流采样
 	dev_phase_current_init(&pobj->phase_current, PHASE_CURRENT_GAIN, PHASE_CURRENT_SHUNT);
 	pobj->phase_current.set_offset(&pobj->phase_current,
-	                               (dev_current_i3axis_t){PHASE_CURRENT_ZERO_ADC,
-	                                                      PHASE_CURRENT_ZERO_ADC,
-	                                                      PHASE_CURRENT_ZERO_ADC}); /* 兜底零偏置; 标定时由 cur_loop_calibrate_offset 采样取均值覆盖 */
+	                               (dev_current_i3axis_t){PHASE_CURRENT_ZERO_ADC, PHASE_CURRENT_ZERO_ADC, PHASE_CURRENT_ZERO_ADC}); /* 兜底零偏置; 标定时由 cur_loop_calibrate_offset 采样取均值覆盖 */
 
 	// 初始化FOC
 	pobj->current_callback = current_callback;

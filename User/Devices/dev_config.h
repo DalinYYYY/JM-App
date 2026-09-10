@@ -30,9 +30,9 @@
 /* ===================================================================== */
 
 #if defined(USE_DEV_POWER_MONITOR)
-#define PM_VREF          (3.3f)  /* ADC 参考电压 */
+#define PM_VREF          (3.3f)    /* ADC 参考电压 */
 #define PM_RESOLUTION    (4096.0f) /* 12-bit ADC */
-#define PM_IBUS_OFFSET_V (1.65f) /* INA199B1 REF=VREF/2, 零电流偏置电压 */
+#define PM_IBUS_OFFSET_V (1.65f)   /* INA199B1 REF=VREF/2, 零电流偏置电压 */
 /* NTC 电路接地侧电阻(kΩ): NTC 接 3.3V、该电阻下拉到地(通道 scale 字段引用)
  * 换算公式还原接 VREF 侧 NTC 阻值: r = (VREF-v)/v * R_pulldown
  * 分度表见 dev_power_monitor.c: 10k 表(-40~125℃) / 100k 表(领技CA-NTC24C018, -30~230℃),
@@ -55,7 +55,7 @@
 #if defined(USE_DEV_PHASE_CURRENT)
 #define PHASE_CURRENT_VREF       (3.3f)    /* ADC 参考电压 */
 #define PHASE_CURRENT_RESOLUTION (4096.0f) /* 12-bit ADC */
-#define PHASE_CURRENT_LPF_ALPHA  (0.9f)    /* 相电流低通滤波系数 */
+#define PHASE_CURRENT_LPF_ALPHA  (1.0f)    /* 相电流低通滤波系数 */
 /* INA199B1 REF 标称 1.65V (VREF/2), 对应 ADC = 1.65/3.3 * 4096 = 2048
  * 仅作为校准前的兜底默认值; 启动时 cur_loop_calibrate_offset 会用实测均值覆盖 */
 #ifndef PHASE_CURRENT_ZERO_ADC

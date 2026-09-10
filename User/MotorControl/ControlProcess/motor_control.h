@@ -84,6 +84,11 @@ typedef struct
 	float temperature;
 	float torque;
 	uint8_t gate_driver_fault; /*!< 栅极驱动器硬件故障(nFAULT): 1=故障, 0=正常; 无此硬件的板型恒 0 */
+
+	/* 编码器健康信息(motor_loop 每拍刷新, 供故障检测) */
+	float mech_angle_deg;      /*!< 单圈机械角度 ° [0,360) */
+	uint16_t enc_err_cnt;      /*!< 连续坏帧计数(CRC 失败累计, 有效帧清零) */
+	uint8_t enc_health;        /*!< 健康位图: bit0=位置无效 bit1=磁场过弱 bit2=磁场过强 */
 } motor_fb_t;
 
 /**

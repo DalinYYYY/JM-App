@@ -21,6 +21,7 @@
 #include "motor_profile.h"      /* motor_profile_apply_param / sync_to_param */
 #include "motor_info_storage.h" /* motor_info_storage_get：Flash 加载的标定参数 */
 #include "dev_dwt_counter.h"   /* ISR 分段耗时打点(调试期) */
+#include "fault_manager.h"      /* 仲裁结果同步到 usr.motor_state.fault */
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR)
 #include "dev_power_monitor.h"  /* 母线电流合成: 配置表检测 SYNTH 通道时 ISR 调用 */
 #endif
@@ -50,11 +51,14 @@ static focCurrent_t motor_loop_current_cb(void)
 }
 
 /**
- * @brief FOC 电弧度回调：返回当前电角度弧度
+ * @brief FOC 电弧度回调：返回当前电角度弧度（含管线延迟超前补偿）
+ * @note  we = 机械角速度(PLL) × 极对数；静止/低速补偿量≈0，标定不受影响。
  */
 static float motor_loop_ele_radian_cb(void)
 {
-	return s_motor_loop.motor.motor_param.ele_radian;
+	motion_param_t *mp = &s_motor_loop.motor.motor_param;
+	float we = mp->slide_rad_s * (float)mp->poles;
+	return mp->ele_radian + we * (FOC_ELE_ANGLE_LEAD_CYCLES * s_motor_loop.current.dt);
 }
 
 void motor_loop_init(float current_freq_hz)
@@ -115,13 +119,25 @@ void motor_loop_init(float current_freq_hz)
 
 	// 上层状态机（模式管理 + 参考生成）
 	system_state_init(&m->sys, &m->motor, param, dt_current);
+
+#if defined(USE_DEV_FLASH)
+	// 缓启动渐变配置: motor_info(EEPROM优先加载) → 运行时 smooth_cfg
+	// (softstart_valid=0 时跳过, 保持 ref_smooth_cfg_init_defaults 编译期默认)
+	transition_mgr_apply_softstart(&m->sys.trans_mgr, motor_info_storage_get());
+
+	// 故障管理配置重新加载: 补偿 fault_mgr_init 在前执行时 cfg 被默认值覆盖
+	// (user_interface.c 已调整顺序, 此处为双重保险, 确保持久化配置生效)
+	motor_profile_sync_fault_cfg_reload(motor_info_storage_get());
+#endif
+
 	motor_loop_sync_state(m);
 
 	// 级联外环（位置/速度）与电流环
 	cascade_control_init(&m->cascade, param, dt_position, dt_velocity);
 	cur_loop_init(&m->current, &m->motor, param, dt_current);
 
-	// 注入组先使能(ADC 注入组 + JEOC 中断), 但转换由 TIM1_CC4 硬件触发,
+	// 注入组先使能(ADC 注入组 + JEOC/JEOS 完成中断), 具体事件由 EOCSelection 选择；
+	// 转换由 TIM1_CC4 硬件触发,
 	// 必须等 half_bridge.start 启动 TIM1 后才会有转换, JDR 才有有效值。
 	m->motor.phase_current.start(&m->motor.phase_current);
 
@@ -192,6 +208,14 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 	m->sys.motor.fb.id = fb->id;
 	m->sys.motor.fb.iq = fb->iq;
 	m->sys.motor.fb.bus_voltage = st->power.v_bus;
+	/* 编码器健康信息(故障检测数据源; 虚拟模式方法为 NULL 恒健康) */
+	m->sys.motor.fb.mech_angle_deg = m->motor.encoder.mechanical_angle;
+	m->sys.motor.fb.enc_err_cnt = (m->motor.encoder.get_err_cnt != NULL)
+	                                 ? m->motor.encoder.get_err_cnt(&m->motor.encoder)
+	                                 : 0u;
+	m->sys.motor.fb.enc_health = (m->motor.encoder.get_health != NULL)
+	                                 ? m->motor.encoder.get_health(&m->motor.encoder)
+	                                 : 0u;
 	/* 栅极驱动器硬件故障(nFAULT): 真实驱动每拍读引脚; 虚拟电机/未连接引脚的板型恒 0 */
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER)
 	m->sys.motor.fb.gate_driver_fault = dev_motor_gate_driver_fault();
@@ -215,6 +239,12 @@ static void motor_loop_sync_state(motor_loop_t *m)
 	st->fault.fault_latched = sys->fault_latched;
 	st->fault.error_count = sys->fault_count;
 	st->fault.last_fault_code = sys->last_fault_code;
+	/* fault_mgr 仲裁结果(0xAA/0xAB 查询与 LED 提示源) */
+	st->fault.warn_mask = fault_mgr_get_warn_mask();
+	st->fault.top_fault_code = fault_mgr_get_top_fault();
+	st->fault.active_count = (uint8_t)fault_mgr_active_count();
+	st->fault.derate_pct = (uint8_t)(fault_mgr_get_derate() * 100.0f + 0.5f);
+	st->fault.level_active = fault_mgr_level_active();
 }
 
 void motor_loop_isr(void)

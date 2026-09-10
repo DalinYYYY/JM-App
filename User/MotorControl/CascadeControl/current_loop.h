@@ -44,6 +44,18 @@ typedef struct
 	pid_state_t pid_iq; // q轴电流环 PID 运行状态
 
 	float dt; // 电流环控制周期(s)，由中断频率决定
+
+	/* 电流环补偿诊断快照: ISR 写入, 通信任务读取。保存 V 域量，
+	 * 避免真实硬件 SVPWM 归一化后无法判断补偿是否进入电压指令。 */
+	volatile float diag_ud_pi;
+	volatile float diag_uq_pi;
+	volatile float diag_ud_cross;
+	volatile float diag_uq_bemf;
+	volatile float diag_ud;
+	volatile float diag_uq;
+	volatile float diag_omega_mech;
+	volatile float diag_vbus;
+	volatile float diag_config;
 } cur_loop_t;
 
 /**

@@ -14,9 +14,29 @@
 #define MOTOR_OBSERVER_DEG_TO_RAD (0.01745329252f)
 #define MOTOR_OBSERVER_CHANNELS_MAX 8u
 #define MOTOR_OBSERVER_SWEEP_POINTS_MAX 1024u
+
+/* 大缓冲 RAM 放置: 见 motor_observer.h 的 MOTOR_OBSERVER_USE_CCM_RAM。
+ * AC5 自定义段 ZI 必须显式 zero_init, 否则生成 RW 初始化数据;
+ * AC6 以 .bss. 前缀段名保证 ZI。 */
+#if MOTOR_OBSERVER_USE_CCM_RAM
+#if defined(__ARMCC_VERSION) && (__ARMCC_VERSION >= 6010050u)
+#define MOTOR_OBS_CCM_BSS __attribute__((section(".bss.ccm_observer")))
+#else
+#define MOTOR_OBS_CCM_BSS __attribute__((section(".ccm_observer"), zero_init))
+#endif
+#else
+#define MOTOR_OBS_CCM_BSS
+#endif
+
 #define TRACE_STATE_STOPPED  0u
 #define TRACE_STATE_RUNNING  1u
 #define TRACE_STATE_DRAINING 2u
+/* TRACE 包头尺寸: session(2)+seq(4)+first(4)+rate(4)+mask(4)+count(1)
+ * +channels(1)+flags(1)+overflow(4)=25B; sweep 包追加
+ * point(2)+phase_inc(4)+freq_mhz(4)=10B。 */
+#define TRACE_PKT_HDR_BASE        25u
+#define TRACE_PKT_HDR_SWEEP_EXTRA 10u
+#define TRACE_PKT_HDR_MAX         (TRACE_PKT_HDR_BASE + TRACE_PKT_HDR_SWEEP_EXTRA)
 #define TRACE_BUFFER_WORDS \
 	(MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES * MOTOR_OBSERVER_CHANNELS_MAX)
 
@@ -27,19 +47,38 @@ typedef struct
 	uint8_t reserved;
 } observer_trace_meta_t;
 
-static motor_observer_snapshot_t s_live[2];
+/* 单包发送信息: 临界区内决策填充, 临界区外用于组包 */
+typedef struct
+{
+	uint16_t session;
+	uint32_t seq;
+	uint32_t first;
+	uint32_t rate;
+	uint32_t mask;
+	uint32_t overflow;
+	uint8_t count;
+	uint8_t channels;
+	uint8_t flags;
+	uint8_t sweep_packet;
+	uint16_t sweep_point;
+	uint32_t phase_inc;
+	uint32_t freq_mhz;
+} observer_trace_pkt_t;
+
+/* 以下大缓冲(约28KB)按 MOTOR_OBSERVER_USE_CCM_RAM 放入 CCM-SRAM 或主 SRAM */
+static motor_observer_snapshot_t s_live[2] MOTOR_OBS_CCM_BSS;
 static volatile uint8_t s_live_index;
 static volatile uint32_t s_live_sequence;
 static uint16_t s_live_div_count;
 static uint32_t s_control_tick;
 
-static float s_trace[TRACE_BUFFER_WORDS];
-static observer_trace_meta_t s_trace_meta[MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES];
-static uint32_t s_sweep_phase_inc[MOTOR_OBSERVER_SWEEP_POINTS_MAX];
-static uint32_t s_sweep_freq_mhz[MOTOR_OBSERVER_SWEEP_POINTS_MAX];
+static float s_trace[TRACE_BUFFER_WORDS] MOTOR_OBS_CCM_BSS;
+static observer_trace_meta_t s_trace_meta[MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES] MOTOR_OBS_CCM_BSS;
+static uint32_t s_sweep_phase_inc[MOTOR_OBSERVER_SWEEP_POINTS_MAX] MOTOR_OBS_CCM_BSS;
+static uint32_t s_sweep_freq_mhz[MOTOR_OBSERVER_SWEEP_POINTS_MAX] MOTOR_OBS_CCM_BSS;
 /* 各频点实际 TRACE 采样率(采样率随频点切换时, 包头 rate 必须与
  * 该频点缓冲样本的写入速率一致, 不能读全局当前值)。 */
-static uint16_t s_sweep_rate_hz[MOTOR_OBSERVER_SWEEP_POINTS_MAX];
+static uint16_t s_sweep_rate_hz[MOTOR_OBSERVER_SWEEP_POINTS_MAX] MOTOR_OBS_CCM_BSS;
 static volatile uint16_t s_trace_read;
 static volatile uint16_t s_trace_write;
 static volatile uint16_t s_trace_count;
@@ -162,6 +201,37 @@ static void observer_publish_runtime(const motor_loop_t *m)
 	s_live_sequence = next_sequence;
 }
 
+/* Bode 会话: 标记频点起止边界, 并缓存该频点的协议参数与实际采样率 */
+static void trace_meta_mark_sweep(const motor_ctrl_t *ctrl, uint16_t write_index,
+	observer_trace_meta_t *meta)
+{
+	uint16_t point = ctrl->sweep_trace_point;
+	meta->point = point;
+	meta->flags = MOTOR_OBSERVER_TRACE_FLAG_SWEEP;
+	if (point < MOTOR_OBSERVER_SWEEP_POINTS_MAX)
+	{
+		s_sweep_phase_inc[point] = ctrl->sweep_trace_phase_inc;
+		s_sweep_freq_mhz[point] = ctrl->sweep_trace_freq_mhz;
+		s_sweep_rate_hz[point] = (uint16_t)s_trace_rate;
+	}
+	if (s_trace_count == 0u)
+	{
+		meta->flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_START;
+		return;
+	}
+	{
+		uint16_t prev = (uint16_t)((write_index +
+			MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES - 1u) %
+			MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+		if ((s_trace_meta[prev].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) == 0u ||
+			s_trace_meta[prev].point != point)
+		{
+			s_trace_meta[prev].flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_END;
+			meta->flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_START;
+		}
+	}
+}
+
 /* 按通道掩码写入一拍示波 trace 数据(环形缓冲，溢出时丢弃最旧) */
 static void observer_trace_write(const motor_loop_t *m)
 {
@@ -198,31 +268,7 @@ static void observer_trace_write(const motor_loop_t *m)
 	meta->reserved = 0u;
 	if (ctrl->run_state == RUN_STATE_TEST_SWEEP_FREQ &&
 		ctrl->sweep_trace_sample_enable != 0u)
-	{
-		uint16_t point = ctrl->sweep_trace_point;
-		meta->point = point;
-		meta->flags = MOTOR_OBSERVER_TRACE_FLAG_SWEEP;
-		if (point < MOTOR_OBSERVER_SWEEP_POINTS_MAX)
-		{
-			s_sweep_phase_inc[point] = ctrl->sweep_trace_phase_inc;
-			s_sweep_freq_mhz[point] = ctrl->sweep_trace_freq_mhz;
-			s_sweep_rate_hz[point] = (uint16_t)s_trace_rate;
-		}
-		if (s_trace_count == 0u)
-			meta->flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_START;
-		else
-		{
-			uint16_t prev = (uint16_t)((write_index +
-				MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES - 1u) %
-				MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
-			if ((s_trace_meta[prev].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) == 0u ||
-				s_trace_meta[prev].point != point)
-			{
-				s_trace_meta[prev].flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_END;
-				meta->flags |= MOTOR_OBSERVER_TRACE_FLAG_POINT_START;
-			}
-		}
-	}
+		trace_meta_mark_sweep(ctrl, write_index, meta);
 	if ((mask & MOTOR_OBS_ID_REF) != 0u)  *dst++ = m->out.id_ref;
 	if ((mask & MOTOR_OBS_ID) != 0u)      *dst++ = m->motor.foc.i_dq.d;
 	if ((mask & MOTOR_OBS_IQ_REF) != 0u)  *dst++ = m->out.iq_ref;
@@ -299,10 +345,11 @@ int motor_observer_trace_start(uint32_t channel_mask, uint32_t rate_hz,
 		return -1;
 	/* 载荷上限防御: 高通道数 × 大包长组合会使组包时帧体超过
 	 * PAYLOAD_MAX, pop 永久拒绝而 RUNNING 又要求凑满包 → 缓冲涨满
-	 * 溢出、会话僵死。按通道数把包长钳到上限内, 钳制值回传 status。 */
+	 * 溢出、会话僵死。按通道数把包长钳到上限内(按最坏 sweep 包头
+	 * 预留), 钳制值回传 status。 */
 	bytes_per_sample = (uint16_t)channels * 4u;
-	max_packet_samples = (uint16_t)((MOTOR_OBSERVER_TRACE_PAYLOAD_MAX - 35u) /
-		bytes_per_sample);
+	max_packet_samples = (uint16_t)((MOTOR_OBSERVER_TRACE_PAYLOAD_MAX -
+		TRACE_PKT_HDR_MAX) / bytes_per_sample);
 	if (max_packet_samples == 0u)
 		return -1;
 	if (packet_samples > max_packet_samples)
@@ -417,28 +464,101 @@ int motor_observer_trace_is_busy(void)
 	return (s_trace_state != TRACE_STATE_STOPPED) ? 1 : 0;
 }
 
-/* 从环形缓冲取出一包采集数据并打包成协议帧(含包头元数据) */
+/* 决策一个可发包: 确定样本数并填充 sweep 元数据。
+ * 规则: Bode 包不跨频点(边界不足固定包长发部分包); RUNNING 态非 sweep
+ * 须凑满整包、sweep 须见到频点结束标记; 帧长不得超出载荷上限。
+ * 须在关中断临界区内调用。返回 0 成功, -1 本次无包可发。 */
+static int trace_pick_packet(uint16_t read_index, uint16_t bytes_per_sample,
+	observer_trace_pkt_t *pkt)
+{
+	uint16_t max_count = s_trace_packet_samples;
+	uint16_t count;
+	uint16_t i;
+
+	if (max_count == 0u || (uint16_t)(TRACE_PKT_HDR_MAX +
+			max_count * bytes_per_sample) > MOTOR_OBSERVER_TRACE_PAYLOAD_MAX)
+		max_count = MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES;
+	count = (s_trace_count < max_count) ? (uint16_t)s_trace_count : max_count;
+
+	pkt->sweep_packet = 0u;
+	pkt->sweep_point = 0u;
+	pkt->phase_inc = 0u;
+	pkt->freq_mhz = 0u;
+	if ((s_trace_meta[read_index].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) != 0u)
+	{
+		pkt->sweep_packet = 1u;
+		pkt->sweep_point = s_trace_meta[read_index].point;
+		if (pkt->sweep_point < MOTOR_OBSERVER_SWEEP_POINTS_MAX)
+		{
+			pkt->phase_inc = s_sweep_phase_inc[pkt->sweep_point];
+			pkt->freq_mhz = s_sweep_freq_mhz[pkt->sweep_point];
+		}
+		/* Bode 包不得跨越频点，边界不足固定包长时发送部分包。 */
+		for (i = 1u; i < count; i++)
+		{
+			uint16_t idx = (uint16_t)((read_index + i) %
+				MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+			if ((s_trace_meta[idx].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) == 0u ||
+				s_trace_meta[idx].point != pkt->sweep_point)
+			{
+				count = i;
+				break;
+			}
+		}
+	}
+	if (s_trace_state == TRACE_STATE_RUNNING && !pkt->sweep_packet &&
+		count < s_trace_packet_samples)
+		return -1;
+	if (s_trace_state == TRACE_STATE_RUNNING && pkt->sweep_packet &&
+		count < max_count)
+	{
+		uint16_t last = (uint16_t)((read_index + count - 1u) %
+			MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+		if ((s_trace_meta[last].flags & MOTOR_OBSERVER_TRACE_FLAG_POINT_END) == 0u)
+			return -1;
+	}
+	if ((uint16_t)(TRACE_PKT_HDR_BASE +
+			(pkt->sweep_packet ? TRACE_PKT_HDR_SWEEP_EXTRA : 0u) +
+			count * bytes_per_sample) > MOTOR_OBSERVER_TRACE_PAYLOAD_MAX)
+		return -1;
+
+	pkt->count = (uint8_t)count;
+	return 0;
+}
+
+/* 打包协议包头(尺寸见 TRACE_PKT_HDR_*), 返回包头长度 */
+static uint16_t trace_pack_header(uint8_t *out, const observer_trace_pkt_t *pkt)
+{
+	uint16_t n = 0u;
+	observer_wr_u16(&out[n], pkt->session); n += 2u;
+	observer_wr_u32(&out[n], pkt->seq); n += 4u;
+	observer_wr_u32(&out[n], pkt->first); n += 4u;
+	observer_wr_u32(&out[n], pkt->rate); n += 4u;
+	observer_wr_u32(&out[n], pkt->mask); n += 4u;
+	out[n++] = pkt->count;
+	out[n++] = pkt->channels;
+	out[n++] = pkt->flags;
+	observer_wr_u32(&out[n], pkt->overflow); n += 4u;
+	if (pkt->sweep_packet)
+	{
+		observer_wr_u16(&out[n], pkt->sweep_point); n += 2u;
+		observer_wr_u32(&out[n], pkt->phase_inc); n += 4u;
+		observer_wr_u32(&out[n], pkt->freq_mhz); n += 4u;
+	}
+	return n;
+}
+
+/* 从环形缓冲取出一包采集数据并打包成协议帧(含包头元数据)。
+ * 临界区内完成边界决策与读指针推进; 组包拷贝在临界区外执行,
+ * 读区间已出队, ISR 溢出覆盖前有充足时间差。 */
 int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len)
 {
-	uint8_t count;
-	uint8_t i;
-	uint8_t flags;
-	uint8_t channels;
-	uint16_t n = 0u;
+	observer_trace_pkt_t pkt;
 	uint16_t read_index;
 	uint16_t bytes_per_sample;
-	uint16_t max_count;
-	uint32_t seq;
-	uint32_t first;
-	uint32_t session;
-	uint32_t mask;
-	uint32_t rate;
-	uint32_t overflow;
+	uint16_t n;
+	uint8_t i;
 	uint32_t primask;
-	uint8_t sweep_packet;
-	uint16_t sweep_point = 0u;
-	uint32_t phase_inc = 0u;
-	uint32_t freq_mhz = 0u;
 	if (out == NULL || out_len == NULL)
 		return -1;
 
@@ -454,110 +574,55 @@ int motor_observer_trace_pop(uint8_t *out, uint16_t *out_len)
 	}
 
 	read_index = s_trace_read;
-	channels = s_trace_channels;
-	bytes_per_sample = (uint16_t)channels * 4u;
-	max_count = s_trace_packet_samples;
-	if (max_count == 0u || (uint16_t)(35u + max_count * bytes_per_sample) >
-		MOTOR_OBSERVER_TRACE_PAYLOAD_MAX)
-		max_count = MOTOR_OBSERVER_TRACE_MAX_PACKET_SAMPLES;
-	count = (s_trace_count < max_count) ? (uint8_t)s_trace_count : (uint8_t)max_count;
-	sweep_packet = ((s_trace_meta[read_index].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) != 0u) ? 1u : 0u;
-	if (sweep_packet)
-	{
-		sweep_point = s_trace_meta[read_index].point;
-		if (sweep_point < MOTOR_OBSERVER_SWEEP_POINTS_MAX)
-		{
-			phase_inc = s_sweep_phase_inc[sweep_point];
-			freq_mhz = s_sweep_freq_mhz[sweep_point];
-		}
-		/* Bode 包不得跨越频点，边界不足固定包长时发送部分包。 */
-		for (i = 1u; i < count; i++)
-		{
-			uint16_t idx = (uint16_t)((read_index + i) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
-			if ((s_trace_meta[idx].flags & MOTOR_OBSERVER_TRACE_FLAG_SWEEP) == 0u ||
-				s_trace_meta[idx].point != sweep_point)
-			{
-				count = i;
-				break;
-			}
-		}
-	}
-	if (s_trace_state == TRACE_STATE_RUNNING && !sweep_packet &&
-		count < s_trace_packet_samples)
-	{
-		__set_PRIMASK(primask);
-		return -1;
-	}
-	if (s_trace_state == TRACE_STATE_RUNNING && sweep_packet &&
-		count < max_count)
-	{
-		uint16_t last = (uint16_t)((read_index + count - 1u) %
-			MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
-		if ((s_trace_meta[last].flags & MOTOR_OBSERVER_TRACE_FLAG_POINT_END) == 0u)
-		{
-			__set_PRIMASK(primask);
-			return -1;
-		}
-	}
-	bytes_per_sample = (uint16_t)channels * 4u;
-	if ((uint16_t)(25u + (sweep_packet ? 10u : 0u) + count * bytes_per_sample) >
-		MOTOR_OBSERVER_TRACE_PAYLOAD_MAX)
+	pkt.channels = s_trace_channels;
+	bytes_per_sample = (uint16_t)pkt.channels * 4u;
+	if (trace_pick_packet(read_index, bytes_per_sample, &pkt) != 0)
 	{
 		__set_PRIMASK(primask);
 		return -1;
 	}
 
-	session = s_trace_session;
-	seq = s_trace_sequence++;
-	first = s_trace_first_index;
-	rate = s_trace_rate;
+	/* 快照包头元数据(含 sweep 边界与 DRAINING 末包标记), 再推进读指针 */
+	pkt.session = s_trace_session;
+	pkt.seq = s_trace_sequence++;
+	pkt.first = s_trace_first_index;
+	pkt.rate = s_trace_rate;
 	/* sweep 包采样率取该频点样本写入时的记录值, 与样本严格对应 */
-	if (sweep_packet && sweep_point < MOTOR_OBSERVER_SWEEP_POINTS_MAX &&
-		s_sweep_rate_hz[sweep_point] != 0u)
-		rate = s_sweep_rate_hz[sweep_point];
-	mask = s_trace_mask;
-	flags = s_trace_flags;
-	overflow = s_trace_overflow;
-	if (sweep_packet)
-		flags |= (uint8_t)(s_trace_meta[read_index].flags &
-			(MOTOR_OBSERVER_TRACE_FLAG_SWEEP | MOTOR_OBSERVER_TRACE_FLAG_POINT_START));
+	if (pkt.sweep_packet && pkt.sweep_point < MOTOR_OBSERVER_SWEEP_POINTS_MAX &&
+		s_sweep_rate_hz[pkt.sweep_point] != 0u)
+		pkt.rate = s_sweep_rate_hz[pkt.sweep_point];
+	pkt.mask = s_trace_mask;
+	pkt.flags = s_trace_flags;
+	pkt.overflow = s_trace_overflow;
+	if (pkt.sweep_packet)
 	{
-		uint16_t last = (uint16_t)((read_index + count - 1u) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
-		if (sweep_packet)
-			flags |= (uint8_t)(s_trace_meta[last].flags & MOTOR_OBSERVER_TRACE_FLAG_POINT_END);
+		uint16_t last = (uint16_t)((read_index + pkt.count - 1u) %
+			MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+		pkt.flags |= (uint8_t)(s_trace_meta[read_index].flags &
+			(MOTOR_OBSERVER_TRACE_FLAG_SWEEP | MOTOR_OBSERVER_TRACE_FLAG_POINT_START));
+		pkt.flags |= (uint8_t)(s_trace_meta[last].flags &
+			MOTOR_OBSERVER_TRACE_FLAG_POINT_END);
 	}
-	if (s_trace_state == TRACE_STATE_DRAINING && count == s_trace_count)
-		flags |= MOTOR_OBSERVER_TRACE_FLAG_LAST;
+	if (s_trace_state == TRACE_STATE_DRAINING && pkt.count == s_trace_count)
+		pkt.flags |= MOTOR_OBSERVER_TRACE_FLAG_LAST;
 	s_trace_flags = 0u;
-	s_trace_read = (uint16_t)((read_index + count) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
-	s_trace_count = (uint16_t)(s_trace_count - count);
-	s_trace_first_index += count;
+	s_trace_read = (uint16_t)((read_index + pkt.count) %
+		MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
+	s_trace_count = (uint16_t)(s_trace_count - pkt.count);
+	s_trace_first_index += pkt.count;
 	if (s_trace_state == TRACE_STATE_DRAINING && s_trace_count == 0u)
 		s_trace_state = TRACE_STATE_STOPPED;
 	__DMB();
+	__set_PRIMASK(primask);
 
-	observer_wr_u16(&out[n], (uint16_t)session); n += 2u;
-	observer_wr_u32(&out[n], seq); n += 4u;
-	observer_wr_u32(&out[n], first); n += 4u;
-	observer_wr_u32(&out[n], rate); n += 4u;
-	observer_wr_u32(&out[n], mask); n += 4u;
-	out[n++] = count;
-	out[n++] = channels;
-	out[n++] = flags;
-	observer_wr_u32(&out[n], overflow); n += 4u;
-	if (sweep_packet)
+	n = trace_pack_header(out, &pkt);
+	for (i = 0u; i < pkt.count; i++)
 	{
-		observer_wr_u16(&out[n], sweep_point); n += 2u;
-		observer_wr_u32(&out[n], phase_inc); n += 4u;
-		observer_wr_u32(&out[n], freq_mhz); n += 4u;
-	}
-	for (i = 0u; i < count; i++)
-	{
-		memcpy(&out[n], &s_trace[(uint32_t)read_index * channels], bytes_per_sample);
+		memcpy(&out[n], &s_trace[(uint32_t)read_index * pkt.channels],
+			bytes_per_sample);
 		n = (uint16_t)(n + bytes_per_sample);
 		read_index = (uint16_t)((read_index + 1u) % MOTOR_OBSERVER_TRACE_BUFFER_SAMPLES);
 	}
-	__set_PRIMASK(primask);
 	*out_len = n;
 	return 0;
 }

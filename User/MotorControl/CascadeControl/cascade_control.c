@@ -13,6 +13,7 @@
 
 #include "cascade_control.h"
 #include "motor_loop_config.h" /* MOTOR_LOOP_VEL_ACCEL_FF_ENABLE: 惯量加速度前馈总开关 */
+#include "fault_manager.h"     /* fault_mgr_get_derate/clamp_pos: 降功率与软限位钳制 */
 #include <string.h>
 
 static float clamp(float value, float min, float max)
@@ -77,8 +78,12 @@ void cascade_control_run_position(cascade_ctrl_t *c, const motor_ref_t *ref, con
 	if (ref->ctrl_type != REF_CTRL_POSITION)
 		return;
 
+	/* 软限位钳制(0x1201): 位置参考超界截断到边界, 允许反向运动 */
+	float pos_ref = ref->pos;
+	fault_mgr_clamp_pos(&pos_ref);
+
 	// 位置环：位置误差 → 速度设定（motor_pid_profile 内部已按 max_speed 限幅）
-	float vel_sp = motor_pid_profile_calculate(&c->pid_pos, ref->pos_profile, ref->pos, fb->pos, c->dt_pos);
+	float vel_sp = motor_pid_profile_calculate(&c->pid_pos, ref->pos_profile, pos_ref, fb->pos, c->dt_pos);
 
 	// 叠加速度前馈
 	vel_sp += ref->vel_ff * (c->param)->position_loop.velocity_ff_gain;
@@ -91,7 +96,8 @@ void cascade_control_run(cascade_ctrl_t *c, const motor_ref_t *ref, const cascad
 {
 	motor_param_t *p = c->param;
 	float kt = (p)->motor_base.kt;
-	float peak_i = (p)->motor_base.peak_current;
+	/* 峰值电流限幅 × 降功率系数(异常级故障降功率运行, 正常时 1.0) */
+	float peak_i = (p)->motor_base.peak_current * fault_mgr_get_derate();
 
 	// 入环层级或配置文件变化：先做无扰预装载（仅闭环模式需要）
 	if ((ref->ctrl_type != c->last_ctrl_type || ref->pos_profile != c->last_pos_profile || ref->vel_profile != c->last_vel_profile)

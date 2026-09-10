@@ -28,7 +28,7 @@ static struct
 	uint8_t point_idx;
 	float test_voltage;
 	float sum_id;
-	uint8_t sample_cnt;
+	uint32_t sample_cnt; /* 采样计数须 uint32：目标 500 超 uint8 上限，回绕将致采样死循环 */
 } s_l5;
 
 /* ===================== L5.3 死区补偿标定（三点拟合）======================
@@ -131,9 +131,9 @@ static calib_state_e poll_deadtime_comp(void)
 			float s_id = 0, s_ud = 0, s_id2 = 0, s_id_ud = 0;
 			for (int i = 0; i < 3; i++)
 			{
-				s_id    += s_l5.id_samples[i];
-				s_ud    += s_l5.ud_samples[i];
-				s_id2   += s_l5.id_samples[i] * s_l5.id_samples[i];
+				s_id += s_l5.id_samples[i];
+				s_ud += s_l5.ud_samples[i];
+				s_id2 += s_l5.id_samples[i] * s_l5.id_samples[i];
 				s_id_ud += s_l5.id_samples[i] * s_l5.ud_samples[i];
 			}
 			float denom = 3.0f * s_id2 - s_id * s_id;
@@ -156,6 +156,8 @@ static calib_state_e poll_deadtime_comp(void)
 			/* R 也顺便更新（三点法精度高于两点法）*/
 			(io->param)->motor_base.r = R_fit;
 			(void)motor_info_calib_submit_r(R_fit);
+			/* V_dt/enable 回写 motor_info(ID 70/88)，随 0xEA 固化持久化 */
+			(void)motor_info_calib_submit_deadtime_comp(V_dt, 1u);
 			calib_mgr_mark_done(CALIB_LEVEL5_NONLINEAR, CALIB_L5_DEADTIME_COMP);
 			calib_step_reset(&s_l5.step);
 			return CALIB_STATE_DONE;
@@ -197,10 +199,8 @@ static bool calib_level5_start(uint8_t submode, motor_param_t *param, float dt)
 		case CALIB_L5_COGGING:
 		case CALIB_L5_FRICTION:
 		case CALIB_L5_DEADTIME_COMP:
-		case CALIB_L5_SATURATION:
-			return true;
-		default:
-			return false;
+		case CALIB_L5_SATURATION: return true;
+		default: return false;
 	}
 }
 
@@ -208,10 +208,10 @@ static calib_state_e calib_level5_poll(void)
 {
 	switch (s_l5.submode)
 	{
-		case CALIB_L5_COGGING:        return poll_cogging();
-		case CALIB_L5_FRICTION:       return poll_friction();
-		case CALIB_L5_DEADTIME_COMP:  return poll_deadtime_comp();
-		case CALIB_L5_SATURATION:     return poll_saturation();
+		case CALIB_L5_COGGING: return poll_cogging();
+		case CALIB_L5_FRICTION: return poll_friction();
+		case CALIB_L5_DEADTIME_COMP: return poll_deadtime_comp();
+		case CALIB_L5_SATURATION: return poll_saturation();
 		default: return CALIB_STATE_FAILED;
 	}
 }
@@ -226,6 +226,6 @@ static void calib_level5_abort(void)
 
 const calib_level_ops_t calib_level5_ops = {
 	.start = calib_level5_start,
-	.poll  = calib_level5_poll,
+	.poll = calib_level5_poll,
 	.abort = calib_level5_abort,
 };
