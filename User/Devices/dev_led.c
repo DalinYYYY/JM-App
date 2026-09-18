@@ -149,3 +149,175 @@ dev_led_t *dev_led_get(led_id_e id)
 }
 
 #endif /* USE_DEV_LED */
+
+/* ==================================================================== */
+/*  RGB LED 设备对象 (GPIO 开关型: 0=灭 / 非0=亮, 支持整灯闪烁)            */
+/* ==================================================================== */
+#if defined(USE_DEV_RGB_LED)
+
+static dev_rgb_led_t s_rgb_led_pool[RGB_LED_ID_MAX];
+
+/* update 中每灯独立的闪烁计数器 */
+static uint32_t s_rgb_blink_tick[RGB_LED_ID_MAX] = {0u};
+
+/* 预设颜色表 (GPIO 开关型: 255=亮, 0=灭) */
+static const uint8_t s_rgb_color_table[RGB_COLOR_MAX][3] = {
+	[RGB_BLACK] = {0u, 0u, 0u},	   [RGB_RED] = {255u, 0u, 0u},
+	[RGB_GREEN] = {0u, 255u, 0u},   [RGB_BLUE] = {0u, 0u, 255u},
+	[RGB_YELLOW] = {255u, 255u, 0u}, [RGB_CYAN] = {0u, 255u, 255u},
+	[RGB_MAGENTA] = {255u, 0u, 255u}, [RGB_WHITE] = {255u, 255u, 255u},
+};
+
+/* 单通道写入: 非0 亮度按极性点亮, 0 熄灭 */
+static void rgb_channel_write(gpioDrv_t gpio, uint8_t val, led_polarity_e polarity)
+{
+	bool on = (val != 0u);
+
+	if (polarity == LED_ACTIVE_HIGH)
+	{
+		if (on)
+		{
+			drv_gpio_set(gpio);
+		}
+		else
+		{
+			drv_gpio_reset(gpio);
+		}
+	}
+	else
+	{
+		if (on)
+		{
+			drv_gpio_reset(gpio);
+		}
+		else
+		{
+			drv_gpio_set(gpio);
+		}
+	}
+}
+
+/* 按当前 r/g/b 值刷新三通道输出 */
+static void rgb_show_impl(dev_rgb_led_t *pobj)
+{
+	const dev_rgb_led_config_t *cfg = &rgb_led_list[pobj->id];
+
+	rgb_channel_write(cfg->r, pobj->r, cfg->polarity);
+	rgb_channel_write(cfg->g, pobj->g, cfg->polarity);
+	rgb_channel_write(cfg->b, pobj->b, cfg->polarity);
+}
+
+static void rgb_set_color_impl(dev_rgb_led_t *pobj, rgb_color_e color)
+{
+	if (color >= RGB_COLOR_MAX)
+	{
+		return;
+	}
+
+	pobj->r = s_rgb_color_table[color][0];
+	pobj->g = s_rgb_color_table[color][1];
+	pobj->b = s_rgb_color_table[color][2];
+	rgb_show_impl(pobj);
+}
+
+static void rgb_set_rgb_impl(dev_rgb_led_t *pobj, uint8_t r, uint8_t g, uint8_t b)
+{
+	pobj->r = r;
+	pobj->g = g;
+	pobj->b = b;
+	rgb_show_impl(pobj);
+}
+
+static void rgb_set_blink_impl(dev_rgb_led_t *pobj, uint32_t period_ms)
+{
+	/* period_ms == 0 表示常亮/常灭, 非 0 表示闪烁周期 */
+	pobj->blink_period_ms = period_ms;
+	if (period_ms != 0u)
+	{
+		s_rgb_blink_tick[pobj->id] = 0u;
+		pobj->blink_on = true;
+		rgb_show_impl(pobj); /* 从亮半周期起点开始 */
+	}
+}
+
+static void rgb_off_impl(dev_rgb_led_t *pobj)
+{
+	pobj->r = 0u;
+	pobj->g = 0u;
+	pobj->b = 0u;
+	rgb_show_impl(pobj);
+}
+
+/* 仅写 GPIO 灭电平, 不清对象颜色 (闪烁灭半周期专用, 亮半周期可恢复原色) */
+static void rgb_hide_impl(dev_rgb_led_t *pobj)
+{
+	const dev_rgb_led_config_t *cfg = &rgb_led_list[pobj->id];
+
+	rgb_channel_write(cfg->r, 0u, cfg->polarity);
+	rgb_channel_write(cfg->g, 0u, cfg->polarity);
+	rgb_channel_write(cfg->b, 0u, cfg->polarity);
+}
+
+static void rgb_update_impl(dev_rgb_led_t *pobj)
+{
+	uint32_t half_period_ticks;
+
+	/* 非闪烁态无需周期处理 */
+	if (pobj->blink_period_ms == 0u)
+	{
+		return;
+	}
+
+	/* thread_display 周期 10ms, 半周期 tick 数 = period_ms / 20 */
+	half_period_ticks = pobj->blink_period_ms / 20u;
+	if (half_period_ticks == 0u)
+	{
+		half_period_ticks = 1u;
+	}
+
+	s_rgb_blink_tick[pobj->id]++;
+	if (s_rgb_blink_tick[pobj->id] >= half_period_ticks)
+	{
+		s_rgb_blink_tick[pobj->id] = 0u;
+		pobj->blink_on = !pobj->blink_on;
+		if (pobj->blink_on)
+		{
+			rgb_show_impl(pobj);
+		}
+		else
+		{
+			rgb_hide_impl(pobj);
+		}
+	}
+}
+
+void dev_rgb_led_init(dev_rgb_led_t *pobj, rgb_led_id_e id)
+{
+	if (id >= RGB_LED_ID_MAX)
+	{
+		return;
+	}
+
+	pobj->id = id;
+	pobj->blink_period_ms = 0u;
+	pobj->blink_on = false;
+	pobj->set_color = rgb_set_color_impl;
+	pobj->set_rgb = rgb_set_rgb_impl;
+	pobj->set_blink = rgb_set_blink_impl;
+	pobj->off = rgb_off_impl;
+	pobj->update = rgb_update_impl;
+
+	/* 初始熄灭 */
+	rgb_off_impl(pobj);
+}
+
+dev_rgb_led_t *dev_rgb_led_get(rgb_led_id_e id)
+{
+	if (id >= RGB_LED_ID_MAX)
+	{
+		return NULL;
+	}
+	return &s_rgb_led_pool[id];
+}
+
+#endif /* USE_DEV_RGB_LED */

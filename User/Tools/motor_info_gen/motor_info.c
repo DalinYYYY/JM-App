@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.c
  * @brief   MotorInfo 配置参数 API 实现
- * @date    2026-09-09
+ * @date    2026-09-11
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -163,6 +163,8 @@ int motor_info_init(motor_info_t *cfg)
 	cfg->blocks.advanced.softstart_vel_rate = 500.0f;
 	cfg->blocks.advanced.softstart_torque_rate = 20.0f;
 	cfg->blocks.advanced.softstart_current_rate = 100.0f;
+	cfg->blocks.advanced.cogging_comp_enable = 0U;
+	cfg->blocks.advanced.cogging_comp_gain = 1.0f;
 
 #endif
 
@@ -408,6 +410,10 @@ int motor_info_validate(const motor_info_t *cfg)
 		return 182; /* softstart_torque_rate */
 	if (cfg->blocks.advanced.softstart_current_rate < 0.0f || cfg->blocks.advanced.softstart_current_rate > 100000.0f)
 		return 183; /* softstart_current_rate */
+	if (cfg->blocks.advanced.cogging_comp_enable > (uint32_t)1)
+		return 184; /* cogging_comp_enable */
+	if (cfg->blocks.advanced.cogging_comp_gain < -1.5f || cfg->blocks.advanced.cogging_comp_gain > 1.5f)
+		return 185; /* cogging_comp_gain */
 
 	return 0;
 #else
@@ -546,6 +552,8 @@ void motor_info_print(const motor_info_t *cfg)
 	printf("softstart_vel_rate: %f rad/s²\n", cfg->blocks.advanced.softstart_vel_rate);
 	printf("softstart_torque_rate: %f Nm/s\n", cfg->blocks.advanced.softstart_torque_rate);
 	printf("softstart_current_rate: %f A/s\n", cfg->blocks.advanced.softstart_current_rate);
+	printf("cogging_comp_enable: %u\n", (unsigned)cfg->blocks.advanced.cogging_comp_enable);
+	printf("cogging_comp_gain: %f\n", cfg->blocks.advanced.cogging_comp_gain);
 
 	printf("\n=============================================\n");
 #else
@@ -588,7 +596,7 @@ static const uint8_t s_pid_to_desc_index[MOTOR_INFO_MAX_PID + 1u] = {
 	255u, 255u, 43u,  44u,  45u,  46u,  47u,  48u,  49u,  50u,  51u,  52u,  53u,  54u,  55u,  56u,  57u,  58u,  59u,  60u,  61u,  62u,  63u,  64u,  65u,  66u,  67u,  255u, 255u, 255u, 255u,
 	255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u,
 	255u, 255u, 255u, 68u,  69u,  70u,  71u,  72u,  73u,  74u,  75u,  76u,  77u,  78u,  79u,  80u,  81u,  82u,  83u,  84u,  85u,  255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 255u, 86u,
-	87u,  88u,  89u,  90u,  91u,  92u,  93u,  94u,  95u,  96u,  97u,  98u,  99u,  100u, 101u, 102u, 255u, 255u, 255u, 255u, 255u, 103u, 104u, 105u, 106u, 107u, 108u, 109u, 110u,
+	87u,  88u,  89u,  90u,  91u,  92u,  93u,  94u,  95u,  96u,  97u,  98u,  99u,  100u, 101u, 102u, 255u, 255u, 255u, 255u, 255u, 103u, 104u, 105u, 106u, 107u, 108u, 109u, 110u, 111u, 112u,
 };
 
 static const motor_info_param_desc_t s_motor_info_desc[MOTOR_INFO_PARAM_COUNT] = {
@@ -814,6 +822,10 @@ static const motor_info_param_desc_t s_motor_info_desc[MOTOR_INFO_PARAM_COUNT] =
 	{182u, (uint16_t)offsetof(motor_info_t, blocks.advanced.softstart_torque_rate),           MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, {.f32 = 0.0f},       {.f32 = 10000.0f}   },
 	/* softstart_current_rate */
 	{183u, (uint16_t)offsetof(motor_info_t, blocks.advanced.softstart_current_rate),          MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, {.f32 = 0.0f},       {.f32 = 100000.0f}  },
+	/* cogging_comp_enable */
+	{184u, (uint16_t)offsetof(motor_info_t, blocks.advanced.cogging_comp_enable),             MOTOR_INFO_TYPE_U32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, {.u32 = 0U},         {.u32 = 1U}         },
+	/* cogging_comp_gain */
+	{185u, (uint16_t)offsetof(motor_info_t, blocks.advanced.cogging_comp_gain),               MOTOR_INFO_TYPE_F32, MOTOR_INFO_ACCESS_RW, 4u, MOTOR_INFO_DESC_HAS_RANGE, {.f32 = -1.5f},      {.f32 = 1.5f}       },
 };
 
 static const motor_info_param_desc_t *motor_info_find_desc(uint16_t pid)

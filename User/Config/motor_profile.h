@@ -206,7 +206,7 @@ void motor_profile_apply_info(void *cfg);
  *   v3: MotorCalibParam 段增加 peak_current/max_speed 字段（Index 43/44）
  *   v4: ProtectComm 块移除旧温度参数（温度保护迁移至 FaultParam 块）
  *   v5: FaultParam 块取消, 故障阈值/三级使能掩码(拆低/高32位对)融合进 ProtectCommParam(协议 v1.12)*/
-#define MOTOR_PROFILE_CONFIG_VERSION 5U /* v5: ProtectCommParam 块布局变更(旧存储作废重建) */
+#define MOTOR_PROFILE_CONFIG_VERSION 6U /* v6: advanced 块新增齿槽补偿参数 PID184/185(旧存储作废重建) */
 
 void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上电用 */
 

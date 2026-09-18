@@ -21,8 +21,10 @@
 /* 标定施加电压幅值上限(√(ud²+uq²))，与电机型号无关 */
 #define CALIB_CFG_MAX_VOLTAGE_MAG_V 7.0f
 
-/* 全局超时(s)，与电机型号无关 */
-#define CALIB_CFG_GLOBAL_TIMEOUT_S     30.0f
+/* 全局超时(s)，与电机型号无关。
+ * 注: L5.1 齿槽扫描(正反各~3.2圈)全程约 40s, 兜底上限放宽至 120s;
+ *     其余标定级均在 30s 内完成, 卡死场景仅延迟报错不影响功能 */
+#define CALIB_CFG_GLOBAL_TIMEOUT_S     120.0f
 #define CALIB_CFG_GLOBAL_TIMEOUT_TICKS (uint32_t)(CALIB_CFG_GLOBAL_TIMEOUT_S * CALIB_TICKS_PER_SEC)
 
 /* ===================== L1 驱动硬件底层参数（与电机无关）===================== */
@@ -58,6 +60,20 @@
 #define CALIB_CFG_L2_POLE_PAIRS_ALIGN_S     1.0f
 #define CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES  21u
 #define CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ 2.0f
+
+/* ===================== L5.1 齿槽转矩扫描（与电机无关）===================== */
+/* 原理: 强制电角度匀速递增开环同步拖动(calib_hw_enter 会话), 恒 uq 电压下
+ * iq(θm) 即齿槽+摩擦力矩曲线; 正反双程 bin 累加取平均自动抵消库仑摩擦。 */
+#define CALIB_CFG_L5_COG_SPEED_RAD_S  1.0f    /* 拖动机械角速度(恒速) */
+#define CALIB_CFG_L5_COG_HOLD_CURRENT 0.15f   /* 拖动保持电流估计(A, 克服摩擦+齿槽峰值) */
+#define CALIB_CFG_L5_COG_VOLTAGE_MUL  2.0f    /* 拖动电压裕度系数(uq=R·I·本系数+ωe·ψ) */
+#define CALIB_CFG_L5_COG_ROUND_SCAN   2.0f    /* 每方向采集圈数 */
+#define CALIB_CFG_L5_COG_ROUND_SKIP   1.2f    /* 起步/换向过渡圈数(不累计) */
+#define CALIB_CFG_L5_COG_SLIP_RATIO   0.25f   /* 失步判定: |ω实际|<命令×本系数
+                                                 * (开环拖动在齿槽峰处速度自然跌落,
+                                                 *  阈值过严会误判, 0.5 实测误报) */
+#define CALIB_CFG_L5_COG_SLIP_TICKS   6000u   /* 失步持续时间(6000 tick=0.6s) */
+#define CALIB_CFG_L5_COG_TABLE_MA_MAX 2000.0f /* 表幅值上限(mA), 超出判标定异常 */
 
 /* ===================== L3 编码器校准时间（与电机无关）===================== */
 #define CALIB_CFG_L3_ALIGN_TIME_S 2.0f

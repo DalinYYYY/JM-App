@@ -164,6 +164,8 @@ extern "C"
 		float speed_bandwidth_hz;      /* 速度环带宽 (Hz) */
 		float speed_filter_alpha;      /* 速度滤波系数 */
 		float position_bandwidth_hz;   /* 位置环带宽 (Hz) */
+		uint8_t cogging_comp_enable;   /* 齿槽补偿使能 (表CRC有效时生效) */
+		float cogging_comp_gain;       /* 齿槽补偿增益 (0~1.5, 现场微调) */
 	} position_loop_t;
 
 	/**

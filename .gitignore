@@ -43,6 +43,7 @@ JLinkLog.txt
 .archify
 .pytest_cache
 .doc
+.plan
 
 # V1 板级编译产物与构建日志
 Board/V1/MDK-ARM/JointMotorApp/

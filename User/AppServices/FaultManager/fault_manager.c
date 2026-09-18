@@ -107,19 +107,11 @@ static void fm_hist_update(fault_mgr_t *fm, uint16_t code, const fault_rec_t *re
 	h->last_ms = fm->uptime_ms;
 }
 
-/* 触发/维持一条故障(任意上下文安全: 短临界区写记录+历史) */
-static void fm_set_active(fault_mgr_t *fm, uint16_t code, float value)
+/* 触发/维持一条故障(短临界区写记录+历史; idx 由调用方保证有效) */
+static void fm_set_active_core(fault_mgr_t *fm, uint8_t idx, float value)
 {
-	int16_t idx = fault_code_to_index(code);
-	fault_rec_t *rec;
+	fault_rec_t *rec = &fm->rec[idx];
 	uint32_t primask;
-
-	if (idx < 0 || idx >= FAULT_CODE_COUNT)
-		return; /* 未定义码或越界: 忽略(防御性检查) */
-	/* 三级使能掩码是统一入口，所有故障来源都在记录前受其约束。 */
-	if (!fault_mgr_is_enabled(code))
-		return;
-	rec = &fm->rec[idx];
 
 	primask = __get_PRIMASK();
 	__disable_irq();
@@ -139,7 +131,7 @@ static void fm_set_active(fault_mgr_t *fm, uint16_t code, float value)
 	}
 	rec->last_ms = fm->uptime_ms;
 	rec->value = value;
-	fm_hist_update(fm, code, rec, value);
+	fm_hist_update(fm, fault_meta_table[idx].code, rec, value);
 	fm->dirty = 1u;
 	__set_PRIMASK(primask);
 }
@@ -147,17 +139,11 @@ static void fm_set_active(fault_mgr_t *fm, uint16_t code, float value)
 /* 条件消失处理: 非停机动作自动清除, 停机类保持锁存(需 CLEAR_FAULT)
  * 判定依据级别策略覆盖后的有效动作(与 fm_eval 一致):
  * 故障级/异常级被 action_policy 覆盖为仅记录时, 条件消失即自动清除 */
-static void fm_set_inactive(fault_mgr_t *fm, uint16_t code)
+static void fm_set_inactive_core(fault_mgr_t *fm, uint8_t idx)
 {
-	int16_t idx = fault_code_to_index(code);
-	const fault_meta_t *meta;
-	fault_rec_t *rec;
+	const fault_meta_t *meta = &fault_meta_table[idx];
+	fault_rec_t *rec = &fm->rec[idx];
 	uint8_t lv, act;
-
-	if (idx < 0 || idx >= FAULT_CODE_COUNT)
-		return;
-	meta = &fault_meta_table[idx];
-	rec = &fm->rec[idx];
 
 	if (rec->status != FAULT_STATUS_ACTIVE)
 		return;
@@ -172,6 +158,28 @@ static void fm_set_inactive(fault_mgr_t *fm, uint16_t code)
 	if (act != FAULT_ACTION_STOP_POWER && act != FAULT_ACTION_STOP_BRAKE &&
 		act != FAULT_ACTION_STOP_IDLE)
 		rec->status = FAULT_STATUS_CLEARED;
+}
+
+/* code 版入口(冷路径: 慢速检测/外部上报), 二分查索引后走 idx 核心 */
+static void fm_set_active(fault_mgr_t *fm, uint16_t code, float value)
+{
+	int16_t idx = fault_code_to_index(code);
+
+	if (idx < 0 || idx >= FAULT_CODE_COUNT)
+		return; /* 未定义码或越界: 忽略(防御性检查) */
+	/* 三级使能掩码是统一入口，所有故障来源都在记录前受其约束。 */
+	if (!fault_mgr_is_enabled_idx((uint8_t)idx))
+		return;
+	fm_set_active_core(fm, (uint8_t)idx, value);
+}
+
+static void fm_set_inactive(fault_mgr_t *fm, uint16_t code)
+{
+	int16_t idx = fault_code_to_index(code);
+
+	if (idx < 0 || idx >= FAULT_CODE_COUNT)
+		return;
+	fm_set_inactive_core(fm, (uint8_t)idx);
 }
 
 /* 仲裁+动作执行: 遍历活动记录重算 top/derate/mask, 执行级别动作
@@ -310,9 +318,11 @@ void fault_mgr_init(void)
 void fault_mgr_attach(struct system_state_s *sys)
 {
 	g_fault_mgr.sys = sys;
-	/* 消抖阈值按控制周期换算(ISR 拍数) */
+	/* 消抖阈值按快检测采样周期换算(控制周期×FAULT_DET_FAST_DIV):
+	 * 快检测错峰分频后计数器每采样周期递增一次, 阈值同步缩放保持响应时间 */
 	if (sys != NULL)
-		fault_detect_fast_init_cycles(&g_fault_mgr, sys->motor.dt);
+		fault_detect_fast_init_cycles(&g_fault_mgr,
+		                              sys->motor.dt * (float)FAULT_DET_FAST_DIV);
 }
 
 void fault_mgr_poll_fast(void)
@@ -423,28 +433,24 @@ fault_cfg_t *fault_mgr_get_cfg(void)
  */
 uint8_t fault_mgr_is_enabled(uint16_t code)
 {
-	fault_cfg_t *cfg = &g_fault_mgr.cfg;
-
-	// 查找故障码在表中的索引
 	int16_t idx = fault_code_to_index(code);
-	if (idx < 0 || idx >= FAULT_CODE_COUNT)
-		return 1u;  // 未知故障默认使能
 
-	// 从元数据表获取级别 (pack2[1:0])
+	if (idx < 0 || idx >= FAULT_CODE_COUNT)
+		return 1u; /* 未知故障默认使能 */
+	return fault_mgr_is_enabled_idx((uint8_t)idx);
+}
+
+/* O(1) 索引版: idx=FAULT_IDX_*(编译期绑定), 快检测热路径专用 */
+uint8_t fault_mgr_is_enabled_idx(uint8_t idx)
+{
 	const fault_meta_t *meta = &fault_meta_table[idx];
 	uint8_t level = FAULT_META_LEVEL(meta);
 
-	uint8_t level_idx;
-	switch (level)
-	{
-		case FAULT_LEVEL_CRITICAL:  level_idx = 0; break;
-		case FAULT_LEVEL_EXCEPTION: level_idx = 1; break;
-		case FAULT_LEVEL_WARNING:   level_idx = 2; break;
-		default: return 1u;  // 未知级别默认使能
-	}
+	if (level < FAULT_LEVEL_CRITICAL || level > FAULT_LEVEL_WARNING)
+		return 1u; /* 未知级别默认使能 */
 
 	/* 位粒度: 掩码对应位=1 启用该故障, =0 禁用 (bit 编译期绑定) */
-	return (uint8_t)((cfg->enable_mask[level_idx] >> FAULT_META_LEVEL_BIT(meta)) & 1u);
+	return (uint8_t)((g_fault_mgr.cfg.enable_mask[level - 1u] >> FAULT_META_LEVEL_BIT(meta)) & 1u);
 }
 
 void fault_mgr_set_enable_mask(const uint64_t mask[3])
@@ -553,5 +559,24 @@ void fault_mgr_internal_set(uint16_t code, float value)
 void fault_mgr_internal_clear(uint16_t code)
 {
 	fm_set_inactive(&g_fault_mgr, code);
+}
+
+/* O(1) 热路径(10kHz 快检测): idx=FAULT_IDX_* 编译期绑定, 免二分查找 */
+void fault_mgr_internal_set_idx(uint8_t idx, float value)
+{
+	fault_mgr_t *fm = &g_fault_mgr;
+
+	if (idx >= FAULT_CODE_COUNT)
+		return;
+	if (!fault_mgr_is_enabled_idx(idx))
+		return;
+	fm_set_active_core(fm, idx, value);
+}
+
+void fault_mgr_internal_clear_idx(uint8_t idx)
+{
+	if (idx >= FAULT_CODE_COUNT)
+		return;
+	fm_set_inactive_core(&g_fault_mgr, idx);
 }
 

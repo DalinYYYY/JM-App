@@ -29,7 +29,7 @@
 #if defined(USE_DEV_DRV8301)
 #include "dev_drv8301.h"
 #endif
-#if defined(USE_DEV_LED)
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
 #include "led_manager.h"
 #endif
 #include "motor_info_storage.h"
@@ -86,8 +86,8 @@ static void hardware_init(void)
      * 电流环频率由 ADC 注入转换中断决定，此处传入实际中断频率 */
 	motor_loop_init(10000.0f);
 
-#if defined(USE_DEV_LED)
-	/* LED 状态指示初始化（LED1红=故障, LED2绿=运行状态）
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
+	/* LED 状态指示初始化（单色板: LED1红=故障,LED2绿=状态; RGB板: 单颗RGB合并故障+状态）
 	 * 须在 motor_loop_init 之后调用, 依赖状态机实例就绪 */
 	led_manager_init();
 #endif
@@ -132,15 +132,15 @@ void motor_virtual_loop(void)
 {
 	// 在使用虚拟电机时，三环控制在中断里执行，主循环无需调用
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER == 0u)
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_CYCLE); // 测量电流环周期
-	dev_dwt_counter_start(SYS_TIMER_RECORD_CURRENT_LOOP_CYCLE);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_IRQ_CYCLE); /* 测量电流环周期 */
+	dev_dwt_counter_start(SYS_TIMER_RECORD_IRQ_CYCLE);
 
-	dev_dwt_counter_start(SYS_TIMER_RECORD_CURRENT_LOOP_TIME); // 测量电流环运行时间
+	dev_dwt_counter_start(SYS_TIMER_RECORD_IRQ_TOTAL); /* 测量 ISR 总耗时 */
 
 	// 三环控制入口（电流10kHz / 速度2kHz / 位置1kHz 分频）
 	motor_loop_isr();
 	motor_observer_on_control_isr(motor_loop_get());
 
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_CURRENT_LOOP_TIME);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_IRQ_TOTAL);
 #endif
 }

@@ -23,6 +23,7 @@
 #ifndef __SYSTEM_STATE_H__
 #define __SYSTEM_STATE_H__
 
+#include <stdbool.h>
 #include "state_define.h"
 #include "motor_control.h"
 #include "ctrl_transition_mgr.h"
@@ -103,23 +104,27 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 /**
  * @brief 电机控制主循环（中断级执行）
  * @param[in,out] sys 系统状态机实例指针（非NULL）
+ * @param[in] fault_tick 故障检测错峰拍标志（motor_loop 超周期调度器给出）
  * @retval 无
- * @note 1. 先执行故障检测，故障/安全状态下参考置为IDLE；
+ * @note 1. 先执行故障检测（NaN 发散每拍；电气类全量检测仅在 fault_tick 拍，
+ *          1kHz 错峰，消抖阈值已按采样周期换算），故障/安全状态下参考置为IDLE；
  *       2. 处理运行状态的平滑过渡（若有），生成 motor.ref 参考输出；
  *       3. 下游三环模块读取 sys->motor.ref，按 ref.ctrl_type 入环并自行分频；
  *       4. 需在硬件中断（如定时器）中调用，保证执行周期稳定
  */
-void motor_control_loop(system_state_t *sys);
+void motor_control_loop(system_state_t *sys, bool fault_tick);
 
 /**
  * @brief 系统故障检测
  * @param[in,out] sys 系统状态机实例指针（非NULL）
+ * @param[in] fault_tick 全量电气检测错峰拍标志（false 时仅执行 NaN 发散检测）
  * @retval 无
- * @note 1. 检测编码器故障等核心故障，映射到fault_code；
- *       2. 检测到故障时自动切换顶层状态为FAULT；
- *       3. 可扩展其他故障类型（如过流、过压、过温等）
+ * @note 1. NaN 算法发散检测每拍执行（保护本拍输出）；
+ *       2. 电气类全量检测（过流/电压/超速/nFAULT 等）仅在 fault_tick 拍执行，
+ *          消抖计数按采样周期（控制周期×FAULT_DET_FAST_DIV）等效换算；
+ *       3. 检测到故障时自动切换顶层状态为FAULT
  */
-void fault_check(system_state_t *sys);
+void fault_check(system_state_t *sys, bool fault_tick);
 
 /**
  * @brief 处理上层控制指令

@@ -4,25 +4,4 @@
 
 | 版本 | 日期 | 类型 | 备注 |
 | --- | --- | --- | --- |
-| 1.0.1 | 2026-08-07 | baseline | 现有基线版本（DataHub 重构后） |
-| 1.0.2 | 2026-08-07 | feat | 新增 motor_observer 实时快照与高速采样（B7/B6/C9） |
-| 1.0.3 | 2026-08-07 | feat | 增强 PID 整定/校验与调试会话（autotune/validate/A1/A2/A5，含 B7/B6/C9 协议接口）；同步 pyqt_gui PID 调试 UI |
-| 1.0.4 | 2026-08-07 | fix | system_state 调整：注释 fault_check 调用、CALIB 态切换逻辑收敛与缩进整理 |
-| 1.0.5 | 2026-08-07 | docs | 更新协议文档与命令清单（高速采样 B7/B6/C9、PID 调试 A1/A2/A5） |
-| 1.0.6 | 2026-08-07 | build | 更新 Keil 编译分析结果（新增 motor_observer 后的 Flash/RAM 占用） |
-| 1.1.0 | 2026-08-07 | feat | 高速波形重构为连续 TRACE 流：环形缓冲+设备主动批量上报（0xB9/0xBA），废弃旧版 B7/B6/C9 采样（不兼容，次版本升级），协议升至 1.2 |
-| 1.1.1 | 2026-08-07 | docs | 更新协议文档与命令清单（TRACE 0xB9/0xBA、废弃 B5~B7/C9 波形） |
-| 1.1.2 | 2026-08-07 | build | 更新 Keil 编译分析结果（TRACE 重构后 Flash/RAM 占用） |
-| 1.1.3 | 2026-08-07 | feat | 删除 VESC/SerialStudio 通信模块（dev_commun_vesc/vesc_proto/serial_studio）并清理冗余注释与死代码 |
-| 1.1.4 | 2026-08-07 | docs+build | 更新 readme 与协议文档（移除 VESC/SerialStudio 引用）、Keil 工程移除 vesc_proto 头文件路径 |
-| 1.1.5 | 2026-08-07 | chore | 同步 pyqt_gui 子模块至 TRACE 主动波形适配版本；清理本地计划/HTML 模式文档并加入 .gitignore，整理 jm_cmd_def.h 注释对齐 |
-| 1.2.0 | 2026-08-14 | feat | motor_info 增加片外 EEPROM 双备份存储（AT24C16，上电优先加载）与 Flash 磨损均衡写入次数保护；新增 SFOC_V2 板级支持；协议新增 EEPROM/写限错误码；同步 pyqt_gui 固化通知与 SFOC_V2 驱动（次版本升级） |
-| 1.3.0 | 2026-08-14 | feat | 新增 Bode 扫频测试：0x76 改造为偏置扫频 12B 整数载荷（control/point_cfg/起止频率/幅值/偏置/格式标签），支持力矩→速度/电流→速度/电流→电流/速度→位置/速度→速度/位置→位置 6 种闭环模式；多圈零点复位接口；TRACE 扩展 512 样本缓冲与 SWEEP/POINT_START/POINT_END 标志，UART 链路单周期 4 包排空支撑 2k~10kHz 上传；协议升至 1.4（次版本升级） |
-| 1.3.1 | 2026-08-14 | fix | 修复 MKS5010 电机电气参数数量级错误（flux/KT/KE 由 e-5/e-3 级别修正 100 倍），力矩模式 iq=τ/KT 放大导致母线被拉垮 |
-| 1.4.0 | 2026-08-21 | feat | 新增对拖台负载模拟：协议 0x60~0x67 命令段（被动恒转矩/动态转矩/平方负载/恒功率/摩擦/惯量/工况谱/冲击过载）、零力模式独立实现；TRACE 链路重构（UART 主走 CAN 兜底）、调试通道增转矩参考；电机选型改板级 motor_config_board.h；协议升至 1.5（次版本升级，HW 版本归位 1.0） |
-| 1.4.1 | 2026-08-24 | feat | L2.1 相序识别重构为开环旋转平均法：累计编码器原始角整电周期平均判定 enc_direction 并持久化至 motor_info.direction（index 19），修复原 120° 步进法不能区分相序/计数反向且未写回方向的问题；同步标定配置与参数表注释 |
-| 1.4.2 | 2026-08-27 | feat | 扫频 TRACE 采样率逐频点钳制（20f 降至 rate_min、高频封顶起始率，512 深缓冲防溢出丢样），包头按频点实际记录速率打包；新增方向一"实测电流→速度"模式 6（纯机械对象，高频谐振/带宽测量不受电流环跟踪误差污染）；mechanical 拟合含等效延迟 τ 网格搜索；同步参数表与 V1 构建产物（patch 1.4.1→1.4.2） |
-| 1.6.0 | 2026-09-10 | feat | 1. 新增 FaultManager 分级故障管理：故障码表(0xSLNN 分级)与 fault_param 生成器、快/慢双路检测、三级使能掩码(故障/异常/警告, 级别总开关)、0xAA/0xAB/0xAC 故障诊断与 0xB0 清障扩展；2. 协议升至 1.12：0xE6/0xE7 value 按类型定长(1/2/4/8B)并预留 JM_PT_U64、新增 0xED 固化清零(魔数防误触)、0xAD/0xAE 逐故障屏蔽废弃统一走掩码；3. 新增 0xA3/0xA4 缓启动渐变配置读写(运行时生效+镜像 motor_info)；4. 编码器健康/错误计数接口(MT6701 磁场强度、MT6835/AS5047)与电源温度通道接入故障检测；5. 软限位钳制与降功率系数联动、故障 LED 分级指示；6. Keil 工程登记 FaultManager 源组并接入 incr_build.py（次版本升级） |
-| 1.7.0 | 2026-09-10 | feat | 1. motor_info/motor_param 生成器重构：数据表按 CSV 重新生成、支持裁剪宏(MOTOR_INFO_EN_/MOTOR_PARAM_EN_)默认裁剪 init/validate/print 省 Flash；2. protect_enable 保护总使能+三级掩码(低/高32位对)融合进 ProtectComm 块、FaultParam 块取消(TOTAL6块)、配置版本升至5；3. 新增 u32_bool 参数类型与 JM_PT_U64 支持，0xE6/0xE7 值类型定长读写；4. EEPROM 回读校验修复(独立回读缓冲防假ACK)、Flash 备份开关(默认仅 EEPROM)与存储初始化状态细分；5. motor_profile 标定默认值兜底(pwm_freq/dead_time/补偿增益)与配置版本一致性维护（次版本升级） |
-| 1.8.0 | 2026-09-10 | feat | 1. 电流环 FOC 补偿诊断快照(交叉解耦/反电势/补偿后ud/uq)入调试通道、CAN 路径同步刷新；2. FOC 解耦/前馈/死区参数板级回退与运行时确保非零(保补偿生效)，反电动势项独立诊断上报；3. ADC 注入组 EOC 序列化修复(JEOS 一次触发, 电流环倍频修复)与 IT 模式注入启动；4. motor_observer 大缓冲按需放 CCM-SRAM(默认启用, 释放主 RAM 约28K)并支持裁剪；5. 电机极对数字段注标定加载、L5 采样计数 uint32 防回绕、编码器健康/坏帧差分化；6. 扫频 TRACE 缓冲与包头上限重构、软限位钳制（次版本升级） |
-| 2.0.0 | 2026-09-10 | feat | 1. 新增 incr_build.py 编译前版本号自动递增脚本并接入 Keil 工程、gen_can_dbc 同步命令清单；2. 缓存与目录整理：忽略构建产物/.doc 与 TwinMotor 目录、clang-format 行宽收敛至200；3. 清理过时的 MotorControl 设计方案文档(对拖台加载/开环波德扫频/扫频原理/下位机功能状态表)；4. Protocols 命令清单与 CAN DBC 脚本化同步（主版本升级, 累计 1.6~1.8 功能） |
+| 1.0.0 | 2026-09-18 | baseline | 现有基线版本发布 |

@@ -24,7 +24,7 @@
 #include "thread_config.h"
 #include "user_interface.h"
 #include "dev_config.h"
-#if defined(USE_DEV_LED)
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
 #include "led_manager.h"
 #endif
 
@@ -37,8 +37,8 @@ void display_thread(void const *argument)
 
 		drv_rtos_delay_ms(THREAD_DELAY_DISPLAY);
 
-#if defined(USE_DEV_LED)
-		/* LED 状态指示周期更新（10ms 周期, 由状态机驱动 LED1/LED2 行为） */
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
+		/* LED 状态指示周期更新（10ms 周期, 由状态机驱动灯效） */
 		led_manager_update();
 #endif
 

@@ -20,7 +20,10 @@
  *          检测项启用由 fault_manager.h 的 FAULT_DET_EN_* 编译期开关控制。
  *          原 system_state.c state_active_faults() 的 6 项检测迁移至此并
  *          保持判据/消抖/启动窗口语义不变(烧板事故教训: 判据时序勿动)。
- *          单次执行预算 < 3µs(全部标量比较, 无函数调用开销大的运算)。
+ *          调度: fault_mgr_poll_fast 经 motor_loop 错峰分频(FAULT_DET_FAST_DIV,
+ *          1kHz @10kHz 电流环), 消抖阈值按采样周期换算(fault_mgr_attach);
+ *          NaN 发散检测(fault_detect_diverge)不受分频, 每拍执行。
+ *          记录接口走 _idx 版(FAULT_IDX_* 编译期绑定, 免二分查找)。
  */
 
 #include "fault_manager.h"
@@ -70,6 +73,29 @@ static float fdet_deg_delta(float a, float b)
 }
 #endif /* FAULT_DET_EN_ENC_JUMP */
 
+/* NaN 算法发散检测(每拍执行, 不受 FAULT_DET_FAST_DIV 分频):
+ * 保护的是本拍算法输出(id/iq/vel/vbus 任一 NaN/Inf 即失控),
+ * 由 fault_check 在每个电流环拍调用 */
+void fault_detect_diverge(fault_mgr_t *fm)
+{
+#if FAULT_DET_EN_ALGO_DIVERGE
+	system_state_t *sys = (system_state_t *)fm->sys;
+	const motor_fb_t *fb;
+
+	if (sys == NULL)
+		return;
+	fb = &sys->motor.fb;
+
+	/* ---- 0x810A 算法发散(NaN/Inf): 全量纲无条件检测 ---- */
+	if (!fdet_is_finite(fb->id) || !fdet_is_finite(fb->iq) || !fdet_is_finite(fb->vel) || !fdet_is_finite(fb->bus_voltage))
+		fault_mgr_internal_set_idx(FAULT_IDX_ALGO_DIVERGE, 0.0f);
+	else
+		fault_mgr_internal_clear_idx(FAULT_IDX_ALGO_DIVERGE);
+#else
+	(void)fm;
+#endif /* FAULT_DET_EN_ALGO_DIVERGE */
+}
+
 void fault_detect_fast(fault_mgr_t *fm)
 {
 	system_state_t *sys = (system_state_t *)fm->sys;
@@ -86,24 +112,16 @@ void fault_detect_fast(fault_mgr_t *fm)
 	const fault_cfg_t *cfg = &fm->cfg;
 #endif
 
-	/* 启动保护窗口倒计时(每拍) */
+	/* 启动保护窗口倒计时(每次执行递减, 执行周期=采样周期) */
 	if (fm->speed_guard_cycles > 0u)
 		fm->speed_guard_cycles--;
 	if (fm->vbus_guard_cycles > 0u)
 		fm->vbus_guard_cycles--;
 
-	/* ---- 0x810A 算法发散(NaN/Inf): 全量纲无条件检测 ---- */
-#if FAULT_DET_EN_ALGO_DIVERGE
-	if (!fdet_is_finite(fb->id) || !fdet_is_finite(fb->iq) || !fdet_is_finite(fb->vel) || !fdet_is_finite(fb->bus_voltage))
-		fault_mgr_internal_set(FAULT_ALGO_DIVERGE, 0.0f);
-	else
-		fault_mgr_internal_clear(FAULT_ALGO_DIVERGE);
-#endif /* FAULT_DET_EN_ALGO_DIVERGE */
-
 	/* ---- 0x3102 峰值过流: 矢量幅值平方比较(免开方), 5ms消抖 ---- */
 	// 同时检查总使能和新级别掩码
 	if (enable != 0u &&
-	    fault_mgr_is_enabled(FAULT_I_OVER_PEAK) &&
+	    fault_mgr_is_enabled_idx(FAULT_IDX_I_OVER_PEAK) &&
 	    fdet_is_finite(fb->id) && fdet_is_finite(fb->iq) &&
 	    (fb->id * fb->id + fb->iq * fb->iq) > pp->protect_over_current * pp->protect_over_current)
 	{
@@ -115,9 +133,9 @@ void fault_detect_fast(fault_mgr_t *fm)
 		fm->over_current_cycles = 0u;
 	}
 	if (fm->over_current_cycles >= fm->over_current_confirm_cyc)
-		fault_mgr_internal_set(FAULT_I_OVER_PEAK, fdet_absf(fb->iq));
+		fault_mgr_internal_set_idx(FAULT_IDX_I_OVER_PEAK, fdet_absf(fb->iq));
 	else
-		fault_mgr_internal_clear(FAULT_I_OVER_PEAK);
+		fault_mgr_internal_clear_idx(FAULT_IDX_I_OVER_PEAK);
 
 	/* ---- 0x2105 VBUS 采样异常 / 0x2102 过压 / 0x2103 欠压 / 0x2201/02 中度 ---- */
 	if (fdet_is_finite(fb->bus_voltage))
@@ -131,13 +149,14 @@ void fault_detect_fast(fault_mgr_t *fm)
 			 * 直接判定必误锁存(故障级不自动清除) */
 			if (fm->vbus_guard_cycles == 0u && fm->vbus_invalid_cycles < 0xFFFFFFFFu)
 				fm->vbus_invalid_cycles++;
-			/* 阈值计算: cfg->vbus_invalid_ms 转换为 ISR 周期数
-			 * 控制频率 10kHz (dt=0.0001s), 200ms = 2000个周期 */
-			uint32_t vbus_invalid_thresh = (uint32_t)((float)cfg->vbus_invalid_ms * 0.001f / sys->motor.dt + 0.5f);
+			/* 阈值计算: cfg->vbus_invalid_ms 转换为快检测执行次数
+			 * (采样周期=控制周期×FAULT_DET_FAST_DIV, 10kHz/10 分频时 200ms=200 次) */
+			float sample_dt = sys->motor.dt * (float)FAULT_DET_FAST_DIV;
+			uint32_t vbus_invalid_thresh = (uint32_t)((float)cfg->vbus_invalid_ms * 0.001f / sample_dt + 0.5f);
 			if (vbus_invalid_thresh == 0u)
 				vbus_invalid_thresh = 1u;
 			if (fm->vbus_guard_cycles == 0u && fm->vbus_invalid_cycles >= vbus_invalid_thresh)
-				fault_mgr_internal_set(FAULT_VBUS_SAMPLE, fb->bus_voltage);
+				fault_mgr_internal_set_idx(FAULT_IDX_VBUS_SAMPLE, fb->bus_voltage);
 #endif /* FAULT_DET_EN_VBUS_SAMPLE */
 			/* 采样疑似失效(<0.5V): 过压/欠压判据跳过, 防失效读数误锁存 */
 		}
@@ -148,45 +167,45 @@ void fault_detect_fast(fault_mgr_t *fm)
 			const uint8_t not_idle = (sys->top_state != TOP_FSM_IDLE);
 
 			fm->vbus_invalid_cycles = 0u;
-			fault_mgr_internal_clear(FAULT_VBUS_SAMPLE);
+			fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_SAMPLE);
 
 			/* 过压: 故障档置位时清中度, 故障档未触发且在中度区间则置中度 */
-			if (en_ov != 0u && fault_mgr_is_enabled(FAULT_VBUS_OVER) &&
+			if (en_ov != 0u && fault_mgr_is_enabled_idx(FAULT_IDX_VBUS_OVER) &&
 			    fb->bus_voltage > pp->protect_over_voltage)
 			{
-				fault_mgr_internal_set(FAULT_VBUS_OVER, fb->bus_voltage);
-				fault_mgr_internal_clear(FAULT_VBUS_OVER_MID);
+				fault_mgr_internal_set_idx(FAULT_IDX_VBUS_OVER, fb->bus_voltage);
+				fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_OVER_MID);
 			}
 			else
 			{
-				fault_mgr_internal_clear(FAULT_VBUS_OVER);
+				fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_OVER);
 #if FAULT_DET_EN_VBUS_MID
 				if (fb->bus_voltage > cfg->ov_mid_v)
-					fault_mgr_internal_set(FAULT_VBUS_OVER_MID, fb->bus_voltage);
+					fault_mgr_internal_set_idx(FAULT_IDX_VBUS_OVER_MID, fb->bus_voltage);
 				else
-					fault_mgr_internal_clear(FAULT_VBUS_OVER_MID);
+					fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_OVER_MID);
 #else
-				fault_mgr_internal_clear(FAULT_VBUS_OVER_MID);
+				fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_OVER_MID);
 #endif /* FAULT_DET_EN_VBUS_MID */
 			}
 
 			/* 欠压: 仅使能后检测(上电前母线未建立) */
-			if (en_uv != 0u && fault_mgr_is_enabled(FAULT_VBUS_UNDER) &&
+			if (en_uv != 0u && fault_mgr_is_enabled_idx(FAULT_IDX_VBUS_UNDER) &&
 			    not_idle && fb->bus_voltage < pp->protect_under_voltage)
 			{
-				fault_mgr_internal_set(FAULT_VBUS_UNDER, fb->bus_voltage);
-				fault_mgr_internal_clear(FAULT_VBUS_UNDER_MID);
+				fault_mgr_internal_set_idx(FAULT_IDX_VBUS_UNDER, fb->bus_voltage);
+				fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_UNDER_MID);
 			}
 			else
 			{
-				fault_mgr_internal_clear(FAULT_VBUS_UNDER);
+				fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_UNDER);
 #if FAULT_DET_EN_VBUS_MID
 				if (not_idle && fb->bus_voltage < cfg->uv_mid_v)
-					fault_mgr_internal_set(FAULT_VBUS_UNDER_MID, fb->bus_voltage);
+					fault_mgr_internal_set_idx(FAULT_IDX_VBUS_UNDER_MID, fb->bus_voltage);
 				else
-					fault_mgr_internal_clear(FAULT_VBUS_UNDER_MID);
+					fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_UNDER_MID);
 #else
-				fault_mgr_internal_clear(FAULT_VBUS_UNDER_MID);
+				fault_mgr_internal_clear_idx(FAULT_IDX_VBUS_UNDER_MID);
 #endif /* FAULT_DET_EN_VBUS_MID */
 			}
 		}
@@ -196,7 +215,7 @@ void fault_detect_fast(fault_mgr_t *fm)
 	if (fm->speed_guard_cycles == 0u &&
 	    (sys->top_state == TOP_FSM_READY || sys->top_state == TOP_FSM_RUN) &&
 	    enable != 0u &&
-	    fault_mgr_is_enabled(FAULT_MOTOR_OVER_SPEED) &&
+	    fault_mgr_is_enabled_idx(FAULT_IDX_MOTOR_OVER_SPEED) &&
 	    fdet_is_finite(fb->vel) && fdet_absf(fb->vel) > pp->protect_over_speed)
 	{
 		if (fm->over_speed_cycles < fm->over_speed_confirm_cyc)
@@ -207,9 +226,9 @@ void fault_detect_fast(fault_mgr_t *fm)
 		fm->over_speed_cycles = 0u;
 	}
 	if (fm->speed_guard_cycles == 0u && fm->over_speed_cycles >= fm->over_speed_confirm_cyc)
-		fault_mgr_internal_set(FAULT_MOTOR_OVER_SPEED, fb->vel);
+		fault_mgr_internal_set_idx(FAULT_IDX_MOTOR_OVER_SPEED, fb->vel);
 	else
-		fault_mgr_internal_clear(FAULT_MOTOR_OVER_SPEED);
+		fault_mgr_internal_clear_idx(FAULT_IDX_MOTOR_OVER_SPEED);
 
 	/* ---- 0x3101 nFAULT: 10ms 消抖(覆盖 DRV8350 8ms 自动重试窗口) ---- */
 	if (fb->gate_driver_fault != 0u)
@@ -223,45 +242,47 @@ void fault_detect_fast(fault_mgr_t *fm)
 	}
 	if (fm->speed_guard_cycles == 0u &&
 	    enable != 0u &&
-	    fault_mgr_is_enabled(FAULT_GATE_NFAULT) &&
+	    fault_mgr_is_enabled_idx(FAULT_IDX_GATE_NFAULT) &&
 	    fm->gate_fault_cycles >= fm->gate_fault_confirm_cyc)
-		fault_mgr_internal_set(FAULT_GATE_NFAULT, 1.0f);
+		fault_mgr_internal_set_idx(FAULT_IDX_GATE_NFAULT, 1.0f);
 	else
-		fault_mgr_internal_clear(FAULT_GATE_NFAULT);
+		fault_mgr_internal_clear_idx(FAULT_IDX_GATE_NFAULT);
 
 	/* ---- 0x5101 绝对位置丢失 / 0x5102 磁编码器消磁 / 0x5105 通讯中断 ---- */
 #if FAULT_DET_EN_ENC_HEALTH
 	/* enc_health 位图: bit0=位置无效(mg INVALID) bit1=磁场过弱(mg TOO_WEAK) */
 	if ((fb->enc_health & 0x01u) != 0u)
-		fault_mgr_internal_set(FAULT_ENC_POS_LOST, fb->mech_angle_deg);
+		fault_mgr_internal_set_idx(FAULT_IDX_ENC_POS_LOST, fb->mech_angle_deg);
 	else
-		fault_mgr_internal_clear(FAULT_ENC_POS_LOST);
+		fault_mgr_internal_clear_idx(FAULT_IDX_ENC_POS_LOST);
 
 	if ((fb->enc_health & 0x02u) != 0u)
-		fault_mgr_internal_set(FAULT_ENC_DEMAG, fb->mech_angle_deg);
+		fault_mgr_internal_set_idx(FAULT_IDX_ENC_DEMAG, fb->mech_angle_deg);
 	else
-		fault_mgr_internal_clear(FAULT_ENC_DEMAG);
+		fault_mgr_internal_clear_idx(FAULT_IDX_ENC_DEMAG);
 
 	if (fb->enc_err_cnt >= cfg->enc_err_frames)
-		fault_mgr_internal_set(FAULT_ENC_COMM_LOST, (float)fb->enc_err_cnt);
+		fault_mgr_internal_set_idx(FAULT_IDX_ENC_COMM_LOST, (float)fb->enc_err_cnt);
 	else
-		fault_mgr_internal_clear(FAULT_ENC_COMM_LOST);
+		fault_mgr_internal_clear_idx(FAULT_IDX_ENC_COMM_LOST);
 #endif /* FAULT_DET_EN_ENC_HEALTH */
 
-	/* ---- 0x5104 位置跳变: 单拍机械角度跳变(编码器误码残余/CRC 漏检)
-	 *      仅 READY/RUN 武装: 标定电流注入/手拧转子时跳变判据不可靠 ---- */
+	/* ---- 0x5104 位置跳变: 相邻两次快检测的机械角度跳变(编码器误码残余/CRC 漏检)
+	 *      仅 READY/RUN 武装: 标定电流注入/手拧转子时跳变判据不可靠
+	 *      注意: 错峰分频后采样间隔=控制周期×FAULT_DET_FAST_DIV(10kHz 时 1ms),
+	 *      启用本检测时 pos_jump_deg 须按 1ms 间隔可能转过的角度整定 ---- */
 #if FAULT_DET_EN_ENC_JUMP
 	if ((sys->top_state == TOP_FSM_READY || sys->top_state == TOP_FSM_RUN) && fm->enc_prev_valid != 0u)
 	{
 		float jump = fdet_deg_delta(fb->mech_angle_deg, fm->enc_prev_deg);
 		if (jump > cfg->pos_jump_deg)
-			fault_mgr_internal_set(FAULT_ENC_JUMP, jump);
+			fault_mgr_internal_set_idx(FAULT_IDX_ENC_JUMP, jump);
 		else
-			fault_mgr_internal_clear(FAULT_ENC_JUMP);
+			fault_mgr_internal_clear_idx(FAULT_IDX_ENC_JUMP);
 	}
 	else
 	{
-		fault_mgr_internal_clear(FAULT_ENC_JUMP);
+		fault_mgr_internal_clear_idx(FAULT_IDX_ENC_JUMP);
 	}
 	fm->enc_prev_deg = fb->mech_angle_deg;
 	fm->enc_prev_valid = 1u;
@@ -273,13 +294,13 @@ void fault_detect_fast(fault_mgr_t *fm)
 	{
 		float err = fdet_absf(sys->motor.ref.pos - fb->pos);
 		if (err > cfg->follow_err_rad)
-			fault_mgr_internal_set(FAULT_FOLLOW_ERR, err);
+			fault_mgr_internal_set_idx(FAULT_IDX_FOLLOW_ERR, err);
 		else
-			fault_mgr_internal_clear(FAULT_FOLLOW_ERR);
+			fault_mgr_internal_clear_idx(FAULT_IDX_FOLLOW_ERR);
 	}
 	else
 	{
-		fault_mgr_internal_clear(FAULT_FOLLOW_ERR);
+		fault_mgr_internal_clear_idx(FAULT_IDX_FOLLOW_ERR);
 	}
 #endif /* FAULT_DET_EN_FOLLOW_ERR */
 
@@ -289,35 +310,36 @@ void fault_detect_fast(fault_mgr_t *fm)
 	{
 		float warn_rad = cfg->soft_limit_warn_deg * 0.01745329f;
 		if (fb->pos > cfg->soft_limit_max_rad || fb->pos < cfg->soft_limit_min_rad)
-			fault_mgr_internal_set(FAULT_SOFT_LIMIT, fb->pos);
+			fault_mgr_internal_set_idx(FAULT_IDX_SOFT_LIMIT, fb->pos);
 		else
-			fault_mgr_internal_clear(FAULT_SOFT_LIMIT);
+			fault_mgr_internal_clear_idx(FAULT_IDX_SOFT_LIMIT);
 
 		if (fb->pos > (cfg->soft_limit_max_rad - warn_rad) || fb->pos < (cfg->soft_limit_min_rad + warn_rad))
-			fault_mgr_internal_set(FAULT_NEAR_SOFT_LIMIT, fb->pos);
+			fault_mgr_internal_set_idx(FAULT_IDX_NEAR_SOFT_LIMIT, fb->pos);
 		else
-			fault_mgr_internal_clear(FAULT_NEAR_SOFT_LIMIT);
+			fault_mgr_internal_clear_idx(FAULT_IDX_NEAR_SOFT_LIMIT);
 	}
 	else
 	{
-		fault_mgr_internal_clear(FAULT_SOFT_LIMIT);
-		fault_mgr_internal_clear(FAULT_NEAR_SOFT_LIMIT);
+		fault_mgr_internal_clear_idx(FAULT_IDX_SOFT_LIMIT);
+		fault_mgr_internal_clear_idx(FAULT_IDX_NEAR_SOFT_LIMIT);
 	}
 #endif /* FAULT_DET_EN_SOFT_LIMIT */
 }
 
-/* 消抖阈值初始化(由 fault_mgr_init 按控制周期换算, 此处导出供其调用) */
-void fault_detect_fast_init_cycles(fault_mgr_t *fm, float dt)
+/* 消抖阈值初始化(由 fault_mgr_attach 按快检测采样周期换算:
+ * 控制周期×FAULT_DET_FAST_DIV, 计数器每次快检测执行递增一次) */
+void fault_detect_fast_init_cycles(fault_mgr_t *fm, float sample_dt)
 {
-	if (dt > 0.0f)
+	if (sample_dt > 0.0f)
 	{
-		fm->speed_guard_cycles = (uint32_t)(FDET_SPEED_GUARD_SECONDS / dt + 0.5f);
-		fm->gate_fault_confirm_cyc = (uint32_t)(FDET_GATE_CONFIRM_SECONDS / dt + 0.5f);
-		fm->vbus_guard_cycles = (uint32_t)(FDET_VBUS_GUARD_SECONDS / dt + 0.5f);
+		fm->speed_guard_cycles = (uint32_t)(FDET_SPEED_GUARD_SECONDS / sample_dt + 0.5f);
+		fm->gate_fault_confirm_cyc = (uint32_t)(FDET_GATE_CONFIRM_SECONDS / sample_dt + 0.5f);
+		fm->vbus_guard_cycles = (uint32_t)(FDET_VBUS_GUARD_SECONDS / sample_dt + 0.5f);
 		/* 峰值过流消抖: 5ms */
-		fm->over_current_confirm_cyc = (uint32_t)(0.005f / dt + 0.5f);
+		fm->over_current_confirm_cyc = (uint32_t)(0.005f / sample_dt + 0.5f);
 		/* 超速消抖: 10ms */
-		fm->over_speed_confirm_cyc = (uint32_t)(0.010f / dt + 0.5f);
+		fm->over_speed_confirm_cyc = (uint32_t)(0.010f / sample_dt + 0.5f);
 	}
 	/* 确保阈值至少为1，避免除零或永不触发 */
 	if (fm->speed_guard_cycles == 0u)

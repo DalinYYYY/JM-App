@@ -180,6 +180,10 @@ void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info)
 	param->motor_base.flux = c->flux_linkage;
 	param->motor_base.kt = c->torque_constant;
 	param->motor_base.inertia = c->rotor_inertia;
+	/* 摩擦模型参数（PID 26/27）: 供级联控制层摩擦前馈(friction_comp)使用,
+	 * 缺此同步时上位机下发/固化的 Tf 永远到不了运行期(前馈恒 0)。 */
+	param->position_loop.friction_coulomb = c->friction_coulomb;
+	param->position_loop.friction_viscous = c->friction_viscous;
 	param->motor_base.peak_current = c->peak_current;
 	param->motor_base.max_speed = c->max_speed;
 	param->motor_base.pwm_freq_hz = (c->pwm_freq_hz != 0U)
@@ -224,6 +228,10 @@ void motor_profile_sync_control_to_param(motor_param_t *param, const motor_info_
 	param->current_loop.bemf_ff_enable = (uint8_t)control->bemf_ff_enable;
 	param->current_loop.deadtime_comp_enable = (uint8_t)control->deadtime_comp_enable;
 	param->current_loop.deadtime_comp_v = control->comp_du_V;
+	/* 齿槽补偿使能/增益（PID 184/185, advanced 块）: 表数据存独立 Flash 扇区,
+	 * 由 cogging_comp_reload 上电加载; 此处仅同步开关与增益供控制层每拍直读 */
+	param->position_loop.cogging_comp_enable = (info->blocks.advanced.cogging_comp_enable != 0u) ? 1u : 0u;
+	param->position_loop.cogging_comp_gain = info->blocks.advanced.cogging_comp_gain;
 }
 
 #if defined(JM_BOARD_V1) || defined(JM_BOARD_SFOC_V2)

@@ -86,7 +86,7 @@ typedef struct
 	uint16_t lsq_window_size; // 拟合窗口点数 (3 ~ MOTION_LSQ_WINDOW_MAX)，0=默认 5
 
 	/* ---- PLL 观测器参数（vel_method=VEL_METHOD_PLL 时生效）---- */
-	float pll_bandwidth_hz; // 观测器带宽 (Hz)，0=默认 150Hz；越大跟随快、滤波弱
+	float pll_bandwidth_hz; // 观测器带宽 (Hz)，0=默认 50Hz；越大跟随快、滤波弱
 	float pll_damping;      // 阻尼比，0=默认 1.0（临界阻尼）
 } motion_param_config_t;
 

@@ -64,6 +64,50 @@
 #endif
 
 /*============================================================================
+ * 超周期错峰调度（削峰: 最小化单次最长中断执行时间）
+ *   motor_loop_isr 内 sched_cnt 于 0..POS_DIV-1 循环(超周期=POS_DIV 拍,
+ *   10kHz 时 1ms), 各特殊活动在指定拍执行, 特殊增量互不叠加:
+ *     速度环      : 拍 0 与 VEL_DIV(=5)  → 2kHz, 节拍与原始实现一致
+ *     位置环      : 拍 POS_BEAT(=4)      → 1kHz, 与速度拍错开
+ *     故障全量检测: 拍 FAULT_BEAT(=2)    → 1kHz, 须 FAULT_DET_FAST_DIV==POS_DIV
+ *     遥测同步    : 拍 SYNC_BEAT(=7)     → 1kHz, sync_state 从每拍降频
+ *   约束: ①PLL 速度解算严格只发生在速度拍(0/VEL_DIV, 间隔均匀 500µs,
+ *   vel_calc_pll 按固定 dt 递推); 位置拍仅做多圈累计, fb->vel 用上一速度拍
+ *   结果(≤500µs 旧)。②位置拍分离曾在坏参数(kp_s 超标10倍)下观测到失稳,
+ *   参数修正后重新启用本调度——测试前务必确认速度环参数已修复且平稳。
+ *   反馈解算随所属环同拍执行; NaN 发散检测/状态机框架每拍。
+ *   仅自增与比较, 无取模/除法。
+ *==========================================================================*/
+#ifndef MOTOR_SCHED_FAULT_BEAT
+#define MOTOR_SCHED_FAULT_BEAT 2u
+#endif
+
+#ifndef MOTOR_SCHED_POS_BEAT
+#define MOTOR_SCHED_POS_BEAT 4u
+#endif
+
+#ifndef MOTOR_SCHED_SYNC_BEAT
+#define MOTOR_SCHED_SYNC_BEAT 7u
+#endif
+
+/* 相位合法性编译期校验: 不落速度拍(0/VEL_DIV)、不越界、互不相同 */
+#if (MOTOR_SCHED_POS_BEAT >= MOTOR_LOOP_POS_DIV) || \
+	(MOTOR_SCHED_POS_BEAT == 0u) || (MOTOR_SCHED_POS_BEAT == MOTOR_LOOP_VEL_DIV)
+#error "MOTOR_SCHED_POS_BEAT 须位于速度拍之间(0<拍号<POS_DIV 且非速度拍)"
+#endif
+#if (MOTOR_SCHED_FAULT_BEAT >= MOTOR_LOOP_POS_DIV) || \
+	(MOTOR_SCHED_FAULT_BEAT == 0u) || (MOTOR_SCHED_FAULT_BEAT == MOTOR_LOOP_VEL_DIV) || \
+	(MOTOR_SCHED_FAULT_BEAT == MOTOR_SCHED_POS_BEAT)
+#error "MOTOR_SCHED_FAULT_BEAT 须位于速度拍之间且与其他特殊拍错开"
+#endif
+#if (MOTOR_SCHED_SYNC_BEAT >= MOTOR_LOOP_POS_DIV) || \
+	(MOTOR_SCHED_SYNC_BEAT == 0u) || (MOTOR_SCHED_SYNC_BEAT == MOTOR_LOOP_VEL_DIV) || \
+	(MOTOR_SCHED_SYNC_BEAT == MOTOR_SCHED_POS_BEAT) || \
+	(MOTOR_SCHED_SYNC_BEAT == MOTOR_SCHED_FAULT_BEAT)
+#error "MOTOR_SCHED_SYNC_BEAT 须位于速度拍之间且与其他特殊拍错开"
+#endif
+
+/*============================================================================
  * 速度环惯量加速度前馈开关（iq_ff += accel_ff_gain * ref->accel）
  *   - 0：关闭（默认）。实测空载速度闭环受前馈扰动失稳，待排查
  *        （疑点：Flash aff 字段无有效性校验，旧数据/自整定值可直接生效；
@@ -74,6 +118,35 @@
  *==========================================================================*/
 #ifndef MOTOR_LOOP_VEL_ACCEL_FF_ENABLE
 #define MOTOR_LOOP_VEL_ACCEL_FF_ENABLE 0u
+#endif
+
+/*============================================================================
+ * 位置误差死区（零速 stick-slip 抑制）
+ *   - 进入死区: |pos_err| < DEADBAND 时位置环输出置 0, 速度环以 0 为目标
+ *     主动刹停, 并按时间常数 VEL_INT_LEAK_TAU 泄漏速度环积分, 消除积分蓄能
+ *     松闸。
+ *   - 迟滞退出: 进带后需 |pos_err| > HYS(须大于 DEADBAND)才重新出力。
+ *     无迟滞时噪声/齿槽使误差在边界来回穿越, 每次出界触发一次全增益
+ *     位置环打击, 形成边界极限环（周期性"嗒"声）。
+ *   - 摩擦前馈(friction_comp 模块)从源头补偿摩擦拖尾, 本死区切断
+ *     极限环能量来源, 两者配合使用。
+ *   - 注意: 开关必须用整型宏（#if 中浮点常量被截断为整数, 0.005f 会变 0）。
+ *     VEL_INT_LEAK_TAU <= 0 时死区内不泄漏积分。
+ *==========================================================================*/
+#ifndef MOTOR_LOOP_POS_DEADBAND_EN
+#define MOTOR_LOOP_POS_DEADBAND_EN 1u
+#endif
+
+#ifndef MOTOR_LOOP_POS_DEADBAND_RAD
+#define MOTOR_LOOP_POS_DEADBAND_RAD 0.005f
+#endif
+
+#ifndef MOTOR_LOOP_POS_DEADBAND_HYS_RAD
+#define MOTOR_LOOP_POS_DEADBAND_HYS_RAD 0.020f
+#endif
+
+#ifndef MOTOR_LOOP_VEL_INT_LEAK_TAU
+#define MOTOR_LOOP_VEL_INT_LEAK_TAU 0.1f
 #endif
 
 /*============================================================================

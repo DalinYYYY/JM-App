@@ -12,7 +12,7 @@
 0x2201,电源系统,异常级,母线过压(中度),母线电压>中度阈值且<故障阈值,降功率运行,VBUS_OVER_MID,DERATE,0,1,v_bus,ov_mid_v
 0x2202,电源系统,异常级,母线欠压(中度),母线电压<中度阈值且>故障阈值,降功率运行,VBUS_UNDER_MID,DERATE,0,1,v_bus,uv_mid_v
 0x2203,电源系统,异常级,长时间过流,母线电流>持续阈值持续ibus_cont_time_s,降功率运行,IBUS_CONT,DERATE,1,2,i_bus,ibus_cont_A/ibus_cont_time_s
-0x2204,电源系统,异常级,电池低电量,电池电量<10%,降功率运行,BATT_LOW,DERATE,1,2,无(非电池供电),-
+0x2204,电源系统,异常级,电池低电量,电池电量<10%,降功率运行,BATT_LOW,DERATE,0,2,无(非电池供电),-
 0x2301,电源系统,警告级,电源效率下降,电源转换效率<90%,记录日志,PWR_EFF_LOW,LOG,0,0,power_elec/power_mech,-
 0x2302,电源系统,警告级,电池循环次数预警,电池循环次数>设计值80%,记录日志,BATT_CYCLE,LOG,0,0,无(非电池供电),-
 0x2303,电源系统,警告级,母线电压波动,电压峰峰值波动>5%额定值,记录日志,VBUS_RIPPLE,LOG,0,0,v_bus,vbus_ripple_pct

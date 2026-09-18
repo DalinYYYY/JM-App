@@ -137,7 +137,7 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	/* 编码器与电角度已在 ISR 开头刷新，此处直接采样电流并做 Clarke/Park */
 
 	// step1: 三相电流采样
-	dev_dwt_counter_start(SYS_TIMER_RECORD_POSITION_LOOP_CYCLE); /* 细分: 采样+Clarke+Park */
+	dev_dwt_counter_start(SYS_TIMER_RECORD_CUR_SAMPLE); /* 细分: 采样+Clarke+Park */
 	m->phase_current.update(&m->phase_current);
 
 	// step2: Clarke 变换（三相 → αβ）
@@ -145,7 +145,7 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 
 	// step3: Park 变换（αβ → dq）
 	m->foc.park(&m->foc);
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_POSITION_LOOP_CYCLE);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_CUR_SAMPLE);
 
 	float ud, uq;
 
@@ -171,8 +171,7 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	else
 	{
 		/* 电流闭环 PI（CURRENT / TORQUE / VELOCITY / POSITION）*/
-		dev_dwt_counter_start(SYS_TIMER_RECORD_POSITION_LOOP_TIME); /* 细分: PI+解耦+SVPWM+PWM */
-		dev_dwt_counter_start(SYS_TIMER_RECORD_TIM_1MS_CYCLE);      /* 细分: PI+解耦 开始 */
+		dev_dwt_counter_start(SYS_TIMER_RECORD_CUR_PI); /* 细分: PI+解耦 */
 		/* 每拍从 param 同步解耦配置，确保 0xE1/0xE7 修改立即生效（3 字段赋值，开销可忽略）*/
 		cur_loop_set_decoupling_config(cl);
 
@@ -217,10 +216,9 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 			cl->param->current_loop.decoupling_gain * 1000.0f;
 		ud = dout.ud;
 		uq = dout.uq;
-		dev_dwt_counter_stop(SYS_TIMER_RECORD_TIM_1MS_CYCLE); /* 细分: PI+解耦 结束 */
-		dev_dwt_counter_start(SYS_TIMER_RECORD_TIM_1MS_TIME); /* 细分: 反Park+SVPWM+PWM */
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_CUR_PI); /* 细分: PI+解耦 结束 */
 #if MOTOR_LOOP_ENABLE_DEV_DRIVER
-		/* 真实电机 SVPWM 归一化：PI 输出为电压值（伏特），SVPWM 期望占空比（0~1）， 
+		/* 真实电机 SVPWM 归一化：PI 输出为电压值（伏特），SVPWM 期望占空比（0~1），
 		 * 须除以 Vbus 转换。与 OPEN_LOOP 分支、calib_hw.c 保持一致。
 		 * Vbus 由 dev_power_monitor 在 task 层 100ms 周期更新。 */
 		ud /= vbus;
@@ -229,6 +227,7 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 	}
 
 	// step6: 设置 dq 电压并反 Park（dq → αβ）
+	dev_dwt_counter_start(SYS_TIMER_RECORD_CUR_PWM); /* 细分: 反Park+SVPWM+PWM(VOLTAGE/闭环共用) */
 	if (!cur_float_is_finite(ud) || !cur_float_is_finite(uq))
 	{
 		m->half_bridge.set_3pwm(&m->half_bridge, 0, 0, 0);
@@ -247,6 +246,5 @@ void cur_loop_run(cur_loop_t *cl, const motor_ref_t *ref, const cascade_out_t *o
 		return;
 	}
 	m->half_bridge.set_3pwm(&m->half_bridge, cur_pwm_compare(m->foc.svpwm.ta), cur_pwm_compare(m->foc.svpwm.tb), cur_pwm_compare(m->foc.svpwm.tc));
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_TIM_1MS_TIME); /* 细分: 反Park+SVPWM+PWM 结束 */
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_POSITION_LOOP_TIME);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_CUR_PWM); /* 细分: 反Park+SVPWM+PWM 结束 */
 }

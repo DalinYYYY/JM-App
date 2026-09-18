@@ -23,6 +23,11 @@
 #include "calib_mgr.h"
 #include "fault_manager.h"
 #include "motor_mode.h" /* motor_load_sim_reset: 负载模拟模式进入复位 */
+#include "dev_dwt_counter.h" /* ISR 分段耗时打点(调试期) */
+#include "runtime_param.h"   /* SYS_TIMER_RECORD_ 打点索引 */
+#include "cogging_comp.h" /* 齿槽表落盘互锁: 本文件包含链不经 dev_config.h,
+                           * 须先无条件包含本头(其内部先含 dev_config.h 使
+                           * USE_DEV_FLASH 可见, 再自我门控), 守卫才有效 */
 #include <string.h>
 
 /**
@@ -292,10 +297,10 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
  * @details 仅 RUN 态生成运动参考；其余状态参考保持 IDLE。
  *          控制逻辑（参考生成）经 motor_ctrl_dispatch 调用，本文件不含。
  */
-void motor_control_loop(system_state_t *sys)
+void motor_control_loop(system_state_t *sys, bool fault_tick)
 {
 	/* 故障保护必须位于参考生成之前；扫频在本周期不得再产生新的激励。 */
-	fault_check(sys);
+	fault_check(sys, fault_tick);
 	if (sys->top_state == TOP_FSM_FAULT || sys->top_state == TOP_FSM_SAFETY)
 	{
 		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
@@ -328,16 +333,28 @@ void motor_control_loop(system_state_t *sys)
 /**
  * @brief 系统故障检测（委托故障管理器）
  * @details 检测/记录/仲裁/级别动作统一在 fault_mgr_poll_fast 内完成
- *          (电气类快检测 + 停机类故障切 FAULT 态)。本函数保留:
+ *          (电气类快检测 + 停机类故障切 FAULT 态)。错峰调度:
+ *          NaN 发散检测(fault_detect_diverge)每拍执行, 保护本拍算法输出;
+ *          全量电气检测仅在 fault_tick 拍(1kHz)执行, 消抖阈值已按
+ *          采样周期(控制周期×FAULT_DET_FAST_DIV)等效换算, 响应时间不变。
+ *          本函数保留:
  *          1. 同步兼容字段到 sys(fault_code/fault_latched 等旧路径);
  *          2. 扫频中止与失能输出兜底(fault_mgr 不依赖 sweep 模块)。
  */
-void fault_check(system_state_t *sys)
+void fault_check(system_state_t *sys, bool fault_tick)
 {
 	if (sys == NULL || sys->motor.param == NULL)
 		return;
 
-	fault_mgr_poll_fast();
+	/* NaN 发散检测每拍(编译开关关闭时为空实现) */
+	fault_detect_diverge(&g_fault_mgr);
+
+	if (fault_tick)
+	{
+		dev_dwt_counter_start(SYS_TIMER_RECORD_FAULT_DET); /* 分段耗时: 全量电气检测 */
+		fault_mgr_poll_fast();
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_FAULT_DET);
+	}
 	fault_mgr_sync_compat(sys);
 
 	if (sys->fault_code != 0u)
@@ -346,6 +363,24 @@ void fault_check(system_state_t *sys)
 		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
 		top_fsm_switch(sys, TOP_FSM_FAULT);
 	}
+}
+
+/**
+ * @brief 齿槽表落盘互锁: 表待写/擦写期间(s_write_state==1)为真
+ * @note L5.1 标定完成后表由 idle 线程异步擦写 Flash(drv_flash_write 全程
+ *      关中断 10~40ms)。该期间进入 RUN(闭环带功率)或带电压标定, 擦写会
+ *      冻结控制中断, PWM 停在非零占空比导致电流失控, 故在状态机唯一
+ *      入口(process_ctrl_cmd)阻断, idle 线程落盘完成后自动放行(重发即可)。
+ *      READY 不阻断: 电流环每拍把 PWM 驱到零, 擦写安全;
+ *      已在 CALIB 态连续标定不阻断: idle 线程门控在 CALIB 态不落盘。
+ */
+static bool cogging_flush_busy(void)
+{
+#if defined(USE_DEV_FLASH)
+	return cogging_comp_get_write_state() == 1u;
+#else
+	return false;
+#endif
 }
 
 /**
@@ -382,7 +417,7 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 			 * 下拍检测重新置 ACTIVE(与旧"条件消失才可清障"语义一致)。
 			 * 无此步则 fault_code 恒派生自锁存记录, 清障死锁 */
 			fault_mgr_clear(FAULT_CLEAR_LATCHED);
-			fault_check(sys);
+			fault_check(sys, true); /* 清障判定需立即全量检测, 不等错峰拍 */
 			if (sys->fault_code == 0u)
 			{
 				sys->fault_latched = 0u;
@@ -399,7 +434,7 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
 		{
 			fault_mgr_clear(FAULT_CLEAR_LATCHED);
-			fault_check(sys);
+			fault_check(sys, true); /* 清障判定需立即全量检测, 不等错峰拍 */
 			if (sys->fault_code == 0u)
 			{
 				sys->fault_latched = 0u;
@@ -468,6 +503,13 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 			/* IDLE 或 READY 态可进入校准；RUN 态需先停止再标定 */
 			if (sys->top_state == TOP_FSM_IDLE || sys->top_state == TOP_FSM_READY)
 			{
+				if (cogging_flush_busy())
+				{
+					/* 齿槽表待落盘: 回滚 calib_mgr_start, 待 idle 线程落盘
+					 * 完成后重发(与状态切换失败的回滚路径一致) */
+					calib_mgr_abort();
+					return;
+				}
 				top_fsm_switch(sys, TOP_FSM_CALIB);
 				if (sys->top_state == TOP_FSM_CALIB)
 					sys->ctrl_mode = cmd;
@@ -507,6 +549,11 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	/* ---- 运动控制指令：需已使能（READY 或 RUN）---- */
 	if (sys->top_state == TOP_FSM_READY)
 	{
+		/* 齿槽表待落盘: 阻断进 RUN——擦写冻结控制中断会使非零 PWM 失控,
+		 * 且新表尚未生效; idle 线程落盘完成后重发即可, 见 cogging_flush_busy */
+		if (cogging_flush_busy())
+			return;
+
 		/* READY → RUN：首次进入也走平滑过渡，避免位置阶跃 */
 		top_fsm_switch(sys, TOP_FSM_RUN);
 		run_state_e target = s_ctrl_mode_to_run_state[cmd];

@@ -20,10 +20,16 @@
 #include "motor_param.h"        /* motor_param_init 加载默认电机参数 */
 #include "motor_profile.h"      /* motor_profile_apply_param / sync_to_param */
 #include "motor_info_storage.h" /* motor_info_storage_get：Flash 加载的标定参数 */
-#include "dev_dwt_counter.h"   /* ISR 分段耗时打点(调试期) */
+#include "cogging_comp.h"       /* cogging_comp_reload：齿槽补偿表上电加载 */
+#include "dev_dwt_counter.h"    /* ISR 分段耗时打点(调试期) */
 #include "fault_manager.h"      /* 仲裁结果同步到 usr.motor_state.fault */
+/* 错峰调度假定: 故障检测分频周期==位置环超周期(消抖阈值换算依赖, 见 fault_manager.h);
+ * FAULT_DET_FAST_DIV=1(每拍全量, 原始行为)除外 */
+#if (FAULT_DET_FAST_DIV != 1u) && (FAULT_DET_FAST_DIV != MOTOR_LOOP_POS_DIV)
+#error "FAULT_DET_FAST_DIV 必须为 1(每拍) 或等于 MOTOR_LOOP_POS_DIV(错峰超周期)"
+#endif
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR)
-#include "dev_power_monitor.h"  /* 母线电流合成: 配置表检测 SYNTH 通道时 ISR 调用 */
+#include "dev_power_monitor.h" /* 母线电流合成: 配置表检测 SYNTH 通道时 ISR 调用 */
 #endif
 
 /* 全局电机三环控制上下文 */
@@ -72,7 +78,7 @@ void motor_loop_init(float current_freq_hz)
 	motor_param_init(param);
 	motor_profile_apply_param(param); /* 用 motor_profile.h 的 MOTOR_* 覆盖电气身份字段 */
 
-	/* Flash 标定参数同步到运行期 motor_param_t*/
+									  /* Flash 标定参数同步到运行期 motor_param_t*/
 #if defined(USE_DEV_FLASH)
 	motor_profile_sync_to_param(param, motor_info_storage_get());
 
@@ -82,6 +88,9 @@ void motor_loop_init(float current_freq_hz)
 	/* Flash 保存的 source 覆盖自动回退结果（用户曾显式选择的环）*/
 	motor_pid_load_source_from_flash(motor_info_storage_get());
 	motor_pid_load(param, motor_info_storage_get()); /* 按 source 重新加载 */
+
+	/* 齿槽补偿表上电加载（独立 Flash 扇区, CRC 校验, 无效则补偿自动旁路）*/
+	cogging_comp_reload();
 #else
 	/* 未启用 Flash 存储: 用 motor_param 默认值 + motor_profile 覆盖, 不加载 Flash 标定参数 */
 	motor_pid_load_boot(param, NULL);
@@ -93,8 +102,7 @@ void motor_loop_init(float current_freq_hz)
 	float dt_velocity = dt_current * MOTOR_LOOP_VEL_DIV;
 	float dt_position = dt_current * MOTOR_LOOP_POS_DIV;
 
-	m->vel_cnt = 0;
-	m->pos_cnt = 0;
+	m->sched_cnt = 0;
 
 	// PID 参数管理器（位置/速度/电流环共用同一套 profile 体系）
 	motor_pid_profile_init(param);
@@ -188,12 +196,13 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 
 	// 基于已刷新的机械角度解算速度/位置（不重复触发编码器采样）
 	// 虚拟模式下 update 指向物理模型实现，直接给出运动量
+	// PLL 速度解算严格只发生在速度拍(0/VEL_DIV, 间隔均匀 500µs): vel_calc_pll
+	// 按固定 dt 递推, 错峰位置拍(POS_BEAT=4)不得再触发速度解算(否则间隔变为
+	// 4/1/5 拍交替 → PLL dt 失配纹波)。位置拍仅做多圈累计, fb->vel 用上一速度
+	// 拍结果(≤500µs 旧, 位置环 5Hz 带宽下可忽略)。
 	if (update_pos)
-	{
-		mp->update(mp, MOTION_TYPE_ALL, mp->mechanical_angle);
 		mt->update_single(mt, mp->mechanical_angle); // 多圈位置解算（单编码器/软件累圈）
-	}
-	else if (update_vel)
+	if (update_vel)
 		mp->update(mp, MOTION_TYPE_ELE_VEL_RADIAN, mp->mechanical_angle);
 
 	// 组织级联反馈：位置来自多圈解算，速度来自运动解算，电流来自 FOC park 结果
@@ -201,6 +210,10 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 	fb->vel = mp->slide_rad_s;
 	fb->id = m->motor.foc.i_dq.d;
 	fb->iq = m->motor.foc.i_dq.q;
+	/* 机械单圈角(rad): 与 L5.1 齿槽标定分桶同源(编码器 mechanical_angle,
+	 * step0 每拍已刷新), 角度周期性补偿查表用; 多圈累计位置零点是上电位姿,
+	 * 不可用于齿槽查表(错相), 见 cascade_fb_t 注释 */
+	fb->mech_single_rad = m->motor.encoder.mechanical_angle * (3.14159265358979f / 180.0f);
 
 	// 同步到状态机反馈（供 IDLE 保持位置、MIT 等 handler 使用）
 	m->sys.motor.fb.pos = fb->pos;
@@ -210,12 +223,8 @@ static void motor_loop_update_feedback(motor_loop_t *m, cascade_fb_t *fb, bool u
 	m->sys.motor.fb.bus_voltage = st->power.v_bus;
 	/* 编码器健康信息(故障检测数据源; 虚拟模式方法为 NULL 恒健康) */
 	m->sys.motor.fb.mech_angle_deg = m->motor.encoder.mechanical_angle;
-	m->sys.motor.fb.enc_err_cnt = (m->motor.encoder.get_err_cnt != NULL)
-	                                 ? m->motor.encoder.get_err_cnt(&m->motor.encoder)
-	                                 : 0u;
-	m->sys.motor.fb.enc_health = (m->motor.encoder.get_health != NULL)
-	                                 ? m->motor.encoder.get_health(&m->motor.encoder)
-	                                 : 0u;
+	m->sys.motor.fb.enc_err_cnt = (m->motor.encoder.get_err_cnt != NULL) ? m->motor.encoder.get_err_cnt(&m->motor.encoder) : 0u;
+	m->sys.motor.fb.enc_health = (m->motor.encoder.get_health != NULL) ? m->motor.encoder.get_health(&m->motor.encoder) : 0u;
 	/* 栅极驱动器硬件故障(nFAULT): 真实驱动每拍读引脚; 虚拟电机/未连接引脚的板型恒 0 */
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER)
 	m->sys.motor.fb.gate_driver_fault = dev_motor_gate_driver_fault();
@@ -251,32 +260,39 @@ void motor_loop_isr(void)
 {
 	motor_loop_t *m = &s_motor_loop;
 	cascade_fb_t fb;
-	// 分频判断：速度环/位置环各用独立计数器，各自到阈值清零，互不干扰
-	// 仅用自增与比较，避免中断内取模/除法
-	bool vel_tick = (++m->vel_cnt >= MOTOR_LOOP_VEL_DIV);
-	bool pos_tick = (++m->pos_cnt >= MOTOR_LOOP_POS_DIV);
-	if (vel_tick)
-		m->vel_cnt = 0;
-	if (pos_tick)
-		m->pos_cnt = 0;
+
+	/* 超周期错峰调度: POS_DIV 拍内 速度0/VEL_DIV、位置POS_BEAT(4)、
+	 * 故障FAULT_BEAT(2)、遥测SYNC_BEAT(7), 特殊增量互不叠加(削峰);
+	 * PLL 速度解算严格只发生在速度拍(间隔均匀 500µs), 见 config 注释 */
+	if (++m->sched_cnt >= MOTOR_LOOP_POS_DIV)
+		m->sched_cnt = 0;
+	bool vel_tick = (m->sched_cnt == 0u) || (m->sched_cnt == MOTOR_LOOP_VEL_DIV);
+	bool pos_tick = (m->sched_cnt == MOTOR_SCHED_POS_BEAT);
+	bool fault_tick = (m->sched_cnt == MOTOR_SCHED_FAULT_BEAT);
+	bool sync_tick = (m->sched_cnt == MOTOR_SCHED_SYNC_BEAT);
 
 	// step0: 刷新编码器与电角度（所有模式统一执行，确保上位机随时可读角度）
 	// 每拍必须无条件刷新: step1 的 ELE_VEL/ALL 解算传入的是 mp->mechanical_angle
 	// (motion_param 内部缓存的上拍值), 依赖本拍此处写入最新编码器角度,
 	// 跳过刷新会导致 vel/pos 拍电角度滞后一拍(高速时>25°电角度错位, FOC失控过流)
-	dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_1); /* 分段耗时: 编码器+电角度 */
+	dev_dwt_counter_start(SYS_TIMER_RECORD_ENC_UPDATE); /* step0: 编码器+电角度 */
 	m->motor.encoder.update(&m->motor.encoder);
 	m->motor.motor_param.update(&m->motor.motor_param, MOTION_TYPE_ELE_RADIAN, m->motor.encoder.mechanical_angle);
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_1);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_ENC_UPDATE);
 
 	// step1: 解算运动反馈（使用本拍刷新的角度）
-	dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_2); /* 分段耗时: 反馈解算+状态机 */
+	dev_dwt_counter_start(SYS_TIMER_RECORD_FB_SOLVE); /* step1: 反馈解算 */
 	motor_loop_update_feedback(m, &fb, vel_tick, pos_tick);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_FB_SOLVE);
 
 	// step2: 状态机生成参考输出 motor.ref（含模式管理与平滑过渡）
-	motor_control_loop(&m->sys);
-	motor_loop_sync_state(m);
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_2);
+	// 故障检测错峰: NaN 发散每拍, 电气类全量检测仅 fault_tick 拍(1kHz)
+	// 遥测同步降频: sync_state 仅 sync_tick 拍(1kHz), 指令路径仍即时同步
+	dev_dwt_counter_start(SYS_TIMER_RECORD_FSM_RUN); /* step2: 状态机 */
+	motor_control_loop(&m->sys, fault_tick);
+	if (sync_tick)
+		motor_loop_sync_state(m);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_FSM_RUN);
 
 	// CALIB 态：标定模块在 calib_mgr_poll() 中直接操作 FOC 链路施加电压，
 	// 不走 cur_loop_run（避免被 IDLE 直通覆盖为零 PWM）
@@ -312,21 +328,32 @@ void motor_loop_isr(void)
 		m->out.id_ref = 0.0f;
 		m->out.iq_ref = 0.0f;
 		/* IDLE 直通：cur_loop_run 内部检测 ctrl_type==IDLE 后 PWM 置零 */
+		dev_dwt_counter_start(SYS_TIMER_RECORD_CUR_TOTAL);
 		cur_loop_run(&m->current, &m->sys.motor.ref, &m->out);
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_CUR_TOTAL);
 		return;
 	}
 
 	// step3: 位置环（分频）——仅 POSITION 模式需要
-	dev_dwt_counter_start(SYS_TIMER_RECORD_TEST_3); /* 分段耗时: 外环+电流环(RUN 主路径) */
 	if (pos_tick && m->sys.motor.ref.ctrl_type == REF_CTRL_POSITION)
+	{
+		dev_dwt_counter_start(SYS_TIMER_RECORD_POS_LOOP); /* step3: 位置环 */
 		cascade_control_run_position(&m->cascade, &m->sys.motor.ref, &fb);
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_POS_LOOP);
+	}
 
 	// step4: 速度环 + 入环分发（分频）——跳过 VOLTAGE/DUTY/IDLE 直通模式
 	if (vel_tick && m->sys.motor.ref.ctrl_type >= REF_CTRL_CURRENT)
+	{
+		dev_dwt_counter_start(SYS_TIMER_RECORD_VEL_LOOP); /* step4: 速度环 */
 		cascade_control_run(&m->cascade, &m->sys.motor.ref, &fb, &m->out);
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_VEL_LOOP);
+	}
 
 	// step5: 电流环（基频）——传入完整 ref，内部按 ctrl_type 分流
+	dev_dwt_counter_start(SYS_TIMER_RECORD_CUR_TOTAL); /* step5: 电流环整体 */
 	cur_loop_run(&m->current, &m->sys.motor.ref, &m->out);
+	dev_dwt_counter_stop(SYS_TIMER_RECORD_CUR_TOTAL);
 
 #if (MOTOR_LOOP_ENABLE_DEV_DRIVER) && defined(USE_DEV_POWER_MONITOR)
 	/* step6: 合成母线电流 (SYNTH 源, 10kHz 高频)
@@ -336,14 +363,13 @@ void motor_loop_isr(void)
 	 * has_channel 检测 const 配置表, 编译器可常量折叠, 运行期无开销 */
 	if (dev_power_monitor_has_channel(PM_CH_IBUS_SYNTH))
 	{
+		dev_dwt_counter_start(SYS_TIMER_RECORD_POWER_SYNTH); /* step6: 母线电流合成 */
 		const foc_t *foc = &m->motor.foc;
 		const dev_phase_current_t *pc = &m->motor.phase_current;
-		dev_power_monitor_synthesize_ibus(pc->current.a, pc->current.b, pc->current.c,
-		                                  foc->svpwm.ta, foc->svpwm.tb, foc->svpwm.tc);
+		dev_power_monitor_synthesize_ibus(pc->current.a, pc->current.b, pc->current.c, foc->svpwm.ta, foc->svpwm.tb, foc->svpwm.tc);
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_POWER_SYNTH);
 	}
 #endif
-
-	dev_dwt_counter_stop(SYS_TIMER_RECORD_TEST_3);
 }
 
 void motor_loop_set_cmd(ctrl_mode_e cmd)

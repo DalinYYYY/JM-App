@@ -7,6 +7,7 @@ FaultParam CSV 转 C 语言模块脚本
   1. 故障来源/级别/动作/状态枚举 + 全量故障码枚举 fault_code_e (0xSLNN 16bit)
   2. 故障元数据表 fault_meta_table[]: 级别/动作/降功率档/实现期, 供 fault_manager 运行时查表
   3. fault_code_to_index() 二分查找 (码表按升序排序) + 优先级比较接口
+  4. fault_idx_e 表索引枚举(FAULT_IDX_*): 快检测热路径 O(1) 直取, 免二分查找
 
 CSV 列: 故障码,故障来源,故障级别,故障名称,触发条件,处理方式,异常命名,
         处理动作,实现期,降功率档,信号源,参数Key
@@ -233,6 +234,11 @@ def gen_header(rows, csv_name):
         for _, r in rows
     )
 
+    # 表索引枚举: fault_meta_table 按码升序, 索引即 CSV 行序(0起)
+    idx_lines = [f'\tFAULT_IDX_{rows[0][1]["异常命名"]} = 0,']
+    idx_lines += [f'\tFAULT_IDX_{r["异常命名"]},' for _, r in rows[1:]]
+    idx_enum_body = '\n'.join(idx_lines)
+
     # 三级使能掩码 bit 枚举: 按级别分组显式列出 位号=故障码, 与 meta 表同源
     _LEVEL_GROUP_CN = (
         ('故障级',   '故障级 -> mask_critical1/2 (PID154/155),  bit0~31 在低位字'),
@@ -351,6 +357,14 @@ typedef enum
 }} fault_code_e;
 
 #define FAULT_CODE_COUNT {n}
+
+/* ===================== 故障码 -> 元数据表索引 (生成期绑定) =====================
+ * fault_meta_table 按码升序, 表索引即本枚举值(CSV 行序); 10kHz 快检测热路径
+ * 经 FAULT_IDX_* O(1) 直取记录/使能位, 免 fault_code_to_index 二分查找(冷路径保留) */
+typedef enum
+{{
+{idx_enum_body}
+}} fault_idx_e;
 
 /* ===================== 三级使能掩码 bit 位定义 (级别内序号, 生成期绑定) =====================
  * 每个故障码在所属级别 64bit 使能掩码中的 bit 位, 与 fault_meta_table 的

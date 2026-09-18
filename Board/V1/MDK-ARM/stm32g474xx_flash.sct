@@ -1,5 +1,6 @@
-LR_IROM1 0x8000000 0x00080000  {  ; load_region size_region (代码区限制在0x0804F000前, 避免覆盖参数存储区)
-  ER_IROM1 0x8000000 0x00080000  {  ; load address = excetion address
+LR_IROM1 0x8000000 0x0004E000  {  ; load_region size_region (代码区限制在0x0804E000前,
+                                  ; 避免覆盖齿槽表区0x0804E000~4K 与参数存储区0x0804F000~4K)
+  ER_IROM1 0x8000000 0x0004E000  {  ; load address = excetion address
    *.o (RESET, +First)
    *(InRoot$$Sections)
    .ANY (+XO)
@@ -19,6 +20,20 @@ LR_IROM1 0x8000000 0x00080000  {  ; load_region size_region (代码区限制在0
   }
 ;***region***;
 ;***endregion***;
+}
+
+LR_IROM2 0x804E800 0x00001800  {  ; 表页(0x0804E000~2K)之后 6KB 还给代码区 (0x0804E800~0x0804FFFF)
+  ER_IROM2 0x804E800 0x00001800  {
+   .ANY (+XO)
+   .ANY (+RO)
+  }
+}
+
+LR_IROM3 0x8050000 0x00030000  {  ; Bank2 剩余区 (0x08050000~0x0807FFFF)
+  ER_IROM3 0x8050000 0x00030000  {  ; load address = execution address
+   .ANY (+XO)
+   .ANY (+RO)
+  }
 }
 
 

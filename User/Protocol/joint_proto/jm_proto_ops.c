@@ -53,7 +53,7 @@
 #include "motor_pid_profile.h"
 #include "motor_observer.h"     /* 统一实时快照与 TRACE 高速采样 */
 #include "main.h"               /* HAL_GetTick (速率限制) */
-#if defined(USE_DEV_LED)
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
 #include "led_manager.h"
 #endif
 #if defined(USE_DEV_COMMUN_CAN)
@@ -1736,7 +1736,7 @@ static jm_err_e app_set_can_id(uint8_t new_id)
 
 static jm_err_e app_identify_can_device(uint8_t duration_100ms)
 {
-#if defined(USE_DEV_LED)
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
 	led_manager_identify((uint32_t)duration_100ms * 100u);
 	return JM_ERR_OK;
 #else
@@ -1906,7 +1906,9 @@ static jm_err_e app_motor_info_write(uint16_t param_id, const uint8_t *value4, u
 		param_id == MOTOR_INFO_PID_COMP_DU_V ||
 		param_id == MOTOR_INFO_PID_DECOUPLE_ALGO ||
 		param_id == MOTOR_INFO_PID_BEMF_FF_ENABLE ||
-		param_id == MOTOR_INFO_PID_DEADTIME_COMP_ENABLE)
+		param_id == MOTOR_INFO_PID_DEADTIME_COMP_ENABLE ||
+		param_id == MOTOR_INFO_PID_COGGING_COMP_ENABLE ||
+		param_id == MOTOR_INFO_PID_COGGING_COMP_GAIN)
 	{
 		app_motor_info_sync_control();
 	}

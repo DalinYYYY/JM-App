@@ -64,6 +64,15 @@ extern "C"
 #define FAULT_DET_EN_SOFT_LIMIT   0u /* 0x1201/0x1301 软限位触发/接近警告 */
 #define FAULT_DET_EN_THERMAL      0u /* 0x3205/0x4205 NTC采样 + 0x32xx/0x41xx/0x43xx 温度分级(慢速) */
 
+/* 快检测错峰分频: fault_mgr_poll_fast 全量电气检测每 N 个电流环拍执行一次
+ * (N=FAULT_DET_FAST_DIV, 1=不分频每拍执行; NaN 发散检测不受分频, 见
+ * fault_detect_diverge 每拍)。消抖/武装阈值按采样周期(控制周期×N)换算,
+ * 保护响应时间不变。
+ * 完整错峰调度(motor_loop_config.h): 速度拍0/VEL_DIV、位置拍4、故障拍2、
+ * 遥测拍7; PLL 速度解算严格只发生在速度拍(间隔均匀), 经判别实验确认故障
+ * 错峰与控制环路零耦合 */
+#define FAULT_DET_FAST_DIV 10u
+
 	/*****************************************************************************
  * @brief   故障管理运行配置(阈值/策略)
  * @note    默认值编译期固化, 上电后由 motor_info FaultParam 块加载覆盖
@@ -199,12 +208,15 @@ extern "C"
 	void fault_mgr_attach(struct system_state_s *sys);
 
 	/*****************************************************************************
- * @brief   快速故障检测与仲裁(10kHz ISR)
- * @note    由 fault_check 委托调用: 执行电气类快检测(过流/电压/超速/NaN/
- *          nFAULT消抖/编码器/跟随误差/软限位), 随后重算仲裁结果并执行
- *          级别动作(停机类故障直接切 FAULT 态)。
- *          单次执行预算 < 5µs(检测14项标量比较+109项仲裁遍历)。
- *****************************************************************************/
+	 * @brief   快速故障检测与仲裁(错峰分频, 1kHz @10kHz 电流环)
+	 * @note    由 fault_check 委托调用: 执行电气类快检测(过流/电压/超速/
+	 *          nFAULT消抖/编码器/跟随误差/软限位), 随后重算仲裁结果并执行
+	 *          级别动作(停机类故障直接切 FAULT 态)。
+	 *          调度: 每 FAULT_DET_FAST_DIV 拍一次(motor_loop 错峰拍), 消抖
+	 *          阈值已按采样周期换算, 保护响应时间不变;
+	 *          NaN 发散检测不走本接口(fault_detect_diverge 每拍)。
+	 *          单次执行预算 < 10µs(检测14项标量比较+109项仲裁遍历空闲快速路径)。
+	 *****************************************************************************/
 	void fault_mgr_poll_fast(void);
 
 	/*****************************************************************************
@@ -240,7 +252,8 @@ extern "C"
 	uint32_t fault_mgr_get_warn_mask(void); /* 警告掩码(异常级bit0-15/警告级bit16-31) */
 	uint8_t fault_mgr_deny_enable(void);    /* 1=禁止使能(DENY: 未标定/低温) */
 	fault_cfg_t *fault_mgr_get_cfg(void);   /* 配置指针(FaultParam 加载用) */
-	uint8_t fault_mgr_is_enabled(uint16_t code); /* 检查故障是否使能(检测逻辑用, 按位: bit=级别内序号) */
+	uint8_t fault_mgr_is_enabled(uint16_t code); /* 检查故障是否使能(冷路径, 二分查索引; 热路径用 is_enabled_idx) */
+	uint8_t fault_mgr_is_enabled_idx(uint8_t idx); /* O(1) 索引版(热路径, idx=FAULT_IDX_*) */
 	void fault_mgr_set_enable_mask(const uint64_t mask[3]); /* 原子更新三级使能并清理已禁用级别活动故障 */
 
 	/*****************************************************************************
@@ -279,16 +292,23 @@ extern "C"
 	void fault_detect_slow(fault_mgr_t *fm);
 
 	/* ---- 检测器记录接口(仅 fault_detect_*.c 使用) ----
- * 条件成立调用 set(首次触发记录+历史, 重复触发计数);
- * 条件消失调用 clear(警告级/非停机异常级自动解除, 停机类锁存)。 */
+	 * 条件成立调用 set(首次触发记录+历史, 重复触发计数);
+	 * 条件消失调用 clear(警告级/非停机异常级自动解除, 停机类锁存)。
+	 * _idx 版为 O(1) 热路径(10kHz 快检测): idx=FAULT_IDX_* 编译期绑定,
+	 *     免二分查找; code 版供慢速检测/外部上报等冷路径。 */
 	void fault_mgr_internal_set(uint16_t code, float value);
 	void fault_mgr_internal_clear(uint16_t code);
+	void fault_mgr_internal_set_idx(uint8_t idx, float value);
+	void fault_mgr_internal_clear_idx(uint8_t idx);
 
 	/* 管理器单例(协议层 0xAA 直接读仲裁结果, 只读语义) */
 	extern fault_mgr_t g_fault_mgr;
 
-	/* 快速检测消抖阈值按控制周期换算(attach 时由 sys->motor.dt 计算) */
-	void fault_detect_fast_init_cycles(fault_mgr_t *fm, float dt);
+	/* 快速检测消抖阈值按采样周期换算(attach 时由 控制周期×FAULT_DET_FAST_DIV 计算) */
+	void fault_detect_fast_init_cycles(fault_mgr_t *fm, float sample_dt);
+
+	/* NaN 算法发散检测(每拍, 不受 FAULT_DET_FAST_DIV 分频; 编译开关 FAULT_DET_EN_ALGO_DIVERGE) */
+	void fault_detect_diverge(fault_mgr_t *fm);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,7 @@
 /**
  * @file    motor_info.h
  * @brief   MotorInfo 配置参数 API 接口（1024B 整块空间）
- * @date    2026-09-09
+ * @date    2026-09-11
  *
  * @warning 【自动生成文件，请勿手动修改】
  *          本文件由脚本 motor_info_generate.py 根据 motor_info.csv 自动生成，
@@ -40,8 +40,8 @@ extern "C"
 #endif
 
 /* ===== 自动生成元信息 ===== */
-#define MOTOR_INFO_GEN_DATE      "2026-09-09"
-#define MOTOR_INFO_PARAM_COUNT   111
+#define MOTOR_INFO_GEN_DATE      "2026-09-11"
+#define MOTOR_INFO_PARAM_COUNT   113
 #define MOTOR_INFO_VERSION_MAJOR 1
 #define MOTOR_INFO_VERSION_MINOR 0
 
@@ -219,7 +219,7 @@ extern "C"
 
 	/**
  * @brief   高级算法参数（MIT/力控/回零/缓启动）
- * @details 块大小 128B，已用 76B，预留 52B
+ * @details 块大小 128B，已用 84B，预留 44B
  */
 	typedef struct __ALIGNED_8
 	{
@@ -242,7 +242,9 @@ extern "C"
 		float softstart_vel_rate;      /* 缓启动速度速率 (rad/s²)  [速度目标变化速率上限(加速度限值)] */
 		float softstart_torque_rate;   /* 缓启动力矩速率 (Nm/s)  [力矩目标变化速率上限] */
 		float softstart_current_rate;  /* 缓启动电流速率 (A/s)  [电流目标变化速率上限] */
-		uint32_t reserved[13];         /* 预留 52B */
+		uint32_t cogging_comp_enable;  /* 齿槽补偿使能  [齿槽转矩补偿使能 表CRC有效时生效 L5.1标定成功自动置1] */
+		float cogging_comp_gain;       /* 齿槽补偿增益  [齿槽补偿增益 负值=反相(标定方向校验用) 幅值现场微调 欠补加大过补减小] */
+		uint32_t reserved[11];         /* 预留 44B */
 	} AdvancedAlgoParam_t;
 
 	/* ===== 主参数区联合体：1024B 整块空间 ===== */
@@ -375,7 +377,9 @@ extern "C"
 #define MOTOR_INFO_PID_SOFTSTART_VEL_RATE           181u
 #define MOTOR_INFO_PID_SOFTSTART_TORQUE_RATE        182u
 #define MOTOR_INFO_PID_SOFTSTART_CURRENT_RATE       183u
-#define MOTOR_INFO_MAX_PID                          183u
+#define MOTOR_INFO_PID_COGGING_COMP_ENABLE          184u
+#define MOTOR_INFO_PID_COGGING_COMP_GAIN            185u
+#define MOTOR_INFO_MAX_PID                          185u
 
 	/******************************************************************************
  * @brief   基础 API

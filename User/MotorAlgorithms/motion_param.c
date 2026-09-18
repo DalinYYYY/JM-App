@@ -41,13 +41,13 @@
 #define MOTION_RAD2DEG (180.0f / MOTION_PI) // rad -> °
 
 /* NULL 防护：替代缺失的 assert_report，非法入参直接返回 */
-#define MOTION_GUARD(cond) \
-	do                     \
-	{                      \
-		if (!(cond))       \
-		{                  \
-			return;        \
-		}                  \
+#define MOTION_GUARD(cond)                                                                                                                                                                             \
+	do                                                                                                                                                                                                 \
+	{                                                                                                                                                                                                  \
+		if (!(cond))                                                                                                                                                                                   \
+		{                                                                                                                                                                                              \
+			return;                                                                                                                                                                                    \
+		}                                                                                                                                                                                              \
 	} while (0)
 
 /* 把角度归一化到 [0, 360)
@@ -281,9 +281,7 @@ static void update_rad_s(struct motion_param *pobj, float mechanical_angle)
 			slide_rad_s = rad_s; /* PLL 自带平滑，不再叠滑窗 */
 			break;
 		case VEL_METHOD_DIFF:
-		default:
-			slide_rad_s = vel_calc_diff(pobj, mechanical_angle, &rad_s);
-			break;
+		default: slide_rad_s = vel_calc_diff(pobj, mechanical_angle, &rad_s); break;
 	}
 	pobj->rad_s = rad_s;
 	pobj->slide_rad_s = slide_rad_s;
@@ -325,9 +323,9 @@ static void set_update_freq(struct motion_param *pobj, uint32_t freq_hz)
 static void pll_set_gains(struct motion_param *pobj, float bandwidth_hz, float damping)
 {
 	if (bandwidth_hz <= 0.0f)
-		bandwidth_hz = 100.0f; /* 默认 100Hz: 在 2kHz 解算下兼顾跟随性与噪声抑制 */
+		bandwidth_hz = 30.0f; /* 抑制编码器噪声经速度环放大,减轻零速空载极限环激励*/
 	if (damping <= 0.0f)
-		damping = 1.0f;        /* 临界阻尼，无超调 */
+		damping = 1.0f;       /* 临界阻尼，无超调 */
 	float wn = MOTION_2PI * bandwidth_hz;
 	pobj->pll_kp = 2.0f * damping * wn;
 	pobj->pll_ki = wn * wn;
@@ -393,8 +391,7 @@ static float feedforword_get_acc(struct motion_param *pobj)
 /* ------------------------------------------------------------------ */
 /* 更新分发                                                            */
 /* ------------------------------------------------------------------ */
-static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
-                               float mechanical_angle)
+static void motor_param_handle(struct motion_param *pobj, motion_type_e type, float mechanical_angle)
 {
 	MOTION_GUARD(pobj != NULL);
 
@@ -403,9 +400,7 @@ static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
 	switch (type)
 	{
 		case MOTION_TYPE_ELE:
-		case MOTION_TYPE_ELE_RADIAN:
-			update_ele_radian(pobj);
-			break;
+		case MOTION_TYPE_ELE_RADIAN: update_ele_radian(pobj); break;
 
 		case MOTION_TYPE_ELE_VEL:
 		case MOTION_TYPE_ELE_VEL_RADIAN:
@@ -422,8 +417,7 @@ static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
 			update_rpm(pobj);
 			break;
 
-		default:
-			break;
+		default: break;
 	}
 }
 
@@ -486,8 +480,7 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 	pobj->feedforword_get_acc = feedforword_get_acc;
 }
 
-void motion_param_init(motion_param_t *pobj, uint8_t poles, uint16_t slide_window_size,
-                       float (*unused_compensation_callback)(void))
+void motion_param_init(motion_param_t *pobj, uint8_t poles, uint16_t slide_window_size, float (*unused_compensation_callback)(void))
 {
 	motion_param_config_t cfg;
 	memset(&cfg, 0, sizeof(cfg));

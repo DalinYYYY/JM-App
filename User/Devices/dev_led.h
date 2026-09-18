@@ -93,9 +93,10 @@ extern "C"
 		RGB_CYAN,
 		RGB_MAGENTA,
 		RGB_WHITE,
+		RGB_COLOR_MAX,
 	} rgb_color_e;
 
-	/* 资源配置 (在 device_config.c 的 rgb_led_list 填表) */
+	/* 资源配置 (在 dev_config_board.inc 的 rgb_led_list 填表) */
 	typedef struct
 	{
 		char name[20];
@@ -105,7 +106,7 @@ extern "C"
 		led_polarity_e polarity;
 	} dev_rgb_led_config_t;
 
-	/* 配置表定义在 device_config.c */
+	/* 配置表定义在 dev_config.c (经 dev_config_board.inc 展开) */
 	extern const dev_rgb_led_config_t rgb_led_list[RGB_LED_ID_MAX];
 
 	typedef struct dev_rgb_led
@@ -114,15 +115,21 @@ extern "C"
 		uint8_t r; /* 0~255, 若为 GPIO 开关型则 0/非0 */
 		uint8_t g;
 		uint8_t b;
+		uint32_t blink_period_ms; /* 闪烁周期, 0 表示常亮/常灭 */
+		bool blink_on;			 /* 闪烁态当前半周期亮/灭 */
 
 		/* public */
 		void (*set_color)(struct dev_rgb_led *pobj, rgb_color_e color);				/* 预设颜色 */
 		void (*set_rgb)(struct dev_rgb_led *pobj, uint8_t r, uint8_t g, uint8_t b); /* 自定义 RGB */
+		void (*set_blink)(struct dev_rgb_led *pobj, uint32_t period_ms);				/* 设置闪烁周期 */
 		void (*off)(struct dev_rgb_led *pobj);
-		void (*update)(struct dev_rgb_led *pobj); /* PWM 调光/闪烁周期调用 */
+		void (*update)(struct dev_rgb_led *pobj); /* 闪烁周期调用 */
 	} dev_rgb_led_t;
 
 	void dev_rgb_led_init(dev_rgb_led_t *pobj, rgb_led_id_e id);
+
+	/* 获取 RGB LED 对象指针（按 ID，用于上层模块访问对象池） */
+	dev_rgb_led_t *dev_rgb_led_get(rgb_led_id_e id);
 
 #endif /* USE_DEV_RGB_LED */
 

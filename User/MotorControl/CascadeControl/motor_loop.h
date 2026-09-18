@@ -42,8 +42,7 @@ typedef struct motor_loop_s
 	cur_loop_t current;		// 电流环
 	cascade_out_t out;		// 级联输出（dq电流参考）
 
-	uint32_t vel_cnt; // 速度环分频计数器（自增比较，避免取模）
-	uint32_t pos_cnt; // 位置环分频计数器（自增比较，避免取模）
+	uint32_t sched_cnt; /* 超周期错峰调度计数器(0..POS_DIV-1): 速度拍0/VEL_DIV, 故障拍2, 位置拍4, 遥测拍7, 见 motor_loop_config.h */
 } motor_loop_t;
 
 /**

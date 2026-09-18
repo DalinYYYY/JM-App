@@ -44,19 +44,24 @@ typedef enum
 } encoder_dir_e;
 
 /* DWT 耗时打点槽位索引(start/stop 区间存入 dwt_timer.duration_us[i])
- * 注: 槽位 2~5 枚举名为历史遗留, 实际测的是电流环内部分段耗时(见注释) */
+ * 槽位按电流环 ISR 执行顺序排列; 分频槽位(位置环/速度环)在非执行拍保持上次值,
+ * CALIB/READY 等提前返回分支不经过的槽位同样保持上次值 */
 typedef enum
 {
-	SYS_TIMER_RECORD_CURRENT_LOOP_CYCLE = 0,  // 电流环中断周期(相邻两次进 ISR 间隔)
-	SYS_TIMER_RECORD_CURRENT_LOOP_TIME = 1,   // 电流环 ISR 总耗时(三环入口+观察者)
-	SYS_TIMER_RECORD_POSITION_LOOP_CYCLE = 2, // 实测: 相电流采样+Clarke+Park 段耗时(电流环 step1~3)
-	SYS_TIMER_RECORD_POSITION_LOOP_TIME = 3,  // 实测: 电流环闭环段耗时(PI+解耦+反Park+SVPWM+PWM)
-	SYS_TIMER_RECORD_TIM_1MS_CYCLE = 4,       // 实测: 电流环 PI+解耦 段耗时
-	SYS_TIMER_RECORD_TIM_1MS_TIME = 5,        // 实测: 电流环 反Park+SVPWM+PWM 段耗时
-	SYS_TIMER_RECORD_TEST_1 = 6,              // 实测: 编码器刷新+电角度更新耗时(motor_loop step0)
-	SYS_TIMER_RECORD_TEST_2 = 7,              // 实测: 反馈解算+状态机耗时(motor_loop step1~2)
-	SYS_TIMER_RECORD_TEST_3 = 8,              // 实测: 外环(位置/速度)+电流环 RUN 主路径耗时(step3~6)
-	SYS_TIMER_RECORD_TEST_4 = 9,              // 实测: 观察者 motor_observer 耗时(control_irq)
+	SYS_TIMER_RECORD_IRQ_CYCLE = 0,    /* 电流环中断周期(相邻两次进 ISR 间隔, 10kHz 满量程≈100us) */
+	SYS_TIMER_RECORD_IRQ_TOTAL = 1,    /* ISR 总耗时(motor_loop_isr + 观察者) */
+	SYS_TIMER_RECORD_ENC_UPDATE = 2,   /* step0: 编码器刷新 + 电角度更新 */
+	SYS_TIMER_RECORD_FB_SOLVE = 3,     /* step1: 运动反馈解算(vel/pos/多圈/健康位) */
+	SYS_TIMER_RECORD_FSM_RUN = 4,      /* step2: 状态机(参考生成+状态同步) */
+	SYS_TIMER_RECORD_POS_LOOP = 5,     /* step3: 位置环(1kHz 分频, 仅 POSITION 模式) */
+	SYS_TIMER_RECORD_VEL_LOOP = 6,     /* step4: 速度环(2kHz 分频, ctrl_type>=CURRENT) */
+	SYS_TIMER_RECORD_CUR_TOTAL = 7,    /* step5: 电流环整体 cur_loop_run(含直通分支) */
+	SYS_TIMER_RECORD_CUR_SAMPLE = 8,   /* step5a: 相电流采样 + Clarke + Park */
+	SYS_TIMER_RECORD_CUR_PI = 9,       /* step5b: 电流环 PI + 解耦补偿(闭环模式) */
+	SYS_TIMER_RECORD_CUR_PWM = 10,     /* step5c: 反Park + SVPWM + PWM 输出(VOLTAGE/闭环共用) */
+	SYS_TIMER_RECORD_POWER_SYNTH = 11, /* step6: 母线电流合成(仅 SYNTH 通道板型) */
+	SYS_TIMER_RECORD_OBSERVER = 12,    /* 控制后观察者 motor_observer */
+	SYS_TIMER_RECORD_FAULT_DET = 13,   /* 全量电气故障检测(1kHz 错峰拍, NaN发散每拍不在内) */
 } sys_timer_record_index_e;
 
 /************************************* 三级变量 *************************************/
@@ -247,7 +252,7 @@ typedef struct sys_data_
 	 * dev_power_monitor / dev_commun_uart），不持有数据、不复制数据，
 	 * 仅方便调试时通过 usr 一个变量统一观察。
 	 * 绑定在 user_init() 的硬件初始化阶段完成；非 const 以便调试时强制设值。
-	 * 访问示例: usr.p_dwt_timer->duration_us[0], usr.p_motor_loop->vel_cnt,
+	 * 访问示例: usr.p_dwt_timer->duration_us[0], usr.p_motor_loop->sched_cnt,
 	 *           usr.p_dev_power_monitor->vbus, usr.p_dev_commun_uart->tx_count
 	 */
 	struct dwtTimer_s *p_dwt_timer;                  /* -> dwt_timer            */
@@ -277,4 +282,3 @@ extern float jm_dbg[JM_DBG_CH];
 extern sys_data_t usr; // 全局变量加g_前缀
 
 #endif                 /* __RUNTIME_PARAM_H__ */
-
