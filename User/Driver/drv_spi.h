@@ -100,6 +100,22 @@ int drv_spi_read(spiDrv_t drv, uint8_t *data, uint16_t len, uint32_t timeout);
 int drv_spi_transfer(spiDrv_t drv, uint8_t *tx_data, uint8_t *rx_data, uint16_t len, uint32_t timeout);
 
 /**
+ * @brief       SPI全双工收发(寄存器直操作轻量版，适用于ISR热路径短帧)
+ * @param        drv               : SPI设备
+ * @param        tx_data           : 发送数据缓冲区
+ * @param        rx_data           : 接收数据缓冲区
+ * @param        len               : 数据长度(字节，需与SPI配置的DataSize一致)
+ * @return       : DRV_EOK成功，DRV_ERROR失败(非法参数/轮询超上限)
+ * @note         直接操作SPI寄存器收发，绕过HAL的状态机/回调/超时框架，
+ *               6字节帧可比HAL_SPI_TransmitReceive节省约12us软件开销。
+ *               入口幂等补齐SPE使能与FRXTH=1(8bit接收门限)，无需调用方
+ *               先发起过HAL事务。CS由调用方自行管理(本函数不碰CS)；
+ *               内部有轮询次数上限防止SPI异常时死等，超上限关SPE复位
+ *               总线后返回错误，调用方自行容错。
+ */
+int drv_spi_transfer_fast(spiDrv_t drv, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len);
+
+/**
  * @brief       SPI中断方式发送(非阻塞，启动前拉低CS)
  * @param        drv               : SPI设备
  * @param        data              : 发送数据缓冲区

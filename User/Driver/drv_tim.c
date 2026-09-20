@@ -67,7 +67,7 @@ static const uint32_t s_tim_channel_map[TIM_CH_MAX] = {
 	[TIM_CH_ALL] = TIM_CHANNEL_ALL,
 };
 
-/* 句柄/通道转换为drv_tim.c内部使用，不对外暴露HAL类型(见drv_tim.h规则) */
+/* 句柄/通道仅供本文件内部使用，不对外暴露HAL类型(见drv_tim.h规则) */
 static inline TIM_HandleTypeDef *get_tim_handle(timNumber_e tim)
 {
 	if (tim >= DRV_TIM_NUMBER_MAX)
@@ -143,7 +143,6 @@ int drv_tim_start_it(timNumber_e tim)
 	{
 		return DRV_ERROR;
 	}
-	/* 启动函数 */
 	HAL_TIM_Base_Start_IT(handle);
 
 	return DRV_EOK;
@@ -161,7 +160,6 @@ int drv_tim_stop_it(timNumber_e tim)
 	{
 		return DRV_ERROR;
 	}
-	/* 停止函数 */
 	HAL_TIM_Base_Stop_IT(handle);
 	return DRV_EOK;
 }
@@ -178,7 +176,6 @@ int drv_tim_set_autoreload(timNumber_e tim, uint32_t period)
 	{
 		return DRV_ERROR;
 	}
-	/* 周期 */
 	__HAL_TIM_SET_AUTORELOAD(handle, period);
 	return DRV_EOK;
 }

@@ -44,7 +44,7 @@ static const motor_mode_fn s_mode_table[RUN_STATE_MAX] = {
 	[RUN_STATE_FORCE_POSITION_HYBRID] = motor_mode_legacy_run,
 	[RUN_STATE_GRAVITY_COMPENSATION] = motor_mode_legacy_run,
 	[RUN_STATE_COLLISION_DETECTION] = motor_mode_legacy_run,
-	[RUN_STATE_ZERO_FORCE] = motor_mode_legacy_run,
+	[RUN_STATE_ZERO_FORCE] = motor_mode_zero_force_run,
 	[RUN_STATE_CONSTANT_FORCE] = motor_mode_legacy_run,
 	[RUN_STATE_VARIABLE_IMPEDANCE] = motor_mode_legacy_run,
 	[RUN_STATE_ADAPTIVE_GRAVITY_COMP] = motor_mode_legacy_run,
@@ -56,6 +56,16 @@ static const motor_mode_fn s_mode_table[RUN_STATE_MAX] = {
 	[RUN_STATE_PWM_INPUT] = motor_mode_legacy_run,
 	[RUN_STATE_JOG] = motor_mode_legacy_run,
 	[RUN_STATE_SAFE_TEACH] = motor_mode_legacy_run,
+
+	/* ===== 负载模拟（0x60 已实现，0x61~0x67 扩展点）===== */
+	[RUN_STATE_PASSIVE_TORQUE] = motor_mode_load_sim_run,
+	[RUN_STATE_DYNAMIC_TORQUE] = motor_mode_load_sim_run,
+	[RUN_STATE_QUADRATIC_LOAD] = motor_mode_load_sim_run,
+	[RUN_STATE_CONSTANT_POWER] = motor_mode_load_sim_run,
+	[RUN_STATE_FRICTION_LOAD] = motor_mode_load_sim_run,
+	[RUN_STATE_INERTIA_SIM] = motor_mode_load_sim_run,
+	[RUN_STATE_DUTY_PROFILE] = motor_mode_load_sim_run,
+	[RUN_STATE_IMPACT_LOAD] = motor_mode_load_sim_run,
 
 	/* ===== 测试模式（扫频已拆分，其余走 legacy）===== */
 	[RUN_STATE_TEST_AGING] = motor_mode_legacy_run,
@@ -72,6 +82,10 @@ void motor_ctrl_dispatch(motor_ctrl_t *ctrl)
 {
 	if (ctrl->run_state >= RUN_STATE_MAX)
 		return;
+
+	/* 加速度参考每拍清零，由模式显式生成（PV斜坡/扫频），防止跨模式残留
+	 * （过渡混合期间的加速度由 transition_update 解析覆盖）*/
+	ctrl->ref.accel = 0.0f;
 
 	motor_mode_fn handler = s_mode_table[ctrl->run_state];
 	if (handler != NULL)
@@ -90,8 +104,7 @@ void motor_ctrl_init(motor_ctrl_t *ctrl, motor_param_t *param, float dt)
 	ctrl->ref.pos_profile = MOTOR_PID_PROFILE_POSITION;
 	ctrl->ref.vel_profile = MOTOR_PID_PROFILE_VELOCITY;
 
-	ctrl->test_phase = 0.0f;
-	ctrl->test_freq = 1.0f;
+	ctrl->sweep_state = MOTOR_SWEEP_STATE_IDLE;
 }
 
 /**
@@ -127,14 +140,13 @@ void motor_mode_legacy_run(motor_ctrl_t *ctrl)
 			ref->vel_ff = ctrl->cmd.vel_ff;
 			break;
 
-		/* ---- 力控模式（位置为基底 + 阻抗 profile）---- */
+			/* ---- 力控模式（位置为基底 + 阻抗 profile）---- */
 		case RUN_STATE_IMPEDANCE:
 		case RUN_STATE_ADMITTANCE:
 		case RUN_STATE_FORCE_CONTROL:
 		case RUN_STATE_FORCE_POSITION_HYBRID:
 		case RUN_STATE_GRAVITY_COMPENSATION:
 		case RUN_STATE_COLLISION_DETECTION:
-		case RUN_STATE_ZERO_FORCE:
 		case RUN_STATE_CONSTANT_FORCE:
 		case RUN_STATE_VARIABLE_IMPEDANCE:
 		case RUN_STATE_ADAPTIVE_GRAVITY_COMP:
@@ -150,8 +162,8 @@ void motor_mode_legacy_run(motor_ctrl_t *ctrl)
 			ref->ctrl_type = REF_CTRL_VELOCITY;
 			ref->vel_profile = MOTOR_PID_PROFILE_JOG;
 			ref->vel = motor_mode_clamp(ctrl->cmd.vel,
-			                            -motor_param_get_max_speed(ctrl->param),
-			                            motor_param_get_max_speed(ctrl->param));
+			                            -(ctrl->param)->motor_base.max_speed,
+			                            (ctrl->param)->motor_base.max_speed);
 			break;
 
 		case RUN_STATE_STEP_DIR:

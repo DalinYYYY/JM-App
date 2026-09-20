@@ -26,6 +26,28 @@
  * 按G4最大页(单Bank模式4KB=512个u64)分配，双Bank模式(2KB)仅用前一半 */
 static u64 page_buf[0x1000U / 8U];
 
+/* G4(RM0440)要求: Flash擦写期间ICache/DCache必须禁用, 否则行为未定义
+ * 擦写段前保存缓存状态并禁用, 段后复位缓存行并按原状态恢复
+ * (未使能缓存的板子恢复后保持禁用, 不改变板级默认行为) */
+static u32 flash_cache_disable(void)
+{
+	u32 cache = FLASH->ACR & (FLASH_ACR_ICEN | FLASH_ACR_DCEN);
+	__HAL_FLASH_INSTRUCTION_CACHE_DISABLE();
+	__HAL_FLASH_DATA_CACHE_DISABLE();
+	return cache;
+}
+
+static void flash_cache_restore(u32 cache)
+{
+	/* 复位缓存行(清残留总线状态)后按原状态恢复 */
+	__HAL_FLASH_INSTRUCTION_CACHE_RESET();
+	__HAL_FLASH_DATA_CACHE_RESET();
+	if (cache & FLASH_ACR_ICEN)
+		__HAL_FLASH_INSTRUCTION_CACHE_ENABLE();
+	if (cache & FLASH_ACR_DCEN)
+		__HAL_FLASH_DATA_CACHE_ENABLE();
+}
+
 /* STM32G4 双Bank模式下 Bank2 基地址固定为 0x08040000（硬件地址译码固定，
  * 与芯片容量无关）。Bank1 起始于 FLASH_BASE(0x08000000)，两Bank之间
  * 是地址空洞（小容量芯片尤为明显，如128KB芯片: Bank1=64KB@0x08000000，
@@ -148,9 +170,11 @@ u8 drv_g4_flash_erase_page(const u32 addr, u8 len, u8 bank)
 	/* 4. 解锁+清错误标志 */
 	HAL_FLASH_Unlock();
 	__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
+	u32 cache = flash_cache_disable(); /* 擦除期间禁用缓存(RM0440硬性要求) */
 	if (FLASH_WaitForLastOperation(FLASH_WAITETIME) != HAL_OK)
 	{
 		__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
+		flash_cache_restore(cache);
 		HAL_FLASH_Lock();
 		return FLASH_ERR_BUSY;
 	}
@@ -171,6 +195,7 @@ u8 drv_g4_flash_erase_page(const u32 addr, u8 len, u8 bank)
 		FLASH_WaitForLastOperation(FLASH_WAITETIME);
 	}
 
+	flash_cache_restore(cache); /* 恢复原缓存状态 */
 	HAL_FLASH_Lock();
 	return (ret == HAL_OK) ? FLASH_ERR_OK : FLASH_ERR_ERASE_FAILED;
 }
@@ -270,9 +295,11 @@ u8 drv_g4_flash_write(const u32 addr, u64 *pdata64, u32 len_64, u8 bank)
 		/* 4. 整页写回(解锁->逐双字编程校验->加锁) */
 		HAL_FLASH_Unlock();
 		__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
+		u32 cache = flash_cache_disable(); /* 编程期间禁用缓存(RM0440硬性要求) */
 		if (FLASH_WaitForLastOperation(FLASH_WAITETIME) != HAL_OK)
 		{
 			__HAL_FLASH_CLEAR_FLAG(FLASH_FLAG_ALL_ERRORS);
+			flash_cache_restore(cache);
 			HAL_FLASH_Lock();
 			return FLASH_ERR_BUSY;
 		}
@@ -285,11 +312,13 @@ u8 drv_g4_flash_write(const u32 addr, u64 *pdata64, u32 len_64, u8 bank)
 			{
 				if (FLASH_WaitForLastOperation(FLASH_WAITETIME) != HAL_OK)
 				{
+					flash_cache_restore(cache);
 					HAL_FLASH_Lock();
 					return FLASH_ERR_BUSY;
 				}
 				if (HAL_FLASH_Program(FLASH_TYPEPROGRAM_DOUBLEWORD, write_addr, page_buf[w]) != HAL_OK)
 				{
+					flash_cache_restore(cache);
 					HAL_FLASH_Lock();
 					return FLASH_ERR_WRITE_VERIFY;
 				}
@@ -302,10 +331,12 @@ u8 drv_g4_flash_write(const u32 addr, u64 *pdata64, u32 len_64, u8 bank)
 			}
 			if (!ok)
 			{
+				flash_cache_restore(cache);
 				HAL_FLASH_Lock();
 				return FLASH_ERR_WRITE_VERIFY;
 			}
 		}
+		flash_cache_restore(cache);
 		HAL_FLASH_Lock();
 
 		curr_addr = page_addr + page_size;
@@ -360,7 +391,7 @@ u8 drv_flash_write(const u32 addr, u64 *pdata64, u32 len_64)
 	u8 ret = FLASH_ERR_OK;
 	u8 bank = drv_g4_flash_get_bank(addr);
 	if (bank == 0xFF)
-		return FLASH_ERR_ADDR_OUT_RANGE; // 地址无效
+		return FLASH_ERR_ADDR_OUT_RANGE;
 
 	__disable_irq();
 	ret = drv_g4_flash_write(addr, pdata64, len_64, bank);
@@ -375,7 +406,7 @@ u8 drv_flash_write(const u32 addr, u64 *pdata64, u32 len_64)
 u8 drv_flash_clear(const u32 addr, u8 len, u8 bank)
 {
 	u8 ret = FLASH_ERR_OK;
-	__disable_irq(); // 中断保护，避免擦除被打断
+	__disable_irq();
 	ret = drv_g4_flash_erase_page(addr, len, bank);
 	__enable_irq();
 	return ret;

@@ -1,8 +1,8 @@
 /**
  * @file        assert_report.h
- * @brief 
+ * @brief       断言上报接口：assert_report 宏与断言失败回调函数声明
  * 
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.0
  * @date        2026-06-17
  * 
@@ -21,8 +21,6 @@
 #define __ASSERT_REPORT_H__
 
 /* Includes -----------------------------------------------------------------------*/
-#include <stdio.h>
-#include <string.h>
 #include <stdint.h>
 
 /* Exported macro -----------------------------------------------------------------*/

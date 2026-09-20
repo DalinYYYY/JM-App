@@ -32,7 +32,6 @@ static void _i2c_delay(void)
 
 /*
  * @brief  起始信号
- * @param  *i2c: 
  */
 static void i2c_start(i2c_soft_drv_t *i2c)
 {
@@ -47,7 +46,6 @@ static void i2c_start(i2c_soft_drv_t *i2c)
 
 /*
  * @brief  停止信号
- * @param  *i2c:
  */
 static void i2c_stop(i2c_soft_drv_t *i2c)
 {
@@ -61,7 +59,6 @@ static void i2c_stop(i2c_soft_drv_t *i2c)
 }
 /*
  * @brief  等待应答信号
- * @param  *i2c:
  * @retval 1接收应答失败，0接收应答成功
  */
 static int i2c_wait_ack(i2c_soft_drv_t *i2c)
@@ -88,7 +85,6 @@ static int i2c_wait_ack(i2c_soft_drv_t *i2c)
 
 /*
  * @brief  回复应答信号
- * @param  *i2c:
  */
 static void i2c_ack(i2c_soft_drv_t *i2c)
 {
@@ -103,7 +99,6 @@ static void i2c_ack(i2c_soft_drv_t *i2c)
 
 /*
  * @brief  回复nack信号
- * @param  *i2c:
  */
 static void i2c_nack(i2c_soft_drv_t *i2c)
 {
@@ -118,7 +113,6 @@ static void i2c_nack(i2c_soft_drv_t *i2c)
 
 /*
  * @brief  发送一个字节数据
- * @param  *i2c : 
  * @param  byte : 发送的数据
  */
 static void i2c_send_byte(i2c_soft_drv_t *i2c, uint8_t byte)
@@ -148,7 +142,6 @@ static void i2c_send_byte(i2c_soft_drv_t *i2c, uint8_t byte)
 
 /*
  * @brief  读出一个字节数据
- * @param  *i2c     :
  * @param  ack      : ACK读完后发送应答信号，NACK读完后回复不应答
  * @retval receive  ：读出的结果
  */
@@ -182,7 +175,6 @@ static uint8_t i2c_read_byte(i2c_soft_drv_t *i2c, i2c_ack_state_e ack)
 
 /*
  * @brief  向从机寄存器写一个字节数据
- * @param  *i2c :
  * @param  reg  : 寄存器地址
  * @param  data : 写入的数据
  * @retval 写入结果 ：0正常，其他则错误
@@ -204,7 +196,6 @@ int drv_i2c_write_byte(i2c_soft_drv_t *i2c, uint8_t reg, uint8_t data)
 
 /*
  * @brief  向从机寄存器写多字节数据
- * @param  *i2c :
  * @param  reg  : 寄存器地址
  * @param  data : 写入的数据
  * @param  len  : 写入的字节数
@@ -229,7 +220,6 @@ int drv_i2c_write_nbytes(i2c_soft_drv_t *i2c, uint8_t reg, uint8_t *data, uint8_
 }
 /*
  * @brief  从从机寄存器读出多字节数据
- * @param  *i2c :
  * @param  reg  : 寄存器地址
  * @param  data : 读出的数据
  * @param  len  : 读出的字节数

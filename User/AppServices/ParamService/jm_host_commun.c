@@ -9,9 +9,6 @@
  * @copyright   Copyright (c) 2026 Robot Tech.co, Ltd. All rights reserved.
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- * @note        面向自研 PyQt 上位机, 取代已废弃的 serialstudio_commun。
- *              joint_proto 业务回调(反馈/控制/参数/设备信息)统一收敛在 jm_proto_ops.c,
- *              串口与 CAN 注入同一份 ops; 本文件只负责串口绑定与遥测帧打包上报。
  * @note        遥控模式(周期无应答上报):
  *              - 上位机用 SET_TELEMETRY(0xCB)=enable+mask+period 配置开关/种类/周期;
  *                ops 记录后, 本模块每拍读 jm_app_telemetry_enabled() 决定是否上报。
@@ -20,27 +17,59 @@
  *              - 数据帧不要求上位机逐帧应答; 仅 0xCB 开关回单次 ACK 供上位机确认。
  */
 #include "jm_host_commun.h"
+
+/* ---- 公共头文件(UART/CAN 共用遥测打包) ---- */
+#include "runtime_param.h" /* JM_DBG_CH, jm_dbg[] */
+#include "thread_config.h" /* THREAD_DELAY_COMMUN */
+#include "jm_proto_ops.h"  /* 共享协议操作与命令定义 */
+#include "motor_observer.h"
+#include "motor_loop.h"    /* motor_loop_get: 调试通道观测 sys.motor 内部量 */
 #if defined(USE_DEV_COMMUN_UART)
-
-#include "runtime_param.h"
-#include "thread_config.h"
-#include "drv_rtos.h"
 #include "dev_commun_uart.h"
-#include "jm_proto_ops.h" /* 传输无关业务回调集(串口/CAN 共用) + 遥测订阅状态 */
-
-/* ---------------- 同步遥测周期状态 ----------------
- * 约束沿用: packer 单全局 send_buffer + 无发送忙查询, 故每个上报节拍只发一帧。
- * 订阅(0xCB)由共用 ops 统一接收并记录 enable/mask/period; 本文件每拍读其
- * period_ms 换算成 tick, 读其 enable 作上报门控, 读其 mask 决定变长帧打包内容。*/
+#endif
+#if defined(USE_DEV_COMMUN_CAN)
+#include "dev_commun_can.h"
+#include "main.h" /* HAL_GetTick */
+#endif
+#if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
 #define COMMUN_TELEMETRY_TICK 5u /* 默认上报节拍: 每 5 个通信 tick 发一帧 */
+#endif
 
-/* 当前上报周期(单位: 通信 tick): 由 ops 记录的 period_ms 换算, 0 表示沿用默认 */
-static drv_rtos_sem_handle_t s_rx_sem = NULL;
-static volatile uint32_t s_rx_notify_count = 0;
-static volatile uint32_t s_rx_wakeup_count = 0;
-static volatile uint32_t s_rx_timeout_count = 0;
+/* ---------------- 公共遥测打包函数(UART/CAN 共用) ----------------
+ * pack_telemetry: 传输无关, 仅把 mask+feedback 打包成字节流
+ * telemetry_tick:  把 period_ms 换算成通信 tick 数 */
+#if defined(USE_DEV_COMMUN_UART) || defined(USE_DEV_COMMUN_CAN)
+static int jm_host_commun_trace_pop(uint8_t *body, uint16_t *len)
+{
+	return (body != NULL && len != NULL && jm_app_trace_pop(body, len) == JM_ERR_OK) ? 1 : 0;
+}
+#endif
 
-static uint16_t commun_uart_telemetry_tick(void)
+static void jm_host_commun_trace_service(void)
+{
+	uint8_t body[MOTOR_OBSERVER_TRACE_PAYLOAD_MAX];
+	uint16_t len = 0u;
+#if defined(USE_DEV_COMMUN_UART)
+	/* UART 链路: 单周期循环排空(上限4包), 支撑扫频2k~10kHz采样率
+	 * 的实时上传; 稳态下队列每周期0~1包, 上限仅用于突发排空防溢出。
+	 * UART+CAN 并存板 TRACE 主走 UART: 经典 CAN 拆帧(一包约30帧)
+	 * 吞吐撑不起高频扫频, 双路串行发送会把排空速率拖到 512 深度
+	 * 缓冲溢出(实测 4900Hz 采样即溢出)。 */
+	uint8_t budget = 4u;
+	while (budget-- > 0u && jm_host_commun_trace_pop(body, &len) != 0)
+	{
+		dev_commun_uart.report(&dev_commun_uart, JM_CMD_TRACE_DATA, body, len);
+	}
+#elif defined(USE_DEV_COMMUN_CAN)
+	/* CAN 链路吞吐受限: 维持单周期单包(高频扫频溢出按 OVERFLOW 标志上报)。 */
+	if (jm_host_commun_trace_pop(body, &len) != 0)
+	{
+		dev_commun_can.report(&dev_commun_can, JM_CMD_TRACE_DATA, body, len);
+	}
+#endif
+}
+
+static uint16_t jm_host_commun_telemetry_tick(void)
 {
 	uint16_t period_ms = jm_app_telemetry_period_ms();
 	uint16_t tick;
@@ -53,12 +82,7 @@ static uint16_t commun_uart_telemetry_tick(void)
 	return (tick == 0u) ? 1u : tick;
 }
 
-/* ---------------- 同步遥测(mask 变长帧上传) ----------------
- * 帧体: mask(u16, 小端) + 按位序拼接所选数据组。位序严格对齐 jm_telemetry_bit_e:
- *   POS_VEL DQ PHASE BUS TEMP MULTITURN TORQUE FAULT STATE DEBUG
- * 帧内自带 mask, 故增删订阅项时上位机解析器无需改动(新增一组: 此处与上位机
- * parse_telemetry 各按位序补一段即可)。每组字节布局见 jm_cmd_def.h 注释。 */
-static uint16_t commun_uart_pack_telemetry(uint16_t mask, const jm_feedback_t *fb, uint8_t *o)
+static uint16_t jm_host_commun_pack_telemetry(uint16_t mask, const jm_feedback_t *fb, uint8_t *o)
 {
 	uint16_t n = 0;
 
@@ -130,6 +154,20 @@ static uint16_t commun_uart_pack_telemetry(uint16_t mask, const jm_feedback_t *f
 		o[n++] = fb->ctrl_mode;
 		o[n++] = fb->enable;
 	}
+	if (mask & JM_TLM_CURRENT_TARGET) /* idRef,iqRef  8B */
+	{
+		jm_wr_f32(&o[n], fb->id_ref);
+		n += 4;
+		jm_wr_f32(&o[n], fb->iq_ref);
+		n += 4;
+	}
+	if (mask & JM_TLM_MOTION_TARGET) /* velRef,posRef  8B */
+	{
+		jm_wr_f32(&o[n], fb->vel_ref);
+		n += 4;
+		jm_wr_f32(&o[n], fb->pos_ref);
+		n += 4;
+	}
 	if (mask & JM_TLM_DEBUG) /* jm_dbg[JM_DBG_CH](f32)  N*4B */
 	{
 		uint8_t i;
@@ -142,10 +180,22 @@ static uint16_t commun_uart_pack_telemetry(uint16_t mask, const jm_feedback_t *f
 	return n;
 }
 
+#if defined(USE_DEV_COMMUN_UART)
+
+#include "drv_rtos.h"
+#include "dev_commun_uart.h"
+#include "motor_observer.h"
+
+/* UART 专用的接收信号量与统计计数器 */
+static drv_rtos_sem_handle_t s_rx_sem = NULL;
+static volatile uint32_t s_rx_notify_count = 0;
+static volatile uint32_t s_rx_wakeup_count = 0;
+static volatile uint32_t s_rx_timeout_count = 0;
+
 static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 {
 	jm_feedback_t fb;
-	uint8_t o[2 + 64 + JM_DBG_CH * 4]; /* mask(2) + 最大固定组(<=64) + 调试通道 */
+	uint8_t o[2 + 96 + JM_DBG_CH * 4]; /* mask(2) + 固定遥测组 + 调试通道 */
 	uint16_t mask;
 	uint16_t n;
 
@@ -159,8 +209,43 @@ static void commun_uart_push_telemetry(dev_commun_uart_t *dev)
 		return;
 	}
 
-	n = commun_uart_pack_telemetry(mask, &fb, o);
+	n = jm_host_commun_pack_telemetry(mask, &fb, o);
 	dev->report(dev, JM_CMD_TELEMETRY, o, n);
+}
+
+/* ---------------- 调试通道绑定 ---------------- */
+static void jm_host_commun_update_debug(void)
+{
+	const motor_state_t *st = &usr.motor_state[M1];
+	const motor_param_t *param = &usr.motor_param[M1];
+	motor_observer_snapshot_t obs;
+	int obs_ok = motor_observer_snapshot_read(&obs);
+	const motor_ctrl_t *mc = &motor_loop_get()->sys.motor;
+
+	jm_dbg[0] = (obs_ok == 0) ? obs.id_ref : st->setpoint.current_id;
+	jm_dbg[1] = (obs_ok == 0) ? obs.iq_ref : st->setpoint.current_iq;
+	jm_dbg[2] = mc->ref.torque; /* 转矩参考(力矩/负载模拟等模式的算法输出, 如 0x60 的 -dir(ω)·t_set) */
+	jm_dbg[3] = (obs_ok == 0) ? obs.id : st->electrical.id_meas;
+	jm_dbg[4] = (obs_ok == 0) ? obs.iq : st->electrical.iq_meas;
+	jm_dbg[5] = st->motion.elec_angle_rad;
+	jm_dbg[6] = st->motion.mech_angle_rad * 57.2957795f; /* 机械角(deg) */
+	jm_dbg[7] = (float)param->encoder_param.enc_offset;  /* 编码器机械零位偏移(deg) */
+
+	/* FOC 补偿诊断(8~15), 单位为 V / rad/s, 由电流环 V 域快照提供。
+	 * [10] 是交叉解耦 d 轴项，[11] 是反电势 q 轴项；
+	 * [12]/[13] 仍是全部补偿叠加后的 ud/uq。
+	 * diag_config: 低4位为 algo/BEMF/deadtime, 高位为 decoupling_gain×1000。 */
+	{
+		const cur_loop_t *cl = &motor_loop_get()->current;
+		jm_dbg[8] = cl->diag_ud_pi;                    /* PI 原始 ud (V) */
+		jm_dbg[9] = cl->diag_uq_pi;                    /* PI 原始 uq (V) */
+		jm_dbg[10] = cl->diag_ud_cross;                /* 交叉解耦 d轴项 (V) */
+		jm_dbg[11] = cl->diag_uq_bemf;                 /* 反电势 q轴项 (V) */
+		jm_dbg[12] = cl->diag_ud;                      /* 补偿后 ud (V) */
+		jm_dbg[13] = cl->diag_uq;                      /* 补偿后 uq (V) */
+		jm_dbg[14] = cl->diag_omega_mech;              /* 实际补偿机械速度 (rad/s) */
+		jm_dbg[15] = cl->diag_config;                  /* 开关编码 + 解耦增益×1000 */
+	}
 }
 
 /* ---------------- 对外接口 ---------------- */
@@ -210,22 +295,95 @@ void jm_host_commun_wait(uint32_t timeout_ms)
 void jm_host_commun_process(void)
 {
 	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
+	jm_app_pid_debug_poll();
+	jm_app_soft_reset_poll();
+
+	/* 刷新调试通道: 从 motor_state 快照填充 jm_dbg[] */
+	jm_host_commun_update_debug();
 
 	/* 取空闲突发数据喂协议栈, 自动完成命令分发与应答 */
 	dev_commun_uart.poll(&dev_commun_uart);
 
-	/* 遥控模式: 仅当上位机用 0xCB 使能后才按订阅周期分频主动推送遥测帧(无应答)。
-	 * 停止时不发, 且复位分频计数, 使下次使能后第一帧及时发出。*/
+	/* LIVE 优先于 TRACE；每个通信周期最多发送一帧各自数据。 */
 	if (!jm_app_telemetry_enabled())
 	{
 		telemetry_tick = 0;
-		return;
 	}
-	if (++telemetry_tick >= commun_uart_telemetry_tick())
+	else if (++telemetry_tick >= jm_host_commun_telemetry_tick())
 	{
 		telemetry_tick = 0;
 		commun_uart_push_telemetry(&dev_commun_uart);
 	}
+	/* TRACE 排空: UART 使能即主走 UART(见 trace_service 注释) */
+	jm_host_commun_trace_service();
 }
 
 #endif /* USE_DEV_COMMUN_UART */
+
+/* ====================================================================== */
+/* CAN/CAN-FD 通信接入层 (与 UART 路径并存, 业务回调共用 jm_proto_ops) */
+/* ====================================================================== */
+#if defined(USE_DEV_COMMUN_CAN)
+#include "dev_commun_can.h"
+#include "main.h" /* HAL_GetTick (降级检查) */
+
+/* 双通道并发: 开发期关闭主控仲裁(JM_DUAL_CHANNEL_ARB_ENABLE=0),
+ * UART 和 CAN 可同时下发命令, motor_state 临界区(__disable_irq)保证原子性。
+ * 两路各自独立 init/process, 互不干扰。*/
+
+void jm_host_commun_can_init(void)
+{
+	/* CAN 通信: init → 注入业务回调(与 UART 共用) → 启动 CAN */
+	dev_commun_can_init(&dev_commun_can, JM_CAN_COMM_ID_1);
+	dev_commun_can.set_ops(&dev_commun_can, jm_app_ops_get());
+	dev_commun_can.start(&dev_commun_can);
+}
+
+void jm_host_commun_can_process(void)
+{
+	static uint8_t telemetry_tick = 0; /* 遥测上报分频计数 */
+	jm_app_pid_debug_poll();
+	jm_app_soft_reset_poll();
+	/* CAN 路径也必须刷新通用调试通道；否则 0xC9/0xCA 读到的是
+	 * UART 线程上一次更新的快照，CAN-only 或 UART低频时无法判断补偿是否生效。 */
+	jm_host_commun_update_debug();
+
+	/* 刷新诊断统计(供应用读取总线负载/通信质量) */
+	dev_commun_can.poll(&dev_commun_can);
+
+	/* CAN 通信超时检测：结果当前仅作预留，未触发降级动作 */
+	if (dev_commun_can.check_loss(&dev_commun_can, HAL_GetTick()))
+	{
+	}
+
+	/* CAN-DI扫描窗口暂停所有主动数据，避免TRACE/LIVE干扰发现时隙。 */
+	if (dev_commun_can.id_switch_pending || (int32_t)(HAL_GetTick() - dev_commun_can.commissioning_quiet_until) < 0)
+	{
+		telemetry_tick = 0;
+		return;
+	}
+
+	/* LIVE 优先于 TRACE；TRACE 只使用剩余的低优先级通信预算。 */
+	if (!jm_app_telemetry_enabled())
+	{
+		telemetry_tick = 0;
+	}
+	else if (++telemetry_tick >= jm_host_commun_telemetry_tick())
+	{
+		jm_feedback_t fb;
+		uint8_t o[2 + 96 + JM_DBG_CH * 4]; /* mask(2) + 固定遥测组 + 调试通道 */
+		uint16_t mask = jm_app_telemetry_mask();
+		if (mask != 0u && jm_app_get_feedback(&fb) == JM_ERR_OK)
+		{
+			uint16_t n = jm_host_commun_pack_telemetry(mask, &fb, o);
+			dev_commun_can.report(&dev_commun_can, JM_CMD_TELEMETRY, o, n);
+		}
+		telemetry_tick = 0;
+	}
+#if !defined(USE_DEV_COMMUN_UART)
+	/* UART 在位时 TRACE 已由 UART 路径排空, 此处仅 CAN-only 板兜底 */
+	jm_host_commun_trace_service();
+#endif
+}
+
+#endif /* USE_DEV_COMMUN_CAN */

@@ -28,6 +28,20 @@ pid_source_e motor_pid_get_source(pid_ring_e ring)
 	return (ring < PID_RING_MAX) ? s_ring_source[ring] : PID_SOURCE_DEFAULT;
 }
 
+void motor_pid_load_source_from_flash(const motor_info_t *info)
+{
+	if (info == NULL) return;
+
+	uint32_t mask = info->blocks.control.pid_source_mask;
+	/* 非 DEFAULT 值表示用户曾显式选择，覆盖 load_boot 的自动回退结果 */
+	pid_source_e cur = pid_source_from_mask(mask, PID_RING_CURRENT);
+	pid_source_e vel = pid_source_from_mask(mask, PID_RING_VELOCITY);
+	pid_source_e pos = pid_source_from_mask(mask, PID_RING_POSITION);
+	if (cur != PID_SOURCE_DEFAULT) s_ring_source[PID_RING_CURRENT]  = cur;
+	if (vel != PID_SOURCE_DEFAULT) s_ring_source[PID_RING_VELOCITY] = vel;
+	if (pos != PID_SOURCE_DEFAULT) s_ring_source[PID_RING_POSITION] = pos;
+}
+
 void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 {
 	if (param == NULL || info == NULL)
@@ -48,6 +62,9 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 			param->current_loop.current_ki_q = ctl->ki_lq;
 			param->current_loop.current_integral_limit = ctl->integral_limit;
 			break;
+		case PID_SOURCE_DEBUG:
+			/* 不覆盖 motor_param_t，保留 0xA5 直接写入 s_motor_pid_profiles 的值 */
+			break;
 		case PID_SOURCE_DEFAULT:
 		default:
 			/* 保留 motor_param_init/motor_profile 的默认值，不覆盖 */
@@ -62,6 +79,11 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 			param->position_loop.speed_kp = ctl->kp_s;
 			param->position_loop.speed_ki = ctl->ki_s;
 			param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
+			/* 惯量加速度前馈增益(J/Kt)：L6.4 autotune 与 PID 同源写入 */
+			param->position_loop.accel_ff_gain = ctl->aff;
+			break;
+		case PID_SOURCE_DEBUG:
+			/* 不覆盖 motor_param_t，保留 0xA5 直接写入 s_motor_pid_profiles 的值 */
 			break;
 		case PID_SOURCE_DEFAULT:
 		default:
@@ -75,6 +97,9 @@ void motor_pid_load(motor_param_t *param, const motor_info_t *info)
 		case PID_SOURCE_AUTOTUNE:
 			param->position_loop.position_kp = ctl->kp_p;
 			param->position_loop.position_integral_limit = ctl->position_integral_limit;
+			break;
+		case PID_SOURCE_DEBUG:
+			/* 不覆盖 motor_param_t，保留 0xA5 直接写入 s_motor_pid_profiles 的值 */
 			break;
 		case PID_SOURCE_DEFAULT:
 		default:
@@ -143,6 +168,7 @@ void motor_pid_load_boot(motor_param_t *param, const motor_info_t *info)
 		param->position_loop.speed_kp = ctl->kp_s;
 		param->position_loop.speed_ki = ctl->ki_s;
 		param->position_loop.speed_integral_limit = ctl->speed_integral_limit;
+		param->position_loop.accel_ff_gain = ctl->aff;
 	}
 	else
 	{
@@ -188,11 +214,32 @@ void motor_pid_load_boot(motor_param_t *param, const motor_info_t *info)
 void motor_pid_reload(void)
 {
 	motor_param_t *param = &usr.motor_param[M1];
+	motor_pid_profile_t debug_saved[MOTOR_PID_PROFILE_MAX];
+	uint8_t debug_valid[MOTOR_PID_PROFILE_MAX] = {0};
+	uint8_t i;
+	/* 保留已进入 DEBUG 的 RAM profile，避免 reload 其它环时覆盖调试值。 */
+	for (i = 0u; i < MOTOR_PID_PROFILE_MAX; i++)
+	{
+		if ((i <= MOTOR_PID_PROFILE_CURRENT_Q && motor_pid_get_source(PID_RING_CURRENT) == PID_SOURCE_DEBUG) ||
+			(i == MOTOR_PID_PROFILE_VELOCITY && motor_pid_get_source(PID_RING_VELOCITY) == PID_SOURCE_DEBUG) ||
+			(i == MOTOR_PID_PROFILE_POSITION && motor_pid_get_source(PID_RING_POSITION) == PID_SOURCE_DEBUG))
+		{
+			debug_valid[i] = 1u;
+			debug_saved[i] = s_motor_pid_profiles[i];
+		}
+	}
+#if defined(USE_DEV_FLASH)
 	const motor_info_t *info = motor_info_storage_get();
+#else
+	const motor_info_t *info = NULL; /* 未启用 Flash 存储,传 NULL(motor_pid_load 内部判空返回) */
+#endif
 
 	/* 按 source 独立加载三环 PID 到 motor_param_t */
 	motor_pid_load(param, info);
 
 	/* 重新同步到 motor_pid_profile 管理器（motor_pid_profile 读 motor_param_t） */
 	motor_pid_profile_load_from_motor_param(param);
+	for (i = 0u; i < MOTOR_PID_PROFILE_MAX; i++)
+		if (debug_valid[i])
+			s_motor_pid_profiles[i] = debug_saved[i];
 }

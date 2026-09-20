@@ -18,10 +18,10 @@
           <Vendor>STMicroelectronics</Vendor>
           <PackID>Keil.STM32G4xx_DFP.2.2.0</PackID>
           <PackURL>https://www.keil.com/pack/</PackURL>
-          <Cpu>IRAM(0x20000000,0x00020000) IROM(0x08000000,0x00020000) CPUTYPE("Cortex-M4") FPU2 DSP CLOCK(12000000) ELITTLE</Cpu>
+          <Cpu>IRAM(0x20000000,0x00020000) IROM(0x08000000,0x00080000) CPUTYPE("Cortex-M4") FPU2 DSP CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
           <StartupFile></StartupFile>
-          <FlashDriverDll>UL2CM3(-S0 -C0 -P0 -FD20000000 -FC8000 -FN1 -FF0STM32G47x-8x_128 -FS08000000 -FL020000 -FP0($$Device:STM32G473CBTx$CMSIS\Flash\STM32G47x-8x_128.FLM))</FlashDriverDll>
+          <FlashDriverDll>UL2CM3(-S0 -C0 -P0 -FD20000000 -FC8000 -FN1 -FF0STM32G47x-8x_512 -FS08000000 -FL080000 -FP0($$Device:STM32G474CETx$CMSIS\Flash\STM32G47x-8x_512.FLM))</FlashDriverDll>
           <DeviceId>0</DeviceId>
           <RegisterFile></RegisterFile>
           <MemoryEnv></MemoryEnv>
@@ -33,7 +33,7 @@
           <SLE66CMisc></SLE66CMisc>
           <SLE66AMisc></SLE66AMisc>
           <SLE66LinkerMisc></SLE66LinkerMisc>
-          <SFDFile>$$Device:STM32G473CBTx$CMSIS\SVD\STM32G473.svd</SFDFile>
+          <SFDFile>$$Device:STM32G474CETx$CMSIS\SVD\STM32G474.svd</SFDFile>
           <bCustSvd>0</bCustSvd>
           <UseEnv>0</UseEnv>
           <BinPath></BinPath>
@@ -70,9 +70,9 @@
             <nStopU2X>0</nStopU2X>
           </BeforeCompile>
           <BeforeMake>
-            <RunUserProg1>0</RunUserProg1>
+            <RunUserProg1>1</RunUserProg1>
             <RunUserProg2>0</RunUserProg2>
-            <UserProg1Name></UserProg1Name>
+            <UserProg1Name>python "..\..\..\User\Tools\scripts\incr_build.py"</UserProg1Name>
             <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
@@ -80,9 +80,9 @@
             <nStopB2X>0</nStopB2X>
           </BeforeMake>
           <AfterMake>
-            <RunUserProg1>0</RunUserProg1>
-            <RunUserProg2>1</RunUserProg2>
-            <UserProg1Name></UserProg1Name>
+            <RunUserProg1>1</RunUserProg1>
+            <RunUserProg2>0</RunUserProg2>
+            <UserProg1Name>keil5_disp_size_bar.exe</UserProg1Name>
             <UserProg2Name></UserProg2Name>
             <UserProg1Dos16Mode>0</UserProg1Dos16Mode>
             <UserProg2Dos16Mode>0</UserProg2Dos16Mode>
@@ -251,7 +251,7 @@
               <IROM>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x20000</Size>
+                <Size>0x80000</Size>
               </IROM>
               <XRAM>
                 <Type>0</Type>
@@ -276,12 +276,12 @@
               <OCR_RVCT4>
                 <Type>1</Type>
                 <StartAddress>0x8000000</StartAddress>
-                <Size>0x20000</Size>
+                <Size>0x4e000</Size>
               </OCR_RVCT4>
               <OCR_RVCT5>
                 <Type>1</Type>
-                <StartAddress>0x0</StartAddress>
-                <Size>0x0</Size>
+                <StartAddress>0x8050000</StartAddress>
+                <Size>0x30000</Size>
               </OCR_RVCT5>
               <OCR_RVCT6>
                 <Type>0</Type>
@@ -301,7 +301,7 @@
               <OCR_RVCT9>
                 <Type>0</Type>
                 <StartAddress>0x20000000</StartAddress>
-                <Size>0x20000</Size>
+                <Size>0x17fff</Size>
               </OCR_RVCT9>
               <OCR_RVCT10>
                 <Type>0</Type>
@@ -339,7 +339,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32G474xx,JM_BOARD_V1</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorCalibration;../../../User/Protocol;../../../User/Protocol/vesc_proto;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl;../../../User/MotorControl/PidManager</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc;../Drivers/STM32G4xx_HAL_Driver/Inc/Legacy;../Middlewares/Third_Party/FreeRTOS/Source/include;../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS;../Middlewares/Third_Party/FreeRTOS/Source/portable/RVDS/ARM_CM4F;../Drivers/CMSIS/Device/ST/STM32G4xx/Include;../Drivers/CMSIS/Include;../Middlewares/ST/ARM/DSP/Inc;../../../User/AppEntry;../../../User/AppServices/ErrorManager;../../../User/AppServices/FaultManager;../../../User/AppServices/LEDManager;../../../User/AppServices/ParamService;../../../User/AppServices/SafetyManager;../../../User/AppServices/StateMachine;../../../User/AppServices/ThreadManager;../../../User/AppServices/Watchdog;../../../User/Common;../../../User/Config;../../../User/DataHub;../../../User/Devices;../../../User/Driver;../../../User/MotorAlgorithms;../../../User/MotorCalibration;../../../User/Protocol;../../../User/Protocol/packer_parser;../../../User/Protocol/joint_proto;../../../User/MotorControl/ControlModes;../../../User/MotorControl/ControlProcess;../../../User/MotorControl/CascadeControl;../../../User/MotorControl/PidManager</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -446,17 +446,52 @@
           </Files>
         </Group>
         <Group>
-          <GroupName>AppServices</GroupName>
+          <GroupName>AppServices/FaultManager</GroupName>
           <Files>
             <File>
-              <FileName>serialstudio_commun.c</FileName>
+              <FileName>fault_def.c</FileName>
               <FileType>1</FileType>
-              <FilePath>..\..\..\User\AppServices\ParamService\serialstudio_commun.c</FilePath>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_def.c</FilePath>
             </File>
+            <File>
+              <FileName>fault_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_manager.c</FilePath>
+            </File>
+            <File>
+              <FileName>fault_detect_fast.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_detect_fast.c</FilePath>
+            </File>
+            <File>
+              <FileName>fault_detect_slow.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\FaultManager\fault_detect_slow.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>AppServices</GroupName>
+          <Files>
             <File>
               <FileName>jm_host_commun.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\AppServices\ParamService\jm_host_commun.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_info_storage.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\ParamService\motor_info_storage.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_info_calib.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\ParamService\motor_info_calib.c</FilePath>
+            </File>
+            <File>
+              <FileName>led_manager.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\AppServices\LEDManager\led_manager.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -472,6 +507,11 @@
               <FileName>jm_proto_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>jm_proto_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Protocol\joint_proto\jm_proto_can.c</FilePath>
             </File>
             <File>
               <FileName>jm_proto.c</FileName>
@@ -564,6 +604,16 @@
               <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_test_sweep.c</FilePath>
             </File>
             <File>
+              <FileName>motor_mode_zero_force.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_zero_force.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_mode_load_sim.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\Modes\motor_mode_load_sim.c</FilePath>
+            </File>
+            <File>
               <FileName>motor_pid_profile.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorControl\PidManager\motor_pid_profile.c</FilePath>
@@ -592,6 +642,11 @@
               <FileName>motor_loop.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorControl\CascadeControl\motor_loop.c</FilePath>
+            </File>
+            <File>
+              <FileName>motor_observer.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorControl\CascadeControl\motor_observer.c</FilePath>
             </File>
             <File>
               <FileName>dev_motor_virtual.c</FileName>
@@ -648,6 +703,16 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorCalibration\calib_hw.c</FilePath>
             </File>
+            <File>
+              <FileName>calib_ac_injection.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_ac_injection.c</FilePath>
+            </File>
+            <File>
+              <FileName>calib_config_runtime.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorCalibration\calib_config_runtime.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -668,6 +733,21 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\User\MotorAlgorithms\multiturn_counter.c</FilePath>
             </File>
+            <File>
+              <FileName>foc_decoupling.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorAlgorithms\foc_decoupling.c</FilePath>
+            </File>
+            <File>
+              <FileName>friction_comp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorAlgorithms\friction_comp.c</FilePath>
+            </File>
+            <File>
+              <FileName>cogging_comp.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\MotorAlgorithms\cogging_comp.c</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -683,6 +763,16 @@
               <FileType>1</FileType>
               <FilePath>..\..\..\User\DataHub\runtime_param.c</FilePath>
             </File>
+            <File>
+              <FileName>motor_info.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\DataHub\motor_info.c</FilePath>
+            </File>
+            <File>
+              <FileName>version.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\..\..\User\DataHub\version.h</FilePath>
+            </File>
           </Files>
         </Group>
         <Group>
@@ -697,6 +787,11 @@
               <FileName>dev_config.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\Devices\dev_config.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_flash.c</FilePath>
             </File>
             <File>
               <FileName>dev_dwt_counter.c</FileName>
@@ -737,6 +832,31 @@
               <FileName>dev_commun_uart.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\..\User\Devices\dev_commun_uart.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_commun_can.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_commun_can.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_eeprom.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_eeprom.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_encoder_mt6701.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_encoder_mt6701.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_encoder_mt6835.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_encoder_mt6835.c</FilePath>
+            </File>
+            <File>
+              <FileName>dev_led.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\..\..\User\Devices\dev_led.c</FilePath>
             </File>
           </Files>
         </Group>
@@ -853,11 +973,6 @@
         <Group>
           <GroupName>Common</GroupName>
           <Files>
-            <File>
-              <FileName>vofa.c</FileName>
-              <FileType>1</FileType>
-              <FilePath>..\..\..\User\Common\vofa.c</FilePath>
-            </File>
             <File>
               <FileName>pid_core.c</FileName>
               <FileType>1</FileType>

@@ -22,7 +22,6 @@
 #include "stm32g4xx_it.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-//#include "dev_commun_vesc.h"
 #include "dev_commun_uart.h"
 #include "jm_host_commun.h"
 /* USER CODE END Includes */
@@ -58,6 +57,7 @@
 /* USER CODE END 0 */
 
 /* External variables --------------------------------------------------------*/
+extern DMA_HandleTypeDef hdma_adc1;
 extern ADC_HandleTypeDef hadc1;
 extern FDCAN_HandleTypeDef hfdcan1;
 extern TIM_HandleTypeDef htim1;
@@ -199,6 +199,20 @@ void DMA1_Channel2_IRQHandler(void)
 }
 
 /**
+  * @brief This function handles DMA1 channel3 global interrupt.
+  */
+void DMA1_Channel3_IRQHandler(void)
+{
+  /* USER CODE BEGIN DMA1_Channel3_IRQn 0 */
+
+  /* USER CODE END DMA1_Channel3_IRQn 0 */
+  HAL_DMA_IRQHandler(&hdma_adc1);
+  /* USER CODE BEGIN DMA1_Channel3_IRQn 1 */
+
+  /* USER CODE END DMA1_Channel3_IRQn 1 */
+}
+
+/**
   * @brief This function handles ADC1 and ADC2 global interrupt.
   */
 void ADC1_2_IRQHandler(void)
@@ -274,10 +288,6 @@ void TIM2_IRQHandler(void)
 void USART1_IRQHandler(void)
 {
   /* USER CODE BEGIN USART1_IRQn 0 */
-#if defined(USE_DEV_COMMUN_VESC)
-  /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
-//  dev_commun_vesc.on_rx_idle(&dev_commun_vesc);
-#endif
 #if defined(USE_DEV_COMMUN_UART)
   /* 先于 HAL 处理: 检测 IDLE 标志, 停 DMA 并锁存本帧(不定长接收) */
   if (dev_commun_uart.on_rx_idle != 0)

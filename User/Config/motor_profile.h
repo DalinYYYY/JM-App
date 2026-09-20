@@ -1,28 +1,61 @@
 #ifndef __MOTOR_PROFILE_H__
 #define __MOTOR_PROFILE_H__
 
-#include "motor_param.h" /* motor_param_t：sync_to_param 参数类型 */
-#include "motor_info.h"  /* motor_info_t：sync_to_param 参数类型 */
+#include "motor_param.h"  /* motor_param_t：sync_to_param 参数类型 */
+#include "motor_info.h"   /* motor_info_t：sync_to_param 参数类型 */
+#include "board_select.h" /* 板级电机选型 MOTOR_PROFILE_BOARD */
 
-/* ===================== 电机参数配置文件（唯一真相源）=====================
- * 所有电机电气身份参数集中于此。三个消费方通过 #include 引用：
- *   - User/DataHub/motor_param.c         （控制环运行时默认值）
- *   - User/DataHub/motor_info.c          （协议持久化参数默认值）
- *   - User/MotorCalibration/calib_config.h（标定结果合理性范围）
+/* ===================== 电机参数配置文件（首次上电 fallback 默认值）=====================
+ * 本文件提供电机电气身份参数的编译期默认值，仅在以下场景使用：
+ *   1. 首次上电（Flash 无有效数据）：apply_info_default() 用 MOTOR_* 宏初始化 motor_info
+ *   2. 未启用 USE_DEV_FLASH 的板（V1 等）：calib_config_runtime.c 回退到 MOTOR_* 编译期值
+ *   3. motor_param_init 后的 apply_param()：写入运行期 motor_param_t 默认值
  *
- * 切换电机型号：修改下面的 MOTOR_PROFILE 宏定义为对应的型号编号。
- * 新增电机型号：在下面追加 #define MOTOR_PROFILE_XXX N，并补一个
- *               #elif 分支填写该型号的全部 MOTOR_* 参数。
+ * 切换电机型号：
+ *   - 编译期选型：在各板 Board/<板>/Config/motor_config_board.h 中定义
+ *     MOTOR_PROFILE_BOARD（由 board_select.h 分发），未定义的板用下方兜底值
+ *   - 运行期换电机（启用 Flash 的板）：上位机通过 0xE7 命令批量写入
+ *     motor_info.blocks.motor_calib 字段，0xEA 固化到 Flash，无需重编译固件
+ *   - 标定算法通过 calib_config_runtime.h 读取 motor_info 派生标定参数
  *
- * 说明：本文件只含电机电气身份参数（换电机时变的量）。
- *       板级参数（pwm_freq/enc_lines/dead_time）、减速器、PID 增益
- *       不在此文件，留在各自原文件。
+ * 三个消费方：
+ *   - User/DataHub/motor_param.c           （控制环运行时默认值）
+ *   - User/DataHub/motor_info.c            （协议持久化参数默认值）
+ *   - User/MotorCalibration/calib_config_runtime.c（运行期派生标定参数的 fallback）
+ *
+ * 说明：本文件只含电机电气身份参数（换电机时变的量），是型号参数库。
+ *       型号选择权在板级（motor_config_board.h），板级参数（pwm_freq/enc_lines/
+ *       dead_time）、减速器、PID 增益不在此文件，留在各自原文件。
  */
 
-/* ===================== 电机型号选择（修改此行切换）===================== */
-#define MOTOR_PROFILE_GM4820H 1
-#define MOTOR_PROFILE_DEMO    2 /* 示例占位，演示多型号切换 */
-#define MOTOR_PROFILE         MOTOR_PROFILE_GM4820H
+/* ===================== 电机型号编号 ===================== */
+#define MOTOR_PROFILE_GM4820H  1
+#define MOTOR_PROFILE_5010_360 2 /* 5010 360KV 云台电机 */
+#define MOTOR_PROFILE_DEMO     3 /* 示例占位，演示多型号切换 */
+#define MOTOR_PROFILE_RS03     4 /* RS03 关节电机 */
+#define MOTOR_PROFILE_QH8919   5 /* 强和 QH8919 关节电机 */
+
+/* ===================== 型号选择（板级 motor_config_board.h 覆盖）===================== */
+#ifndef MOTOR_PROFILE_BOARD
+#define MOTOR_PROFILE_BOARD MOTOR_PROFILE_GM4820H /* 板级未指定时兜底 */
+#endif
+#if (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_GM4820H)     \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_5010_360) \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_DEMO)     \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_RS03)     \
+	&& (MOTOR_PROFILE_BOARD != MOTOR_PROFILE_QH8919)
+#error "MOTOR_PROFILE_BOARD 非法，请检查板级 motor_config_board.h 的型号编号"
+#endif
+#define MOTOR_PROFILE MOTOR_PROFILE_BOARD
+
+/* V1/SFOC_V2 的 TIM1 中心对齐 PWM 默认载波为 10 kHz，外部参数为零或
+ * 裁剪构建时用于自动死区补偿的回退值；有效 motor_info 标定值优先。 */
+#ifndef MOTOR_PROFILE_PWM_FREQ_HZ
+#define MOTOR_PROFILE_PWM_FREQ_HZ 10000U
+#endif
+#ifndef MOTOR_PROFILE_DEAD_TIME_NS
+#define MOTOR_PROFILE_DEAD_TIME_NS 500.0f
+#endif
 
 /* ===================== 各型号参数 ===================== */
 #if MOTOR_PROFILE == MOTOR_PROFILE_GM4820H
@@ -30,7 +63,7 @@
  * 结构 12N14P / WYE / SPMSM（表贴式，Ld≈Lq）
  * 时间常数 τ = L/R = 4.8mH/3.6Ω = 1.33ms */
 #define MOTOR_NAME            "GM4820H"
-#define MOTOR_R               3.6f    /* 相电阻(Ω) PDF: Ri */
+#define MOTOR_R               1.8f    /* 相电阻(Ω) PDF: Ri */
 #define MOTOR_LD              4.8e-3f /* d轴电感(H) PDF: 4.8mH */
 #define MOTOR_LQ              4.8e-3f /* q轴电感(H) SPMSM: Ld≈Lq */
 #define MOTOR_FLUX            0.02f   /* 磁链(Wb) KV=66反算: 60/(2π·66·7) */
@@ -45,6 +78,36 @@
 #define MOTOR_RATED_TORQUE    0.2f    /* 额定转矩(Nm) PDF */
 #define MOTOR_PEAK_TORQUE     0.5f    /* 峰值转矩(Nm) */
 #define MOTOR_INERTIA         1e-5f   /* 转子惯量(kg·m²) 估算 */
+
+#elif MOTOR_PROFILE == MOTOR_PROFILE_5010_360
+/* MKS 5010 360KV 无刷云台电机（参数来源：厂家规格书）
+ * 结构 12N14P / WYE / SPMSM（表贴式，Ld≈Lq）
+ * 厂家参数: R=120mΩ, L=50μH, Imax=20A, Pmax=300W, 极对数=7, DC12~24V
+ * 派生计算（自洽校验: 24V空载转速 = 360KV×24V = 8640rpm = 904.8rad/s,
+ *           电角速度 ωe = 904.8×7 = 6333rad/s, flux = 24/6333 ≈ 3.79e-3 Wb）:
+ *   磁链 flux = 60/(2π·KV·pp) = 60/(2π·360·7) ≈ 3.79e-3 Wb
+ *   转矩常数 KT = 1.5·pp·flux ≈ 0.0398 Nm/A（注: KV法反算磁链对低KV大电机偏小，
+ *                实际应以堵转转矩实测为准；此值仅用于首次上电）
+ *   反电动势常数 KE = flux·pp ≈ 0.0265 V/(rad/s)
+ *   时间常数 τ = L/R = 50μH/0.12Ω ≈ 0.42ms
+ * KT 数量级自检: 修正前误写为 0.398e-3(小100倍), 力矩模式 iq=τ/kt 被放大100倍,
+ * 0.01Nm 即 25A 电流命令, 现象为母线被拉垮(2026-08 排查修复) */
+#define MOTOR_NAME            "MKS5010_360KV"
+#define MOTOR_R               0.12f    /* 相电阻(Ω) 厂家: 120mΩ */
+#define MOTOR_LD              50e-6f   /* d轴电感(H) 厂家: 50μH */
+#define MOTOR_LQ              50e-6f   /* q轴电感(H) SPMSM: Ld≈Lq */
+#define MOTOR_FLUX            3.79e-3f /* 磁链(Wb) KV=360反算: 60/(2π·360·7) */
+#define MOTOR_KT              0.0398f  /* 转矩常数(Nm/A) = 1.5·pp·flux */
+#define MOTOR_KE              0.0265f  /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      7        /* 极对数 厂家: 7 (12N14P) */
+#define MOTOR_RATED_CURRENT   2.0f     /* 额定电流(A) 保守取 Imax/2 */
+#define MOTOR_PEAK_CURRENT    6.0f     /* 峰值电流(A) 厂家: 20A */
+#define MOTOR_MAX_SPEED       150.0f   /* 最大转速(rad/s) 保守限幅(空载可达8640rpm) */
+#define MOTOR_RATED_VOLTAGE   12.0f    /* 额定电压(V) 厂家: DC12~24V, 取上限 */
+#define MOTOR_RATED_SPEED_RPM 1432.0f  /* 额定转速(rpm) 对应 MAX_SPEED 限幅 */
+#define MOTOR_RATED_TORQUE    0.08f    /* 额定转矩(Nm) 估算: KT×Irated = 0.04×2 */
+#define MOTOR_PEAK_TORQUE     0.2f     /* 峰值转矩(Nm) 估算: KT×Ipeak ≈ 0.24 */
+#define MOTOR_INERTIA         5e-6f    /* 转子惯量(kg·m²) 估算: 5010尺寸 */
 
 #elif MOTOR_PROFILE == MOTOR_PROFILE_DEMO
 /* 示例：演示如何添加第二个电机型号（占位，非真实参数）*/
@@ -65,6 +128,57 @@
 #define MOTOR_PEAK_TORQUE     3.0f
 #define MOTOR_INERTIA         1e-5f
 
+#elif MOTOR_PROFILE == MOTOR_PROFILE_RS03
+/* RS03 关节电机（参数来源：RS03使用说明书260428.pdf）
+ * 额定 500W / 1500rpm / 3.183Nm / DC48V / 极对数8
+ * 内部自洽性说明:
+ *   KT = 额定转矩/连续电流 = 3.183/10 ≈ 0.3183 Nm/A
+ *   flux = KT/(1.5·pp) = 0.3183/12 ≈ 0.0265 Wb
+ *   说明书标称磁链 4e-5Wb 与额定转矩/反电势不自洽(按4e-5算KT仅4.8e-4),
+ *   故按 KT 反算校准。时间常数 τ = L/R = 0.114mH/0.22Ω ≈ 0.52ms */
+#define MOTOR_NAME            "RS03"
+#define MOTOR_R               0.22f     /* 相电阻(Ω) 20°C */
+#define MOTOR_LD              0.114e-3f /* d轴电感(H) 0.114mH */
+#define MOTOR_LQ              0.114e-3f /* q轴电感(H) 取同d轴 */
+#define MOTOR_FLUX            0.0265f   /* 磁链(Wb) 由KT反算: KT/(1.5·pp) */
+#define MOTOR_KT              0.3183f   /* 转矩常数(Nm/A) = 额定转矩/连续电流 */
+#define MOTOR_KE              0.2122f   /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      20        /* 极对数 */
+#define MOTOR_RATED_CURRENT   10.0f     /* 连续电流(峰值)(A) */
+#define MOTOR_PEAK_CURRENT    30.0f     /* 峰值电流(短时)(A) */
+#define MOTOR_MAX_SPEED       200.0f    /* 最大转速(rad/s) 额定≈157.1rad/s */
+#define MOTOR_RATED_VOLTAGE   48.0f     /* 直流母线电压(V) */
+#define MOTOR_RATED_SPEED_RPM 1500.0f   /* 额定转速(rpm) */
+#define MOTOR_RATED_TORQUE    3.183f    /* 额定转矩(Nm) */
+#define MOTOR_PEAK_TORQUE     9.55f     /* 峰值转矩(Nm) ≈ KT×峰值电流 */
+#define MOTOR_INERTIA         4.7e-5f   /* 转子惯量(kg·m²) */
+
+#elif MOTOR_PROFILE == MOTOR_PROFILE_QH8919
+/* 强和 QH8919 关节电机（参数来源：本机实测标定 2026-08，台架：V1板+MT6835+磁滞对拖台）
+ * 额定 3500rpm / 1.6Nm / 13A / DC48V / 极对数14 / 直连无减速器
+ * 标定链自洽性（已验证：堵转功率账 + 50rad/s@1Nm 带载功率账均闭合）:
+ *   KT = 额定转矩/额定电流 = 1.6/13 ≈ 0.126 Nm/A（与实测 0.126 一致）
+ *   flux = KT/(1.5·pp) = 0.126/21 ≈ 6.01e-3 Wb（实测 6.012e-3）
+ *   KE = flux·pp ≈ 0.0842 V/(rad/s)
+ * 48V 电压极限（SVPWM 线性区 48/√3 ≈ 27.7V，含 R·I 压降与交叉项）:
+ * 时间常数 τ = L/R = 0.175mH/0.085Ω ≈ 2.1ms */
+#define MOTOR_NAME            "QH8919"
+#define MOTOR_R               0.085f    /* 相电阻(Ω) 实测 0.0852 */
+#define MOTOR_LD              0.165e-3f /* d轴电感(H) 实测 165µH */
+#define MOTOR_LQ              0.175e-3f /* q轴电感(H) 实测 175µH */
+#define MOTOR_FLUX            6.012e-3f /* 磁链(Wb) 实测，与KT自洽 */
+#define MOTOR_KT              0.106f    /* 转矩常数(Nm/A) = 额定转矩/额定电流 */
+#define MOTOR_KE              0.0842f   /* 反电动势常数(V/(rad/s)) = flux·pp */
+#define MOTOR_POLE_PAIRS      14        /* 极对数 开环扫描实测 */
+#define MOTOR_RATED_CURRENT   15.0f     /* 额定电流(A) = 额定转矩/KT */
+#define MOTOR_PEAK_CURRENT    20.0f     /* 峰值电流(A) 运行期限幅(与 id 43 配置一致) */
+#define MOTOR_MAX_SPEED       330.0f    /* 最大转速(rad/s) 48V线性区极限 ~3150rpm */
+#define MOTOR_RATED_VOLTAGE   48.0f     /* 直流母线电压(V) */
+#define MOTOR_RATED_SPEED_RPM 2830.0f   /* 额定转速(rpm) 48V下13A带载极限 */
+#define MOTOR_RATED_TORQUE    1.6f      /* 额定转矩(Nm) */
+#define MOTOR_PEAK_TORQUE     2.52f     /* 峰值转矩(Nm) = KT×峰值电流 */
+#define MOTOR_INERTIA         1.26e-3f  /* 惯量(kg·m²) 扫频辨识值(含磁滞台转子)，装机后应重估 */
+
 #else
 #error "未知 MOTOR_PROFILE，请在 motor_profile.h 中定义有效的电机型号编号"
 #endif
@@ -81,10 +195,18 @@
 void motor_profile_apply_param(void *cfg);
 void motor_profile_apply_info(void *cfg);
 
-/* profile 配置版本号：修改 MOTOR_PROFILE 宏切换电机型号时递增此版本号，
- * 用于上电时检测 Flash 中存储的参数是否对应当前固件的 profile。
- * 版本不匹配时触发重新初始化（init + apply_default + save）。*/
-#define MOTOR_PROFILE_CONFIG_VERSION 1U
+/* profile 配置版本号：仅当 motor_info_t 结构体字段增删时递增此版本号，
+ * 用于上电时检测 Flash 中存储的参数布局是否对应当前固件。
+ * 版本不匹配时触发重新初始化（init + apply_default + save）。
+ * 切换电机型号不再递增此版本号（型号切换通过 0xE7 写入 motor_info 实现）。
+ *
+ * 版本历史：
+ *   v1: 初始版本
+ *   v2: 增加 pid_flash_valid_magic 字段
+ *   v3: MotorCalibParam 段增加 peak_current/max_speed 字段（Index 43/44）
+ *   v4: ProtectComm 块移除旧温度参数（温度保护迁移至 FaultParam 块）
+ *   v5: FaultParam 块取消, 故障阈值/三级使能掩码(拆低/高32位对)融合进 ProtectCommParam(协议 v1.12)*/
+#define MOTOR_PROFILE_CONFIG_VERSION 6U /* v6: advanced 块新增齿槽补偿参数 PID184/185(旧存储作废重建) */
 
 void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上电用 */
 
@@ -107,5 +229,11 @@ void motor_profile_apply_info_default(void *cfg); /* 无条件覆盖：首次上
  * @param info   Flash 加载的 motor_info 句柄（motor_info_storage_get() 返回值）
  */
 void motor_profile_sync_to_param(motor_param_t *param, const motor_info_t *info);
+
+/* 将 motor_info 中的电流环补偿配置同步到 ISR 实际读取的 motor_param。 */
+void motor_profile_sync_control_to_param(motor_param_t *param, const motor_info_t *info);
+
+/* 重新加载故障管理配置到 fault_mgr（补偿 fault_mgr_init 覆盖） */
+void motor_profile_sync_fault_cfg_reload(const motor_info_t *info);
 
 #endif /* __MOTOR_PROFILE_H__ */

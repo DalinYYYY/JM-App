@@ -450,8 +450,7 @@ float utils_throttle_curve(float val, float curve_acc, float curve_brake, int mo
 		curve = curve_brake;
 	}
 
-	// 参考
-	// http://math.stackexchange.com/questions/297768/how-would-i-create-a-exponential-ramp-function-from-0-0-to-1-1-with-a-single-val
+	// 曲线公式参考 http://math.stackexchange.com/questions/297768
 	if (mode == 0)
 	{ // 指数
 		if (curve >= 0.0f)
@@ -530,7 +529,6 @@ uint32_t utils_crc32c(uint8_t *data, uint32_t len)
 	return ~crc;
 }
 
-// 注：bin0 实际就是均值
 /**
  * @brief   32 点 DFT 的第 0 频点（直流分量，即均值）
  * @param   real_in 输入实数序列（32 点）

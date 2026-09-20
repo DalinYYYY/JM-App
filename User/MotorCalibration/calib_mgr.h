@@ -50,7 +50,7 @@ void calib_mgr_set_fail_reason(calib_fail_reason_e reason);
  * @param step     当前步骤索引（0-based）
  * @param step_total L7 序列总步数
  * @note  同时设置 status.step 与 status.step_total, 供 0x97 查询。
- *        L7 调用此接口后, status.level/submode 也会被更新为当前子项。
+ *        level/submode 不入此接口更新, 保持 calib_mgr_start 时写入的 L7/FULL_AUTO。
  */
 void calib_mgr_set_l7_progress(uint8_t step, uint8_t step_total);
 

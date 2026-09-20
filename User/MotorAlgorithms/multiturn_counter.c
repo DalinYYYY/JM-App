@@ -200,6 +200,14 @@ static int32_t multiturn_get_turns(multiturn_t *pobj)
 	return pobj->turns;
 }
 
+static void multiturn_reset_position(multiturn_t *pobj)
+{
+	/* 保留 last_single_rad 与 settle 状态: 下一拍增量连续, 不引入过零跳变 */
+	pobj->position = 0.0f;
+	pobj->turns = 0;
+	pobj->multiturn_position = 0.0f;
+}
+
 /* ------------------------------------------------------------------ */
 /* 初始化                                                              */
 /* ------------------------------------------------------------------ */
@@ -215,4 +223,5 @@ void multiturn_init(multiturn_t *pobj, const multiturn_config_t *cfg)
 	pobj->update_single = multiturn_update_single;
 	pobj->get_position = multiturn_get_position;
 	pobj->get_turns = multiturn_get_turns;
+	pobj->reset_position = multiturn_reset_position;
 }

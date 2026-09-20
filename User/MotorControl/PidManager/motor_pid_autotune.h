@@ -10,7 +10,7 @@
  *
  *          前置条件：电机辨识已完成（is_calibrated == 1 且 R/L 非默认值）。
  *          事务语义：motor_pid_autotune_apply 任一环失败则全部不写入。
- *          带宽参数 = 0 时用推荐默认值（电流环 1kHz / 速度环 100Hz / 位置环 20Hz）。
+ *          带宽参数 = 0 时用推荐默认值（电流环 1kHz / 速度环 30Hz / 位置环 5Hz）。
  */
 #ifndef __MOTOR_PID_AUTOTUNE_H__
 #define __MOTOR_PID_AUTOTUNE_H__
@@ -42,7 +42,7 @@ int motor_pid_autotune_current(const motor_info_t *info, float bandwidth_hz,
 /**
  * @brief  速度环理论估计（二阶最佳阻尼 ξ=0.707）
  * @param  info         motor_info 指针（读取 J/Kt）
- * @param  bandwidth_hz 期望速度环带宽 (Hz)，≤0 时用默认 100Hz
+ * @param  bandwidth_hz 期望速度环带宽 (Hz)，≤0 时用默认 30Hz
  * @param  out          结果输出
  * @retval 0=成功, -1=参数无效, -2=辨识数据未就绪
  */
@@ -52,7 +52,7 @@ int motor_pid_autotune_velocity(const motor_info_t *info, float bandwidth_hz,
 /**
  * @brief  位置环理论估计（纯比例，带宽 = Kp）
  * @param  info         motor_info 指针
- * @param  bandwidth_hz 期望位置环带宽 (Hz)，≤0 时用默认 20Hz
+ * @param  bandwidth_hz 期望位置环带宽 (Hz)，≤0 时用默认 5Hz
  * @param  out          结果输出
  * @retval 0=成功, -1=参数无效
  */
@@ -60,16 +60,18 @@ int motor_pid_autotune_position(const motor_info_t *info, float bandwidth_hz,
                                 autotune_result_t *out);
 
 /**
- * @brief  事务性应用：计算三环并写入 ControlParam_t
+ * @brief  事务性应用：按 ring_mask 计算指定环并写入 ControlParam_t
  * @param  info          motor_info 指针（可写，理论值写入 control 段）
+ * @param  ring_mask     环选择位掩码: bit0=电流环 bit1=速度环 bit2=位置环 (可组合, 如 0x05=电流+位置)
  * @param  current_bw_hz 电流环带宽 (Hz)，≤0 用默认
  * @param  velocity_bw_hz 速度环带宽 (Hz)，≤0 用默认
  * @param  position_bw_hz 位置环带宽 (Hz)，≤0 用默认
  * @retval 0=成功, -1=参数无效, -2=辨识数据未就绪
- * @note   事务语义：任一环计算失败则全部不写入，返回错误码。
+ * @note   事务语义：所选环中任一计算失败则全部不写入，返回错误码。
+ *         未选中的环不计算、不校验、不写入，保留 ControlParam_t 原值。
  *         写入后需调用 motor_pid_reload() 生效，由上位机显式发 0xEA 固化。
  */
-int motor_pid_autotune_apply(motor_info_t *info, float current_bw_hz,
-                             float velocity_bw_hz, float position_bw_hz);
+int motor_pid_autotune_apply(motor_info_t *info, uint8_t ring_mask,
+                             float current_bw_hz, float velocity_bw_hz, float position_bw_hz);
 
 #endif /* __MOTOR_PID_AUTOTUNE_H__ */

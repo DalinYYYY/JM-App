@@ -34,4 +34,21 @@ float calib_hw_get_encoder_raw_deg(struct dev_motor *m);
 /* 获取编码器当前机械角度(°) [0,360)，含 offset/dir 补偿 */
 float calib_hw_get_encoder_mech_angle(struct dev_motor *m);
 
+/* 施加 dq 电压并回读限幅后的实际电压，用于 R 标定两点差分法
+ * @param ud_cmd/uq_cmd 命令电压(V)
+ * @param theta 强制电角度(rad)
+ * @param ud_act/uq_act 输出：限幅后的实际施加电压(V)，传 NULL 可不回读
+ * @note 内部调 calib_hw_apply_voltage 完成限幅+归一化+SVPWM */
+void calib_hw_apply_voltage_comp(calib_hw_session_t *s, float ud_cmd, float uq_cmd,
+                                 float theta, float *ud_act, float *uq_act);
+
+/* 施加交流注入电压（d 轴 DC + AC），用于低阻电机 R/Ld 辨识
+ * @param ud_dc 直流偏置电压(V)
+ * @param ud_ac 交流幅值(V)
+ * @param freq_hz 交流频率(Hz)
+ * @param tick 当前 tick 计数（用于计算相位）
+ * @param theta 强制电角度(rad) */
+void calib_hw_apply_ac_injection(calib_hw_session_t *s, float ud_dc, float ud_ac,
+                                 float freq_hz, uint32_t tick, float theta);
+
 #endif /* __CALIB_HW_H__ */

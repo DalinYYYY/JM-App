@@ -44,10 +44,14 @@
  */
 typedef struct
 {
-	float pos; // 实际位置(rad)
+	float pos; // 实际位置(rad, 多圈累计: 上电零点, 可被位置复位清零)
 	float vel; // 实际速度(rad/s)
 	float id;  // 实际d轴电流(A)
 	float iq;  // 实际q轴电流(A)
+	float mech_single_rad; // 编码器机械单圈角(rad, [0,2π), 每拍刷新)
+	                       // 与 L5.1 齿槽标定分桶同源(encoder.mechanical_angle),
+	                       // 角度周期性补偿(齿槽)必须用它: 多圈累计位置的零点
+	                       // 是上电位姿而非编码器机械零位, 直接查表会整体错相
 } cascade_fb_t;
 
 /**
@@ -72,6 +76,8 @@ typedef struct
 	pid_state_t pid_vel; // 速度环
 
 	float vel_setpoint; // 位置环输出的速度设定（调试可观测）
+
+	uint8_t pos_in_deadband; // 位置误差死区迟滞状态（1=带内保持不推）
 
 	ref_ctrl_type_e last_ctrl_type;	   // 上一拍入环层级（无扰切换检测）
 	motor_pid_profile_id_e last_pos_profile; // 上一拍位置环配置文件

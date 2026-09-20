@@ -1,6 +1,6 @@
 /**
- * @file thread_communication.c
- * @brief 
+ * @file thread_commun.c
+ * @brief 通信线程实现：周期驱动上位机 UART/CAN 通信设备 
  * 
  * @author dalin (dalinyy@163.com)
  * @version 1.0
@@ -22,65 +22,79 @@
 #include "runtime_param.h"
 #include "thread_config.h"
 #include "thread_commun.h"
-#include "vofa.h"
 #include "main.h"
-#include "dev_commun_vesc.h"
 #include "jm_host_commun.h"
+#if defined(USE_DEV_COMMUN_CAN)
+#include "drv_can.h"
+#endif
 
-void vofa_update(void)
+#if defined(USE_DEV_COMMUN_CAN)
+/* CAN 测试接口: 周期发送固定 ID 的原始测试帧, 供外接 CAN 盒子检查物理链路。
+ * 仅用于调试, 确认链路正常后应删除或置 0 关闭。 */
+#define CAN_TEST_ID        0x123u /* 测试帧标准 ID */
+#define CAN_TEST_PERIOD_MS 100u   /* 发送周期(ms) */
+#define CAN_TEST_ENABLED   0u     /* 1=使能周期发送, 0=关闭 */
+
+static void can_test_frame_send(void)
 {
-#define VOFA_MAX 10
-	float vofa_buf[VOFA_MAX] = {0.0F};
+	static uint32_t s_counter = 0u;
+	drvCanMsg_t msg;
 
-	vofa_upload((uint8_t *)vofa_buf, VOFA_MAX * 4);
+	memset(&msg, 0, sizeof(msg));
+	msg.id = CAN_TEST_ID;
+	msg.ide = 0u; /* 标准帧 */
+	msg.rtr = 0u;
+	msg.len = 8u;
+	msg.is_fd = 0u; /* 经典 CAN 帧 */
+	msg.data[0] = 'T';
+	msg.data[1] = 'E';
+	msg.data[2] = 'S';
+	msg.data[3] = 'T';
+	msg.data[4] = (uint8_t)(s_counter >> 0u);
+	msg.data[5] = (uint8_t)(s_counter >> 8u);
+	msg.data[6] = (uint8_t)(s_counter >> 16u);
+	msg.data[7] = (uint8_t)(s_counter >> 24u);
+	s_counter++;
+	drv_can_send(DRV_CAN1, &msg);
 }
-
-#if defined(USE_DEV_COMMUN_VESC)
-#define RAD_TO_DEG (57.2957795f) /* 弧度转角度 (180/π) */
-
-/* VESC Tool 仪表盘取值回调: 从运行参数填充实时量 */
-static void commun_vesc_fill_values(vesc_values_t *v)
-{
-	const motor_state_t *m = &usr.motor_state[M1];
-
-	v->id = m->electrical.id_meas;                    /* 直轴电流 A */
-	v->iq = m->electrical.iq_meas;                    /* 交轴电流 A */
-	v->current_motor = m->electrical.iq_meas;         /* 电机电流 A (近似取 iq) */
-	v->rpm = m->motion.velocity_rad_s;                /* 转速 (rad/s, 如需 ERPM 另换算) */
-	v->pid_pos = m->motion.position_rad * RAD_TO_DEG; /* PID 位置 ° */
-	v->fault_code = 0;
-	v->controller_id = 0;
-}
-#endif /* USE_DEV_COMMUN_VESC */
+#endif
 
 void commun_thread(void const *argument)
 {
 	drv_rtos_delay_ms(INTO_THREAD_DELAY / 5);
-
-#if defined(USE_DEV_COMMUN_VESC)
-	/* VESC Tool 串口通信(USART+DMA空闲中断): 初始化协议栈→注入数据源→启动接收 */
-	dev_commun_vesc_init(&dev_commun_vesc, VESC_COMM_ID_1);
-	dev_commun_vesc.set_values_cb(&dev_commun_vesc, commun_vesc_fill_values);
-	dev_commun_vesc.start(&dev_commun_vesc);
-#endif
 
 #if defined(USE_DEV_COMMUN_UART)
 	/* 关节电机上位机串口通信(joint_proto): 初始化设备→注入业务回调→启动接收 */
 	jm_host_commun_init();
 #endif
 
-	for (;;)
-	{
-		// vofa_update();
-
-#if defined(USE_DEV_COMMUN_VESC)
-		/* 取空闲突发数据喂协议栈, 自动完成识别握手与实时值回复 */
-		dev_commun_vesc.poll(&dev_commun_vesc);
+#if defined(USE_DEV_COMMUN_CAN)
+	/* 关节电机上位机 CAN/CAN-FD 通信(joint_proto): 与 UART 并存, 业务回调共用 */
+	jm_host_commun_can_init();
 #endif
 
+	for (;;)
+	{
 #if defined(USE_DEV_COMMUN_UART)
 		/* 上位机通信周期处理: 命令分发应答 + 遥控使能时按订阅周期推送遥测帧(无应答) */
 		jm_host_commun_process();
+#endif
+
+#if defined(USE_DEV_COMMUN_CAN)
+		/* CAN 通信周期处理: 诊断刷新 + 通信中断降级检查 */
+		jm_host_commun_can_process();
+
+#if CAN_TEST_ENABLED
+		/* 周期发送原始测试帧, 供外接 CAN 盒子检查物理链路 */
+		{
+			static uint32_t can_test_tick = 0u;
+			if (++can_test_tick >= (CAN_TEST_PERIOD_MS / THREAD_DELAY_COMMUN))
+			{
+				can_test_tick = 0u;
+				can_test_frame_send();
+			}
+		}
+#endif
 #endif
 
 		usr.sys.task_cnt.commun_cnt++;

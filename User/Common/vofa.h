@@ -1,4 +1,10 @@
 
+/**
+ * @file vofa.h
+ * @brief VOFA+ 上位机通信接口：justFloat 数据帧定义与收发函数声明
+ * @note 通过宏 VOFA_PORT(1~6) 选择使用的串口
+ */
+
 #ifndef __VOFA_H
 #define __VOFA_H
 

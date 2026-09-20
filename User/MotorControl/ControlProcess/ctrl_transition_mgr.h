@@ -3,6 +3,7 @@
 
 #include "ctrl_transition.h"
 #include "motor_control.h"
+#include "motor_info.h" /* motor_info_t: softstart 持久化镜像 */
 
 /* 前向声明打破与 system_state.h 的循环依赖。
  * 前提：system_state.h 需把匿名 typedef 改为带 tag 的
@@ -21,6 +22,7 @@ typedef struct
 	ref_smooth_cfg_t smooth_cfg; /* 同模式渐变配置（完全内聚） */
 	run_state_e target_run_state; /* 模式切换过渡的目标 run_state */
 	float dt;					/* 控制周期(s)，默认 100µs，供 rate 模式算 duration，运行期可改 */
+	bool stop_pending;			/* STOP 延迟过渡标志：过渡完成后才真正切 READY */
 } transition_mgr_t;
 
 /**
@@ -49,6 +51,40 @@ void transition_mgr_on_mode_switch(transition_mgr_t *mgr,
 								   run_state_e new_state,
 								   uint32_t trans_count,
 								   const motor_ref_t *cur_ref);
+
+/**
+ * @brief STOP 命令延迟过渡：保持当前模式，目标渐变到零，完成后自动切 READY
+ * @details 不立即切 top_fsm，而是把 cmd 目标清零（POSITION 类停在当前 ref 位置），
+ *          设 stop_pending，让 transition_mgr_step 的 ref_smooth 引擎渐变到零。
+ *          渐变完成后由 step 自动调 top_fsm_switch(READY)。
+ *          进行中的过渡（模式切换/同模式渐变）被终止，停机渐变从当前混合
+ *          参考起步；模式切换过渡中 STOP 时先提交目标 run_state
+ *          （过渡期间 run_state 仍为旧值，判据按目标模式）。
+ *          ESTOP/FAULT 触发 on_top_fsm_change 时立即中止 stop_pending。
+ * @param mgr 管理器指针
+ * @param sys 系统状态（读 run_state/ref，写 cmd）
+ * @return true 已启动停机过渡（延迟切 READY）；false 模式不支持（调用方应直接切 READY）
+ */
+bool transition_mgr_on_stop(transition_mgr_t *mgr, system_state_t *sys);
+
+/**
+ * @brief 取消停机渐变（STOP 后、渐变完成前收到新运动指令时调用）
+ * @details 仅清除 stop_pending：停机目标不再被强制清零，残留的 stop_pending
+ *          也不会在切换过渡完成后误触发立即停机。进行中的减速渐变保持，
+ *          新目标经"目标再变化检测"重启渐变平滑接管（同模式），或走
+ *          模式切换过渡（不同模式）。
+ */
+void transition_mgr_cancel_stop(transition_mgr_t *mgr);
+
+/**
+ * @brief motor_info → 运行时 smooth_cfg 全量应用
+ * @details 启动加载 / 0xA3 镜像写 / 0xE7 写 softstart PID 后的同步 hook 三方共用。
+ *          softstart_valid=0（老配置迁移或未配置）时跳过，保持编译期默认。
+ *          含 g_run_state_trans_count（跨模式兜底时长）。
+ * @param mgr 管理器指针
+ * @param info motor_info 持久化镜像（读 advanced 块 softstart 字段）
+ */
+void transition_mgr_apply_softstart(transition_mgr_t *mgr, const motor_info_t *info);
 
 /**
  * @brief 每拍步进（替代 motor_control_loop 的 if/else 分支 + 同模式渐变逻辑）

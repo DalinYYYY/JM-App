@@ -15,7 +15,7 @@
  * | 2026-06-25 | 1.1  | Dalin  | 增补 jm_app_can_baudrate 声明 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- * @note        把 jm_proto_ops_t 的全部回调集中实现在一处, 对接固件应用层:
+ *              把 jm_proto_ops_t 的全部回调集中实现在一处, 对接固件应用层:
  *              - 反馈/状态     ← usr.motor_state[M1]   (runtime_param)
  *              - 控制/模式     → motor_loop (sys.motor.cmd + motor_loop_set_cmd)
  *              - 参数读写      ← usr.motor_param[M1]    (motor_param, 按 param_id 表寻址)
@@ -66,6 +66,16 @@ extern "C"
 	 * @brief  当前遥测上报周期(ms, SET_TELEMETRY 0xCB 写入), 0 表示沿用默认
 	 */
 	uint16_t jm_app_telemetry_period_ms(void);
+
+	/* TRACE 通信服务从环形缓冲取一批数据。返回 JM_ERR_STATE_DENY 表示当前无完整数据包。 */
+	jm_err_e jm_app_trace_pop(uint8_t *out, uint16_t *out_len);
+
+	/* PID DEBUG 会话租约检查: 通信线程每拍调用，超时自动回滚。 */
+	void jm_app_pid_debug_poll(void);
+
+	/* 软件复位执行检查: 通信线程每拍调用, 0x07 命令置位并到期后 NVIC_SystemReset。
+	 * UART/CAN 双通道各自挂载即可(单例标志, 先到先执行)。 */
+	void jm_app_soft_reset_poll(void);
 
 	/**
 	 * @brief  当前 CAN 波特率码(SET_BAUDRATE 0xF1 写入)

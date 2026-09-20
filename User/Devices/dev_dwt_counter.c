@@ -2,7 +2,7 @@
  * @file        dev_dwt_counter.c
  * @brief       基于内核DWT周期计数器的耗时打点与阻塞延时
  *
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.1
  * @date        2026-06-9
  *
@@ -18,6 +18,13 @@
  */
 
 #include "dev_dwt_counter.h"
+
+/* 跨板兼容: 包含 HAL 头文件以访问 RCC 寄存器和 HAL_RCC_GetSysClockFreq */
+#if defined(STM32F405xx)
+#include "stm32f4xx_hal.h"
+#elif defined(STM32G474xx) || defined(STM32G473xx)
+#include "stm32g4xx_hal.h"
+#endif
 
 dwtTimer_t dwt_timer;
 

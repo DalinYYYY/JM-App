@@ -31,7 +31,13 @@ extern "C"
 
 #if defined(USE_DEV_FLASH)
 
+#include "drv_config.h"
+
+#if defined(USE_FLASH_G4_DRIVER)
 #include "drv_flash_g4.h"
+#elif defined(USE_FLASH_F4_DRIVER)
+#include "drv_flash_f4.h"
+#endif
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>

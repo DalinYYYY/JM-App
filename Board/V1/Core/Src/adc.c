@@ -25,6 +25,7 @@
 /* USER CODE END 0 */
 
 ADC_HandleTypeDef hadc1;
+DMA_HandleTypeDef hdma_adc1;
 
 /* ADC1 init function */
 void MX_ADC1_Init(void)
@@ -50,14 +51,23 @@ void MX_ADC1_Init(void)
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
   hadc1.Init.GainCompensation = 0;
   hadc1.Init.ScanConvMode = ADC_SCAN_ENABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+  /* 三相电流在 injected rank 1~3 组成一个完整序列；控制 ISR 必须在
+   * sequence end 只触发一次，否则 SINGLE_CONV 会在每个 rank 触发 JEOC，
+   * ISR 读取到新旧 JDR 混合值并把电流环频率放大为约 3 倍。 */
+  hadc1.Init.EOCSelection = ADC_EOC_SEQ_CONV;
   hadc1.Init.LowPowerAutoWait = DISABLE;
+  /* 规则组(vbus/NTC)与注入组(相电流)共用 ADC1。
+   * ContinuousConvMode 必须为 DISABLE: 若开连续转换, 规则组会持续霸占 ADC,
+   * 打乱注入组(TIM1 CC4 波峰触发)的采样时序, 导致相电流读到随机相位噪声。
+   * DISABLE 后规则组仅在被触发时转换一轮, 两次触发之间 ADC 空闲, 不干扰注入组。
+   * DMAContinuousRequests 保持 ENABLE + DMA_CIRCULAR: 每次软件重触发的采样都写入
+   * 循环缓冲。vbus 刷新由 period_thread 每 20ms 软触发一次(见 power_monitor_update)。*/
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-  hadc1.Init.DMAContinuousRequests = DISABLE;
+  hadc1.Init.DMAContinuousRequests = ENABLE;
   hadc1.Init.Overrun = ADC_OVR_DATA_PRESERVED;
   hadc1.Init.OversamplingMode = DISABLE;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -77,7 +87,7 @@ void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = ADC_REGULAR_RANK_1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_2CYCLES_5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_47CYCLES_5;
   sConfig.SingleDiff = ADC_SINGLE_ENDED;
   sConfig.OffsetNumber = ADC_OFFSET_NONE;
   sConfig.Offset = 0;
@@ -88,7 +98,7 @@ void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_2;
+  sConfig.Channel = ADC_CHANNEL_15;
   sConfig.Rank = ADC_REGULAR_RANK_2;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -97,7 +107,7 @@ void MX_ADC1_Init(void)
 
   /** Configure Regular Channel
   */
-  sConfig.Channel = ADC_CHANNEL_3;
+  sConfig.Channel = ADC_CHANNEL_12;
   sConfig.Rank = ADC_REGULAR_RANK_3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
@@ -112,13 +122,31 @@ void MX_ADC1_Init(void)
   sConfigInjected.InjectedSingleDiff = ADC_SINGLE_ENDED;
   sConfigInjected.InjectedOffsetNumber = ADC_OFFSET_NONE;
   sConfigInjected.InjectedOffset = 0;
-  sConfigInjected.InjectedNbrOfConversion = 1;
+  sConfigInjected.InjectedNbrOfConversion = 3;
   sConfigInjected.InjectedDiscontinuousConvMode = DISABLE;
   sConfigInjected.AutoInjectedConv = DISABLE;
   sConfigInjected.QueueInjectedContext = DISABLE;
   sConfigInjected.ExternalTrigInjecConv = ADC_EXTERNALTRIGINJEC_T1_CC4;
   sConfigInjected.ExternalTrigInjecConvEdge = ADC_EXTERNALTRIGINJECCONV_EDGE_RISING;
   sConfigInjected.InjecOversamplingMode = DISABLE;
+  if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Injected Channel
+  */
+  sConfigInjected.InjectedChannel = ADC_CHANNEL_3;
+  sConfigInjected.InjectedRank = ADC_INJECTED_RANK_2;
+  if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure Injected Channel
+  */
+  sConfigInjected.InjectedChannel = ADC_CHANNEL_4;
+  sConfigInjected.InjectedRank = ADC_INJECTED_RANK_3;
   if (HAL_ADCEx_InjectedConfigChannel(&hadc1, &sConfigInjected) != HAL_OK)
   {
     Error_Handler();
@@ -172,6 +200,24 @@ void HAL_ADC_MspInit(ADC_HandleTypeDef* adcHandle)
     GPIO_InitStruct.Pull = GPIO_NOPULL;
     HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
+    /* ADC1 DMA Init */
+    /* ADC1 Init */
+    hdma_adc1.Instance = DMA1_Channel3;
+    hdma_adc1.Init.Request = DMA_REQUEST_ADC1;
+    hdma_adc1.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    hdma_adc1.Init.PeriphInc = DMA_PINC_DISABLE;
+    hdma_adc1.Init.MemInc = DMA_MINC_ENABLE;
+    hdma_adc1.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
+    hdma_adc1.Init.MemDataAlignment = DMA_MDATAALIGN_WORD;
+    hdma_adc1.Init.Mode = DMA_CIRCULAR;
+    hdma_adc1.Init.Priority = DMA_PRIORITY_LOW;
+    if (HAL_DMA_Init(&hdma_adc1) != HAL_OK)
+    {
+      Error_Handler();
+    }
+
+    __HAL_LINKDMA(adcHandle,DMA_Handle,hdma_adc1);
+
     /* ADC1 interrupt Init */
     HAL_NVIC_SetPriority(ADC1_2_IRQn, 5, 0);
     HAL_NVIC_EnableIRQ(ADC1_2_IRQn);
@@ -203,6 +249,9 @@ void HAL_ADC_MspDeInit(ADC_HandleTypeDef* adcHandle)
     HAL_GPIO_DeInit(GPIOA, ADC1_IN1_BUS_Pin|MOTOR_U_Pin|MOTOR_V_Pin|MOTOR_W_Pin);
 
     HAL_GPIO_DeInit(GPIOB, ADC1_IN15_NTC1_Pin|ADC1_IN12_NTC2_Pin);
+
+    /* ADC1 DMA DeInit */
+    HAL_DMA_DeInit(adcHandle->DMA_Handle);
 
     /* ADC1 interrupt Deinit */
     HAL_NVIC_DisableIRQ(ADC1_2_IRQn);

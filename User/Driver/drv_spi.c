@@ -122,6 +122,73 @@ int drv_spi_transfer(spiDrv_t drv, uint8_t *tx_data, uint8_t *rx_data, uint16_t 
 }
 
 /**
+ * @brief       SPI全双工收发(寄存器直操作轻量版，适用于ISR热路径短帧)
+ * @note        交错收发: TXE即写TX FIFO, RXNE即读RX FIFO, 收满len字节结束。
+ *              8bit模式下DR必须按字节访问，否则32位访问会破坏FIFO进出单位。
+ *
+ *              外设使能: HAL_SPI_Init不置SPE位, 仅HAL事务函数会置位并保持;
+ *              本函数入口做幂等检查(SPE/FRXTH), 不依赖调用方先行发起过HAL事务。
+ *              FRXTH=1使RXNE按1字节门限置位, 与字节级DR访问配套, 配置顺序
+ *              与HAL一致(先FRXTH后SPE)。
+ *
+ *              轮询上限(len*64+128次迭代)远大于正常所需(约len*25),
+ *              仅在SPI总线异常时兜底防死锁; 超上限关SPE(硬件自动flush
+ *              收发FIFO)复位总线状态后返回错误, 调用方保留旧数据容错。
+ */
+int drv_spi_transfer_fast(spiDrv_t drv, const uint8_t *tx_data, uint8_t *rx_data, uint16_t len)
+{
+	SPI_HandleTypeDef *hspi;
+	SPI_TypeDef *spi;
+	uint16_t tx_i = 0u, rx_i = 0u;
+	uint32_t guard;
+	uint32_t flush = 8u;
+
+	hspi = get_spi_handle(drv.hspi);
+	if (hspi == NULL || tx_data == NULL || rx_data == NULL || len == 0u)
+	{
+		return DRV_ERROR;
+	}
+
+	spi = hspi->Instance;
+
+	/* 幂等补齐外设配置(首次调用生效, 后续热路径仅1次寄存器读+分支) */
+	if ((spi->CR2 & SPI_CR2_FRXTH) == 0u)
+	{
+		spi->CR2 |= SPI_CR2_FRXTH;
+	}
+	if ((spi->CR1 & SPI_CR1_SPE) == 0u)
+	{
+		spi->CR1 |= SPI_CR1_SPE;
+	}
+
+	/* 清RX FIFO残留(限8拍)，避免上一帧尾巴污染本次接收 */
+	while ((spi->SR & SPI_SR_RXNE) != 0u && flush-- > 0u)
+	{
+		(void)*(volatile uint8_t *)&spi->DR;
+	}
+
+	guard = (uint32_t)len * 64u + 128u;
+	while (rx_i < len)
+	{
+		if (tx_i < len && (spi->SR & SPI_SR_TXE) != 0u)
+		{
+			*(volatile uint8_t *)&spi->DR = tx_data[tx_i++];
+		}
+		if ((spi->SR & SPI_SR_RXNE) != 0u)
+		{
+			rx_data[rx_i++] = *(volatile uint8_t *)&spi->DR;
+		}
+		if (--guard == 0u)
+		{
+			spi->CR1 &= ~SPI_CR1_SPE; /* 关SPE截断残传并flush FIFO */
+			return DRV_ERROR;
+		}
+	}
+
+	return DRV_EOK;
+}
+
+/**
  * @brief       SPI中断方式发送(非阻塞)
  */
 int drv_spi_send_it(spiDrv_t drv, uint8_t *data, uint16_t len)

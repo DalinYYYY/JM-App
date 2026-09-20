@@ -113,7 +113,7 @@ typedef struct
 
 /* ===================== 标定硬件访问接口 =====================
  * 标定模块需要施加电压、读取编码器、操作 FOC 链路等硬件能力。
- * calib_mgr_init 注入 dev_motor_t 指针，calib_mgr_get_motor() 对所有级别模块可见。
+ * calib_mgr_init 注入 dev_motor_t 指针，calib_mgr_get_io() 对所有级别模块可见。
  * 这样避免每个 level 模块各自 extern 引用 motor_loop_get()，解耦标定与控制层。*/
 typedef struct
 {

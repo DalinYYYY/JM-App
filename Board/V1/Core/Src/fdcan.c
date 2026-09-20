@@ -21,7 +21,7 @@
 #include "fdcan.h"
 
 /* USER CODE BEGIN 0 */
-
+#include "board_select.h" /* dev_config_board.h: FDCAN 位定时 + USE_CAN_FD_MODE */
 /* USER CODE END 0 */
 
 FDCAN_HandleTypeDef hfdcan1;
@@ -39,21 +39,32 @@ void MX_FDCAN1_Init(void)
   /* USER CODE END FDCAN1_Init 1 */
   hfdcan1.Instance = FDCAN1;
   hfdcan1.Init.ClockDivider = FDCAN_CLOCK_DIV2;
+  /* §R3 FrameFormat: 由 dev_config_board.h 的 USE_CAN_FD_MODE 决定
+   *   - USE_CAN_FD_MODE=1: FDCAN_FRAME_FD_BRS (FD + 比特率切换, 数据段 8Mbps)
+   *   - USE_CAN_FD_MODE=0: FDCAN_FRAME_CLASSIC (仅经典帧 1Mbps)
+   * 注: .ioc 未配此参数, CubeMX 重新生成时需手动同步此处 */
+#if defined(USE_CAN_FD_MODE) && (USE_CAN_FD_MODE == 1)
+  hfdcan1.Init.FrameFormat = FDCAN_FRAME_FD_BRS;
+#else
   hfdcan1.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
+#endif
   hfdcan1.Init.Mode = FDCAN_MODE_NORMAL;
   hfdcan1.Init.AutoRetransmission = DISABLE;
   hfdcan1.Init.TransmitPause = DISABLE;
   hfdcan1.Init.ProtocolException = DISABLE;
-  hfdcan1.Init.NominalPrescaler = 5;
+  /* 标称段 1Mbps: Prescaler=5, Sync(1)+TS1(12)+TS2(4)=17Tq, 采样点 76.5% */
+  hfdcan1.Init.NominalPrescaler = FDCAN_NOMINAL_PRESCALER;
   hfdcan1.Init.NominalSyncJumpWidth = 1;
-  hfdcan1.Init.NominalTimeSeg1 = 12;
-  hfdcan1.Init.NominalTimeSeg2 = 4;
-  hfdcan1.Init.DataPrescaler = 1;
+  hfdcan1.Init.NominalTimeSeg1 = FDCAN_NOMINAL_TS1;
+  hfdcan1.Init.NominalTimeSeg2 = FDCAN_NOMINAL_TS2;
+  /* 数据段 8Mbps: Prescaler=1, Sync(1)+TS1(7)+TS2(3)=11Tq, 采样点 72.7% (§AC4) */
+  hfdcan1.Init.DataPrescaler = FDCAN_DATA_PRESCALER;
   hfdcan1.Init.DataSyncJumpWidth = 1;
-  hfdcan1.Init.DataTimeSeg1 = 1;
-  hfdcan1.Init.DataTimeSeg2 = 1;
+  hfdcan1.Init.DataTimeSeg1 = FDCAN_DATA_TS1;
+  hfdcan1.Init.DataTimeSeg2 = FDCAN_DATA_TS2;
   hfdcan1.Init.StdFiltersNbr = 0;
-  hfdcan1.Init.ExtFiltersNbr = 0;
+  /* §V3 双过滤器: 扩展帧用 2 个过滤器(单播+广播), 由 drv_can_init_dual_filter 配置 */
+  hfdcan1.Init.ExtFiltersNbr = 2;
   hfdcan1.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
   if (HAL_FDCAN_Init(&hfdcan1) != HAL_OK)
   {

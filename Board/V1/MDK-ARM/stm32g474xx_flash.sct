@@ -1,15 +1,39 @@
-LR_IROM1 0x8000000 0x00080000  {  ; load_region size_region
-  ER_IROM1 0x8000000 0x00080000  {  ; load address = excetion address
+LR_IROM1 0x8000000 0x0004E000  {  ; load_region size_region (代码区限制在0x0804E000前,
+                                  ; 避免覆盖齿槽表区0x0804E000~4K 与参数存储区0x0804F000~4K)
+  ER_IROM1 0x8000000 0x0004E000  {  ; load address = excetion address
    *.o (RESET, +First)
    *(InRoot$$Sections)
    .ANY (+XO)
    .ANY (+RO)
   }
-  RW_IRAM1 0x20000000 0x00020000  {  ; load address = excetion address
+  RW_IRAM1 0x20000000 0x00018000  {  ; load address = excetion address
    .ANY (+RW +ZI)
+  }
+  ; CCM-SRAM 32KB: motor_observer 大缓冲(宏 MOTOR_OBSERVER_USE_CCM_RAM=1 时,
+  ; 段 .ccm_observer)。须位于 RW_IRAM1 之后(.ANY 按顺序填充, 主 SRAM 优先);
+  ; 宏关闭时缓冲回主 SRAM, 链接提示一条 L6314W 属预期。
+  ; 注意: 本工程须保持 umfTarg=0(不勾选 Use Memory Layout from Target Dialog),
+  ; 否则本文件被忽略、链接改用对话框自动生成布局, CCM region 失效。
+  RW_CCMRAM 0x10000000 0x00008000  {
+   *(.ccm_observer)        ; AC5 段名(显式 zero_init); 若迁 AC6 需改为 *(.bss.ccm_observer)
+   .ANY (+ZI)              ; 兜底: 保持空 region 合法
   }
 ;***region***;
 ;***endregion***;
+}
+
+LR_IROM2 0x804E800 0x00001800  {  ; 表页(0x0804E000~2K)之后 6KB 还给代码区 (0x0804E800~0x0804FFFF)
+  ER_IROM2 0x804E800 0x00001800  {
+   .ANY (+XO)
+   .ANY (+RO)
+  }
+}
+
+LR_IROM3 0x8050000 0x00030000  {  ; Bank2 剩余区 (0x08050000~0x0807FFFF)
+  ER_IROM3 0x8050000 0x00030000  {  ; load address = execution address
+   .ANY (+XO)
+   .ANY (+RO)
+  }
 }
 
 

@@ -41,20 +41,30 @@
 #define MOTION_RAD2DEG (180.0f / MOTION_PI) // rad -> °
 
 /* NULL 防护：替代缺失的 assert_report，非法入参直接返回 */
-#define MOTION_GUARD(cond) \
-	do                     \
-	{                      \
-		if (!(cond))       \
-		{                  \
-			return;        \
-		}                  \
+#define MOTION_GUARD(cond)                                                                                                                                                                             \
+	do                                                                                                                                                                                                 \
+	{                                                                                                                                                                                                  \
+		if (!(cond))                                                                                                                                                                                   \
+		{                                                                                                                                                                                              \
+			return;                                                                                                                                                                                    \
+		}                                                                                                                                                                                              \
 	} while (0)
 
-/* 把角度归一化到 [0, 360) */
+/* 把角度归一化到 [0, 360)
+ * 热路径优化: fmodf 为软浮点库调用(商较大时内部多次迭代), 电流环每拍
+ * 调用 3 次(电角度×2 + PLL 归一化); 改为一次乘法取整+减法, 再做一次
+ * 浮点舍入修正。输入为有限值即可保证正确, 极端大角度由取整自然覆盖。 */
 static float normalize_angle(float angle)
 {
-	float remainder = fmodf(angle, 360.0f);
-	return remainder >= 0.0f ? remainder : (remainder + 360.0f);
+	if (angle >= 360.0f || angle < 0.0f)
+	{
+		angle -= (float)(int)(angle * (1.0f / 360.0f)) * 360.0f;
+		if (angle >= 360.0f)
+			angle -= 360.0f;
+		else if (angle < 0.0f)
+			angle += 360.0f;
+	}
+	return angle;
 }
 
 /* ------------------------------------------------------------------ */
@@ -135,15 +145,6 @@ static void update_deg_s(struct motion_param *pobj)
 	pobj->deg_s = (int32_t)(pobj->rad_s * MOTION_RAD2DEG);
 }
 
-/**
- * @brief 解算角速度（rad/s）与角加速度（rad/s^2）
- * @note  update_freq_hz 为每秒解算次数。支持三种方法（pobj->vel_method）：
- *        - DIFF：后向差分 + 滑动平均（兼容旧行为）
- *        - LSQ ：N 点最小二乘差分（FIR 微分器，固定群延迟，低噪声）
- *        - PLL ：二阶观测器，速度由积分得到，低滞后、平滑
- *        三者统一输出 rad_s / slide_rad_s；加速度统一对最终速度做差分滤波。
- */
-
 /* 处理 ±180° 跳变，返回归一化到 (-180,180] 的角度增量(deg) */
 static float wrap_delta_deg(float delta)
 {
@@ -165,7 +166,7 @@ static float vel_calc_diff(struct motion_param *pobj, float mechanical_angle, fl
 	return slide_filter_calc(&pobj->slide_filter, rad_s);
 }
 
-// https://k0uhb8quijf.feishu.cn/wiki/Tw7qwWYvkiwY9LkX8TRc6WPunVf?from=from_copylink
+// 算法设计参考：https://k0uhb8quijf.feishu.cn/wiki/Tw7qwWYvkiwY9LkX8TRc6WPunVf
 /* 方法二：N 点最小二乘差分（对最近 N 个角度拟合直线，斜率即速度）。
  * 角度先去跳变累加成连续序列，避免 360° 折返污染拟合。返回 rad/s。 */
 static float vel_calc_lsq(struct motion_param *pobj, float mechanical_angle)
@@ -220,7 +221,7 @@ static float vel_calc_lsq(struct motion_param *pobj, float mechanical_angle)
 	return slope * freq * MOTION_DEG2RAD;
 }
 
-// https://k0uhb8quijf.feishu.cn/wiki/Bth6wWwTii7YhWknRvEcAYYknmc?from=from_copylink
+// 算法设计参考：https://k0uhb8quijf.feishu.cn/wiki/Bth6wWwTii7YhWknRvEcAYYknmc
 /* 方法三：PLL/龙伯格二阶观测器。位置误差驱动 PI，速度状态积分得位置。
  * 返回 rad/s（取观测器速度状态 pll_omega）。 */
 static float vel_calc_pll(struct motion_param *pobj, float mechanical_angle)
@@ -241,6 +242,14 @@ static float vel_calc_pll(struct motion_param *pobj, float mechanical_angle)
 	return pobj->pll_omega * MOTION_DEG2RAD; /* deg/s -> rad/s */
 }
 
+/**
+ * @brief 解算角速度（rad/s）与角加速度（rad/s^2）
+ * @note  update_freq_hz 为每秒解算次数。支持三种方法（pobj->vel_method）：
+ *        - DIFF：后向差分 + 滑动平均（兼容旧行为）
+ *        - LSQ ：N 点最小二乘差分（FIR 微分器，固定群延迟，低噪声）
+ *        - PLL ：二阶观测器，速度由积分得到，低滞后、平滑
+ *        三者统一输出 rad_s / slide_rad_s；加速度统一对最终速度做差分滤波。
+ */
 static void update_rad_s(struct motion_param *pobj, float mechanical_angle)
 {
 	float freq = (float)pobj->update_freq_hz;
@@ -272,9 +281,7 @@ static void update_rad_s(struct motion_param *pobj, float mechanical_angle)
 			slide_rad_s = rad_s; /* PLL 自带平滑，不再叠滑窗 */
 			break;
 		case VEL_METHOD_DIFF:
-		default:
-			slide_rad_s = vel_calc_diff(pobj, mechanical_angle, &rad_s);
-			break;
+		default: slide_rad_s = vel_calc_diff(pobj, mechanical_angle, &rad_s); break;
 	}
 	pobj->rad_s = rad_s;
 	pobj->slide_rad_s = slide_rad_s;
@@ -316,9 +323,9 @@ static void set_update_freq(struct motion_param *pobj, uint32_t freq_hz)
 static void pll_set_gains(struct motion_param *pobj, float bandwidth_hz, float damping)
 {
 	if (bandwidth_hz <= 0.0f)
-		bandwidth_hz = 50.0f;
+		bandwidth_hz = 30.0f; /* 抑制编码器噪声经速度环放大,减轻零速空载极限环激励*/
 	if (damping <= 0.0f)
-		damping = 1.0f;
+		damping = 1.0f;       /* 临界阻尼，无超调 */
 	float wn = MOTION_2PI * bandwidth_hz;
 	pobj->pll_kp = 2.0f * damping * wn;
 	pobj->pll_ki = wn * wn;
@@ -384,8 +391,7 @@ static float feedforword_get_acc(struct motion_param *pobj)
 /* ------------------------------------------------------------------ */
 /* 更新分发                                                            */
 /* ------------------------------------------------------------------ */
-static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
-                               float mechanical_angle)
+static void motor_param_handle(struct motion_param *pobj, motion_type_e type, float mechanical_angle)
 {
 	MOTION_GUARD(pobj != NULL);
 
@@ -394,9 +400,7 @@ static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
 	switch (type)
 	{
 		case MOTION_TYPE_ELE:
-		case MOTION_TYPE_ELE_RADIAN:
-			update_ele_radian(pobj);
-			break;
+		case MOTION_TYPE_ELE_RADIAN: update_ele_radian(pobj); break;
 
 		case MOTION_TYPE_ELE_VEL:
 		case MOTION_TYPE_ELE_VEL_RADIAN:
@@ -413,8 +417,7 @@ static void motor_param_handle(struct motion_param *pobj, motion_type_e type,
 			update_rpm(pobj);
 			break;
 
-		default:
-			break;
+		default: break;
 	}
 }
 
@@ -477,8 +480,7 @@ void motion_param_init_cfg(motion_param_t *pobj, const motion_param_config_t *cf
 	pobj->feedforword_get_acc = feedforword_get_acc;
 }
 
-void motion_param_init(motion_param_t *pobj, uint8_t poles, uint16_t slide_window_size,
-                       float (*unused_compensation_callback)(void))
+void motion_param_init(motion_param_t *pobj, uint8_t poles, uint16_t slide_window_size, float (*unused_compensation_callback)(void))
 {
 	motion_param_config_t cfg;
 	memset(&cfg, 0, sizeof(cfg));

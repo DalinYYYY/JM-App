@@ -32,6 +32,10 @@ void calib_hw_enter(calib_hw_session_t *s, struct dev_motor *m)
 	s_active = s;
 	m->ele_radian_callback = calib_hw_ele_radian_cb;
 	m->foc.ele_radian_callback = calib_hw_ele_radian_cb;
+	/* WP1.2: 标定期间旁路 park LPF，消除 α=0.8 滤波对阶跃响应的延迟污染 */
+	m->foc.calib_raw_mode = 1;
+	m->foc.calib_prev_id = 0.0f;
+	m->foc.calib_prev_iq = 0.0f;
 }
 
 void calib_hw_exit(calib_hw_session_t *s)
@@ -44,6 +48,8 @@ void calib_hw_exit(calib_hw_session_t *s)
 		s->motor->ele_radian_callback = s->orig_ele_cb;
 		s->motor->foc.ele_radian_callback = s->orig_ele_cb;
 	}
+	/* WP1.2: 恢复正常 LPF */
+	s->motor->foc.calib_raw_mode = 0;
 	s_active = NULL;
 }
 
@@ -67,7 +73,7 @@ void calib_hw_apply_voltage(calib_hw_session_t *s, float ud, float uq, float the
 	 * 会被当作占空比（>>1.0）触发过调制限幅，实际电压幅值失真且随角度
 	 * 非线性波动，导致开环标定（极对数/R/Ld/Lq/flux）结果错误。
 	 * 虚拟电机直接用 ud/uq 推进物理模型（不走 SVPWM），不归一化。
-	 * Vbus 由 dev_power_monitor 在 task 层 100ms 周期更新, 标定时已就绪。*/
+	 * Vbus 由 dev_power_monitor 在 task 层 20ms 周期更新, 标定时已就绪。*/
 	float vbus = dev_power_monitor.vbus;
 	if (vbus < 1.0f)
 		vbus = 1.0f; /* 保护：Vbus 未就绪时避免除零，标称 Vbus >= 12V */
@@ -88,6 +94,35 @@ void calib_hw_apply_voltage(calib_hw_session_t *s, float ud, float uq, float the
 void calib_hw_apply_zero(struct dev_motor *m)
 {
 	m->half_bridge.set_3pwm(&m->half_bridge, 0, 0, 0);
+}
+
+void calib_hw_apply_voltage_comp(calib_hw_session_t *s, float ud_cmd, float uq_cmd,
+                                 float theta, float *ud_act, float *uq_act)
+{
+	float ud = ud_cmd, uq = uq_cmd;
+	/* 复用 apply_voltage 的限幅逻辑 */
+	float mag = sqrtf(ud * ud + uq * uq);
+	if (mag > CALIB_CFG_MAX_VOLTAGE_MAG_V)
+	{
+		float scale = CALIB_CFG_MAX_VOLTAGE_MAG_V / mag;
+		ud *= scale;
+		uq *= scale;
+	}
+	/* 回读限幅后的实际电压（归一化前的伏特值）*/
+	if (ud_act != NULL)
+		*ud_act = ud;
+	if (uq_act != NULL)
+		*uq_act = uq;
+	/* 调用主施加函数完成 Vbus 归一化 + SVPWM */
+	calib_hw_apply_voltage(s, ud, uq, theta);
+}
+
+void calib_hw_apply_ac_injection(calib_hw_session_t *s, float ud_dc, float ud_ac,
+                                 float freq_hz, uint32_t tick, float theta)
+{
+	float t = (float)tick / CALIB_TICKS_PER_SEC;
+	float ud = ud_dc + ud_ac * sinf(2.0f * 3.14159265f * freq_hz * t);
+	calib_hw_apply_voltage(s, ud, 0.0f, theta);
 }
 
 float calib_hw_get_encoder_raw_deg(struct dev_motor *m)

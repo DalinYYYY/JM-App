@@ -14,8 +14,7 @@
  * | 2026-06-15 | 1.0  | Dalin  | 初始创建   |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
- * @note        串口初始化由CubeMX的MX_USARTx_UART_Init完成，此层仅封装运行期收发
- * @note        对外接口不暴露HAL类型，HAL句柄仅在drv_usart.c内部使用
+ *              初始化由 CubeMX 完成，本层仅封装运行期收发，不暴露 HAL 类型。
  */
 #ifndef DRV_USART_H_
 #define DRV_USART_H_

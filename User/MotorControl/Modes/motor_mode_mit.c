@@ -8,7 +8,7 @@ void motor_mode_mit_run(motor_ctrl_t *ctrl)
 {
 	motor_param_t *p = ctrl->param;
 	motor_ref_t *ref = &ctrl->ref;
-	float peak_t = motor_param_get_peak_torque(p);
+	float peak_t = (p)->motor_base.peak_torque;
 
 	float pos_err = ctrl->cmd.pos - ctrl->fb.pos;
 	float vel_err = ctrl->cmd.vel - ctrl->fb.vel;

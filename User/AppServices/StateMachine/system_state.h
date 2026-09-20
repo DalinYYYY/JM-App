@@ -2,7 +2,7 @@
  * @file        system_state.h
  * @brief 		系统状态机核心头文件
  * 
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.0
  * @date        2026-06-11
  * 
@@ -23,6 +23,7 @@
 #ifndef __SYSTEM_STATE_H__
 #define __SYSTEM_STATE_H__
 
+#include <stdbool.h>
 #include "state_define.h"
 #include "motor_control.h"
 #include "ctrl_transition_mgr.h"
@@ -31,20 +32,38 @@
 /* 前向声明，避免 system_state.h 直接依赖 dev_motor.h */
 struct dev_motor;
 
+#define SYSTEM_PROTECT_OVER_CURRENT  (1u << 0)
+#define SYSTEM_PROTECT_OVER_VOLTAGE  (1u << 1)
+#define SYSTEM_PROTECT_UNDER_VOLTAGE (1u << 2)
+#define SYSTEM_PROTECT_OVER_TEMP     (1u << 3)
+#define SYSTEM_PROTECT_OVER_SPEED    (1u << 4)
+#define SYSTEM_PROTECT_GATE_DRIVER   (1u << 5) /* 栅极驱动器硬件故障保护(nFAULT) */
+
+#define SYSTEM_FAULT_OVER_CURRENT  (1u << 0)
+#define SYSTEM_FAULT_OVER_VOLTAGE  (1u << 1)
+#define SYSTEM_FAULT_UNDER_VOLTAGE (1u << 2)
+#define SYSTEM_FAULT_OVER_SPEED    (1u << 10)
+#define SYSTEM_FAULT_NUMERIC       (1u << 11)
+#define SYSTEM_FAULT_GATE_DRIVER   (1u << 12) /* 栅极驱动器故障(nFAULT 拉低, OCP/UVLO/TSD) */
+
 typedef struct system_state_s
 {
-	top_fsm_e top_state;		  /*!< 顶层有限状态机状态 */
-	ctrl_mode_e ctrl_mode;	  /*!< 当前控制模式 */
-	uint32_t fault_code;		  /*!< 系统故障码 */
-	motor_ctrl_t motor;			  /*!< 电机控制核心上下文 */
+	top_fsm_e top_state;        /*!< 顶层有限状态机状态 */
+	ctrl_mode_e ctrl_mode;      /*!< 当前控制模式 */
+	uint32_t fault_code;        /*!< 系统故障码(fault_mgr 兼容掩码派生) */
+	motor_ctrl_t motor;         /*!< 电机控制核心上下文 */
 	transition_mgr_t trans_mgr; /*!< 过渡管理器（内含 transition_t + ref_smooth_cfg） */
-	calib_state_e calib_state;	/*!< 标定子状态（仅 CALIB 态有效）*/
+	calib_state_e calib_state;  /*!< 标定子状态（仅 CALIB 态有效）*/
+	uint32_t fault_latched;     /*!< 已锁存故障掩码（清除前持续生效, fault_mgr 派生） */
+	uint16_t fault_count;       /*!< 故障累积计数 */
+	uint8_t last_fault_code;    /*!< 最近一次故障编号 */
 } system_state_t;
 
 /**
- * @brief 运行模式平滑过渡的调用次数（可配置）
+ * @brief 运行模式平滑过渡的调用次数（可配置，rate 不适用时的兜底时长）
  * @details 过渡时长以 motor_control_loop（建议在电流环中调用）的调用次数计，
  *          而非软件定时器。配置值 = 期望过渡时长 / 电流环周期。
+ *          smooth_cfg 任一 rate>0 时模式切换过渡按速率重算时长，覆盖此值。
  */
 extern uint32_t g_run_state_trans_count;
 
@@ -85,23 +104,27 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
 /**
  * @brief 电机控制主循环（中断级执行）
  * @param[in,out] sys 系统状态机实例指针（非NULL）
+ * @param[in] fault_tick 故障检测错峰拍标志（motor_loop 超周期调度器给出）
  * @retval 无
- * @note 1. 先执行故障检测，故障/安全状态下参考置为IDLE；
+ * @note 1. 先执行故障检测（NaN 发散每拍；电气类全量检测仅在 fault_tick 拍，
+ *          1kHz 错峰，消抖阈值已按采样周期换算），故障/安全状态下参考置为IDLE；
  *       2. 处理运行状态的平滑过渡（若有），生成 motor.ref 参考输出；
  *       3. 下游三环模块读取 sys->motor.ref，按 ref.ctrl_type 入环并自行分频；
  *       4. 需在硬件中断（如定时器）中调用，保证执行周期稳定
  */
-void motor_control_loop(system_state_t *sys);
+void motor_control_loop(system_state_t *sys, bool fault_tick);
 
 /**
  * @brief 系统故障检测
  * @param[in,out] sys 系统状态机实例指针（非NULL）
+ * @param[in] fault_tick 全量电气检测错峰拍标志（false 时仅执行 NaN 发散检测）
  * @retval 无
- * @note 1. 检测编码器故障等核心故障，映射到fault_code；
- *       2. 检测到故障时自动切换顶层状态为FAULT；
- *       3. 可扩展其他故障类型（如过流、过压、过温等）
+ * @note 1. NaN 算法发散检测每拍执行（保护本拍输出）；
+ *       2. 电气类全量检测（过流/电压/超速/nFAULT 等）仅在 fault_tick 拍执行，
+ *          消抖计数按采样周期（控制周期×FAULT_DET_FAST_DIV）等效换算；
+ *       3. 检测到故障时自动切换顶层状态为FAULT
  */
-void fault_check(system_state_t *sys);
+void fault_check(system_state_t *sys, bool fault_tick);
 
 /**
  * @brief 处理上层控制指令

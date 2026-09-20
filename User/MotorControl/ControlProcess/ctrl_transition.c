@@ -7,12 +7,13 @@ void transition_init(transition_t *trans)
 	trans->state = TRANSITION_IDLE;
 }
 
-void transition_start(transition_t *trans, uint32_t duration, const motor_ref_t *old_ref)
+void transition_start(transition_t *trans, uint32_t duration, const motor_ref_t *old_ref, transition_shape_e shape)
 {
 	trans->state = TRANSITION_IN_PROGRESS;
 	trans->elapsed = 0;
 	trans->duration = duration;
 	trans->ratio = 0.0f;
+	trans->shape = shape;
 	trans->old_ref = *old_ref;
 }
 
@@ -24,13 +25,49 @@ static float blend(float old_v, float new_v, float ratio)
 	return old_v * (1.0f - ratio) + new_v * ratio;
 }
 
-bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_ref_t *out_ref)
+/**
+ * @brief 按形状整形进度：LINEAR 恒斜率；SCURVE smoothstep 加速度连续
+ */
+static float shape_ratio(float linear, transition_shape_e shape)
+{
+	if (shape == TRANSITION_SHAPE_SCURVE)
+		return linear * linear * (3.0f - 2.0f * linear);
+	return linear;
+}
+
+/**
+ * @brief 混合速度的解析加速度(rad/s²)
+ * @details vel(t) = old + Δv·shape(r)，对 elapsed 求导再换算到秒：
+ *          LINEAR: d vel/dt = Δv/(duration·dt)
+ *          SCURVE: d vel/dt = Δv·6r(1-r)/(duration·dt)
+ *          Δv 取当前拍 new_ref 与 old_ref 之差，目标中途变化仍然准确。
+ */
+static float blend_vel_accel(const transition_t *t, const motor_ref_t *new_ref,
+                             float ratio, float dt)
+{
+	if (dt <= 0.0f || t->duration == 0u)
+		return 0.0f;
+	float dv = new_ref->vel - t->old_ref.vel;
+	float slope;
+	if (t->shape == TRANSITION_SHAPE_SCURVE)
+		slope = dv * (6.0f * ratio - 6.0f * ratio * ratio) / (float)t->duration;
+	else
+		slope = dv / (float)t->duration;
+	return slope / dt;
+}
+
+/* 状态机参考渐变：按累计调用次数推进混合，量纲变化时数值仍渐变 */
+bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_ref_t *out_ref, float dt)
 {
 	if (trans->state != TRANSITION_IN_PROGRESS)
 	{
 		*out_ref = *new_ref;
 		return true;
 	}
+
+	// 首拍登记渐变朝向的目标：供 mgr 层检测渐变中目标再变化（重启渐变用）
+	if (trans->elapsed == 0)
+		trans->target_ref = *new_ref;
 
 	// 以调用次数计时：每次更新自增一次
 	trans->elapsed++;
@@ -43,17 +80,27 @@ bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_re
 		return true;
 	}
 
-	// 量纲不同（入环层级变化）：不混合，直接采用新参考，
-	// 无扰切换交由下游三环检测 ctrl_type 变化后预装载积分实现
+	trans->ratio = shape_ratio((float)trans->elapsed / (float)trans->duration, trans->shape);
+
+	// 量纲不同（入环层级变化）：ctrl_type 立即切换（环路结构即时生效，
+	// 输出无扰由下游三环检测 ctrl_type 变化后预装载积分实现），
+	// 数值字段仍按形状渐变：消除使能/切模式瞬间的给定阶跃
 	if (trans->old_ref.ctrl_type != new_ref->ctrl_type)
 	{
 		*out_ref = *new_ref;
+		out_ref->pos = blend(trans->old_ref.pos, new_ref->pos, trans->ratio);
+		out_ref->vel = blend(trans->old_ref.vel, new_ref->vel, trans->ratio);
+		out_ref->torque = blend(trans->old_ref.torque, new_ref->torque, trans->ratio);
+		out_ref->id = blend(trans->old_ref.id, new_ref->id, trans->ratio);
+		out_ref->iq = blend(trans->old_ref.iq, new_ref->iq, trans->ratio);
+		out_ref->ud = blend(trans->old_ref.ud, new_ref->ud, trans->ratio);
+		out_ref->voltage = blend(trans->old_ref.voltage, new_ref->voltage, trans->ratio);
+		out_ref->duty = blend(trans->old_ref.duty, new_ref->duty, trans->ratio);
+		out_ref->accel = blend_vel_accel(trans, new_ref, trans->ratio, dt);
 		return false;
 	}
 
-	// 同量纲：对目标值做线性混合，保证参考连续
-	trans->ratio = (float)trans->elapsed / trans->duration;
-
+	// 同量纲：对目标值做混合，保证参考连续
 	*out_ref = *new_ref;
 	out_ref->pos = blend(trans->old_ref.pos, new_ref->pos, trans->ratio);
 	out_ref->vel = blend(trans->old_ref.vel, new_ref->vel, trans->ratio);
@@ -63,6 +110,7 @@ bool transition_update(transition_t *trans, const motor_ref_t *new_ref, motor_re
 	out_ref->ud = blend(trans->old_ref.ud, new_ref->ud, trans->ratio);
 	out_ref->voltage = blend(trans->old_ref.voltage, new_ref->voltage, trans->ratio);
 	out_ref->duty = blend(trans->old_ref.duty, new_ref->duty, trans->ratio);
+	out_ref->accel = blend_vel_accel(trans, new_ref, trans->ratio, dt);
 
 	/* PID profile 保留旧值直到过渡完成，避免增益突变+中间参考值导致力矩跳变 */
 	out_ref->pos_profile = trans->old_ref.pos_profile;
@@ -81,19 +129,31 @@ void transition_force_complete(transition_t *trans)
 
 void ref_smooth_cfg_init_defaults(ref_smooth_cfg_t *cfg)
 {
+	/* 总开关：false 时同模式目标渐变完全禁用（目标值直接透传） */
 	cfg->enable = true;
+
+	/* 固定时长兜底（单位：控制环调用次数，×dt=实际时间）：
+	 * 仅当所有 rate<=0 时生效，任一 rate>0 即被覆盖 */
 	cfg->smooth_duration = 500;
-	cfg->pos_thresh = 0.1f;
-	cfg->vel_thresh = 1.0f;
-	cfg->torque_thresh = 0.1f;
-	cfg->current_thresh = 0.5f;
-	cfg->voltage_thresh = 1.0f;
-	cfg->duty_thresh = 0.1f;
-	/* 速率模式默认启用（>0 即生效），覆盖 smooth_duration */
-	cfg->pos_rate = 50.0f;		/* 50 rad/s：5 rad 突变 → 0.1s 过渡 */
-	cfg->vel_rate = 500.0f;		/* 500 rad/s²：50 rad/s 突变 → 0.1s 过渡 */
-	cfg->torque_rate = 20.0f;	/* 20 N·m/s */
-	cfg->current_rate = 100.0f; /* 100 A/s */
+
+	/* 触发阈值：目标单拍突变超过此值才启动渐变，小于则直接透传。
+	 * 调大=小步给定更跟手，调小=更多目标突变被平滑 */
+	cfg->pos_thresh = 0.1f;     /* 位置目标突变阈值(rad) */
+	cfg->vel_thresh = 1.0f;     /* 速度目标突变阈值(rad/s) */
+	cfg->torque_thresh = 0.1f;  /* 力矩目标突变阈值(N·m) */
+	cfg->current_thresh = 0.5f; /* id/iq 电流目标突变阈值(A) */
+	cfg->voltage_thresh = 1.0f; /* 电压目标突变阈值(V) */
+	cfg->duty_thresh = 0.1f;    /* 占空比目标突变阈值 */
+
+	/* 速率模式：目标变化速率上限，过渡时长=|Δ目标|/rate。
+	 * 原始：pos_rate=100, vel_rate=500, torque_rate=20, current_rate=100 */
+	cfg->pos_rate = 5.0f;      /* 位置 5 rad/s：10 rad 突变→2s 过渡 */
+	cfg->vel_rate = 20.0f;     /* 速度 20 rad/s²：50 rad/s 突变→2.5s 过渡 */
+	cfg->torque_rate = 2.0f;   /* 力矩 2 N·m/s：1 N·m 突变→0.5s 过渡 */
+	cfg->current_rate = 20.0f; /* 电流 20 A/s：10 A 突变→0.5s 过渡 */
+
+	/* 渐变形状：LINEAR 恒定斜率；SCURVE S曲线（起停更柔和，时长自动×1.5 补偿峰值斜率） */
+	cfg->shape = TRANSITION_SHAPE_SCURVE;
 }
 
 static float ref_smooth_absf(float v)
@@ -104,13 +164,15 @@ static float ref_smooth_absf(float v)
 /**
  * @brief 按 rate 模式计算过渡时长(调用次数)
  * @details duration_i = ceil(|delta_i| / (rate_i × dt))，取各字段最大值。
- *          rate_i <= 0 表示该字段不参与速率计算（交由 smooth_duration 兜底）。
- *          所有 rate 都 <= 0 时返回 0，由调用方回退到 smooth_duration。
+ *          rate_i <= 0 表示该字段不参与速率计算（交由兜底时长）。
+ *          所有 rate 都 <= 0 或无差异时返回 0，由调用方回退到兜底时长。
+ * @note 供同模式渐变与模式切换过渡共用：模式切换过渡首拍调用，
+ *       使使能/切模式的目标阶跃也遵循 rate 斜坡（方案：速率自适应时长）。
  */
-static uint32_t ref_smooth_calc_duration_by_rate(const motor_ref_t *raw,
-												 const motor_ref_t *prev,
-												 const ref_smooth_cfg_t *cfg,
-												 float dt)
+uint32_t transition_calc_duration_by_rate(const motor_ref_t *raw,
+                                          const motor_ref_t *prev,
+                                          const ref_smooth_cfg_t *cfg,
+                                          float dt)
 {
 	if (dt <= 0.0f)
 		return 0;
@@ -147,6 +209,10 @@ static uint32_t ref_smooth_calc_duration_by_rate(const motor_ref_t *raw,
 	if (max_needed <= 0.0f)
 		return 0;
 
+	/* S曲线峰值斜率为平均值的 1.5 倍：时长 ×1.5 保证峰值速率不超过配置值 */
+	if (cfg->shape == TRANSITION_SHAPE_SCURVE)
+		max_needed *= 1.5f;
+
 	/* ceil，至少 1 */
 	uint32_t dur = (uint32_t)(max_needed + 0.999f);
 	return (dur < 1) ? 1 : dur;
@@ -167,18 +233,20 @@ static bool ref_smooth_run_state_enabled(run_state_e s)
 		case RUN_STATE_VELOCITY:
 		case RUN_STATE_TORQUE:
 		case RUN_STATE_CURRENT:
+		case RUN_STATE_PASSIVE_TORQUE: /* t_set 热更新经 torque blend 平滑 */
 			return true;
 		default:
 			return false;
 	}
 }
 
+/* 同模式目标值渐变检测：单拍突变超阈值则启动参考渐变过渡 */
 bool transition_ref_smooth_check(transition_t *trans,
-								 run_state_e run_state,
-								 const motor_ref_t *raw_ref,
-								 const motor_ref_t *prev_ref,
-								 const ref_smooth_cfg_t *cfg,
-								 float dt)
+                                 run_state_e run_state,
+                                 const motor_ref_t *raw_ref,
+                                 const motor_ref_t *prev_ref,
+                                 const ref_smooth_cfg_t *cfg,
+                                 float dt)
 {
 	/* 总开关关闭：完全跳过 */
 	if (!cfg->enable)
@@ -221,8 +289,7 @@ bool transition_ref_smooth_check(transition_t *trans,
 				exceed = true;
 			break;
 		case REF_CTRL_CURRENT:
-			if (ref_smooth_absf(raw_ref->id - prev_ref->id) > cfg->current_thresh ||
-				ref_smooth_absf(raw_ref->iq - prev_ref->iq) > cfg->current_thresh)
+			if (ref_smooth_absf(raw_ref->id - prev_ref->id) > cfg->current_thresh || ref_smooth_absf(raw_ref->iq - prev_ref->iq) > cfg->current_thresh)
 				exceed = true;
 			break;
 		default:
@@ -233,13 +300,13 @@ bool transition_ref_smooth_check(transition_t *trans,
 		return false;
 
 	/* 计算过渡时长：优先速率模式，回退固定时长 */
-	uint32_t duration = ref_smooth_calc_duration_by_rate(raw_ref, prev_ref, cfg, dt);
+	uint32_t duration = transition_calc_duration_by_rate(raw_ref, prev_ref, cfg, dt);
 	if (duration == 0)
 		duration = cfg->smooth_duration;
 	if (duration == 0)
 		return false; /* 无效配置，不启动 */
 
 	/* 以上一拍实际输出为起点启动渐变 */
-	transition_start(trans, duration, prev_ref);
+	transition_start(trans, duration, prev_ref, cfg->shape);
 	return true;
 }

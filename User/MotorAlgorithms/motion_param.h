@@ -62,12 +62,12 @@ typedef enum
  */
 typedef enum
 {
-	MOTION_TYPE_NONE = 0,           // 数据类型：无
-	MOTION_TYPE_ELE = 1,            // 数据类型：电角度
-	MOTION_TYPE_ELE_RADIAN = 2,     // 数据类型：电角度弧度
-	MOTION_TYPE_ELE_VEL = 3,        // 数据类型：电角度 + 速度
-	MOTION_TYPE_ELE_VEL_RADIAN = 4, // 数据类型：电角度弧度 + 速度
-	MOTION_TYPE_ALL = 0x0F,         // 数据类型：电角度 + 速度 + 加速度
+	MOTION_TYPE_NONE = 0,           // 无
+	MOTION_TYPE_ELE = 1,            // 仅电角度
+	MOTION_TYPE_ELE_RADIAN = 2,     // 仅电角度弧度
+	MOTION_TYPE_ELE_VEL = 3,        // 电角度 + 速度
+	MOTION_TYPE_ELE_VEL_RADIAN = 4, // 电角度弧度 + 速度
+	MOTION_TYPE_ALL = 0x0F,         // 电角度 + 速度 + 加速度
 } motion_type_e;
 
 /**

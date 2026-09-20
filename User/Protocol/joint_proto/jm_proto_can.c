@@ -3,7 +3,7 @@
  * @brief       关节电机协议-CAN绑定层实现: 定点压缩 + 多帧分包 + 共用dispatch
  *
  * @author      Dalin (dalinyy@163.com)
- * @version     1.0
+ * @version     1.1
  * @date        2026-06-18
  *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
@@ -12,11 +12,13 @@
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
  * | 2026-06-18 | 1.0  | Dalin  | 初始创建   |
+ * | 2026-07-29 | 1.1  | Dalin  | 运行期FD模式切换 + 多帧CRC16 + 超时清理 + 首帧冲突检测 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
  */
 #include <string.h>
 #include "jm_proto_can.h"
+#include "crc16.h" /* 与UART层共用 crc16_calc(CCITT/XMODEM, 初值0) */
 
 /* ---------------- 定点压缩助手 ---------------- */
 
@@ -100,18 +102,70 @@ uint8_t jm_fb_pack(uint8_t out[8], const jm_feedback_t *fb)
 	return 8;
 }
 
+/* ---------------- 运行期模式 ---------------- */
+
+/* 运行期单帧上限: FD=64B, 经典=8B */
+static inline uint8_t jm_can_single_max(const jm_proto_can_t *c)
+{
+	return c->use_fd_runtime ? JM_CAN_SINGLE_MAX_FD : JM_CAN_SINGLE_MAX_CLS;
+}
+
+static uint8_t jm_can_fd_len_is_valid(uint16_t len)
+{
+	return len <= 8u || len == 12u || len == 16u || len == 20u ||
+	       len == 24u || len == 32u || len == 48u || len == 64u;
+}
+
+static uint16_t jm_can_next_chunk(const jm_proto_can_t *c, uint16_t remaining)
+{
+	static const uint8_t fd_chunks[] = {63u, 47u, 31u, 23u, 19u, 15u, 11u, 7u, 6u, 5u, 4u, 3u, 2u, 1u};
+	uint8_t i;
+
+	if (!c->use_fd_runtime)
+		return (remaining > JM_CAN_SEG_PAYLOAD_CLS) ? JM_CAN_SEG_PAYLOAD_CLS : remaining;
+
+	for (i = 0u; i < sizeof(fd_chunks); i++)
+	{
+		if (remaining >= fd_chunks[i])
+			return fd_chunks[i];
+	}
+	return 0u;
+}
+
+uint8_t jm_proto_can_set_fd_mode(jm_proto_can_t *c, uint8_t enable)
+{
+	if (c == NULL)
+	{
+		return 0;
+	}
+#if defined(JM_PERIPH_CAN_FD) && defined(USE_CAN_FD_MODE) && (USE_CAN_FD_MODE == 1)
+	c->use_fd_runtime = enable ? 1u : 0u; /* 硬件支持, 按 enable 切换 */
+	return 1;                              /* 硬件能力: 支持 */
+#else
+	c->use_fd_runtime = 0u; /* 硬件不支持, 强制经典 */
+	return 0;                /* 硬件能力: 不支持 */
+#endif
+}
+
+uint8_t jm_proto_can_get_fd_mode(const jm_proto_can_t *c)
+{
+	return (c != NULL) ? c->use_fd_runtime : 0u;
+}
+
 /* ---------------- TX 底层 ---------------- */
 
-/* 发一帧原始CAN(ID已含CMD+电机ID) */
+/* 发一帧原始CAN(ID已含CMD+电机ID). is_fd 由运行期模式决定 */
 static void can_send_raw(jm_proto_can_t *c, uint32_t id, const uint8_t *d, uint8_t len)
 {
 	jm_can_frame_t f;
-	if (c->tx == NULL || len > 8)
+	uint8_t max_len = jm_can_single_max(c);
+	if (c->tx == NULL || len > max_len)
 	{
 		return;
 	}
 	f.id = id;
 	f.len = len;
+	f.is_fd = c->use_fd_runtime;
 	memset(f.data, 0, sizeof(f.data));
 	if (d != NULL && len > 0)
 	{
@@ -120,35 +174,57 @@ static void can_send_raw(jm_proto_can_t *c, uint32_t id, const uint8_t *d, uint8
 	c->tx(&f);
 }
 
-/* 发送一段已确定编码的载荷: <=8字节单帧, 否则多帧分包 */
+/* 发送一段已确定编码的载荷: <=single_max 单帧, 否则多帧分包(末帧追加 CRC16) */
+static void can_copy_stream(uint8_t *dst, const uint8_t *body, uint16_t len,
+	                         uint16_t crc, uint16_t offset, uint16_t count)
+{
+	uint16_t i;
+	for (i = 0; i < count; i++)
+	{
+		uint16_t pos = (uint16_t)(offset + i);
+		if (pos < len)
+			dst[i] = body[pos];
+		else if (pos == len)
+			dst[i] = (uint8_t)(crc & 0xFFu);
+		else
+			dst[i] = (uint8_t)(crc >> 8);
+	}
+}
+
 static void can_emit_payload(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint16_t len)
 {
 	uint32_t id = JM_CAN_MAKE_ID(cmd, c->motor_id);
+	uint8_t single_max = jm_can_single_max(c);
 
-	if (len <= JM_CAN_SINGLE_MAX)
+	if (len <= single_max && (!c->use_fd_runtime || jm_can_fd_len_is_valid(len)))
 	{
 		can_send_raw(c, id, body, (uint8_t)len);
 		return;
 	}
 
-	/* 多帧: 每帧 data[0]=控制字(序号+末帧标志), data[1..7]=片段 */
+	/* 多帧: data[0]=控制字(序号+末帧标志), data[1..]=片段;
+	 *       末帧末尾追加 2 字节 CRC16(小端, 覆盖整个载荷) */
+	uint16_t crc = crc16_calc((uint8_t *)body, (int)len);
 	uint16_t off = 0;
+	uint16_t total = (uint16_t)(len + 2u);
 	uint8_t seq = 0;
-	while (off < len)
+	id |= JM_CAN_MULTI_FLAG;
+	while (off < total)
 	{
-		uint8_t frame[8];
-		uint16_t chunk = (uint16_t)(len - off);
-		if (chunk > JM_CAN_SEG_PAYLOAD)
-		{
-			chunk = JM_CAN_SEG_PAYLOAD;
-		}
+		uint8_t frame[64];
+		uint16_t chunk = jm_can_next_chunk(c, (uint16_t)(total - off));
 		frame[0] = (uint8_t)(seq & JM_CAN_SEG_SEQ_MASK);
-		if (off + chunk >= len)
+		if (off + chunk >= total)
 		{
 			frame[0] |= JM_CAN_SEG_LAST; /* 末帧 */
+			can_copy_stream(&frame[1], body, len, crc, off, chunk);
+			can_send_raw(c, id, frame, (uint8_t)(1u + chunk));
 		}
-		memcpy(&frame[1], &body[off], chunk);
-		can_send_raw(c, id, frame, (uint8_t)(1 + chunk));
+		else
+		{
+			can_copy_stream(&frame[1], body, len, crc, off, chunk);
+			can_send_raw(c, id, frame, (uint8_t)(1 + chunk));
+		}
 		off = (uint16_t)(off + chunk);
 		seq++;
 	}
@@ -188,7 +264,8 @@ void jm_proto_can_send(jm_proto_can_t *c, uint8_t cmd, const uint8_t *body, uint
 
 /* 对已重组好的(cmd + payload)做分发, 应答经CAN压缩/分包发回 */
 static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
-                                   const uint8_t *payload, uint16_t plen)
+                                   const uint8_t *payload, uint16_t plen,
+                                   uint8_t reply_enabled)
 {
 	uint8_t norm[20]; /* MIT归一化缓冲: 5*f32 */
 
@@ -209,8 +286,8 @@ static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
 
 	jm_proto_dispatch(&c->proto, cmd, payload, plen);
 
-	/* 广播(电机ID=0)不应答; 有应答则发回 */
-	if (c->proto.reply_len > 0)
+	/* 广播命令只执行不应答, 避免多节点同时发送造成总线冲突。 */
+	if (reply_enabled && c->proto.reply_len > 0)
 	{
 		uint8_t rcmd = c->proto.reply[0];
 		const uint8_t *rbody = (c->proto.reply_len > 1) ? &c->proto.reply[1] : NULL;
@@ -220,6 +297,58 @@ static void can_dispatch_and_reply(jm_proto_can_t *c, uint8_t cmd,
 	}
 }
 
+/* 广播仅开放不会修改持久化配置的全局安全命令。 */
+uint8_t jm_proto_can_broadcast_allowed(uint8_t cmd)
+{
+	return (cmd == JM_CMD_BROADCAST_SYNC || cmd == JM_CMD_ESTOP ||
+	        cmd == JM_CMD_CAN_DI_DISCOVER || cmd == JM_CMD_CAN_DI_SET_ID ||
+	        cmd == JM_CMD_CAN_DI_IDENTIFY) ? 1u : 0u;
+}
+
+uint8_t jm_proto_can_is_peer_response(uint32_t id, uint8_t len)
+{
+	uint8_t cmd = JM_CAN_GET_CMD(id);
+
+	/* 主动上行数据只允许Motor->Host，任何载荷长度都不能作为设备请求。 */
+	if (cmd == JM_CMD_TELEMETRY || cmd == JM_CMD_TRACE_DATA || cmd == JM_CMD_NACK)
+		return 1u;
+
+	/* B9请求可在经典CAN上分包；带多帧标志的片段一定是请求。单帧配置请求为13B，ACK为9B或空载荷。 */
+	if (cmd == JM_CMD_TRACE_CONFIG)
+		return JM_CAN_IS_MULTI_ID(id) ? 0u : ((len == 13u) ? 0u : 1u);
+
+	/* C9 只支持空载荷通用调试查询。 */
+	if (cmd == JM_CMD_READ_DEBUG)
+		return (len == 0u) ? 0u : 1u;
+
+	/* 下列查询的Host请求必须是空载荷，非空帧只能是另一节点的响应。
+	 * 同ID设备会收到彼此的响应；若再次dispatch，会形成无限应答环。 */
+	if (len == 0u)
+		return 0u;
+	if (cmd == JM_CMD_CALIB_QUERY || cmd == JM_CMD_PID_SOURCE_GET)
+		return 1u;
+	if (cmd >= JM_CMD_READ_FEEDBACK && cmd < JM_CMD_READ_DEBUG)
+		return 1u;
+	if (cmd >= JM_CMD_READ_DEV_INFO && cmd <= JM_CMD_HEARTBEAT)
+		return 1u;
+	return 0u;
+}
+
+void jm_proto_can_di_build(const uint8_t uid[12], uint8_t di56[7], uint8_t *guard)
+{
+	uint16_t lot_crc;
+	uint16_t uid_crc;
+	if (uid == NULL || di56 == NULL || guard == NULL)
+		return;
+
+	memcpy(di56, uid, 5u);
+	lot_crc = crc16_calc((uint8_t *)&uid[5], 7);
+	di56[5] = (uint8_t)(lot_crc & 0xFFu);
+	di56[6] = (uint8_t)((lot_crc >> 8) & 0xFFu);
+	uid_crc = crc16_calc((uint8_t *)uid, 12);
+	*guard = (uint8_t)((uid_crc >> 8) & 0xFFu);
+}
+
 /* 复位多帧重组状态 */
 static void rx_reset(jm_proto_can_t *c)
 {
@@ -227,11 +356,12 @@ static void rx_reset(jm_proto_can_t *c)
 	c->rx_len = 0;
 	c->rx_seq = 0;
 	c->rx_cmd = 0;
+	c->rx_start_tick = 0;
 }
 
-void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame)
+void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame, uint32_t now_tick)
 {
-	uint8_t cmd, dst;
+	uint8_t cmd, dst, is_broadcast;
 
 	if (c == NULL || frame == NULL)
 	{
@@ -246,21 +376,40 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame)
 	{
 		return;
 	}
+	/* 仅 Motor->Host 方向的帧才是响应, 不是请求。节点 ID 重复时, 设备会收到
+	 * 彼此的遥测/NACK 帧; 若对其再分发, 会形成 NACK 叠 NACK 的无应答环, 使总线饱和。 */
+	if (jm_proto_can_is_peer_response(frame->id, frame->len))
+	{
+		return;
+	}
+	is_broadcast = (dst == JM_CAN_BROADCAST_ID) ? 1u : 0u;
+	if (is_broadcast && !jm_proto_can_broadcast_allowed(cmd))
+	{
+		return;
+	}
+
+	/* 多帧重组超时清理: 200ms 未收到末帧则丢弃当前重组, 避免永久占用缓冲 */
+	if (c->rx_active && (now_tick - c->rx_start_tick) > JM_CAN_MULTI_TIMEOUT_MS)
+	{
+		c->rx_timeout_count++;
+		rx_reset(c);
+	}
 
 	/* 判断是否多帧分包: 载荷上限内的命令走单帧;
-	 * 这里以"该CMD在CSV中是否>8字节"无法仅凭帧判断, 故采用约定:
-	 * 单帧命令 data 直接是载荷; 需分包的命令由发送端用控制字标记。
-	 * 接收端策略: 若上一帧未完成重组(rx_active)或本帧带分包语义则按多帧处理。
-	 * 简化实现: 默认按单帧分发; 多帧重组仅用于本层 can_emit_payload 产生的帧,
-	 * 即 data[0] 为控制字。为避免与单帧载荷歧义, 多帧仅对"已知大载荷CMD"启用。*/
-
-	/* 已知需要多帧的大载荷命令(与CSV"CAN需分包"一致) */
-	uint8_t is_multi = (cmd == JM_CMD_PARAM_READ_BULK || cmd == JM_CMD_PARAM_WRITE_BULK || cmd == JM_CMD_READ_DEV_INFO || cmd == JM_CMD_ADMITTANCE || cmd == JM_CMD_FORCE_POSITION_HYBRID || cmd == JM_CMD_VARIABLE_IMPEDANCE || cmd == JM_CMD_PVT || cmd == JM_CMD_CUBIC_SPLINE || cmd == JM_CMD_TRAPEZOIDAL_TRAJ || cmd == JM_CMD_S_CURVE_TRAJ || cmd == JM_CMD_TEST_SWEEP_FREQ);
+	 * 多帧重组仅用于本层 can_emit_payload 产生的帧, 即 data[0] 为控制字。
+	 * 为避免与单帧载荷歧义, 多帧仅对"已知大载荷CMD"启用(与CSV"CAN需分包"一致)。*/
+	uint8_t is_multi = JM_CAN_IS_MULTI_ID(frame->id) ? 1u : 0u;
 
 	if (!is_multi)
 	{
 		/* 单帧: data 即载荷 */
-		can_dispatch_and_reply(c, cmd, frame->data, frame->len);
+		can_dispatch_and_reply(c, cmd, frame->data, frame->len,
+		                       is_broadcast ? 0u : 1u);
+		return;
+	}
+	/* 白名单广播命令均为单帧。拒绝广播分包, 避免跨节点重组状态冲突。 */
+	if (is_broadcast)
+	{
 		return;
 	}
 
@@ -277,12 +426,17 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame)
 
 		if (seq == 0)
 		{
-			/* 新一轮重组 */
+			/* 新一轮重组; 若旧重组未完成则计为冲突 */
+			if (c->rx_active)
+			{
+				c->rx_conflict_count++;
+			}
 			rx_reset(c);
 			c->rx_active = 1;
 			c->rx_cmd = cmd;
 			c->rx_buf[0] = cmd; /* 重组区[0]存CMD, 与dispatch约定一致 */
 			c->rx_len = 1;
+			c->rx_start_tick = now_tick;
 		}
 		else if (!c->rx_active || cmd != c->rx_cmd || seq != c->rx_seq)
 		{
@@ -301,10 +455,23 @@ void jm_proto_can_feed(jm_proto_can_t *c, const jm_can_frame_t *frame)
 
 		if (last)
 		{
-			/* 重组完成: rx_buf[0]=CMD, [1..]=载荷 */
-			const uint8_t *pl = (c->rx_len > 1) ? &c->rx_buf[1] : NULL;
-			uint16_t plen = (uint16_t)(c->rx_len - 1);
-			can_dispatch_and_reply(c, c->rx_cmd, pl, plen);
+			/* 重组完成: rx_buf[0]=CMD, [1..]=载荷+CRC16(末2字节小端) */
+			if (c->rx_len >= 3u) /* 至少 1B CMD + 2B CRC */
+			{
+				uint16_t plen = (uint16_t)(c->rx_len - 1u); /* 含 CRC 的载荷长度 */
+				uint16_t recv_crc = (uint16_t)(c->rx_buf[c->rx_len - 2u]
+				                          | (c->rx_buf[c->rx_len - 1u] << 8));
+				uint16_t calc_crc = crc16_calc(&c->rx_buf[1], (int)(plen - 2u));
+				if (recv_crc != calc_crc)
+				{
+					c->rx_crc_fail_count++;
+					rx_reset(c);
+					return; /* CRC 校验失败, 丢弃 */
+				}
+				/* CRC 校验通过, 分发载荷(去除末2字节CRC) */
+				can_dispatch_and_reply(c, c->rx_cmd, &c->rx_buf[1],
+				                       (uint16_t)(plen - 2u), 1u);
+			}
 			rx_reset(c);
 		}
 	}
@@ -322,6 +489,7 @@ int jm_proto_can_init(jm_proto_can_t *c, const jm_proto_ops_t *ops,
 	jm_proto_init(&c->proto, ops, motor_id);
 	c->tx = tx;
 	c->motor_id = motor_id;
+	c->use_fd_runtime = 0; /* 上电默认经典模式(兼容所有上位机硬件) */
 	rx_reset(c);
 	return 0;
 }

@@ -12,14 +12,14 @@
  * include 头文件后可见；调试器靠 DWARF 信息展开字段，不受前向声明影响。
  * 前 3 个 struct 标签由 Task 1 具名化产生；后 2 个原本就是具名 struct。
  */
-struct dwtTimer_s;            /* dev_dwt_counter.h:    dwtTimer_t              */
-struct motor_loop_s;          /* motor_loop.h:         motor_loop_t            */
-struct motor_info_storage;    /* motor_info_storage.h: motor_info_storage_t    */
-struct dev_power_monitor;     /* dev_power_monitor.h:  dev_power_monitor_t（原具名）*/
-struct dev_commun_uart;       /* dev_commun_uart.h:    dev_commun_uart_t（原具名）*/
+struct dwtTimer_s;         /* dev_dwt_counter.h:    dwtTimer_t              */
+struct motor_loop_s;       /* motor_loop.h:         motor_loop_t            */
+struct motor_info_storage; /* motor_info_storage.h: motor_info_storage_t    */
+struct dev_power_monitor;  /* dev_power_monitor.h:  dev_power_monitor_t（原具名）*/
+struct dev_commun_uart;    /* dev_commun_uart.h:    dev_commun_uart_t（原具名）*/
 
 #define OFFSET_LUT_NUM 128
-#define DT (1.0f / 10000.0f)
+#define DT             (1.0f / 10000.0f)
 
 /************************************* 枚举变量 *************************************/
 typedef enum
@@ -43,18 +43,25 @@ typedef enum
 	ENCODER_MODE_CHANGE = 1,  // 方向已变化
 } encoder_dir_e;
 
+/* DWT 耗时打点槽位索引(start/stop 区间存入 dwt_timer.duration_us[i])
+ * 槽位按电流环 ISR 执行顺序排列; 分频槽位(位置环/速度环)在非执行拍保持上次值,
+ * CALIB/READY 等提前返回分支不经过的槽位同样保持上次值 */
 typedef enum
 {
-	SYS_TIMER_RECORD_CURRENT_LOOP_CYCLE = 0,  // 电流环周期
-	SYS_TIMER_RECORD_CURRENT_LOOP_TIME = 1,   // 电流环耗时
-	SYS_TIMER_RECORD_POSITION_LOOP_CYCLE = 2, // 位置环周期
-	SYS_TIMER_RECORD_POSITION_LOOP_TIME = 3,  // 位置环耗时
-	SYS_TIMER_RECORD_TIM_1MS_CYCLE = 4,       // 1ms定时器周期
-	SYS_TIMER_RECORD_TIM_1MS_TIME = 5,        // 1ms定时器耗时
-	SYS_TIMER_RECORD_TEST_1 = 6,              // 测试1
-	SYS_TIMER_RECORD_TEST_2 = 7,              // 测试2
-	SYS_TIMER_RECORD_TEST_3 = 8,              // 测试3
-	SYS_TIMER_RECORD_TEST_4 = 9,              // 测试4
+	SYS_TIMER_RECORD_IRQ_CYCLE = 0,    /* 电流环中断周期(相邻两次进 ISR 间隔, 10kHz 满量程≈100us) */
+	SYS_TIMER_RECORD_IRQ_TOTAL = 1,    /* ISR 总耗时(motor_loop_isr + 观察者) */
+	SYS_TIMER_RECORD_ENC_UPDATE = 2,   /* step0: 编码器刷新 + 电角度更新 */
+	SYS_TIMER_RECORD_FB_SOLVE = 3,     /* step1: 运动反馈解算(vel/pos/多圈/健康位) */
+	SYS_TIMER_RECORD_FSM_RUN = 4,      /* step2: 状态机(参考生成+状态同步) */
+	SYS_TIMER_RECORD_POS_LOOP = 5,     /* step3: 位置环(1kHz 分频, 仅 POSITION 模式) */
+	SYS_TIMER_RECORD_VEL_LOOP = 6,     /* step4: 速度环(2kHz 分频, ctrl_type>=CURRENT) */
+	SYS_TIMER_RECORD_CUR_TOTAL = 7,    /* step5: 电流环整体 cur_loop_run(含直通分支) */
+	SYS_TIMER_RECORD_CUR_SAMPLE = 8,   /* step5a: 相电流采样 + Clarke + Park */
+	SYS_TIMER_RECORD_CUR_PI = 9,       /* step5b: 电流环 PI + 解耦补偿(闭环模式) */
+	SYS_TIMER_RECORD_CUR_PWM = 10,     /* step5c: 反Park + SVPWM + PWM 输出(VOLTAGE/闭环共用) */
+	SYS_TIMER_RECORD_POWER_SYNTH = 11, /* step6: 母线电流合成(仅 SYNTH 通道板型) */
+	SYS_TIMER_RECORD_OBSERVER = 12,    /* 控制后观察者 motor_observer */
+	SYS_TIMER_RECORD_FAULT_DET = 13,   /* 全量电气故障检测(1kHz 错峰拍, NaN发散每拍不在内) */
 } sys_timer_record_index_e;
 
 /************************************* 三级变量 *************************************/
@@ -146,15 +153,20 @@ typedef struct
 	float temp_mcu;   /* MCU 内核温度 ℃ */
 } motor_thermal_t;
 
-/* 故障与诊断: 对应 READ_FAULT(0xC8) (具体故障位定义后续补充) */
+/* 故障与诊断: READ_FAULT 查询与 JM_TLM_FAULT 遥测(fault_mgr 派生) */
 typedef struct
 {
-	uint32_t fault_mask;     /* 当前故障位掩码 */
-	uint32_t warn_mask;      /* 当前警告位掩码 */
+	uint32_t fault_mask;     /* 当前故障位掩码(停机类活动故障, 低13位兼容旧语义) */
+	uint32_t warn_mask;      /* 当前警告掩码(异常级降功率/警告级活动) */
 	uint32_t fault_latched;  /* 锁存故障(需清障清除) */
 	uint32_t warn_latched;   /* 锁存警告 */
 	uint16_t error_count;    /* 累计错误次数 */
 	uint8_t last_fault_code; /* 最近一次故障码 */
+	/* fault_mgr 扩展(0xAA/0xAB 查询源) */
+	uint16_t top_fault_code; /* 最高优先级活动故障码 0xSLNN(0=无) */
+	uint8_t active_count;    /* 活动故障总数 */
+	uint8_t derate_pct;      /* 当前功率档百分比(100=正常) */
+	uint32_t level_active;   /* bit0/1/2=故障级/异常级/警告级有活动 */
 } motor_fault_t;
 
 /* 控制目标设定: 覆盖各 CONTROL_MODE_* 指令的目标量 */
@@ -239,15 +251,15 @@ typedef struct sys_data_
 	 * 指向已存在的全局变量（dwt_timer / s_motor_loop / g_motor_info_storage /
 	 * dev_power_monitor / dev_commun_uart），不持有数据、不复制数据，
 	 * 仅方便调试时通过 usr 一个变量统一观察。
-	 * 绑定在 user_data_init() 中完成；非 const 以便调试时强制设值。
-	 * 访问示例: usr.p_dwt_timer->duration_us[0], usr.p_motor_loop->vel_cnt,
+	 * 绑定在 user_init() 的硬件初始化阶段完成；非 const 以便调试时强制设值。
+	 * 访问示例: usr.p_dwt_timer->duration_us[0], usr.p_motor_loop->sched_cnt,
 	 *           usr.p_dev_power_monitor->vbus, usr.p_dev_commun_uart->tx_count
 	 */
-	struct dwtTimer_s           *p_dwt_timer;          /* -> dwt_timer            */
-	struct motor_loop_s         *p_motor_loop;         /* -> s_motor_loop         */
-	struct motor_info_storage   *p_motor_info_storage; /* -> g_motor_info_storage */
-	struct dev_power_monitor    *p_dev_power_monitor;  /* -> dev_power_monitor    */
-	struct dev_commun_uart      *p_dev_commun_uart;    /* -> dev_commun_uart      */
+	struct dwtTimer_s *p_dwt_timer;                  /* -> dwt_timer            */
+	struct motor_loop_s *p_motor_loop;               /* -> s_motor_loop         */
+	struct motor_info_storage *p_motor_info_storage; /* -> g_motor_info_storage */
+	struct dev_power_monitor *p_dev_power_monitor;   /* -> dev_power_monitor    */
+	struct dev_commun_uart *p_dev_commun_uart;       /* -> dev_commun_uart      */
 } sys_data_t;
 
 void user_data_init(void);
@@ -259,9 +271,11 @@ void user_data_init(void);
  *          上报帧把整块 float 一次性发出, 解析器固定映射到连续槽位, 故:
  *          - 加一个观测量 = 固件写一行 + 上位机加一个数据集(纯 GUI), 解析器不动。
  *          - 通道含义由使用者自行约定(建议在调用处注释), 不固化字段名。
- *          若通道不够改 JM_DBG_CH 即可(需同步上位机解析器的映射长度)。
+ *          0~7 为历史通道; 8~15 为 FOC 补偿诊断:
+ *          ud_pi, uq_pi, ud_cross, uq_bemf, ud, uq, omega_mech, config。
+ *          上位机按实际帧长解析，无需改协议字段。
  */
-#define JM_DBG_CH 8 /* 调试通道数, 改这里即可扩容(同步上位机解析器映射) */
+#define JM_DBG_CH 16 /* 调试通道数; 0~7兼容旧通道, 8~15为FOC补偿诊断 */
 extern float jm_dbg[JM_DBG_CH];
 
 /**************************************** 数据接口 ****************************************/

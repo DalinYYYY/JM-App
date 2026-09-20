@@ -1,118 +1,120 @@
 #ifndef __CALIB_CONFIG_H__
 #define __CALIB_CONFIG_H__
 
-#include "motor_profile.h" /* 电机电气身份参数（R/Ld/Lq/flux/pole_pairs），用于派生标定结果合理性范围 */
-
-/* ===================== 标定集中配置 =====================
- * 所有标定可调参数（电压/时间/采样数）集中于此。
- * 各 level 模块 #include 引用，避免魔法数散落。
- * 修改参数只需改本文件，无需动算法源码。
+/* ===================== 标定集中配置（与电机型号无关的常量）=====================
+ * 所有与电机型号无关的标定可调参数集中于此。
+ * 时间相关 TICK 数约定：控制环频率 10kHz（dt=100us）。
  *
- * 时间相关 TICK 数约定：控制环频率 10kHz（dt=100us），
- * 秒数 × 10000 得到 TICK。若控制环频率改动，
- * 仅需修改下面的 CALIB_TICKS_PER_SEC 宏。
- *
- * 所有测试电压与时间均从 motor_profile.h 的 MOTOR_* 参数派生，
- * 切换电机型号时自动适配，无需手动调整本文件。
+ * 与电机型号相关的派生参数（基于 R/Ld/Lq/flux/pole_pairs/peak_current/max_speed）
+ * 已迁移至 calib_config_runtime.h/c，运行期从 motor_info 读取派生。
+ * 切换电机型号无需重编译固件，通过上位机 0xE7/0xEA 命令修改 motor_info 即可。
  */
 
 #define CALIB_TICKS_PER_SEC 10000.0f
 
-/* 电机时间常数 τ = Ld/R（秒），用于派生标定时间参数 */
-#define MOTOR_TAU_S (MOTOR_LD / MOTOR_R)
+/* 电机分档识别阈值（与电机型号无关的通用阈值）*/
+#define CALIB_LOW_R_THRESHOLD 0.5f
 
-/* 标定测试电流基准 = 峰值电流 × 0.14（14% 堵转，安全裕度）
- * 所有"施加电压产生电流"类标定均以此为电流目标 */
-#define CALIB_CFG_TEST_CURRENT_A (MOTOR_PEAK_CURRENT * 0.14f)
+/* 测试电流安全上限（电源限流保护，与电机型号无关）*/
+#define CALIB_CFG_MAX_TEST_CURRENT_A 1.5f
 
-/* ===================== L1 驱动硬件底层参数（预留）===================== */
-#define CALIB_CFG_L1_ADC_OFFSET_SAMPLES 1000 /* ADC偏置采样次数（取平均）*/
-#define CALIB_CFG_L1_VBUS_SAMPLE_COUNT  500  /* 母线电压采样次数 */
+/* 标定施加电压幅值上限(√(ud²+uq²))，与电机型号无关 */
+#define CALIB_CFG_MAX_VOLTAGE_MAG_V 7.0f
 
-/* ===================== L2 电机电气身份参数（从 MOTOR_* 派生）===================== */
-
-/* R 辨识（DC 法）
- * 测试电压 = 测试电流 × R；稳态等待 = 750τ（充分稳定）*/
-#define CALIB_CFG_L2_R_TEST_VOLTAGE_V (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
-#define CALIB_CFG_L2_R_TEST_TIME_S    (MOTOR_TAU_S * 750.0f)
-#define CALIB_CFG_L2_R_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_R_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_R_SAMPLE_COUNT   200 /* 稳态采样次数 */
-
-/* Ld 辨识（d 轴阶跃响应）
- * 阶跃电压 = R 测试电压 × 1.3（需更高电压产生 di/dt）
- * 暂态窗口 = 2.25τ（末端 di/dt 仍远 > 阈值，避免尾部噪声）*/
-#define CALIB_CFG_L2_LD_TEST_VOLTAGE_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 1.3f)
-#define CALIB_CFG_L2_LD_TEST_TIME_S    (MOTOR_TAU_S * 2.25f)
-#define CALIB_CFG_L2_LD_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_LD_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_LD_SAMPLE_COUNT   30 /* 暂态采样点数 */
-
-/* Lq 辨识（q 轴阶跃响应）—— 与 Ld 对称 */
-#define CALIB_CFG_L2_LQ_TEST_VOLTAGE_V (CALIB_CFG_L2_R_TEST_VOLTAGE_V * 1.3f)
-#define CALIB_CFG_L2_LQ_TEST_TIME_S    (MOTOR_TAU_S * 2.25f)
-#define CALIB_CFG_L2_LQ_TEST_TICKS     (uint32_t)(CALIB_CFG_L2_LQ_TEST_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_LQ_SAMPLE_COUNT   30 /* 暂态采样点数 */
-
-/* flux 辨识（反电势法）
- * 驱动电压 = R 压降 + 反电势 = 测试电流×R + flux×pp×目标转速
- * 目标机械转速取 10 rad/s（保守，确保 back-EMF 可测）*/
-#define CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S 10.0f
-#define CALIB_CFG_L2_FLUX_SPIN_VOLTAGE_V     (CALIB_CFG_TEST_CURRENT_A * MOTOR_R + MOTOR_FLUX * MOTOR_POLE_PAIRS * CALIB_CFG_L2_FLUX_TARGET_SPEED_RAD_S)
-#define CALIB_CFG_L2_FLUX_SPIN_TIME_S        2.0f /* 稳速转动时间(s)，让滤波收敛 */
-#define CALIB_CFG_L2_FLUX_SPIN_TICKS         (uint32_t)(CALIB_CFG_L2_FLUX_SPIN_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_FLUX_SAMPLE_COUNT       200  /* 稳态采样次数 */
-
-/* 相序识别：对齐/步进电压 = 测试电流 × R */
-#define CALIB_CFG_L2_PHASE_SEQ_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
-#define CALIB_CFG_L2_PHASE_SEQ_ALIGN_S     1.0f /* 对齐等待(s) */
-#define CALIB_CFG_L2_PHASE_SEQ_ALIGN_TICKS (uint32_t)(CALIB_CFG_L2_PHASE_SEQ_ALIGN_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_PHASE_SEQ_STEP_S      0.5f /* 步进后等待(s) */
-#define CALIB_CFG_L2_PHASE_SEQ_STEP_TICKS  (uint32_t)(CALIB_CFG_L2_PHASE_SEQ_STEP_S * CALIB_TICKS_PER_SEC)
-
-/* 极对数辨识：开环强制电角度扫描法
- * 施加 ud 锁定转子跟随"强制电角度"，匀速扫过 N 个完整电周期，
- *   pole_pairs = 命令电角度变化(N·2π，精确已知) / 实测机械角变化
- * 分子是我方开环命令值（独立、精确），分母是编码器实测机械角，两者独立可测。
- * 【禁止】用 motor_param.ele_radian 反推——该量 = 机械角×已配置极对数，
- *   是循环自证的派生量，最好情况只把配置值还回来，测不出真实极对数。*/
-#define CALIB_CFG_L2_POLE_PAIRS_VOLTAGE_V   (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
-#define CALIB_CFG_L2_POLE_PAIRS_ALIGN_S     1.0f /* 对齐 d 轴等待(s)，让转子锁到 theta=0 */
-#define CALIB_CFG_L2_POLE_PAIRS_ALIGN_TICKS (uint32_t)(CALIB_CFG_L2_POLE_PAIRS_ALIGN_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES  8u   /* 扫描的完整电周期数（越多量化误差越小）*/
-#define CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ 2.0f /* 电角度扫描频率(电周期/秒)，慢速确保转子跟随 */
-/* 每 tick 电角度增量(rad) = 2π·f / ticks_per_sec */
-#define CALIB_CFG_L2_POLE_PAIRS_DTHETA_RAD (2.0f * 3.14159265F * CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ / CALIB_TICKS_PER_SEC)
-/* 扫描目标：命令电角度累加到 N·2π 即结束 */
-#define CALIB_CFG_L2_POLE_PAIRS_TARGET_RAD (2.0f * 3.14159265F * (float)CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES)
-
-/* ===================== L3 编码器校准参数（从 MOTOR_* 派生）===================== */
-/* 零位标定：对齐电压 = 测试电流 × R（d 轴锁定）*/
-#define CALIB_CFG_L3_ALIGN_VOLTAGE_V (CALIB_CFG_TEST_CURRENT_A * MOTOR_R)
-#define CALIB_CFG_L3_ALIGN_TIME_S    2.0f /* 对齐稳定等待时间(s) */
-#define CALIB_CFG_L3_ALIGN_TICKS     (uint32_t)(CALIB_CFG_L3_ALIGN_TIME_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_L3_SAMPLE_COUNT    100  /* 零位标定采样次数（取平均滤波）*/
-/* 方向标定：uq 电压 = 测试电流 × R × 0.7（略小，可靠克服静摩擦）*/
-#define CALIB_CFG_L3_DIR_VOLTAGE_V (CALIB_CFG_TEST_CURRENT_A * MOTOR_R * 0.7f)
-#define CALIB_CFG_L3_DIR_TIME_S    1.0f /* 方向测试持续时间(s) */
-#define CALIB_CFG_L3_DIR_TICKS     (uint32_t)(CALIB_CFG_L3_DIR_TIME_S * CALIB_TICKS_PER_SEC)
-
-/* ===================== 全局健壮性参数 ===================== */
-#define CALIB_CFG_GLOBAL_TIMEOUT_S     30.0f /* 单次标定全局超时(s)，防止电机卡转挂死 */
+/* 全局超时(s)，与电机型号无关。
+ * 注: L5.1 齿槽扫描(正反各~3.2圈)全程约 40s, 兜底上限放宽至 120s;
+ *     其余标定级均在 30s 内完成, 卡死场景仅延迟报错不影响功能 */
+#define CALIB_CFG_GLOBAL_TIMEOUT_S     120.0f
 #define CALIB_CFG_GLOBAL_TIMEOUT_TICKS (uint32_t)(CALIB_CFG_GLOBAL_TIMEOUT_S * CALIB_TICKS_PER_SEC)
-#define CALIB_CFG_MAX_VOLTAGE_MAG_V    5.0f  /* 标定施加电压幅值上限(√(ud²+uq²))，防止烧管子 */
 
-/* ===================== 结果合理性范围（calib_validate.h 用）=====================
- * 从 motor_profile.h 的 MOTOR_* 参数派生，容差 ±50%。
- * 切换电机型号时自动适配，无需手动调整。
- * 拦截短路/断路/异常值，兼顾误测拦截与误触发规避。*/
-#define CALIB_CFG_R_MIN_OHM      (MOTOR_R * 0.1f)    /* R 下限 = 标称×0.2 */
-#define CALIB_CFG_R_MAX_OHM      (MOTOR_R * 10.0f)   /* R 上限 = 标称×3.0 */
-#define CALIB_CFG_LD_MIN_H       (MOTOR_LD * 0.2f)   /* Ld 下限 */
-#define CALIB_CFG_LD_MAX_H       (MOTOR_LD * 3.0f)   /* Ld 上限 */
-#define CALIB_CFG_LQ_MIN_H       (MOTOR_LQ * 0.2f)   /* Lq 下限 */
-#define CALIB_CFG_LQ_MAX_H       (MOTOR_LQ * 3.0f)   /* Lq 上限 */
-#define CALIB_CFG_FLUX_MIN_WB    (MOTOR_FLUX * 0.2f) /* flux 下限 */
-#define CALIB_CFG_FLUX_MAX_WB    (MOTOR_FLUX * 3.0f) /* flux 上限 */
-#define CALIB_CFG_POLE_PAIRS_MIN 1                   /* 极对数下限（通用）*/
-#define CALIB_CFG_POLE_PAIRS_MAX 14                  /* 极对数上限（覆盖 2N-28P）*/
+/* ===================== L1 驱动硬件底层参数（与电机无关）===================== */
+#define CALIB_CFG_L1_ADC_OFFSET_SAMPLES 1000
+#define CALIB_CFG_L1_VBUS_SAMPLE_COUNT  500
 
-#endif                                               /* __CALIB_CONFIG_H__ */
+/* ===================== L2 采样次数（与电机无关）===================== */
+#define CALIB_CFG_L2_R_SAMPLE_COUNT    500
+#define CALIB_CFG_L2_LD_SAMPLE_COUNT   30
+#define CALIB_CFG_L2_LD_SKIP_TICKS     2u
+#define CALIB_CFG_L2_LQ_SAMPLE_COUNT   30
+#define CALIB_CFG_L2_LQ_SKIP_TICKS     2u
+#define CALIB_CFG_L2_FLUX_SAMPLE_COUNT 200
+
+/* ===================== L2 死区压降估计（与电机无关的保守值）===================== */
+#define CALIB_CFG_L2_R_V_DT_ESTIMATE_V 0.5f
+
+/* ===================== L2 flux 稳速判断（与电机无关）===================== */
+#define CALIB_CFG_L2_FLUX_SPEED_STABLE_WINDOW 50u
+#define CALIB_CFG_L2_FLUX_SPEED_STABLE_RATIO  0.05f
+#define CALIB_CFG_L2_FLUX_OMEGA_E_MIN_RAD_S   5.0f
+#define CALIB_CFG_L2_FLUX_SPIN_TIME_S         2.0f
+
+/* ===================== 交流注入采样次数（与电机无关）===================== */
+/* 平均周期数: 噪声按 √N 压缩。5 周期(旧值)对 Ld 小信号方差抑制不足,
+ * 提升到 20 周期(约 0.13s @153Hz), 方差再降 2 倍 */
+#define CALIB_CFG_AC_INJECT_CYCLES       20u
+#define CALIB_CFG_AC_INJECT_SAMPLE_COUNT 200
+
+/* ===================== L2 相序/极对数时间（与电机无关）===================== */
+#define CALIB_CFG_L2_PHASE_SEQ_ALIGN_S      1.0f
+#define CALIB_CFG_L2_PHASE_SEQ_SCAN_ELE_CYCLES 2u /* 相序开环扫描电周期数 */
+#define CALIB_CFG_L2_POLE_PAIRS_ALIGN_S     1.0f
+#define CALIB_CFG_L2_POLE_PAIRS_ELE_CYCLES  21u
+#define CALIB_CFG_L2_POLE_PAIRS_ELE_FREQ_HZ 2.0f
+
+/* ===================== L5.1 齿槽转矩扫描（与电机无关）===================== */
+/* 原理: 强制电角度匀速递增开环同步拖动(calib_hw_enter 会话), 恒 uq 电压下
+ * iq(θm) 即齿槽+摩擦力矩曲线; 正反双程 bin 累加取平均自动抵消库仑摩擦。 */
+#define CALIB_CFG_L5_COG_SPEED_RAD_S  1.0f    /* 拖动机械角速度(恒速) */
+#define CALIB_CFG_L5_COG_HOLD_CURRENT 0.15f   /* 拖动保持电流估计(A, 克服摩擦+齿槽峰值) */
+#define CALIB_CFG_L5_COG_VOLTAGE_MUL  2.0f    /* 拖动电压裕度系数(uq=R·I·本系数+ωe·ψ) */
+#define CALIB_CFG_L5_COG_ROUND_SCAN   2.0f    /* 每方向采集圈数 */
+#define CALIB_CFG_L5_COG_ROUND_SKIP   1.2f    /* 起步/换向过渡圈数(不累计) */
+#define CALIB_CFG_L5_COG_SLIP_RATIO   0.25f   /* 失步判定: |ω实际|<命令×本系数
+                                                 * (开环拖动在齿槽峰处速度自然跌落,
+                                                 *  阈值过严会误判, 0.5 实测误报) */
+#define CALIB_CFG_L5_COG_SLIP_TICKS   6000u   /* 失步持续时间(6000 tick=0.6s) */
+#define CALIB_CFG_L5_COG_TABLE_MA_MAX 2000.0f /* 表幅值上限(mA), 超出判标定异常 */
+
+/* ===================== L3 编码器校准时间（与电机无关）===================== */
+#define CALIB_CFG_L3_ALIGN_TIME_S 2.0f
+#define CALIB_CFG_L3_SAMPLE_COUNT 100
+#define CALIB_CFG_L3_DIR_TIME_S   1.0f
+
+/* ===================== 极对数通用范围（与电机型号无关）===================== */
+#define CALIB_CFG_R_MIN_OHM_SAFE 0.01f
+#define CALIB_CFG_POLE_PAIRS_MIN 1
+#define CALIB_CFG_POLE_PAIRS_MAX 24 /* 24 覆盖多极对电机(RS03=21, 轮毂电机可达23) */
+
+/* 标定对齐电流安全上限(低阻电机突破 1.5A 默认上限, 保证足够对齐力矩)
+ * RS03(R=0.1Ω, 额定13A) 用 6A 时电压=0.6V, 占空比 1.25%, 力矩 1.2Nm(电机端)
+ * 6A 为 46% 额定, 短时标定(扫描10s)安全, 避免大电流持续导致绕组发热
+ * 3A 时力矩不足导致极对数辨识偏低(实测21→20), 提升至 6A 修复 */
+#define CALIB_CFG_ALIGN_CURRENT_MAX_A 6.0f
+
+/* ===================== L6 惯量辨识参数（与电机无关）===================== */
+/* 双向恒流加速法：恒流 ±I 往返加速，在速度窗 [v_a,v_b] 内 LSQ 回归斜率，
+ * 往返取和抵消摩擦/磁滞负载转矩。开窗由运动触发（|v| 进入窗口），
+ * 测试电流按飞行时长自适应缩放（小惯量自动减小电流拉长斜坡保证采样窗）。
+ * 电流/转速上限派生见 calib_config_runtime.c。*/
+#define CALIB_CFG_L6_INERTIA_SPEED_FRAC      0.3f    /* v_b = max_speed×0.3 再 clamp */
+#define CALIB_CFG_L6_INERTIA_SPEED_MIN_RAD_S 5.0f    /* v_b 下限(rad/s) */
+#define CALIB_CFG_L6_INERTIA_SPEED_MAX_RAD_S 50.0f   /* v_b 上限(rad/s 台架机械约束) */
+#define CALIB_CFG_L6_INERTIA_VSTART_RAD_S    1.0f    /* v_a 开窗速度(rad/s) */
+#define CALIB_CFG_L6_INERTIA_VSTOP_RAD_S     0.5f    /* 尝试间停机判定速度(rad/s) */
+#define CALIB_CFG_L6_INERTIA_VHARD_FRAC      0.5f    /* 硬超速中止 = max_speed×0.5 */
+#define CALIB_CFG_L6_INERTIA_CURRENT_FRAC    0.3f    /* 初始测试电流 = peak×0.3 */
+#define CALIB_CFG_L6_INERTIA_CURRENT_MIN_A   0.3f    /* 初始电流下限(A) */
+#define CALIB_CFG_L6_INERTIA_CURRENT_FLOOR_A 0.05f   /* 自适应电流下限(A) */
+#define CALIB_CFG_L6_INERTIA_MAX_ATTEMPTS    4u      /* 最大测量尝试次数 */
+#define CALIB_CFG_L6_INERTIA_LEAD_TICKS      500u    /* 相1开窗前导 50ms(PLL/电流环整定) */
+#define CALIB_CFG_L6_INERTIA_PRE_TIMEOUT_TICKS  15000u /* 起动段超时 1.5s */
+#define CALIB_CFG_L6_INERTIA_WIN_TIMEOUT_TICKS  15000u /* 采样窗超时 1.5s */
+#define CALIB_CFG_L6_INERTIA_SETTLE_TICKS    15000u /* 尝试间停机等待上限 1.5s */
+#define CALIB_CFG_L6_INERTIA_FLIGHT_TARGET_TICKS 3000u /* 目标飞行时长 300ms */
+#define CALIB_CFG_L6_INERTIA_MIN_SAMPLES     200u   /* 每窗最小样本数(10kHz→20ms) */
+#define CALIB_CFG_L6_INERTIA_MIN_ACCEL_RAD_S2 2.0f  /* 最小可辨识加速度(rad/s²) */
+#define CALIB_CFG_L6_INERTIA_IQ_TRACK_RATIO  0.5f   /* iq̄/I 最低跟踪比(电压饱和检测) */
+#define CALIB_CFG_L6_INERTIA_CURLOOP_BW_HZ   500.0f /* 标定用本地电流环带宽(Hz) */
+#define CALIB_CFG_L6_INERTIA_PI_INTEG_MAX_V  5.0f   /* 电流 PI 积分限幅(V 抗饱和) */
+
+#endif /* __CALIB_CONFIG_H__ */

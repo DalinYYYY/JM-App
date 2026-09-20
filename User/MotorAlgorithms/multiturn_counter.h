@@ -74,6 +74,11 @@ typedef struct multiturn
 	float (*update_single)(struct multiturn *pobj, float mechanical_angle);
 	float (*get_position)(struct multiturn *pobj);			 // 多圈位置 (rad)
 	int32_t (*get_turns)(struct multiturn *pobj);			 // 绝对整圈数
+	// 多圈零点复位：position/turns 归零，从当前物理位置重新起算。
+	// 用于位置相关扫频前消除历史累计圈数（速度/电流扫频转出的偏置）。
+	// SOFT 模式保留 last_single_rad，下一拍增量连续不引入跳变；
+	// NONIUS 为绝对式解算，复位无效（每拍由齿轮系重建）。
+	void (*reset_position)(struct multiturn *pobj);
 } multiturn_t;
 
 /**

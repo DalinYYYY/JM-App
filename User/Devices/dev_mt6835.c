@@ -3,8 +3,8 @@
  * @brief       MT6835磁编码器(21bit SPI): 角度/零点读写(寄存器/EEPROM)/方向
  *
  * @author      Dalin (dalinyy@163.com)
- * @version     1.1
- * @date        2026-06-17
+ * @version     1.3
+ * @date        2026-07-21
  *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
  *
@@ -13,8 +13,42 @@
  * |------------|------|--------|--------------------------------------------|
  * | 2026-06-11 | 1.0  | Dalin  | 分离角度获取和角度转化                     |
  * | 2026-06-17 | 1.1  | Dalin  | 复用共享配置表; 去重去死码去魔数; 补init漏绑 |
+ * | 2026-07-21 | 1.2  | Dalin  | 修复SPI字节流时序/21bit角度拼接/写reg命令字/CSN初始电平/方向约定 |
+ * | 2026-07-21 | 1.3  | Dalin  | 严格按MT6835_Rev.1.3中文手册: 所有单字节读写改为3字节(24bit/帧); 移除普通写的ACK检查; 修正EEPROM ACK位置; 修正零点寄存器bit分布 |
  *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
+ *
+ * @note        MT6835 SPI 协议(摘自 MT6835_Rev.1.3 中文手册):
+ *              - SPI 模式 3 (CPOL=1, CPHA=1), MSB first, 最高 16MHz
+ *              - 数据帧 = 24bit/帧 = 3 字节 (4bit命令 + 12bit地址 + 8bit数据)
+ *              - SCK 空闲高电平, CSN 低有效, MISO 空闲 Hi-Z
+ *              - CSN 下降沿锁存角度寄存器(0x003~0x006), 并激活 SPI 通信
+ *              - T_L (CSN下降沿→首个SCK下降沿) ≥ 100ns
+ *
+ *              命令编码 (C3~C0):
+ *              - 0011 (0x30): 读寄存器 READ
+ *              - 0110 (0x60): 写寄存器 WRITE (普通写无 ACK)
+ *              - 0101 (0x50): 自动设零点 SetZeroPoint (返回 0x55 ACK)
+ *              - 1010 (0xA0): 连续读角度 ContinuousRead
+ *              - 1100 (0xC0): 烧录 EEPROM (返回 0x55 ACK)
+ *
+ *              时序(24bit/帧, 严格 3 字节):
+ *              - 读寄存器: MOSI=[0x30|A11~A8][A7~A0][dummy], MISO=[Hi-Z][Hi-Z][DO7~DO0]
+ *                数据在第 3 字节 rx[2] 返回
+ *              - 写寄存器: MOSI=[0x60|A11~A8][A7~A0][DI7~DI0], MISO 全程 Hi-Z (无 ACK)
+ *              - 连续读:   MOSI=[0xA0][0x03][dummy×4], MISO=[?][?][A3][A2][A1][CRC]
+ *                数据从第 3 字节开始, 每 4 字节一组(0x003~0x006)
+ *
+ * @note        21bit 角度寄存器布局(手册 0x003~0x005):
+ *              0x003: ANGLE[20:13] (8bit, 全部有效)
+ *              0x004: ANGLE[12:5]  (8bit, 全部有效)
+ *              0x005: bit[7:3]=ANGLE[4:0], bit[2:0]=STATUS[2:0] (3bit 状态, 需剔除)
+ *              拼接公式: raw = (rx[2]<<13) | (rx[3]<<5) | (rx[4]>>3)
+ *
+ * @note        零点寄存器布局(手册 0x009~0x00A):
+ *              0x009 (ZERO_POS2): ZERO_POS[11:4] (高 8bit)
+ *              0x00A (ZERO_POS1): bit[7:4]=ZERO_POS[3:0] (低 4bit), bit[3]=Z_EDGE, bit[2:0]=Z_PUL_WID
+ *              零点分辨率 = 360°/4096 ≈ 0.0879°/LSB
  */
 #include "dev_mt6835.h"
 
@@ -26,76 +60,181 @@
 
 #define MT6835_SPI_TIMEOUT (200u) /* SPI收发超时, ms */
 
+/* MT6835 数据帧固定 24bit = 3 字节 (手册规定, 不可改动) */
+#define MT6835_FRAME_LEN          (3u)
+/* 连续读角度: 命令 2 字节 + 4 字节数据(ANGLE3/2/1/CRC) = 6 字节 */
+#define MT6835_CONT_READ_FRAME_LEN (6u)
+/* 21bit 原始值 → 角度换算系数(编译期常量, 乘法替代除法省一次 VDIV) */
+#define MT6835_RAW_TO_DEG (360.0F / (float)MT6835_ANGLE_RESOLUTION)
+
 /* 片选控制 */
 static void dev_mt6835_csn_ctrl(struct dev_mt6835 *pobj, mt6835State_e state)
 {
 	drv_gpio_write(mt6835_list[pobj->id].csn, (drvPinState_e)state);
 }
 
-/* 读指定寄存器(突发读3字节: 命令字+数据) */
-static void mt6835_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg, uint8_t *rxdata)
+/*
+ * @brief 读单字节寄存器 (严格 24bit/帧 = 3 字节传输)
+ * @note  手册时序: MOSI 发送 3 字节 = [0x30|A11~A8][A7~A0][dummy]
+ *        MISO 返回: 前 2 字节 Hi-Z, 第 3 字节为寄存器数据
+ *        MT6835 在收到完整 16bit 命令后, 在第 3 字节(dummy)期间输出数据
+ *        注意: 不可多发 dummy 字节, 否则会被 MT6835 当作下一帧命令, 导致状态机错乱
+ * @param[out] value 寄存器值
+ * @return true=读取成功，false=SPI 传输失败
+ */
+static bool mt6835_read_reg(struct dev_mt6835 *pobj, mt6835_reg_enum_t reg, uint8_t *value)
 {
-	uint16_t tx = MT6835_READ | reg;
+	uint8_t tx[MT6835_FRAME_LEN] = {
+		(uint8_t)((MT6835_READ | reg) >> 8),  /* 0x30 | A[11:8] */
+		(uint8_t)(MT6835_READ | reg),          /* A[7:0] */
+		0xFFu,                                  /* dummy, MT6835 在此字节输出数据 */
+	};
+	uint8_t rx[MT6835_FRAME_LEN] = {0};
+	int status;
 
 	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-	drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, rxdata, 3, MT6835_SPI_TIMEOUT);
+	status = drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, rx,
+	                          MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
 	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+
+	if (status != DRV_EOK || value == NULL)
+	{
+		pobj->read_error_count++;
+		return false;
+	}
+	*value = rx[2]; /* 数据在第 3 字节 */
+	return true;
 }
 
 /*
- * @brief 写寄存器, 返回true表示芯片应答0x55
- * @note  TODO: 当前命令字 tx=MT6835_WRITE|data 未编入reg地址, 写位置可能不符手册,
- *        需对照MT6835手册的写时序(命令+地址+数据)核实并在硬件上验证
+ * @brief 写单字节寄存器 (严格 24bit/帧 = 3 字节传输)
+ * @note  手册时序: MOSI 发送 3 字节 = [0x60|A11~A8][A7~A0][DI7~DI0]
+ *        MISO 全程 Hi-Z, 普通写寄存器不返回 ACK (手册图-20 明确说明)
+ *        注意: 不可多发 dummy 字节, 否则会被 MT6835 当作下一帧命令
+ *        如需验证写入是否成功, 须另行读回寄存器比较
  */
 static bool mt6835_write_reg(dev_mt6835_t *pobj, mt6835_reg_enum_t reg, uint8_t data)
 {
-	uint8_t rxdata[3] = {0, 0, 0xFF};
-	uint16_t tx = MT6835_WRITE | data;
-	(void)reg;
+	uint8_t tx[MT6835_FRAME_LEN] = {
+		(uint8_t)((MT6835_WRITE | reg) >> 8),  /* 0x60 | A[11:8] */
+		(uint8_t)(MT6835_WRITE | reg),          /* A[7:0] */
+		data,                                    /* DI7~DI0 */
+	};
+	uint8_t dummy_rx[MT6835_FRAME_LEN] = {0}; /* HAL_SPI_TransmitReceive 不接受 NULL rx, 须提供 dummy 缓冲 */
+	int status;
 
 	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-	drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, rxdata, 3, MT6835_SPI_TIMEOUT);
+	status = drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, dummy_rx,
+	                          MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
 	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
-
-	return (rxdata[2] == 0x55);
-}
-
-/* 写EEPROM, 返回true表示芯片应答0x55 (同write_reg, 命令字编码待手册核实) */
-static bool mt6835_write_eeprom(dev_mt6835_t *pobj, mt6835_reg_enum_t reg, uint8_t data)
-{
-	uint8_t rxdata[3] = {0, 0, 0xFF};
-	uint16_t tx = MT6835_WRITEEEPROM | data;
-	(void)reg;
-
-	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
-	drv_spi_transfer(mt6835_list[pobj->id].spi_num, (uint8_t *)&tx, rxdata, 3, MT6835_SPI_TIMEOUT);
-	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
-
-	return (rxdata[2] == 0x55);
+	return status == DRV_EOK;
 }
 
 /*
- * @brief 读取21bit原始角度值(按running_dir做正反向)
- * @note  TODO: rxdata声明为uint16_t但驱动按字节填充, (rxdata[1]<<5)|(rxdata[2]>>11)
- *        的字节身位疑似有误, 需对照手册ANGLE3..1寄存器布局并在硬件上验证
+ * @brief 烧录 EEPROM (将所有寄存器值永久写入 EEPROM)
+ * @note  手册时序: MOSI 发送 3 字节 = [0xC0][0x00][dummy]
+ *        (烧录命令地址字段全 0, 不针对单个寄存器)
+ *        MISO 在第 3 字节返回 0x55 ACK 表示接收成功
+ *        烧录后须等待至少 6 秒再断电, 否则数据可能丢失
+ * @return true=ACK 0x55(接收成功), false=未收到 ACK
+ */
+static bool mt6835_write_eeprom(dev_mt6835_t *pobj)
+{
+	uint8_t tx[MT6835_FRAME_LEN] = {
+		(uint8_t)(MT6835_WRITEEEPROM >> 8), /* 0xC0 */
+		0x00u,                               /* 地址字段全 0 */
+		0xFFu,                               /* dummy, MT6835 在此字节输出 ACK */
+	};
+	uint8_t rx[MT6835_FRAME_LEN] = {0};
+
+	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
+	drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, rx, MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+
+	return (rx[2] == 0x55u); /* ACK 在第 3 字节 */
+}
+
+/*
+ * @brief 自动设置零点 (将当前角度写入零点寄存器)
+ * @note  手册时序: MOSI 发送 3 字节 = [0x50][0x00][dummy]
+ *        (设零点命令地址字段全 0)
+ *        MISO 在第 3 字节返回 0x55 ACK 表示接收成功
+ *        注意: 此命令仅写入寄存器 RAM, 断电丢失; 须额外调用 mt6835_write_eeprom 永久保存
+ * @return true=ACK 0x55(接收成功), false=未收到 ACK
+ */
+static bool mt6835_set_zero_point(dev_mt6835_t *pobj)
+{
+	uint8_t tx[MT6835_FRAME_LEN] = {
+		(uint8_t)(MT6835_SETZEROPOINT >> 8), /* 0x50 */
+		0x00u,                                /* 地址字段全 0 */
+		0xFFu,                                /* dummy, MT6835 在此字节输出 ACK */
+	};
+	uint8_t rx[MT6835_FRAME_LEN] = {0};
+
+	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
+	drv_spi_transfer(mt6835_list[pobj->id].spi_num, tx, rx, MT6835_FRAME_LEN, MT6835_SPI_TIMEOUT);
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+
+	return (rx[2] == 0x55u); /* ACK 在第 3 字节 */
+}
+
+/*
+ * @brief 读取 21bit 原始角度值 (连续读模式, 一帧 6 字节, 寄存器直操作)
+ * @note  电流环热路径: 3 次独立单字节读(3×CS 周期+3×HAL 阻塞开销)实测 37us,
+ *        改用连续读命令 0xA0 一帧读回 ANGLE3/2/1, SPI 启停开销降为 1 次;
+ *        传输走 drv_spi_transfer_fast(寄存器直操作), 绕过 HAL 阻塞框架开销。
+ *
+ *        手册时序(连续读, 起始地址 0x003):
+ *          MOSI = [0xA0][0x03][dummy ×4], 共 6 字节
+ *          MISO = [?][?][A3][A2][A1][CRC], 数据从第 3 字节开始
+ *        拼接公式与单字节读一致(手册权威):
+ *          raw = (rx[2] << 13) | (rx[3] << 5) | (rx[4] >> 3)
+ *          rx[4]>>3 剔除低 3bit STATUS, 保留高 5bit ANGLE[4:0]
+ *
+ *        附带收益: 21bit 角度在同一帧内采样, 消除 3 次独立读之间
+ *        的角度撕裂(高速旋转时三次读数不一致导致的非线性误差)。
+ *        rx[5] 为 CRC 寄存器(0x006), CRC 功能默认关闭, 不做校验。
+ *
+ * @return 21bit 原始角度值 [0, 2097151]
  */
 static uint32_t dev_mt6835_get_raw(struct dev_mt6835 *pobj)
 {
-	uint16_t rxdata[3] = {0};
-	mt6835_read_reg(pobj, MT6835_REG_ANGLE3, (uint8_t *)rxdata);
-	pobj->raw = ((uint32_t)(rxdata[1] << 5) | (rxdata[2] >> 11)) & MT6835_ANGLE_MASK;
+	uint8_t tx[MT6835_CONT_READ_FRAME_LEN] = {
+		(uint8_t)(MT6835_CONTINUOUSREAD >> 8), /* 0xA0 连续读命令 */
+		(uint8_t)(MT6835_CONTINUOUSREAD | MT6835_REG_ANGLE3), /* 起始地址 0x003 */
+		0xFFu, 0xFFu, 0xFFu, 0xFFu,             /* dummy ×4, 期间 MT6835 输出数据 */
+	};
+	uint8_t rx[MT6835_CONT_READ_FRAME_LEN] = {0};
+	int status;
 
-	if (pobj->running_dir > 1) /* 反向 */
+	dev_mt6835_csn_ctrl(pobj, MT6835_LOW);
+	status = drv_spi_transfer_fast(mt6835_list[pobj->id].spi_num, tx, rx,
+	                               MT6835_CONT_READ_FRAME_LEN);
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
+
+	if (status != DRV_EOK)
+	{
+		pobj->read_error_count++;
+		return pobj->raw; /* 传输失败保留上一有效角度 */
+	}
+
+	/* 21bit 角度拼接 (手册权威公式) */
+	uint32_t raw = ((uint32_t)rx[2] << 13)
+	             | ((uint32_t)rx[3] << 5)
+	             | ((uint32_t)rx[4] >> 3);
+	pobj->raw = raw & MT6835_ANGLE_MASK;
+
+	if (pobj->running_dir < 0) /* 反向: -1/1 约定, <0 表示反向 */
 	{
 		pobj->raw = MT6835_ANGLE_MASK - pobj->raw;
 	}
 	return pobj->raw;
 }
 
-/* 由21bit原始值算机械角度, 去偏移并归一化到[0,360) */
+/* 由 21bit 原始值算机械角度, 去偏移并归一化到 [0,360) */
 static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
 {
-	float angle_org = (float)pobj->raw / MT6835_ANGLE_RESOLUTION * 360.0F;
+	float angle_org = (float)pobj->raw * MT6835_RAW_TO_DEG;
 	float angle = angle_org - pobj->offset;
 
 	pobj->mech_angle_org = angle_org;
@@ -104,45 +243,65 @@ static float dev_mt6835_get_machAngle(struct dev_mt6835 *pobj)
 	return pobj->mechanical_angle;
 }
 
-/* 读零点寄存器原始值(ZERO_POS2:高8位, ZERO_POS1:低4位)
- * 注: read_reg固定写3字节, 故每个接收缓冲须>=3字节, 否则越界破坏栈 */
+/*
+ * @brief 读零点寄存器原始值 (12bit)
+ * @note  手册布局:
+ *        0x009 (ZERO_POS2): ZERO_POS[11:4] (高 8bit)
+ *        0x00A (ZERO_POS1): bit[7:4]=ZERO_POS[3:0] (低 4bit), bit[3:0]=Z_EDGE+Z_PUL_WID
+ *        拼接: ZERO_POS[11:0] = (pos2 << 4) | (pos1 >> 4)
+ */
 static uint16_t mt6835_get_raw_zero_angle(dev_mt6835_t *pobj)
 {
-	uint8_t rx_pos2[3] = {0};
-	uint8_t rx_pos1[3] = {0};
-	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, rx_pos2);
-	mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, rx_pos1);
-	return (uint16_t)((rx_pos2[0] << 4) | (rx_pos1[0] >> 4));
+	uint8_t pos2;
+	uint8_t pos1;
+	if (!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &pos2) ||
+		!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, &pos1))
+	{
+		return 0u;
+	}
+	return (uint16_t)(((uint16_t)pos2 << 4) | (pos1 >> 4));
 }
 
-/* 读零点角度(°) */
+/* 读零点角度 (°) */
 static float mt6835_get_zero_angle(dev_mt6835_t *pobj)
 {
 	return (float)mt6835_get_raw_zero_angle(pobj) * MT6835_ZERO_REG_STEP;
 }
 
 /*
- * @brief 写零点角度, 成功返回true(两个寄存器均应答0x55)
- * @note  原实现存在栈溢出: read_reg固定写3字节, 而tx_buf仅2字节, 越界1字节
- *        会破坏栈上相邻内存(如pobj指针); 且该次读取还覆盖了刚算好的高8位。
- *        现去掉可疑的读-改-写, 直接写入12bit零点值。
- *        ZERO_POS1低4位为保留位, 此处写0; 若手册要求保留原值需改回读-改-写,
- *        并使用>=3字节缓冲, 需在硬件上验证。
+ * @brief 写零点角度 (写寄存器 RAM, 不烧录 EEPROM)
+ * @note  手册: 普通写寄存器(0110)无 ACK, 故采用"写后读回验证"判断成功
+ *        如需永久保存, 须另行调用 mt6835_write_eeprom
+ *        ZERO_POS[11:0] = (pos2 << 4) | (pos1 >> 4)
+ *        pos2 = ZERO_POS[11:4], pos1[7:4] = ZERO_POS[3:0], pos1[3:0] 保留位写 0
+ * @return true=读回验证一致, false=验证失败或角度超范围
  */
 static bool mt6835_set_zero_angle(dev_mt6835_t *pobj, float rad)
 {
 	uint16_t angle = (uint16_t)roundf(rad * MT6835_RAD2DEG / MT6835_ZERO_REG_STEP);
-	if (angle > 0xFFF)
+	if (angle > 0xFFFu)
 	{
 		return false;
 	}
 
-	uint8_t zero_pos2 = (uint8_t)(angle >> 4);          /* 高8位 */
-	uint8_t zero_pos1 = (uint8_t)((angle & 0x0F) << 4); /* 低4位置于bit[7:4], bit[3:0]保留位写0 */
+	uint8_t zero_pos2 = (uint8_t)(angle >> 4);           /* ZERO_POS[11:4] */
+	uint8_t zero_pos1 = (uint8_t)((angle & 0x0Fu) << 4); /* ZERO_POS[3:0] 置于 bit[7:4], bit[3:0] 保留位写 0 */
 
-	bool ok = mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, zero_pos2);
-	ok = mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, zero_pos1) && ok;
-	return ok;
+	if (!mt6835_write_reg(pobj, MT6835_REG_ZERO_POS2, zero_pos2) ||
+		!mt6835_write_reg(pobj, MT6835_REG_ZERO_POS1, zero_pos1))
+	{
+		return false;
+	}
+
+	/* 写后读回验证 (普通写无 ACK, 只能靠读回判断) */
+	uint8_t rb_pos2;
+	uint8_t rb_pos1;
+	if (!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS2, &rb_pos2) ||
+		!mt6835_read_reg(pobj, MT6835_REG_ZERO_POS1, &rb_pos1))
+	{
+		return false;
+	}
+	return (rb_pos2 == zero_pos2) && ((rb_pos1 & 0xF0u) == zero_pos1);
 }
 
 static void dev_mt6835_set_offset(struct dev_mt6835 *pobj, float offset)
@@ -150,9 +309,13 @@ static void dev_mt6835_set_offset(struct dev_mt6835 *pobj, float offset)
 	pobj->offset = offset;
 }
 
+/*
+ * @brief 设置编码器方向
+ * @param dir 方向: 1=CW(正向), -1=CCW(反向), 与项目其他编码器约定一致
+ */
 static void dev_mt6835_set_dir(struct dev_mt6835 *pobj, int dir)
 {
-	pobj->running_dir = dir;
+	pobj->running_dir = (dir < 0) ? -1 : 1;
 }
 
 /* 数据处理: 读原始值→算机械角度 */
@@ -168,6 +331,12 @@ void dev_mt6835_init(dev_mt6835_t *pobj, mt6835_id_e dev_id)
 	assert_report(pobj != NULL);
 	memset(pobj, 0, sizeof(dev_mt6835_t));
 	pobj->id = dev_id;
+	pobj->running_dir = 1;   /* 默认正向(CW), 与项目 -1/1 约定一致 */
+
+	/* CSN 上电默认拉高, 避免 MT6835 误以为被选中导致首帧失步
+	 * 手册: CSN 下降沿激活 SPI 通信, 空闲时须保持高电平
+	 * 原理图未外接上拉电阻, 这里靠 MCU 推挽输出高电平保证总线空闲 */
+	dev_mt6835_csn_ctrl(pobj, MT6835_HIGH);
 
 	pobj->update = dev_mt6835_handle;
 	pobj->get_mechanical_angle = dev_mt6835_get_machAngle;

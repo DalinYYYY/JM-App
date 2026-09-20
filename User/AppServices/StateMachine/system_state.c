@@ -1,9 +1,10 @@
 /**
  * @file        system_state.c
  * @brief 系统状态机实现文件
- * @details 仅负责状态管理：顶层主状态机（INIT/IDLE/READY/RUN/FAULT/SAFETY/
+ * @details 仅负责状态管理：顶层主状态机表驱动转移 + 进入/退出动作，
+ *          控制逻辑(参考生成)经 motor_ctrl_dispatch 调用，本文件不含。
  *
- * @author      name (name@robot.com)
+ * @author      yangsl (yangsl@robot.com)
  * @version     1.1
  * @date        2026-06-11
  *
@@ -20,13 +21,22 @@
 
 #include "system_state.h"
 #include "calib_mgr.h"
+#include "fault_manager.h"
+#include "motor_mode.h" /* motor_load_sim_reset: 负载模拟模式进入复位 */
+#include "dev_dwt_counter.h" /* ISR 分段耗时打点(调试期) */
+#include "runtime_param.h"   /* SYS_TIMER_RECORD_ 打点索引 */
+#include "cogging_comp.h" /* 齿槽表落盘互锁: 本文件包含链不经 dev_config.h,
+                           * 须先无条件包含本头(其内部先含 dev_config.h 使
+                           * USE_DEV_FLASH 可见, 再自我门控), 守卫才有效 */
 #include <string.h>
 
 /**
- * @brief 运行模式平滑过渡的调用次数
+ * @brief 运行模式平滑过渡的调用次数（rate 不适用时的兜底时长）
  * @details 过渡时长以 motor_control_loop（建议置于电流环）的调用次数计，
  *          而非软件定时器。可在运行期配置：调用次数 = 期望过渡时长 / 电流环周期。
  *          例：电流环 50us，期望过渡 5ms，则置为 100。
+ *          注意：smooth_cfg 任一 rate>0 时模式切换过渡首拍会按速率重算时长，
+ *          覆盖此值（=|Δ目标|/rate）；rate 全<=0 时才使用此固定时长。
  */
 uint32_t g_run_state_trans_count = 1000;
 
@@ -37,7 +47,7 @@ uint32_t g_run_state_trans_count = 1000;
 static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 	[CONTROL_MODE_IDLE] = RUN_STATE_IDLE,
 	[CONTROL_MODE_HOLD] = RUN_STATE_HOLD,
-	[CONTROL_MODE_BRAKE] = RUN_STATE_HOLD,  /* 刹车=位置保持 */
+	[CONTROL_MODE_BRAKE] = RUN_STATE_HOLD, /* 刹车=位置保持 */
 
 	[CONTROL_MODE_OPEN_LOOP] = RUN_STATE_OPEN_LOOP,
 	[CONTROL_MODE_CURRENT] = RUN_STATE_CURRENT,
@@ -70,15 +80,24 @@ static const run_state_e s_ctrl_mode_to_run_state[CONTROL_MODE_MAX] = {
 	[CONTROL_MODE_TRAPEZOIDAL_TRAJ] = RUN_STATE_TRAPEZOIDAL_TRAJ,
 	[CONTROL_MODE_S_CURVE_TRAJ] = RUN_STATE_S_CURVE_TRAJ,
 	[CONTROL_MODE_HOMING] = RUN_STATE_HOMING,
-	[CONTROL_MODE_CANOPEN_SYNC] = RUN_STATE_POSITION,  /* SYNC 同步位置 */
+	[CONTROL_MODE_CANOPEN_SYNC] = RUN_STATE_POSITION, /* SYNC 同步位置 */
 	[CONTROL_MODE_ETHERCAT_CSP] = RUN_STATE_POSITION, /* CSP = Cyclic Sync Position */
 	[CONTROL_MODE_ETHERCAT_CSV] = RUN_STATE_VELOCITY, /* CSV = Cyclic Sync Velocity */
 	[CONTROL_MODE_ETHERCAT_CST] = RUN_STATE_TORQUE,   /* CST = Cyclic Sync Torque */
-	[CONTROL_MODE_PP] = RUN_STATE_POSITION,              /* Profile Position（前期复用 POSITION）*/
-	[CONTROL_MODE_PV] = RUN_STATE_PROFILE_VELOCITY,     /* Profile Velocity → 独立模式文件 */
-	[CONTROL_MODE_PT] = RUN_STATE_PROFILE_TORQUE,       /* Profile Torque → 独立模式文件 */
+	[CONTROL_MODE_PP] = RUN_STATE_POSITION,           /* Profile Position（前期复用 POSITION）*/
+	[CONTROL_MODE_PV] = RUN_STATE_PROFILE_VELOCITY,   /* Profile Velocity → 独立模式文件 */
+	[CONTROL_MODE_PT] = RUN_STATE_PROFILE_TORQUE,     /* Profile Torque → 独立模式文件 */
 	[CONTROL_MODE_ELECTRONIC_GEAR] = RUN_STATE_ELECTRONIC_GEAR,
 	[CONTROL_MODE_ELECTRONIC_CAM] = RUN_STATE_ELECTRONIC_CAM,
+
+	[CONTROL_MODE_PASSIVE_TORQUE] = RUN_STATE_PASSIVE_TORQUE,
+	[CONTROL_MODE_DYNAMIC_TORQUE] = RUN_STATE_DYNAMIC_TORQUE,
+	[CONTROL_MODE_QUADRATIC_LOAD] = RUN_STATE_QUADRATIC_LOAD,
+	[CONTROL_MODE_CONSTANT_POWER] = RUN_STATE_CONSTANT_POWER,
+	[CONTROL_MODE_FRICTION_LOAD] = RUN_STATE_FRICTION_LOAD,
+	[CONTROL_MODE_INERTIA_SIM] = RUN_STATE_INERTIA_SIM,
+	[CONTROL_MODE_DUTY_PROFILE] = RUN_STATE_DUTY_PROFILE,
+	[CONTROL_MODE_IMPACT_LOAD] = RUN_STATE_IMPACT_LOAD,
 
 	[CONTROL_MODE_STEP_DIR] = RUN_STATE_STEP_DIR,
 	[CONTROL_MODE_ANALOG_INPUT] = RUN_STATE_ANALOG_INPUT,
@@ -159,6 +178,9 @@ void system_state_init(system_state_t *sys, struct dev_motor *motor, motor_param
 	sys->ctrl_mode = CONTROL_MODE_IDLE;
 	sys->fault_code = 0;
 
+	/* 故障管理器绑定状态机(检测/仲裁/动作统一委托, 消抖阈值按 dt 换算) */
+	fault_mgr_attach(sys);
+
 	top_fsm_switch(sys, TOP_FSM_IDLE);
 }
 
@@ -235,8 +257,37 @@ void top_fsm_switch(system_state_t *sys, top_fsm_e new_state)
  */
 void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans_count)
 {
-	if (new_state >= RUN_STATE_MAX || new_state == sys->motor.run_state)
+	if (new_state >= RUN_STATE_MAX)
 		return;
+
+	/* 切换过渡进行中：run_state 仍为旧值，判据改用 target_run_state。
+	 * 目标相同=重复指令，忽略（重启过渡会使渐变斜率归零造成顿挫）；
+	 * 目标不同（含切回旧模式）=从当前混合输出重启过渡 */
+	if (sys->trans_mgr.trans.state == TRANSITION_IN_PROGRESS)
+	{
+		if (new_state == sys->trans_mgr.target_run_state)
+			return;
+	}
+	else if (new_state == sys->motor.run_state)
+	{
+		return;
+	}
+	/* 扫频带有内部时序和 TRACE 点边界，不能在普通参考平滑过渡期间  */
+	if (new_state == RUN_STATE_TEST_SWEEP_FREQ)
+	{
+		transition_force_complete(&sys->trans_mgr.trans);
+		sys->trans_mgr.target_run_state = new_state;
+		sys->motor.run_state = new_state;
+		return;
+	}
+
+	/* 负载模拟模式: 过渡启动前复位运行时状态(相位/计时/加速度估计) */
+	if (new_state >= RUN_STATE_PASSIVE_TORQUE && new_state <= RUN_STATE_IMPACT_LOAD)
+		motor_load_sim_reset(&sys->motor);
+
+	/* PV 速度轮廓: 复位斜坡状态, 下拍从实测速度无扰起步 */
+	if (new_state == RUN_STATE_PROFILE_VELOCITY)
+		motor_profile_vel_reset(&sys->motor);
 
 	transition_mgr_on_mode_switch(&sys->trans_mgr, new_state, trans_count, &sys->motor.ref);
 }
@@ -246,10 +297,15 @@ void run_state_switch(system_state_t *sys, run_state_e new_state, uint32_t trans
  * @details 仅 RUN 态生成运动参考；其余状态参考保持 IDLE。
  *          控制逻辑（参考生成）经 motor_ctrl_dispatch 调用，本文件不含。
  */
-void motor_control_loop(system_state_t *sys)
+void motor_control_loop(system_state_t *sys, bool fault_tick)
 {
-	fault_check(sys);
-
+	/* 故障保护必须位于参考生成之前；扫频在本周期不得再产生新的激励。 */
+	fault_check(sys, fault_tick);
+	if (sys->top_state == TOP_FSM_FAULT || sys->top_state == TOP_FSM_SAFETY)
+	{
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		return;
+	}
 	/* CALIB 态：周期推进标定，不生成运动参考 */
 	if (sys->top_state == TOP_FSM_CALIB)
 	{
@@ -267,15 +323,64 @@ void motor_control_loop(system_state_t *sys)
 
 	// 运行态：所有过渡策略收敛到 transition_mgr_step
 	transition_mgr_step(&sys->trans_mgr, sys);
+	if (sys->motor.run_state == RUN_STATE_TEST_SWEEP_FREQ && motor_sweep_is_complete(&sys->motor) && sys->motor.sweep_finish_pending == 0u)
+	{
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		top_fsm_switch(sys, TOP_FSM_READY);
+	}
 }
 
 /**
- * @brief 系统故障检测（具体实现，预留）
+ * @brief 系统故障检测（委托故障管理器）
+ * @details 检测/记录/仲裁/级别动作统一在 fault_mgr_poll_fast 内完成
+ *          (电气类快检测 + 停机类故障切 FAULT 态)。错峰调度:
+ *          NaN 发散检测(fault_detect_diverge)每拍执行, 保护本拍算法输出;
+ *          全量电气检测仅在 fault_tick 拍(1kHz)执行, 消抖阈值已按
+ *          采样周期(控制周期×FAULT_DET_FAST_DIV)等效换算, 响应时间不变。
+ *          本函数保留:
+ *          1. 同步兼容字段到 sys(fault_code/fault_latched 等旧路径);
+ *          2. 扫频中止与失能输出兜底(fault_mgr 不依赖 sweep 模块)。
  */
-void fault_check(system_state_t *sys)
+void fault_check(system_state_t *sys, bool fault_tick)
 {
-	(void)sys;
-	return;
+	if (sys == NULL || sys->motor.param == NULL)
+		return;
+
+	/* NaN 发散检测每拍(编译开关关闭时为空实现) */
+	fault_detect_diverge(&g_fault_mgr);
+
+	if (fault_tick)
+	{
+		dev_dwt_counter_start(SYS_TIMER_RECORD_FAULT_DET); /* 分段耗时: 全量电气检测 */
+		fault_mgr_poll_fast();
+		dev_dwt_counter_stop(SYS_TIMER_RECORD_FAULT_DET);
+	}
+	fault_mgr_sync_compat(sys);
+
+	if (sys->fault_code != 0u)
+	{
+		motor_sweep_abort(&sys->motor);
+		sys->motor.ref.ctrl_type = REF_CTRL_IDLE;
+		top_fsm_switch(sys, TOP_FSM_FAULT);
+	}
+}
+
+/**
+ * @brief 齿槽表落盘互锁: 表待写/擦写期间(s_write_state==1)为真
+ * @note L5.1 标定完成后表由 idle 线程异步擦写 Flash(drv_flash_write 全程
+ *      关中断 10~40ms)。该期间进入 RUN(闭环带功率)或带电压标定, 擦写会
+ *      冻结控制中断, PWM 停在非零占空比导致电流失控, 故在状态机唯一
+ *      入口(process_ctrl_cmd)阻断, idle 线程落盘完成后自动放行(重发即可)。
+ *      READY 不阻断: 电流环每拍把 PWM 驱到零, 擦写安全;
+ *      已在 CALIB 态连续标定不阻断: idle 线程门控在 CALIB 态不落盘。
+ */
+static bool cogging_flush_busy(void)
+{
+#if defined(USE_DEV_FLASH)
+	return cogging_comp_get_write_state() == 1u;
+#else
+	return false;
+#endif
 }
 
 /**
@@ -299,13 +404,26 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 		return;
 	}
 
+	/* ---- STOP 延迟过渡期间：拒绝其他命令（ESTOP 已上面处理）---- */
+	if (sys->trans_mgr.stop_pending)
+		return;
+
 	/* ---- 故障态：仅响应清除故障 ---- */
 	if (sys->top_state == TOP_FSM_FAULT)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
 		{
-			sys->ctrl_mode = cmd;
-			top_fsm_switch(sys, TOP_FSM_IDLE);
+			/* 放行 fm 侧锁存记录: 条件已消失的清为 CLEARED, 仍触发的
+			 * 下拍检测重新置 ACTIVE(与旧"条件消失才可清障"语义一致)。
+			 * 无此步则 fault_code 恒派生自锁存记录, 清障死锁 */
+			fault_mgr_clear(FAULT_CLEAR_LATCHED);
+			fault_check(sys, true); /* 清障判定需立即全量检测, 不等错峰拍 */
+			if (sys->fault_code == 0u)
+			{
+				sys->fault_latched = 0u;
+				sys->ctrl_mode = cmd;
+				top_fsm_switch(sys, TOP_FSM_IDLE);
+			}
 		}
 		return;
 	}
@@ -315,8 +433,14 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	{
 		if (cmd == CONTROL_MODE_CLEAR_FAULT)
 		{
-			sys->ctrl_mode = cmd;
-			top_fsm_switch(sys, TOP_FSM_IDLE);
+			fault_mgr_clear(FAULT_CLEAR_LATCHED);
+			fault_check(sys, true); /* 清障判定需立即全量检测, 不等错峰拍 */
+			if (sys->fault_code == 0u)
+			{
+				sys->fault_latched = 0u;
+				sys->ctrl_mode = cmd;
+				top_fsm_switch(sys, TOP_FSM_IDLE);
+			}
 		}
 		return;
 	}
@@ -336,17 +460,28 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 
 		case CONTROL_MODE_ENABLE:
 			// 上使能：IDLE → READY
+			/* DENY 类故障活动(低温等)时拒绝使能, 故障码经 0xAB 查询 */
+			if (fault_mgr_deny_enable() != 0u)
+				return;
 			top_fsm_switch(sys, TOP_FSM_READY);
 			if (sys->top_state == TOP_FSM_READY)
 				sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_STOP:
-			// 停止运行：RUN → READY（保持使能）
+			/* 停止运行：RUN → READY（保持使能）
+			 * 支持停机过渡的模式：启动延迟过渡，保持当前模式减速到零，完成后自动切 READY
+			 * 不支持的模式（MIT/HOLD/直控）：立即切 READY */
 			if (sys->top_state == TOP_FSM_RUN)
-				top_fsm_switch(sys, TOP_FSM_READY);
-			if (sys->top_state == TOP_FSM_READY)
+			{
 				sys->ctrl_mode = cmd;
+				if (!transition_mgr_on_stop(&sys->trans_mgr, sys))
+					top_fsm_switch(sys, TOP_FSM_READY);
+			}
+			else if (sys->top_state == TOP_FSM_READY)
+			{
+				sys->ctrl_mode = cmd;
+			}
 			return;
 
 		case CONTROL_MODE_ENTER_BOOTLOADER:
@@ -355,50 +490,55 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 				sys->ctrl_mode = cmd;
 			return;
 
-		/* 校准指令：进入 CALIB 状态
-	 * 0x90-0x96: 启动标定（子模式已由 app_set_mode 传给 calib_mgr）
-	 * 0x97/0x98: 查询/中止，不切状态（app_set_mode 已处理并 return）*/
-	case CONTROL_MODE_CALIB_LEVEL1:
-	case CONTROL_MODE_CALIB_LEVEL2:
-	case CONTROL_MODE_CALIB_LEVEL3:
-	case CONTROL_MODE_CALIB_LEVEL4:
-	case CONTROL_MODE_CALIB_LEVEL5:
-	case CONTROL_MODE_CALIB_LEVEL6:
-	case CONTROL_MODE_CALIB_LEVEL7:
-		/* IDLE 或 READY 态可进入校准；RUN 态需先停止再标定 */
-		if (sys->top_state == TOP_FSM_IDLE || sys->top_state == TOP_FSM_READY)
-		{
-			top_fsm_switch(sys, TOP_FSM_CALIB);
-			if (sys->top_state == TOP_FSM_CALIB)
+			/* 校准指令：进入 CALIB 状态
+			 * 0x90-0x96: 启动标定（子模式已由 app_set_mode 传给 calib_mgr）
+			 * 0x97/0x98: 查询/中止，不切状态（app_set_mode 已处理并 return）*/
+		case CONTROL_MODE_CALIB_LEVEL1:
+		case CONTROL_MODE_CALIB_LEVEL2:
+		case CONTROL_MODE_CALIB_LEVEL3:
+		case CONTROL_MODE_CALIB_LEVEL4:
+		case CONTROL_MODE_CALIB_LEVEL5:
+		case CONTROL_MODE_CALIB_LEVEL6:
+		case CONTROL_MODE_CALIB_LEVEL7:
+			/* IDLE 或 READY 态可进入校准；RUN 态需先停止再标定 */
+			if (sys->top_state == TOP_FSM_IDLE || sys->top_state == TOP_FSM_READY)
+			{
+				if (cogging_flush_busy())
+				{
+					/* 齿槽表待落盘: 回滚 calib_mgr_start, 待 idle 线程落盘
+					 * 完成后重发(与状态切换失败的回滚路径一致) */
+					calib_mgr_abort();
+					return;
+				}
+				top_fsm_switch(sys, TOP_FSM_CALIB);
+				if (sys->top_state == TOP_FSM_CALIB)
+					sys->ctrl_mode = cmd;
+				else
+					calib_mgr_abort(); /* 状态切换失败，回滚标定避免卡死 */
+			}
+			else if (sys->top_state == TOP_FSM_CALIB)
+			{
+				/* 已在 CALIB 态：上一个标定已 DONE/FAILED，calib_mgr_start 已成功启动新标定，
+				 * 直接接受即可，不得 abort（否则会终止刚启动的新标定）*/
 				sys->ctrl_mode = cmd;
+			}
 			else
-				calib_mgr_abort(); /* 状态切换失败，回滚标定避免卡死 */
-		}
-		else if (sys->top_state == TOP_FSM_CALIB)
-		{
-			/* 已在 CALIB 态：上一个标定已 DONE/FAILED，calib_mgr_start 已成功启动新标定，
-			 * 直接接受即可，不得 abort（否则会终止刚启动的新标定）*/
-			sys->ctrl_mode = cmd;
-		}
-		else
-		{
-			/* 非法状态（RUN/FAULT/SAFETY等），回滚 calib_mgr_start */
-			calib_mgr_abort();
-		}
-		return;
+			{
+				/* 非法状态（RUN/FAULT/SAFETY等），回滚 calib_mgr_start */
+				calib_mgr_abort();
+			}
+			return;
 
-	case CONTROL_MODE_CALIB_QUERY:
-	case CONTROL_MODE_CALIB_ABORT:
-		/* 查询/中止不切状态，app_set_mode 已处理 */
-		return;
+		case CONTROL_MODE_CALIB_QUERY:
+		case CONTROL_MODE_CALIB_ABORT:
+			/* 查询/中止不切状态，app_set_mode 已处理 */
+			return;
 
 		case CONTROL_MODE_SAVE_CONFIG:
-			// extern int motor_param_save(const motor_param_t *cfg);
 			sys->ctrl_mode = cmd;
 			return;
 
 		case CONTROL_MODE_FACTORY_RESET:
-			// extern int motor_param_load_default(motor_param_t * cfg);
 			sys->ctrl_mode = cmd;
 			return;
 
@@ -409,6 +549,11 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	/* ---- 运动控制指令：需已使能（READY 或 RUN）---- */
 	if (sys->top_state == TOP_FSM_READY)
 	{
+		/* 齿槽表待落盘: 阻断进 RUN——擦写冻结控制中断会使非零 PWM 失控,
+		 * 且新表尚未生效; idle 线程落盘完成后重发即可, 见 cogging_flush_busy */
+		if (cogging_flush_busy())
+			return;
+
 		/* READY → RUN：首次进入也走平滑过渡，避免位置阶跃 */
 		top_fsm_switch(sys, TOP_FSM_RUN);
 		run_state_e target = s_ctrl_mode_to_run_state[cmd];
@@ -424,6 +569,12 @@ void process_ctrl_cmd(system_state_t *sys, ctrl_mode_e cmd)
 	}
 	else if (sys->top_state == TOP_FSM_RUN)
 	{
+		/* 停机渐变中收到新运动指令：取消停机，新目标经渐变逻辑平滑接管
+		 * （同模式：目标再变化重启渐变；不同模式：模式切换过渡）。
+		 * 不取消则同模式指令被 apply_stop_cmd 吞掉，切模式的过渡
+		 * 完成后会被残留 stop_pending 立即停机 */
+		transition_mgr_cancel_stop(&sys->trans_mgr);
+
 		// RUN 态内运动模式切换：走平滑过渡，时长由全局调用次数配置
 		run_state_e target = s_ctrl_mode_to_run_state[cmd];
 		run_state_switch(sys, target, g_run_state_trans_count);

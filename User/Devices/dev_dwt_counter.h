@@ -7,7 +7,7 @@ extern "C"
 {
 #endif
 
-#define SYS_TIMER_RECORD_MAX_INDEX 10
+#define SYS_TIMER_RECORD_MAX_INDEX 14
 	typedef struct dwtTimer_s
 	{
 		uint32_t now_records[SYS_TIMER_RECORD_MAX_INDEX];	   /* 记录各索引对应的起始时刻(DWT_CYCCNT计数值) */

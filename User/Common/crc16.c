@@ -1,17 +1,11 @@
 /**
  * @file crc16.c
- * @brief 
+ * @brief CRC16（CCITT）查表法实现与累加校验和
  * @author Dalin
  * @version 1.00
  * @date 2024-11-13
  * 
  * @copyright Copyright (c) 2024  RobotDance Technology Co., Ltd.
- * 
- * @par 修改日志:
- * <table>
- * <tr><th>Date           <th>Version     <th>Author      <th>Description
- * <tr><td>2024-11-13     <td>1.00        <td>LinHui      <td>Init
- * </table>
  */
 
 #include "crc16.h"
@@ -50,6 +44,12 @@ static const uint16_t crc16tab[256] = {
 	0xef1f, 0xff3e, 0xcf5d, 0xdf7c, 0xaf9b, 0xbfba, 0x8fd9, 0x9ff8,
 	0x6e17, 0x7e36, 0x4e55, 0x5e74, 0x2e93, 0x3eb2, 0x0ed1, 0x1ef0};
 
+/**
+ * @brief   计算 CRC16（CCITT，多项式 0x1021）查表校验值
+ * @param   buf  数据缓冲区
+ * @param   len  数据长度（字节）
+ * @return  CRC16 校验值
+ */
 uint16_t crc16_calc(uint8_t *buf, int len)
 {
 	int counter;
@@ -63,10 +63,10 @@ uint16_t crc16_calc(uint8_t *buf, int len)
 }
 
 /**
- * @brief	校验和计算
- * @param	buf : 待校验的数据
- * @param	len : 数据长度
- * @retval	sum ：校验结果
+ * @brief	累加校验和计算
+ * @param	buf  待校验的数据
+ * @param	len  数据长度（字节）
+ * @return	计算结果
  */
 uint16_t check_sum(uint8_t *buf, uint16_t len)
 {

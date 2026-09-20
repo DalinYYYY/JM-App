@@ -1,7 +1,11 @@
 /**
  * @file dev_eeprom.h
- * @brief EEPROM 设备：字节/块读写、跨页写、参数持久化
- * @note  默认按 I2C 接口(AT24Cxx 类)设计; 若为 SPI EEPROM 请替换驱动头与配置成员。
+ * @brief EEPROM 设备：字节/块读写、跨页写、写周期等待、参数持久化
+ * @note  兼容 AT24Cxx I2C EEPROM 与 MB85RC16 FRAM：
+ *        两者均为 16Kbit(2048B)、8bit 内部地址、块选择位在器件地址 A2A1A0 中，
+ *        寻址时序一致，驱动可复用。
+ *        EEPROM 特有: 页写限制(AT24C16=16B) + 写周期 tWR(需要 ACK polling 等待)。
+ *        硬件 I2C 走 drv_i2c(USE_I2C_DRIVER)。
  */
 #ifndef __DEV_EEPROM_H
 #define __DEV_EEPROM_H
@@ -28,10 +32,10 @@ extern "C"
 	typedef struct
 	{
 		char name[20];
-//		i2cDrv_t i2c;		 /* I2C 驱动句柄 */
-		uint8_t i2c_addr;	 /* 7bit 器件地址 */
-		uint16_t page_size;	 /* 页大小, 字节 */
-		uint32_t total_size; /* 总容量, 字节 */
+		i2cDrv_t i2c;		 /* I2C 传输描述(硬I2C: 外设编号/超时) */
+		uint8_t i2c_addr;	 /* 7bit 基础器件地址(块0), AT24C16=0x50 */
+		uint16_t page_size;	 /* 页大小, 字节 (AT24C16=16) */
+		uint32_t total_size; /* 总容量, 字节 (AT24C16=2048) */
 		uint8_t addr_width;	 /* 内部地址宽度: 1=8bit, 2=16bit */
 	} dev_eeprom_config_t;
 
@@ -45,18 +49,28 @@ extern "C"
 		uint32_t total_size;
 
 		/* public, 返回 DEV_EOK / DEV_ERROR */
-		int (*read)(struct dev_eeprom *pobj, uint32_t addr, uint8_t *data, uint16_t len);		 /* 任意长度读 */
-		int (*write)(struct dev_eeprom *pobj, uint32_t addr, const uint8_t *data, uint16_t len); /* 跨页自动分页写 */
+		int (*read)(struct dev_eeprom *pobj, uint32_t addr, uint8_t *data, uint16_t len);		  /* 任意长度读(跨块自动拆块) */
+		int (*write)(struct dev_eeprom *pobj, uint32_t addr, const uint8_t *data, uint16_t len); /* 跨页自动分页写 + 写周期等待 */
 		int (*read_byte)(struct dev_eeprom *pobj, uint32_t addr, uint8_t *data);
 		int (*write_byte)(struct dev_eeprom *pobj, uint32_t addr, uint8_t data);
 		bool (*is_ready)(struct dev_eeprom *pobj); /* 轮询写完成(ACK polling) */
 		int (*erase_all)(struct dev_eeprom *pobj); /* 全片擦除(写 0xFF) */
 	} dev_eeprom_t;
 
+	/* 默认设备实例 (dev_eeprom.c 定义) */
+	extern dev_eeprom_t dev_eeprom;
+
 	/**
  * @brief 初始化 EEPROM 对象
  */
 	void dev_eeprom_init(dev_eeprom_t *pobj, eeprom_id_e id);
+
+	/**
+ * @brief 芯片自检: 多块写入回读校验(覆盖块0跨页边界/块1/末尾块)
+ * @note  会覆盖校验区域内的原数据, 仅用于上电自检/调试
+ * @retval DEV_EOK 通过, DEV_ERROR 失败
+ */
+	int dev_eeprom_test(struct dev_eeprom *pobj);
 
 #ifdef __cplusplus
 }

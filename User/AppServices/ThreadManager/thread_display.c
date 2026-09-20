@@ -1,6 +1,6 @@
 /**
  * @file thread_display.c
- * @brief 
+ * @brief 显示/LED 线程实现（周期驱动 LED 状态指示） 
  * 
  * @author dalin (dalinyy@163.com)
  * @version 1.0
@@ -22,19 +22,26 @@
 #include "runtime_param.h"
 #include "thread_display.h"
 #include "thread_config.h"
-#include "vofa.h"
 #include "user_interface.h"
+#include "dev_config.h"
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
+#include "led_manager.h"
+#endif
 
 void display_thread(void const *argument)
 {
-	/* Infinite loop */
 	drv_rtos_delay_ms(INTO_THREAD_DELAY / 2);
 
 	for (;;)
 	{
 
 		drv_rtos_delay_ms(THREAD_DELAY_DISPLAY);
-		/* 任务计数 */
+
+#if defined(USE_DEV_LED) || defined(USE_DEV_RGB_LED)
+		/* LED 状态指示周期更新（10ms 周期, 由状态机驱动灯效） */
+		led_manager_update();
+#endif
+
 		usr.sys.task_cnt.display_cnt++;
 	}
 }

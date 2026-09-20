@@ -79,7 +79,7 @@ extern "C"
 	 * @param  id                     : 设备编号
 	 * @param  raw_buf                : SPI读回的4字节原始帧(多读1B以容纳前导空闲bit)
 	 * @param  raw                    : 14bit原始角度值
-	 * @param  mech_angle_org         : 去偏移/方向处理后的机械角度, °
+	 * @param  mech_angle_org         : 未补偿原始机械角度, °
 	 * @param  mechanical_angle       : 最终机械角度, ° [0,360)
 	 * @param  mg_state               : 磁场状态(Mg[3:0]解析, 可叠加)
 	 * @param  crc_code               : 帧中6bit CRC

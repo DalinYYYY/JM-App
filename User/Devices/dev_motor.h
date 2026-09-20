@@ -33,11 +33,13 @@
  *   控制层只面向 dev_encoder_t 抽象接口，与型号无关；具体用哪颗芯片由本宏决定。
  *   切换编码器：只改本宏值，dev_motor_init 内的初始化/装配按宏条件编译，
  *==========================================================================*/
+
 #define DEV_MOTOR_ENCODER_MT6701 1
 #define DEV_MOTOR_ENCODER_MT6835 2
+#define DEV_MOTOR_ENCODER_AS5047 3
 
 #ifndef DEV_MOTOR_ENCODER_TYPE
-#define DEV_MOTOR_ENCODER_TYPE DEV_MOTOR_ENCODER_MT6701
+#define DEV_MOTOR_ENCODER_TYPE DEV_MOTOR_ENCODER_AS5047
 #endif
 
 typedef enum
@@ -50,8 +52,12 @@ typedef enum
 typedef struct
 {
 	char name[20];
-	gpioDrv_t gpio;
+	gpioDrv_t gpio;        /*!< 功率级使能 EN 引脚(高电平使能) */
+	gpioDrv_t nfault_gpio; /*!< 栅极驱动器 nFAULT 故障输入(低电平有效); gpiox=DRV_GPIO_INIT 表示本板未连接 */
 } dev_motor_enable_config_t;
+
+/* 配置表定义在板级 dev_config_board.inc, 由 dev_config.c include */
+extern const dev_motor_enable_config_t motor_enable_list[DEV_MOTOR_MAX];
 
 typedef struct
 {
@@ -86,6 +92,15 @@ typedef struct dev_motor
 void dev_motor_init(dev_motor_t *pobj, motor_id_e id,
                     focCurrent_t (*current_callback)(void),
                     float (*ele_radian_callback)(void));
+
+/**
+ * @brief 读取栅极驱动器硬件故障状态(nFAULT)
+ * @retval 1=驱动器故障(nFAULT 拉低, OCP/UVLO/TSD 等硬件保护已锁存); 0=正常
+ * @note  nFAULT 低电平有效; 未连接该信号的板型(配置 gpiox=DRV_GPIO_INIT,
+ *        如 SFOC/ODrive)恒返回 0, 不影响对应板型编译与运行。
+ *        硬件故障锁存需 EN 复位或重新上电清除, 软件不做自恢复。
+ */
+uint8_t dev_motor_gate_driver_fault(void);
 
 /**
  * @brief 运行时翻转编码器方向(换电机/换安装后快速调试用)

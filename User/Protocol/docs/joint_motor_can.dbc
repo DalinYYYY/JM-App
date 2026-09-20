@@ -1,0 +1,574 @@
+VERSION "JointMotor CAN Database v1.1"
+
+NS_ :
+    NS_DESC_
+    CM_
+    BA_DEF_
+    BA_
+    VAL_
+    BA_DEF_DEF_
+    SIG_VALTYPE_
+
+BS_:
+
+BU_: Host Motor
+
+BO_ 2147483649 IDLE: 0 Host
+
+BO_ 2147483905 HOLD: 0 Host
+
+BO_ 2147484161 BRAKE: 0 Host
+
+BO_ 2147484417 ESTOP: 0 Host
+
+BO_ 2147484673 ENABLE: 0 Host
+
+BO_ 2147484929 DISABLE: 0 Host
+
+BO_ 2147485185 STOP: 0 Host
+
+BO_ 2147485441 SOFT_RESET: 4 Host
+ SG_ magic : 0|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147487745 OPEN_LOOP: 8 Host
+ SG_ ud : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ uq : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147488001 CURRENT: 8 Host
+ SG_ id_ref : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ iq_ref : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147488257 TORQUE: 4 Host
+ SG_ torque : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147488513 MIT: 8 Host
+ SG_ pos : 0|16@1+ (1,0) [0|65535] "" Motor
+ SG_ vel : 16|12@1+ (1,0) [0|4095] "" Motor
+ SG_ kp : 28|12@1+ (1,0) [0|4095] "" Motor
+ SG_ kd : 40|12@1+ (1,0) [0|4095] "" Motor
+ SG_ tff : 52|12@1+ (1,0) [0|4095] "" Motor
+
+BO_ 2147488769 VELOCITY: 4 Host
+ SG_ vel_ref : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147489025 POSITION: 4 Host
+ SG_ pos_ref : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147489281 POS_VEL_FF: 8 Host
+ SG_ pos : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ vel_ff : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147489537 POS_TORQUE_LIM: 8 Host
+ SG_ pos : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ tq_lim : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147489793 VEL_TORQUE_LIM: 8 Host
+ SG_ vel : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ tq_lim : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147490049 DUTY_CYCLE: 4 Host
+ SG_ duty : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147490305 VOLTAGE_VECTOR: 8 Host
+ SG_ u_alpha : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ u_beta : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147490561 FIELD_WEAKENING: 8 Host
+ SG_ id_weak : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ iq_ref : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147490817 SENSORLESS: 4 Host
+ SG_ vel_ref : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147495937 IMPEDANCE: 8 Host
+ SG_ pos : 0|16@1+ (1,0) [0|65535] "" Motor
+ SG_ vel : 16|12@1+ (1,0) [0|4095] "" Motor
+ SG_ kp : 28|12@1+ (1,0) [0|4095] "" Motor
+ SG_ kd : 40|12@1+ (1,0) [0|4095] "" Motor
+ SG_ tff : 52|12@1+ (1,0) [0|4095] "" Motor
+
+BO_ 2147496193 ADMITTANCE: 8 Host
+
+BO_ 2147496449 FORCE_CONTROL: 4 Host
+ SG_ force : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147496705 FORCE_POS_HYBRID: 8 Host
+
+BO_ 2147496961 GRAVITY_COMP: 0 Host
+
+BO_ 2147497217 COLLISION_DET: 5 Host
+ SG_ threshold : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ enable : 32|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147497473 ZERO_FORCE: 0 Host
+
+BO_ 2147497729 CONSTANT_FORCE: 4 Host
+ SG_ force : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147497985 VAR_IMPEDANCE: 8 Host
+
+BO_ 2147498241 ADAPT_GRAVITY: 4 Host
+ SG_ gain : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147498497 LANDING_BUFFER: 8 Host
+ SG_ stiffness : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ damp : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147504129 PVT: 8 Host
+
+BO_ 2147504385 CUBIC_SPLINE: 8 Host
+
+BO_ 2147504641 TRAPEZOIDAL: 8 Host
+
+BO_ 2147504897 S_CURVE: 8 Host
+
+BO_ 2147505153 HOMING: 1 Host
+ SG_ method : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147505409 CANOPEN_SYNC: 0 Host
+
+BO_ 2147505665 ETHERCAT_CSP: 4 Host
+ SG_ pos : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147505921 ETHERCAT_CSV: 4 Host
+ SG_ vel : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147506177 ETHERCAT_CST: 4 Host
+ SG_ torque : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147506433 PP: 8 Host
+ SG_ pos : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ vel : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147506689 PV: 8 Host
+ SG_ vel : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ acc : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147506945 PT: 8 Host
+ SG_ torque : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ slope : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147507201 ELECTRONIC_GEAR: 8 Host
+ SG_ ratio_num : 0|32@1- (1,0) [-2147483648|2147483647] "" Motor
+ SG_ ratio_den : 32|32@1- (1,0) [-2147483648|2147483647] "" Motor
+
+BO_ 2147507457 ELECTRONIC_CAM: 2 Host
+ SG_ cam_table_id : 0|16@1+ (1,0) [0|65535] "" Motor
+
+BO_ 2147512321 STEP_DIR: 4 Host
+ SG_ pulse_per_rev : 0|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147512577 ANALOG_INPUT: 5 Host
+ SG_ ch : 0|8@1+ (1,0) [0|255] "" Motor
+ SG_ scale : 8|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147512833 PWM_INPUT: 4 Host
+ SG_ min_us : 0|16@1+ (1,0) [0|65535] "" Motor
+ SG_ max_us : 16|16@1+ (1,0) [0|65535] "" Motor
+
+BO_ 2147513089 JOG: 5 Host
+ SG_ dir : 0|8@1- (1,0) [-128|127] "" Motor
+ SG_ speed : 8|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147513345 SAFE_TEACH: 0 Host
+
+BO_ 2147513601 TEST_AGING: 4 Host
+ SG_ cycles : 0|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147513857 TEST_SWEEP_FREQ: 8 Host
+
+BO_ 2147514113 TEST_COGGING: 0 Host
+
+BO_ 2147514369 TEST_FRICTION: 0 Host
+
+BO_ 2147514625 TEST_INERTIA: 0 Host
+
+BO_ 2147514881 TEST_CURRENT_LOOP: 8 Host
+ SG_ amp : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ freq : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147515137 TEST_VEL_LOOP: 8 Host
+ SG_ amp : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+ SG_ freq : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Motor
+
+BO_ 2147516417 SYNC_FRAME: 0 Host
+
+BO_ 2147516673 PRESET_CMD: 0 Host
+
+BO_ 2147516929 TRIGGER: 0 Host
+
+BO_ 2147520513 CALIB_L1: 1 Host
+ SG_ submode : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147520769 CALIB_L2: 1 Host
+ SG_ submode : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147521025 CALIB_L3: 1 Host
+ SG_ submode : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147521281 CALIB_L4: 1 Host
+ SG_ submode : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147521537 CALIB_L5: 1 Host
+ SG_ submode : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147521793 CALIB_L6: 1 Host
+ SG_ submode : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147522049 CALIB_L7: 1 Host
+ SG_ submode : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147522305 CALIB_QUERY_ACK: 8 Motor
+ SG_ state : 0|8@1+ (1,0) [0|255] "" Host
+ SG_ fail_reason : 8|8@1+ (1,0) [0|255] "" Host
+ SG_ progress : 16|8@1+ (1,0) [0|255] "" Host
+ SG_ level : 24|8@1+ (1,0) [0|255] "" Host
+ SG_ submode : 32|8@1+ (1,0) [0|255] "" Host
+ SG_ step : 40|8@1+ (1,0) [0|255] "" Host
+ SG_ step_total : 48|8@1+ (1,0) [0|255] "" Host
+ SG_ reserved : 56|8@1+ (1,0) [0|255] "" Host
+
+BO_ 2147522561 CALIB_ABORT: 0 Host
+
+BO_ 2147524609 PID_AUTOTUNE: 8 Host
+
+BO_ 2147524865 PID_SOURCE_SET: 2 Host
+ SG_ ring_select : 0|8@1+ (1,0) [0|255] "" Motor
+ SG_ source : 8|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147525121 PID_SOURCE_ACK: 3 Motor
+ SG_ cur_src : 0|8@1+ (1,0) [0|255] "" Host
+ SG_ vel_src : 8|8@1+ (1,0) [0|255] "" Host
+ SG_ pos_src : 16|8@1+ (1,0) [0|255] "" Host
+
+BO_ 2147525889 PID_PARAM_WRITE: 6 Host
+ SG_ ring : 0|8@1+ (1,0) [0|255] "" Motor
+ SG_ param_type : 8|8@1+ (1,0) [0|255] "" Motor
+ SG_ value : 16|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147526145 PID_PARAM_READ: 2 Host
+ SG_ ring : 0|8@1+ (1,0) [0|255] "" Motor
+ SG_ param_type : 8|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147528705 CLEAR_FAULT: 0 Host
+
+BO_ 2147528961 DIAGNOSTIC: 0 Host
+
+BO_ 2147529217 ENTER_BOOTLOADER: 4 Host
+ SG_ magic : 0|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147529473 SAVE_CONFIG: 0 Host
+
+BO_ 2147529729 FACTORY_RESET: 4 Host
+ SG_ magic : 0|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147529985 START_LOG: 6 Host
+ SG_ rate_hz : 0|16@1+ (1,0) [0|65535] "" Motor
+ SG_ mask : 16|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147530241 STOP_LOG: 0 Host
+
+BO_ 2147530497 HIGH_SPEED_DAQ: 8 Host
+ SG_ ch_mask : 0|32@1+ (1,0) [0|4294967295] "" Motor
+ SG_ rate_hz : 32|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147530753 SINGLE_STEP: 0 Host
+
+BO_ 2147532801 FEEDBACK_ACK: 8 Motor
+ SG_ pos : 0|16@1+ (1,0) [0|65535] "" Host
+ SG_ vel : 16|16@1+ (1,0) [0|65535] "" Host
+ SG_ torque : 32|16@1+ (1,0) [0|65535] "" Host
+ SG_ temp : 48|8@1+ (1,0) [0|255] "" Host
+ SG_ err : 56|8@1+ (1,0) [0|255] "" Host
+
+BO_ 2147533057 STATE_ACK: 4 Motor
+ SG_ top_fsm : 0|8@1+ (1,0) [0|255] "" Host
+ SG_ run_state : 8|8@1+ (1,0) [0|255] "" Host
+ SG_ ctrl_mode : 16|8@1+ (1,0) [0|255] "" Host
+ SG_ enable : 24|8@1+ (1,0) [0|255] "" Host
+
+BO_ 2147533313 PHASE_CURRENT_ACK: 8 Motor
+
+BO_ 2147533569 DQ_CURRENT_ACK: 8 Motor
+ SG_ id : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Host
+ SG_ iq : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Host
+
+BO_ 2147533825 BUS_INFO_ACK: 8 Motor
+
+BO_ 2147534081 TEMP_ACK: 8 Motor
+ SG_ temp_fet : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Host
+ SG_ temp_motor : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Host
+
+BO_ 2147534337 POS_VEL_ACK: 8 Motor
+ SG_ pos : 0|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Host
+ SG_ vel : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Host
+
+BO_ 2147534593 MULTITURN_ACK: 8 Motor
+ SG_ multiturn : 0|32@1- (1,0) [-2147483648|2147483647] "" Host
+ SG_ single : 32|32@1+ (1,0) [-3.4e+38|3.4e+38] "" Host
+
+BO_ 2147534849 FAULT_ACK: 8 Motor
+ SG_ fault_mask : 0|32@1+ (1,0) [0|4294967295] "" Host
+ SG_ warn_mask : 32|32@1+ (1,0) [0|4294967295] "" Host
+
+BO_ 2147535105 DEBUG_ACK: 8 Motor
+
+BO_ 2147535361 TELEMETRY: 8 Motor
+ SG_ mask : 0|16@1+ (1,0) [0|65535] "" Host
+
+BO_ 2147535617 SET_TELEMETRY: 5 Host
+ SG_ enable : 0|8@1+ (1,0) [0|255] "" Motor
+ SG_ mask : 8|16@1+ (1,0) [0|65535] "" Motor
+ SG_ period : 24|16@1+ (1,0) [0|65535] "" Motor
+
+BO_ 2147535873 OTA_START: 0 Host
+
+BO_ 2147536129 OTA_DATA: 0 Host
+
+BO_ 2147536385 OTA_END: 0 Host
+
+BO_ 2147536641 OTA_RESUME: 0 Host
+
+BO_ 2147536897 DEV_INFO_ACK: 8 Motor
+
+BO_ 2147537153 DEV_NAME_ACK: 8 Motor
+
+BO_ 2147537409 HEARTBEAT: 7 Motor
+ SG_ state : 0|8@1+ (1,0) [0|255] "" Host
+ SG_ err : 8|16@1+ (1,0) [0|65535] "" Host
+ SG_ ts : 24|32@1+ (1,0) [0|4294967295] "" Host
+
+BO_ 2147540993 PARAM_READ: 2 Host
+ SG_ param_id : 0|16@1+ (1,0) [0|65535] "" Motor
+
+BO_ 2147541249 PARAM_WRITE: 8 Host
+
+BO_ 2147541505 PARAM_READ_BULK: 8 Host
+
+BO_ 2147541761 PARAM_WRITE_BULK: 8 Host
+
+BO_ 2147542017 PARAM_SAVE: 0 Host
+
+BO_ 2147542273 PARAM_DEFAULT: 2 Host
+ SG_ param_id : 0|16@1+ (1,0) [0|65535] "" Motor
+
+BO_ 2147542529 MOTOR_INFO_READ: 2 Host
+ SG_ param_id : 0|16@1+ (1,0) [0|65535] "" Motor
+
+BO_ 2147542785 MOTOR_INFO_WRITE: 6 Host
+ SG_ param_id : 0|16@1+ (1,0) [0|65535] "" Motor
+ SG_ value : 16|32@1+ (1,0) [0|4294967295] "" Motor
+
+BO_ 2147543041 MOTOR_INFO_READ_BULK: 8 Host
+
+BO_ 2147543297 MOTOR_INFO_WRITE_BULK: 8 Host
+
+BO_ 2147543553 MOTOR_INFO_SAVE: 0 Host
+
+BO_ 2147543809 MOTOR_INFO_DEFAULT: 2 Host
+ SG_ param_id : 0|16@1+ (1,0) [0|65535] "" Motor
+
+BO_ 2147544065 MOTOR_INFO_RECALIB_RESET: 0 Host
+
+BO_ 2147545089 SET_CAN_ID: 1 Host
+ SG_ new_id : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147545345 SET_BAUDRATE: 1 Host
+ SG_ baud_code : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147545601 BROADCAST_SYNC: 0 Host
+
+BO_ 2147545857 SET_FD_MODE: 1 Host
+ SG_ enable : 0|8@1+ (1,0) [0|255] "" Motor
+
+BO_ 2147546113 CAN_DI_DISCOVER: 8 Both
+
+BO_ 2147546369 CAN_DI_SET_ID: 8 Both
+
+BO_ 2147546625 CAN_DI_IDENTIFY: 8 Both
+
+BO_ 2147548673 NACK: 2 Motor
+ SG_ cmd : 0|8@1+ (1,0) [0|255] "" Host
+ SG_ err_code : 8|8@1+ (1,0) [0|255] "" Host
+
+CM_ BO_ 2147483649 "进入待机 IDLE停止输出  CAN_ID=0x00<<8|MotorID";
+CM_ BO_ 2147483905 "位置保持 锁定当前位置  CAN_ID=0x01<<8|MotorID";
+CM_ BO_ 2147484161 "机械刹车 短接相线抱闸  CAN_ID=0x02<<8|MotorID";
+CM_ BO_ 2147484417 "紧急停止 最高优先级断输出  CAN_ID=0x03<<8|MotorID";
+CM_ BO_ 2147484673 "上使能 IDLE->READY  CAN_ID=0x04<<8|MotorID";
+CM_ BO_ 2147484929 "下使能 READY/RUN->IDLE  CAN_ID=0x05<<8|MotorID";
+CM_ BO_ 2147485185 "停止运行 RUN->READY  CAN_ID=0x06<<8|MotorID";
+CM_ BO_ 2147485441 "软件复位 magic=0x5E7E7E5E ACK后延迟约200ms复位 广播不开放  CAN_ID=0x07<<8|MotorID";
+CM_ BO_ 2147487745 "开环电压  CAN_ID=0x10<<8|MotorID";
+CM_ BO_ 2147488001 "电流环  CAN_ID=0x11<<8|MotorID";
+CM_ BO_ 2147488257 "力矩环 Nm  CAN_ID=0x12<<8|MotorID";
+CM_ BO_ 2147488513 "MIT控制 CAN定点压缩: pos16+vel12+kp12+kd12+tff12  CAN_ID=0x13<<8|MotorID";
+CM_ BO_ 2147488769 "速度环 rad/s  CAN_ID=0x14<<8|MotorID";
+CM_ BO_ 2147489025 "位置环 rad  CAN_ID=0x15<<8|MotorID";
+CM_ BO_ 2147489281 "位置+速度前馈  CAN_ID=0x16<<8|MotorID";
+CM_ BO_ 2147489537 "位置+力矩限幅  CAN_ID=0x17<<8|MotorID";
+CM_ BO_ 2147489793 "速度+力矩限幅  CAN_ID=0x18<<8|MotorID";
+CM_ BO_ 2147490049 "占空比控制 -1~1  CAN_ID=0x19<<8|MotorID";
+CM_ BO_ 2147490305 "电压矢量  CAN_ID=0x1A<<8|MotorID";
+CM_ BO_ 2147490561 "弱磁控制  CAN_ID=0x1B<<8|MotorID";
+CM_ BO_ 2147490817 "无感FOC  CAN_ID=0x1C<<8|MotorID";
+CM_ BO_ 2147495937 "阻抗控制 CAN同MIT压缩  CAN_ID=0x30<<8|MotorID";
+CM_ BO_ 2147496193 "[Multi] 导纳控制 多帧(16B): force/mass/damp/stiff  CAN_ID=0x31<<8|MotorID";
+CM_ BO_ 2147496449 "纯力控制 N或Nm  CAN_ID=0x32<<8|MotorID";
+CM_ BO_ 2147496705 "[Multi] 力位混合 多帧(12B): pos/force/sel_mask  CAN_ID=0x33<<8|MotorID";
+CM_ BO_ 2147496961 "重力补偿  CAN_ID=0x34<<8|MotorID";
+CM_ BO_ 2147497217 "碰撞检测  CAN_ID=0x35<<8|MotorID";
+CM_ BO_ 2147497473 "零力模式 拖动示教  CAN_ID=0x36<<8|MotorID";
+CM_ BO_ 2147497729 "恒力控制 N或Nm  CAN_ID=0x37<<8|MotorID";
+CM_ BO_ 2147497985 "[Multi] 变阻抗 多帧(12B): kp/kd/rate  CAN_ID=0x38<<8|MotorID";
+CM_ BO_ 2147498241 "自适应重力补偿  CAN_ID=0x39<<8|MotorID";
+CM_ BO_ 2147498497 "落地缓冲  CAN_ID=0x3A<<8|MotorID";
+CM_ BO_ 2147504129 "[Multi] PVT插补 多帧(12B): pos/vel/time_ms  CAN_ID=0x50<<8|MotorID";
+CM_ BO_ 2147504385 "[Multi] 三次样条 多帧(18B): seg_idx/coef[4]  CAN_ID=0x51<<8|MotorID";
+CM_ BO_ 2147504641 "[Multi] 梯形轨迹 多帧(12B): target/vmax/acc  CAN_ID=0x52<<8|MotorID";
+CM_ BO_ 2147504897 "[Multi] S型轨迹 多帧(16B): target/vmax/acc/jerk  CAN_ID=0x53<<8|MotorID";
+CM_ BO_ 2147505153 "回零  CAN_ID=0x54<<8|MotorID";
+CM_ BO_ 2147505409 "CANopen同步 SYNC对象  CAN_ID=0x55<<8|MotorID";
+CM_ BO_ 2147505665 "EtherCAT CSP 周期同步位置  CAN_ID=0x56<<8|MotorID";
+CM_ BO_ 2147505921 "EtherCAT CSV  CAN_ID=0x57<<8|MotorID";
+CM_ BO_ 2147506177 "EtherCAT CST  CAN_ID=0x58<<8|MotorID";
+CM_ BO_ 2147506433 "轮廓位置  CAN_ID=0x59<<8|MotorID";
+CM_ BO_ 2147506689 "轮廓速度  CAN_ID=0x5A<<8|MotorID";
+CM_ BO_ 2147506945 "轮廓力矩  CAN_ID=0x5B<<8|MotorID";
+CM_ BO_ 2147507201 "电子齿轮  CAN_ID=0x5C<<8|MotorID";
+CM_ BO_ 2147507457 "电子凸轮  CAN_ID=0x5D<<8|MotorID";
+CM_ BO_ 2147512321 "脉冲方向  CAN_ID=0x70<<8|MotorID";
+CM_ BO_ 2147512577 "模拟量输入  CAN_ID=0x71<<8|MotorID";
+CM_ BO_ 2147512833 "PWM输入  CAN_ID=0x72<<8|MotorID";
+CM_ BO_ 2147513089 "点动  CAN_ID=0x73<<8|MotorID";
+CM_ BO_ 2147513345 "安全示教  CAN_ID=0x74<<8|MotorID";
+CM_ BO_ 2147513601 "老化测试  CAN_ID=0x75<<8|MotorID";
+CM_ BO_ 2147513857 "[Multi] 扫频测试 多帧(12B): f_start/f_end/amp  CAN_ID=0x76<<8|MotorID";
+CM_ BO_ 2147514113 "齿槽测试  CAN_ID=0x77<<8|MotorID";
+CM_ BO_ 2147514369 "摩擦测试  CAN_ID=0x78<<8|MotorID";
+CM_ BO_ 2147514625 "惯量测试  CAN_ID=0x79<<8|MotorID";
+CM_ BO_ 2147514881 "电流环测试  CAN_ID=0x7A<<8|MotorID";
+CM_ BO_ 2147515137 "速度环测试  CAN_ID=0x7B<<8|MotorID";
+CM_ BO_ 2147516417 "周期同步帧 预留 回NACK(NOT_SUPPORTED)  CAN_ID=0x80<<8|MotorID";
+CM_ BO_ 2147516673 "预存指令 预留 回NACK(NOT_SUPPORTED)  CAN_ID=0x81<<8|MotorID";
+CM_ BO_ 2147516929 "广播触发 预留 ID=0广播 回NACK(NOT_SUPPORTED)  CAN_ID=0x82<<8|MotorID";
+CM_ BO_ 2147520513 "L1驱动硬件底层校准 submode:1=ADC偏置 2=ADC增益 3=电流传感器 4=温度 5=母线电压 6=死区  CAN_ID=0x90<<8|MotorID";
+CM_ BO_ 2147520769 "L2电机电气身份校准 submode:1=相序 2=极对数 3=R/Ld/Lq/flux  CAN_ID=0x91<<8|MotorID";
+CM_ BO_ 2147521025 "L3编码器校准 submode:1=零位 2=方向 3=线性度 4=正余弦/旋变 5=多圈零点  CAN_ID=0x92<<8|MotorID";
+CM_ BO_ 2147521281 "L4转矩基础校准 submode:1=力矩常数Kt  CAN_ID=0x93<<8|MotorID";
+CM_ BO_ 2147521537 "L5非线性补偿校准 submode:1=齿槽 2=摩擦 3=死区补偿 4=磁饱和  CAN_ID=0x94<<8|MotorID";
+CM_ BO_ 2147521793 "L6负载系统级校准 submode:1=惯量 2=阻尼 3=回程间隙 4=PID自整定  CAN_ID=0x95<<8|MotorID";
+CM_ BO_ 2147522049 "L7自动化集成校准 submode:1=一键全自动  CAN_ID=0x96<<8|MotorID";
+CM_ BO_ 2147522305 "标定进度查询应答 state:0=空闲 1=进行中 2=完成 3=失败 fail_reason:0~9  CAN_ID=0x97<<8|MotorID";
+CM_ BO_ 2147522561 "标定中止  CAN_ID=0x98<<8|MotorID";
+CM_ BO_ 2147524609 "[Multi] PID理论估计 多帧(13B): ring_mask/cur_bw/vel_bw/pos_bw  CAN_ID=0xA0<<8|MotorID";
+CM_ BO_ 2147524865 "PID来源切换 ring:0=电流 1=速度 2=位置 source:0=默认 1=Flash 2=理论估计 3=调试  CAN_ID=0xA1<<8|MotorID";
+CM_ BO_ 2147525121 "读PID来源应答 0=默认 1=Flash 2=理论估计 3=调试  CAN_ID=0xA2<<8|MotorID";
+CM_ BO_ 2147525889 "PID参数实时写 ring:0=D轴 1=Q轴 2=速度 3=位置 type:1=kp 2=ki 3=kd 4=output_limit 5=integral_limit 6=alpha 7=flags  CAN_ID=0xA5<<8|MotorID";
+CM_ BO_ 2147526145 "PID参数实时读 应答6B: ring/param_type/value(4B)  CAN_ID=0xA6<<8|MotorID";
+CM_ BO_ 2147528705 "清除故障 FAULT->IDLE  CAN_ID=0xB0<<8|MotorID";
+CM_ BO_ 2147528961 "诊断模式  CAN_ID=0xB1<<8|MotorID";
+CM_ BO_ 2147529217 "进入Bootloader magic=0xB00710AD 不匹配回NACK(UNAUTHORIZED)  CAN_ID=0xB2<<8|MotorID";
+CM_ BO_ 2147529473 "保存配置 参数写入Flash(与0xE4等价)  CAN_ID=0xB3<<8|MotorID";
+CM_ BO_ 2147529729 "恢复出厂 magic=0xFAC70F5F  CAN_ID=0xB4<<8|MotorID";
+CM_ BO_ 2147529985 "开始日志  CAN_ID=0xB5<<8|MotorID";
+CM_ BO_ 2147530241 "停止日志  CAN_ID=0xB6<<8|MotorID";
+CM_ BO_ 2147530497 "高速采集  CAN_ID=0xB7<<8|MotorID";
+CM_ BO_ 2147530753 "单步调试  CAN_ID=0xB8<<8|MotorID";
+CM_ BO_ 2147532801 "读实时反馈应答 CAN压缩: pos16+vel16+tq16+tmp8+err8  CAN_ID=0xC0<<8|MotorID";
+CM_ BO_ 2147533057 "读电机状态应答  CAN_ID=0xC1<<8|MotorID";
+CM_ BO_ 2147533313 "[Multi] 读相电流应答 多帧(12B): ia/ib/ic f32  CAN_ID=0xC2<<8|MotorID";
+CM_ BO_ 2147533569 "读DQ电流应答  CAN_ID=0xC3<<8|MotorID";
+CM_ BO_ 2147533825 "[Multi] 读母线信息应答 多帧(12B): vbus/ibus/power  CAN_ID=0xC4<<8|MotorID";
+CM_ BO_ 2147534081 "读温度应答  CAN_ID=0xC5<<8|MotorID";
+CM_ BO_ 2147534337 "读位置速度应答  CAN_ID=0xC6<<8|MotorID";
+CM_ BO_ 2147534593 "读多圈位置应答  CAN_ID=0xC7<<8|MotorID";
+CM_ BO_ 2147534849 "读故障码应答  CAN_ID=0xC8<<8|MotorID";
+CM_ BO_ 2147535105 "[Multi] 读调试数据应答 多帧(变长): dbg:f32[N] N<=16  CAN_ID=0xC9<<8|MotorID";
+CM_ BO_ 2147535361 "[Multi] 同步遥测 多帧(变长): mask后按位拼接数据  CAN_ID=0xCA<<8|MotorID";
+CM_ BO_ 2147535617 "设置遥测  CAN_ID=0xCB<<8|MotorID";
+CM_ BO_ 2147535873 "OTA启动 预留 回NACK(NOT_SUPPORTED)  CAN_ID=0xCC<<8|MotorID";
+CM_ BO_ 2147536129 "OTA数据 预留 回NACK(NOT_SUPPORTED)  CAN_ID=0xCD<<8|MotorID";
+CM_ BO_ 2147536385 "OTA结束 预留 回NACK(NOT_SUPPORTED)  CAN_ID=0xCE<<8|MotorID";
+CM_ BO_ 2147536641 "OTA续传 预留 回NACK(NOT_SUPPORTED)  CAN_ID=0xCF<<8|MotorID";
+CM_ BO_ 2147536897 "[Multi] 读设备信息应答 多帧(28B): hw_ver/fw_ver/uid+扩展8B  CAN_ID=0xD0<<8|MotorID";
+CM_ BO_ 2147537153 "[Multi] 读设备名称应答 多帧(16B): char[16]  CAN_ID=0xD1<<8|MotorID";
+CM_ BO_ 2147537409 "心跳/在线  CAN_ID=0xD2<<8|MotorID";
+CM_ BO_ 2147540993 "读单个参数  CAN_ID=0xE0<<8|MotorID";
+CM_ BO_ 2147541249 "[Multi] 写单个参数 多帧(变长): param_id+value  CAN_ID=0xE1<<8|MotorID";
+CM_ BO_ 2147541505 "[Multi] 批量读参数 多帧: start_id+count  CAN_ID=0xE2<<8|MotorID";
+CM_ BO_ 2147541761 "[Multi] 批量写参数 多帧(变长): start_id+count+values  CAN_ID=0xE3<<8|MotorID";
+CM_ BO_ 2147542017 "参数存Flash(同0xB3)  CAN_ID=0xE4<<8|MotorID";
+CM_ BO_ 2147542273 "参数恢复默认 0xFFFF=全部  CAN_ID=0xE5<<8|MotorID";
+CM_ BO_ 2147542529 "读电机配置 依赖USE_DEV_FLASH  CAN_ID=0xE6<<8|MotorID";
+CM_ BO_ 2147542785 "写电机配置 RAM生效 需0xEA固化  CAN_ID=0xE7<<8|MotorID";
+CM_ BO_ 2147543041 "[Multi] 批量读电机配置 多帧: start_id+count  CAN_ID=0xE8<<8|MotorID";
+CM_ BO_ 2147543297 "[Multi] 批量写电机配置 多帧(变长)  CAN_ID=0xE9<<8|MotorID";
+CM_ BO_ 2147543553 "电机配置存Flash 依赖USE_DEV_FLASH  CAN_ID=0xEA<<8|MotorID";
+CM_ BO_ 2147543809 "电机配置恢复默认 0xFFFF=全部  CAN_ID=0xEB<<8|MotorID";
+CM_ BO_ 2147544065 "电机配置重新标定复位 清除编码器字段  CAN_ID=0xEC<<8|MotorID";
+CM_ BO_ 2147545089 "设置CAN_ID 1~127 需保存重启生效  CAN_ID=0xF0<<8|MotorID";
+CM_ BO_ 2147545345 "设置波特率 0=1M 1=500K 2=250K 3=125K  CAN_ID=0xF1<<8|MotorID";
+CM_ BO_ 2147545601 "广播同步 ID=0广播  CAN_ID=0xF2<<8|MotorID";
+CM_ BO_ 2147545857 "设置FD模式 运行期切换  CAN_ID=0xF3<<8|MotorID";
+CM_ BO_ 2147546113 "CAN-DI广播发现/单帧时隙响应  CAN_ID=0xF4<<8|MotorID";
+CM_ BO_ 2147546369 "按CAN-DI定向设置节点ID  CAN_ID=0xF5<<8|MotorID";
+CM_ BO_ 2147546625 "按CAN-DI触发物理设备指示  CAN_ID=0xF6<<8|MotorID";
+CM_ BO_ 2147548673 "错误应答 err_code见协议文档  CAN_ID=0xFE<<8|MotorID";
+
+SIG_VALTYPE_ 2147487745 ud : 1;
+SIG_VALTYPE_ 2147487745 uq : 1;
+SIG_VALTYPE_ 2147488001 id_ref : 1;
+SIG_VALTYPE_ 2147488001 iq_ref : 1;
+SIG_VALTYPE_ 2147488257 torque : 1;
+SIG_VALTYPE_ 2147488769 vel_ref : 1;
+SIG_VALTYPE_ 2147489025 pos_ref : 1;
+SIG_VALTYPE_ 2147489281 pos : 1;
+SIG_VALTYPE_ 2147489281 vel_ff : 1;
+SIG_VALTYPE_ 2147489537 pos : 1;
+SIG_VALTYPE_ 2147489537 tq_lim : 1;
+SIG_VALTYPE_ 2147489793 vel : 1;
+SIG_VALTYPE_ 2147489793 tq_lim : 1;
+SIG_VALTYPE_ 2147490049 duty : 1;
+SIG_VALTYPE_ 2147490305 u_alpha : 1;
+SIG_VALTYPE_ 2147490305 u_beta : 1;
+SIG_VALTYPE_ 2147490561 id_weak : 1;
+SIG_VALTYPE_ 2147490561 iq_ref : 1;
+SIG_VALTYPE_ 2147490817 vel_ref : 1;
+SIG_VALTYPE_ 2147496449 force : 1;
+SIG_VALTYPE_ 2147497217 threshold : 1;
+SIG_VALTYPE_ 2147497729 force : 1;
+SIG_VALTYPE_ 2147498241 gain : 1;
+SIG_VALTYPE_ 2147498497 stiffness : 1;
+SIG_VALTYPE_ 2147498497 damp : 1;
+SIG_VALTYPE_ 2147505665 pos : 1;
+SIG_VALTYPE_ 2147505921 vel : 1;
+SIG_VALTYPE_ 2147506177 torque : 1;
+SIG_VALTYPE_ 2147506433 pos : 1;
+SIG_VALTYPE_ 2147506433 vel : 1;
+SIG_VALTYPE_ 2147506689 vel : 1;
+SIG_VALTYPE_ 2147506689 acc : 1;
+SIG_VALTYPE_ 2147506945 torque : 1;
+SIG_VALTYPE_ 2147506945 slope : 1;
+SIG_VALTYPE_ 2147512577 scale : 1;
+SIG_VALTYPE_ 2147513089 speed : 1;
+SIG_VALTYPE_ 2147514881 amp : 1;
+SIG_VALTYPE_ 2147514881 freq : 1;
+SIG_VALTYPE_ 2147515137 amp : 1;
+SIG_VALTYPE_ 2147515137 freq : 1;
+SIG_VALTYPE_ 2147533569 id : 1;
+SIG_VALTYPE_ 2147533569 iq : 1;
+SIG_VALTYPE_ 2147534081 temp_fet : 1;
+SIG_VALTYPE_ 2147534081 temp_motor : 1;
+SIG_VALTYPE_ 2147534337 pos : 1;
+SIG_VALTYPE_ 2147534337 vel : 1;
+SIG_VALTYPE_ 2147534593 single : 1;
+
+VAL_ 2147524865 ring_select 0 "current" 1 "velocity" 2 "position" ;
+VAL_ 2147524865 source 0 "default" 1 "flash" 2 "autotune" 3 "debug" ;
+VAL_ 2147525889 ring 0 "d_axis" 1 "q_axis" 2 "velocity" 3 "position" ;
+VAL_ 2147525889 param_type 1 "kp" 2 "ki" 3 "kd" 4 "output_limit" 5 "integral_limit" 6 "output_filter_alpha" 7 "flags" ;
+VAL_ 2147545345 baud_code 0 "1M" 1 "500K" 2 "250K" 3 "125K" ;
+VAL_ 2147548673 err_code 1 "CMD_UNSUPPORTED" 2 "OUT_OF_RANGE" 3 "STATE_DENY" 4 "BAD_PARAM_ID" 5 "CRC_ERROR" 6 "LENGTH" 7 "READ_ONLY" 8 "FLASH_FAIL" 9 "FAULT_STATE" 10 "CALIB_BUSY" 11 "ASYNC_QUEUED" 12 "BUSY" 13 "UNAUTHORIZED" 14 "RATE_LIMIT" 15 "NOT_FOUND" 16 "FLASH_ERASE_FAIL" 17 "FLASH_WRITE_FAIL" 18 "FLASH_VERIFY_FAIL" 19 "NOT_IMPLEMENTED" ;
+VAL_ 2147522305 state 0 "idle" 1 "running" 2 "done" 3 "failed" ;
+VAL_ 2147522305 fail_reason 0 "none" 1 "timeout" 2 "out_of_range" 3 "dep_not_met" 4 "sample_error" 5 "motor_not_turn" 6 "over_current" 7 "over_speed" 8 "flash_write_fail" 9 "aborted" ;

@@ -19,6 +19,8 @@
 #include <string.h>
 #include "jm_proto.h"
 #include "calib_mgr.h"
+#include "fault_manager.h" /* 0xAA/0xAB 故障诊断 + 0xB0 历史清除 */
+#include "motor_info_storage.h" /* g_motor_info_storage: 0xD0[25] 存储状态位图 */
 
 /* 组织应答: reply[0]=cmd, 其后拷贝 body(可空), 设置 reply_len */
 static void reply_set(jm_proto_t *p, uint8_t cmd, const uint8_t *body, uint16_t body_len)
@@ -35,10 +37,21 @@ static void reply_set(jm_proto_t *p, uint8_t cmd, const uint8_t *body, uint16_t 
 	p->reply_len = (uint16_t)(1 + body_len);
 }
 
-/* 组织 NACK 应答: [0xFE][失败的cmd][err_code] */
+/* 载荷长度校验宏 (内部使用, 依赖 static reply_nack)
+ * 用法: if (JM_CHECK_LEN(len, 8, cmd, p)) return err; 或直接 JM_CHECK_LEN(len, 8, cmd, p);
+ * 长度不足时回 NACK(LENGTH) 并返回 err (err 已是 reply_nack 的返回值) */
+#define JM_CHECK_LEN(len_var, expected_min, cmd_var, p_var) \
+	do { \
+		if ((len_var) < (expected_min)) { \
+			return reply_nack((p_var), (cmd_var), JM_ERR_LENGTH); \
+		} \
+	} while (0)
+
+/* 组织 NACK 应答: [0xFE][失败的cmd][err_code][seq] (4B 格式)
+ * seq: 异步命令的序列号, 同步命令填 0 */
 static jm_err_e reply_nack(jm_proto_t *p, uint8_t cmd, jm_err_e err)
 {
-	uint8_t body[2] = {cmd, (uint8_t)err};
+	uint8_t body[3] = {cmd, (uint8_t)err, 0u}; /* seq=0 (同步命令) */
 	reply_set(p, JM_CMD_NACK, body, sizeof(body));
 	return err;
 }
@@ -78,6 +91,47 @@ void jm_proto_init(jm_proto_t *proto, const jm_proto_ops_t *ops, uint8_t motor_i
 	memset(proto, 0, sizeof(*proto));
 	proto->ops = ops;
 	proto->motor_id = motor_id;
+	/* async_seq 初始为 0(同步命令); 首次 alloc 返回 1 */
+}
+
+/* ===================== 异步命令序列号机制 ===================== */
+jm_err_e jm_proto_reply_nack_async(jm_proto_t *p, uint8_t cmd, jm_err_e err, uint8_t seq)
+{
+	uint8_t body[3] = {cmd, (uint8_t)err, seq}; /* [orig_cmd][err_code][seq] */
+	reply_set(p, JM_CMD_NACK, body, sizeof(body));
+	return err;
+}
+
+jm_err_e jm_proto_reply_pending(jm_proto_t *p, uint8_t cmd, uint8_t seq)
+{
+	/* PENDING 即时应答 = NACK with err_code=PENDING + seq */
+	return jm_proto_reply_nack_async(p, cmd, JM_ERR_PENDING, seq);
+}
+
+jm_err_e jm_proto_reply_ack_async(jm_proto_t *p, uint8_t cmd, uint8_t status, uint8_t seq)
+{
+	/* 异步最终 ACK 载荷: [seq][status] (2B), 加上 reply[0]=cmd 共 3B
+	 * 与同步 ACK(2B: [cmd][status]) 区别: 多 1 字节 seq, 上位机据此匹配 PENDING */
+	uint8_t body[2] = {seq, status};
+	reply_set(p, cmd, body, sizeof(body));
+	return JM_ERR_OK;
+}
+
+uint8_t jm_proto_async_alloc_seq(jm_proto_t *proto)
+{
+	uint8_t seq;
+	if (proto == NULL)
+	{
+		return 0;
+	}
+	/* 1~255 循环递增; 0 保留给同步命令 */
+	seq = (uint8_t)(proto->async_seq + 1u);
+	if (seq == 0u)
+	{
+		seq = 1u;
+	}
+	proto->async_seq = seq;
+	return seq;
 }
 
 /* ---- 反馈查询类 0xC0~0xC8 ---- */
@@ -141,11 +195,6 @@ static jm_err_e handle_read(jm_proto_t *p, uint8_t cmd)
 		case JM_CMD_READ_MULTITURN:
 			jm_wr_u32(&o[0], (uint32_t)fb.multiturn);
 			jm_wr_f32(&o[4], fb.single);
-			n = 8;
-			break;
-		case JM_CMD_READ_FAULT:
-			jm_wr_u32(&o[0], fb.fault_mask);
-			jm_wr_u32(&o[4], fb.warn_mask);
 			n = 8;
 			break;
 		default:
@@ -240,10 +289,11 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			reply_set(p, cmd, &status, 1);
 			return e;
 		}
-		/* 电机配置读 0xE6: {param_id:u16} -> {param_id:u16;type:u8;value:4B} (固定4字节值) */
+		/* 电机配置读 0xE6: {param_id:u16} -> {param_id:u16;type:u8;value:nB}
+		 * v1.12: value 长度随类型(1/2/4/8B, u64 参数回 8B) */
 		case JM_CMD_MOTOR_INFO_READ:
 		{
-			uint8_t o[3 + 4];
+			uint8_t o[3 + 8];
 			uint8_t type = 0, vlen = 0;
 			if (len < 2)
 				return reply_nack(p, cmd, JM_ERR_LENGTH);
@@ -258,7 +308,8 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			reply_set(p, cmd, o, (uint16_t)(3 + vlen));
 			return JM_ERR_OK;
 		}
-		/* 电机配置写 0xE7: {param_id:u16;value:4B} -> ACK{param_id:u16;status:u8} (固定4字节值) */
+		/* 电机配置写 0xE7: {param_id:u16;value:nB} -> ACK{param_id:u16;status:u8}
+		 * v1.12: value 长度随参数类型(1/2/4/8B), 长度校验在 ops 层查 desc->size */
 		case JM_CMD_MOTOR_INFO_WRITE:
 		{
 			uint8_t o[3];
@@ -306,26 +357,53 @@ static jm_err_e handle_param(jm_proto_t *p, uint8_t cmd, const uint8_t *pl, uint
 			reply_set(p, cmd, &status, 1);
 			return e;
 		}
-		/* 电机配置存Flash 0xEA: 无载荷 -> ACK{status:u8} */
+		/* 电机配置固化 0xEA: {flags:u8 可选} -> ACK{status:u8}
+		 * flags bit0=1 追加写 Flash 备份, 默认(无载荷/bit0=0)仅写 EEPROM */
 		case JM_CMD_MOTOR_INFO_SAVE:
 			if (ops == NULL || ops->motor_info_save == NULL)
 				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
-			e = ops->motor_info_save();
+			if (len > 1)
+				return reply_nack(p, cmd, JM_ERR_LENGTH);
+			e = ops->motor_info_save((len >= 1) ? pl[0] : 0u);
 			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
 		/* 电机配置恢复默认 0xEB: {param_id:u16=0xFFFF全部} -> ACK{status:u8} */
-		case JM_CMD_MOTOR_INFO_RESET:
-			if (len < 2)
-				return reply_nack(p, cmd, JM_ERR_LENGTH);
-			if (ops == NULL || ops->motor_info_reset == NULL)
-				return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
-			e = ops->motor_info_reset(jm_rd_u16(pl));
-			return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+	case JM_CMD_MOTOR_INFO_RESET:
+		if (len < 2)
+			return reply_nack(p, cmd, JM_ERR_LENGTH);
+		if (ops == NULL || ops->motor_info_reset == NULL)
+			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+		e = ops->motor_info_reset(jm_rd_u16(pl));
+		return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+	/* 重新标定复位 0xEC: 无载荷 -> ACK{status:u8}
+	 * 清除 is_calibrated + 编码器字段，保留电气字段和限幅字段。
+	 * 仅清 RAM，需随后发 0xEA 固化。*/
+	case JM_CMD_MOTOR_INFO_RECALIB_RESET:
+		if (ops == NULL || ops->motor_info_recalib_reset == NULL)
+			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+		e = ops->motor_info_recalib_reset();
+		return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
+	/* 固化清零 0xED: {magic:u32=JM_MAGIC_STORAGE_ERASE} -> ACK{status:u8}
+	 * 擦除 EEPROM 全部参数, RAM 同步恢复默认; 魔数不符回 NACK(防误触)。*/
+	case JM_CMD_MOTOR_INFO_ERASE:
+		if (len < 4 || jm_rd_u32(&pl[0]) != JM_MAGIC_STORAGE_ERASE)
+			return reply_nack(p, cmd, JM_ERR_UNAUTHORIZED);
+		if (ops == NULL || ops->motor_info_erase == NULL)
+			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
+		e = ops->motor_info_erase();
+		return (e == JM_ERR_OK) ? reply_ack(p, cmd, 0) : reply_nack(p, cmd, e);
 		default:
 			return reply_nack(p, cmd, JM_ERR_UNSUPPORTED);
 	}
 }
 
-/* ---- 设备信息类 0xD0~0xD2 ---- */
+/* ---- 设备信息类 0xD0~0xD2 ----
+ * 0xD0 READ_DEV_INFO 应答格式 (向后兼容追加, 协议层不依赖板级宏):
+ *   原始格式 (20B, 老上位机): [0-3]hw [4-7]fw [8-19]uid[12]
+ *   扩展格式 (28B, 新上位机): 追加 [20]motor_id_default [21]proto_major [22]proto_minor
+ *                                  [23]feat_lo [24]feat_hi [25]存储诊断位图 [26-27]reserved
+ * 协议层始终返回 28B 扩展格式; 老上位机读前 20B 即可, 后 8B 自动忽略。
+ * JM_FEATURE_FLAGS_LO 在 jm_cmd_def.h 中根据 USE_CAN_FD_MODE 编译期决定,
+ * 若板级未启用 FD, bit0(CAN_FD)=0, 上位机据此关闭 FD 模式适配。 */
 static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 {
 	const jm_proto_ops_t *ops = p->ops;
@@ -333,7 +411,7 @@ static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 	{
 		case JM_CMD_READ_DEV_INFO:
 		{
-			uint8_t o[20];
+			uint8_t o[28];
 			uint32_t hw = 0, fw = 0;
 			uint8_t uid[12] = {0};
 			if (ops == NULL || ops->get_dev_info == NULL)
@@ -343,7 +421,29 @@ static jm_err_e handle_dev(jm_proto_t *p, uint8_t cmd)
 			jm_wr_u32(&o[0], hw);
 			jm_wr_u32(&o[4], fw);
 			memcpy(&o[8], uid, 12);
-			reply_set(p, cmd, o, 20);
+			/* 扩展字段 (motor_id_default + proto_version + feature_flags) */
+			o[20] = p->motor_id;
+			o[21] = JM_PROTO_VERSION_MAJOR;
+			o[22] = JM_PROTO_VERSION_MINOR;
+			o[23] = (uint8_t)(JM_FEATURE_FLAGS_LO & 0xFF);
+			o[24] = (uint8_t)((JM_FEATURE_FLAGS_LO >> 8) & 0xFF);
+			/* [25] 存储状态位图(v1.10): bit0=storage.inited
+			 * bit1=eeprom_dev 已挂接 bit2=预留(EEPROM 应答由 0xEA 错误码揭示)
+			 * bit3=dev_flash 子设备 inited */
+			o[25] = 0;
+#if defined(USE_DEV_FLASH)
+			if (g_motor_info_storage.inited)
+				o[25] |= 0x01u;
+#if defined(USE_DEV_EEPROM)
+			if (g_motor_info_storage.eeprom_dev != NULL)
+				o[25] |= 0x02u;
+#endif
+			if (g_motor_info_storage.flash_dev.inited)
+				o[25] |= 0x08u;
+#endif
+			o[26] = 0;
+			o[27] = 0;
+			reply_set(p, cmd, o, sizeof(o)); /* 始终 28B (向后兼容追加) */
 			return JM_ERR_OK;
 		}
 		case JM_CMD_READ_DEV_NAME:
@@ -419,6 +519,26 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 	}
 	proto->reply_len = 0; /* 默认无应答 */
 
+	/* 软件复位 0x07: {magic:u32=0x5E7E7E5E} -> ACK, 随后延迟约 200ms 执行复位。
+	 * 回调内已安全停机; 魔数不匹配回 NACK(UNAUTHORIZED)。
+	 * CAN 广播(motor_id=0)对本命令不开放(见 jm_proto_can_broadcast_allowed)。 */
+	if (cmd == JM_CMD_SOFT_RESET)
+	{
+		uint32_t magic;
+		jm_err_e e;
+		if (len < 4u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->soft_reset == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		magic = jm_rd_u32(&payload[0]);
+		e = proto->ops->soft_reset(magic);
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
 	/* 订阅同步遥测 0xCB: payload = enable(u8) + mask(u16) [+ period_ms(u16)], 小端。
 	 * enable=1 启动周期上报, enable=0 停止; 仅本订阅命令回单次 ACK 供上位机确认开关,
 	 * 之后的周期性 0xCA 数据帧由绑定层主动推送, 不要求逐帧应答。*/
@@ -446,23 +566,83 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 	}
 
-	/* 反馈查询 0xC0~0xC8 */
-	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_FAULT)
+	/* 反馈查询 0xC0~0xC7 (0xC8 已废弃: 故障查询走 0xAA/0xAB) */
+	if (cmd >= JM_CMD_READ_FEEDBACK && cmd <= JM_CMD_READ_MULTITURN)
 	{
+		if (len != 0u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_read(proto, cmd);
 	}
-	/* 调试通道 0xC9: 通用 float[] 观测点 */
+	/* C9 仅保留通用 jm_dbg 查询，不再承载高速波形读取。 */
 	if (cmd == JM_CMD_READ_DEBUG)
 	{
+		if (len != 0u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_read_debug(proto, cmd);
 	}
+	/* TEST_SWEEP_FREQ 0x76: 专用 ACK 与严格长度分支，避免通用 set_mode
+	 * 只能返回单字节状态而丢失 session/点数/时长。 */
+	if (cmd == JM_CMD_TEST_SWEEP_FREQ)
+	{
+		uint8_t out[8];
+		uint16_t out_len = 0u;
+		jm_err_e e;
+		uint8_t enable = (len > 0u) ? (payload[0] & JM_SWEEP_CONTROL_ENABLE) : 0u;
+		uint8_t length_ok = 0u;
+
+		if (len == JM_SWEEP_PAYLOAD_LEN)
+			length_ok = 1u;
+		else if (len == JM_SWEEP_STOP_PAYLOAD_LEN && enable == 0u)
+			length_ok = 1u;
+		else if (len == JM_SWEEP_BIAS_PAYLOAD_LEN)
+			length_ok = 1u;
+		if (!length_ok)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+#if (JM_ENABLE_BODE_SWEEP != 1)
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
+#else
+		if (proto->ops == NULL || proto->ops->test_sweep == NULL)
+			return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
+		e = proto->ops->test_sweep(payload, len, out, &out_len);
+		if (e != JM_ERR_OK)
+			return reply_nack(proto, cmd, e);
+		if (out_len > sizeof(out))
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		reply_set(proto, cmd, out, out_len);
+		return JM_ERR_OK;
+#endif
+	}
+	/* TRACE_CONFIG 0xB9: enable + session + mask + rate + packet + flags。 */
+	if (cmd == JM_CMD_TRACE_CONFIG)
+	{
+		uint8_t out[JM_PAYLOAD_MAX];
+		uint16_t out_len = 0u;
+		jm_err_e e;
+		if (len != 13u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		if (proto->ops == NULL || proto->ops->trace_config == NULL)
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		e = proto->ops->trace_config(payload[0], jm_rd_u16(&payload[1]),
+			jm_rd_u32(&payload[3]), jm_rd_u32(&payload[7]), payload[11],
+			payload[12], out, &out_len);
+		if (e != JM_ERR_OK)
+			return reply_nack(proto, cmd, e);
+		reply_set(proto, cmd, out, out_len);
+		return JM_ERR_OK;
+	}
+	/* B5~B7 旧版采集命令不再支持, B8 单步调试仍由 set_mode 处理。 */
+	if (cmd == JM_CMD_START_LOG || cmd == JM_CMD_STOP_LOG ||
+		cmd == JM_CMD_HIGH_SPEED_DAQ)
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
 	/* 设备信息 0xD0~0xDF */
 	if (cmd >= JM_CMD_READ_DEV_INFO && cmd <= JM_CMD_HEARTBEAT)
 	{
+		if (len != 0u)
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
 		return handle_dev(proto, cmd);
 	}
-	/* 参数读写 0xE0~0xEF */
-	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_MOTOR_INFO_RESET)
+	/* 参数读写 0xE0~0xED */
+	if (cmd >= JM_CMD_PARAM_READ && cmd <= JM_CMD_MOTOR_INFO_ERASE)
 	{
 		return handle_param(proto, cmd, payload, len);
 	}
@@ -475,7 +655,8 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 		return JM_ERR_OK;
 	}
-	/* 设置 CAN_ID 0xF0: {new_id:u8} -> ACK{new_id:u8}; 范围 1~127, 需保存重启生效 */
+	/* 设置 CAN_ID 0xF0: {new_id:u8} -> ACK{new_id:u8,restart_required:u8}。
+	 * 回调原子写入 motor_info Flash。运行期地址保持不变, 重启后加载新地址。 */
 	if (cmd == JM_CMD_SET_CAN_ID)
 	{
 		uint8_t new_id;
@@ -498,8 +679,11 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		{
 			return reply_nack(proto, cmd, e);
 		}
-		proto->motor_id = new_id;             /* 同步 RAM 地址, CAN 滤波重启后生效 */
-		return reply_ack(proto, cmd, new_id); /* ACK{new_id:u8} */
+		{
+			uint8_t o[2] = {new_id, 1u};
+			reply_set(proto, cmd, o, sizeof(o));
+			return JM_ERR_OK;
+		}
 	}
 	/* 设置波特率 0xF1: {baud_code:u8} -> ACK; 0=1M 1=500K 2=250K 3=125K, 重启生效 */
 	if (cmd == JM_CMD_SET_BAUDRATE)
@@ -522,12 +706,45 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		e = proto->ops->set_baudrate(baud);
 		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
 	}
+	/* 切换 CAN FD 模式 0xF3: {enable:u8} -> ACK{ack_enable:u8, cap:u8}
+	 * 下位机在 ACK 后才切换模式(ACK 用旧模式发出); UART 模式返回 cap=0 */
+	if (cmd == JM_CMD_SET_FD_MODE)
+	{
+		uint8_t enable;
+		uint8_t ack_enable = 0u;
+		uint8_t cap = 0u;
+		jm_err_e e;
+		if (len < 1)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->set_fd_mode == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		enable = payload[0] ? 1u : 0u;
+		e = proto->ops->set_fd_mode(enable, &ack_enable, &cap);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		/* ACK{ack_enable, cap} */
+		{
+			uint8_t ack[2] = {ack_enable, cap};
+			reply_set(proto, cmd, ack, sizeof(ack));
+		}
+		return JM_ERR_OK;
+	}
 
 	/* 标定进度查询 0x97: 直接返回 8 字节详细状态 ACK, 不走 ops->set_mode。
 	 * 字段: state/fail_reason/progress/level/submode/step/step_total/reserved。
 	 * 无论 state 为何(空闲/进行/完成/失败)都回 ACK, 由上位机解读。*/
 	if (cmd == JM_CMD_CALIB_QUERY)
 	{
+		if (len != 0u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
 		calib_status_t st = calib_mgr_get_status();
 		uint8_t body[8] = {
 			(uint8_t)st.state,
@@ -543,8 +760,9 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		return JM_ERR_OK;
 	}
 
-	/* PID 理论估计 0x9A: 触发 autotune 计算 + 自动设 source=2 + reload。
-	 * ACK: 8字节 {status, fail_reason, ring_select_done, reserved[5]} */
+	/* PID 理论估计 0xA0: 触发 autotune 计算 + 自动设 source=2 + reload。
+	 * ring_select 位掩码: bit0=电流 bit1=速度 bit2=位置 (可组合)
+	 * ACK: 8字节 {status, fail_reason, ring_mask_done, reserved[5]} */
 	if (cmd == JM_CMD_PID_AUTOTUNE)
 	{
 		uint8_t ring_select;
@@ -565,7 +783,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		memcpy(&vel_bw, &payload[5], 4);
 		memcpy(&pos_bw, &payload[9], 4);
 		e = proto->ops->pid_autotune(ring_select, cur_bw, vel_bw, pos_bw, &fail_reason);
-		/* 0x9A 总是回 8字节 ACK(成功/失败均回), 返回 JM_ERR_OK 避免调用方覆盖 reply。
+		/* 0xA0 总是回 8字节 ACK(成功/失败均回), 返回 JM_ERR_OK 避免调用方覆盖 reply。
 		 * 成败信息编码在 body[0](status) 和 body[1](fail_reason) 中, 同 0x97 先例。*/
 		{
 			uint8_t body[8] = {(e == JM_ERR_OK) ? 0u : 1u, fail_reason,
@@ -575,7 +793,7 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		}
 	}
 
-	/* PID 来源切换 0x9B: 独立设置某环 source, 立即 reload。简单 ACK。*/
+	/* PID 来源切换 0xA1: 独立设置某环 source, 立即 reload。简单 ACK。*/
 	if (cmd == JM_CMD_PID_SOURCE_SET)
 	{
 		uint8_t ring_select, source;
@@ -593,6 +811,218 @@ jm_err_e jm_proto_dispatch(jm_proto_t *proto, uint8_t cmd, const uint8_t *payloa
 		source = payload[1];
 		e = proto->ops->pid_source_set(ring_select, source);
 		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
+	/* PID 来源查询 0xA2: 返回三环当前 source (3字节: cur/vel/pos) */
+	if (cmd == JM_CMD_PID_SOURCE_GET)
+	{
+		uint8_t o[3];
+		jm_err_e e;
+		if (len != 0u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->pid_source_get == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		e = proto->ops->pid_source_get(&o[0], &o[1], &o[2]);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		reply_set(proto, cmd, o, 3);
+		return JM_ERR_OK;
+	}
+
+	/* 缓启动渐变配置写 0xA3: param_id(1) + value(4)，逐字段写 RAM+镜像。
+	 * ACK: 简单成功应答; 非法 param_id/值走 NACK。 */
+	if (cmd == JM_CMD_SMOOTH_CFG_SET)
+	{
+		if (len < 5u) /* param_id(1) + value(4) */
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->smooth_cfg_set == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		jm_err_e e = proto->ops->smooth_cfg_set(payload[0], &payload[1]);
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
+	/* 缓启动渐变配置读 0xA4: param_id(1)。单字段回4B; 0xFF 整块回52B(CAN层自动多帧) */
+	if (cmd == JM_CMD_SMOOTH_CFG_GET)
+	{
+		uint8_t out[52];
+		uint16_t out_len = 0;
+		if (len != 1u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->smooth_cfg_get == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		jm_err_e e = proto->ops->smooth_cfg_get(payload[0], out, &out_len);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		reply_set(proto, cmd, out, out_len);
+		return JM_ERR_OK;
+	}
+
+	/* ---- 故障诊断 0xAA~0xAC (fault_mgr 分级故障管理, v1.8) ---- */
+
+	/* 清除故障 0xB0 可选载荷预处理: flags bit1=清历史(锁存清除仍由状态机路径处理) */
+	if (cmd == JM_CMD_CLEAR_FAULT && len == 1u && (payload[0] & 0x02u) != 0u)
+	{
+		fault_mgr_clear(FAULT_CLEAR_HISTORY);
+	}
+
+	/* 故障摘要 0xAA: 无载荷; 应答 18B
+	 * fault_mask(u32) + warn_mask(u32) + level_active(u32)
+	 * + top_code(u16) + active_cnt(u8) + derate_pct(u8) */
+	if (cmd == JM_CMD_FAULT_SUMMARY)
+	{
+		uint8_t out[18];
+		if (len != 0u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		jm_wr_u32(&out[0], g_fault_mgr.compat_mask);
+		jm_wr_u32(&out[4], g_fault_mgr.warn_mask);
+		jm_wr_u32(&out[8], g_fault_mgr.level_active);
+		jm_wr_u16(&out[12], g_fault_mgr.top_fault);
+		out[14] = (uint8_t)g_fault_mgr.active_cnt;
+		out[15] = (uint8_t)(g_fault_mgr.derate * 100.0f + 0.5f);
+		out[16] = (uint8_t)fault_mgr_history_count();
+		out[17] = 0u; /* 预留 */
+		reply_set(proto, cmd, out, 18);
+		return JM_ERR_OK;
+	}
+
+	/* 故障详情 0xAB: type(1)+idx(1); 应答 20B
+	 * code(u16) + status(u8) + rsv(u8) + count(u32)
+	 * + first_ms(u32) + last_ms(u32) + value(f32)
+	 * type: 0=活动记录(优先级序) 1=历史记录(时间倒序); 越界回 NACK(NOT_FOUND) */
+	if (cmd == JM_CMD_FAULT_DETAIL)
+	{
+		uint8_t out[20];
+		if (len != 2u)
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (payload[0] == 0u)
+		{
+			uint16_t code = 0u;
+			const fault_rec_t *rec = fault_mgr_get_active(payload[1], &code);
+			if (rec == NULL)
+			{
+				return reply_nack(proto, cmd, JM_ERR_NOT_FOUND);
+			}
+			jm_wr_u16(&out[0], code);
+			out[2] = rec->status;
+			out[3] = 0u;
+			jm_wr_u32(&out[4], rec->count);
+			jm_wr_u32(&out[8], rec->first_ms);
+			jm_wr_u32(&out[12], rec->last_ms);
+			memcpy(&out[16], &rec->value, 4);
+		}
+		else if (payload[0] == 1u)
+		{
+			const fault_hist_t *h = fault_mgr_get_history(payload[1]);
+			if (h == NULL)
+			{
+				return reply_nack(proto, cmd, JM_ERR_NOT_FOUND);
+			}
+			jm_wr_u16(&out[0], h->code);
+			out[2] = FAULT_STATUS_CLEARED; /* 历史记录无活动语义 */
+			out[3] = 0u;
+			jm_wr_u32(&out[4], h->count);
+			jm_wr_u32(&out[8], h->first_ms);
+			jm_wr_u32(&out[12], h->last_ms);
+			memcpy(&out[16], &h->value, 4);
+		}
+		else
+		{
+			return reply_nack(proto, cmd, JM_ERR_OUT_OF_RANGE);
+		}
+		reply_set(proto, cmd, out, 20);
+		return JM_ERR_OK;
+	}
+
+	/* 故障事件主动上报 0xAC: M->H 无应答, 二期实现(需通信线程轮询 pending 事件) */
+	if (cmd == JM_CMD_FAULT_EVENT)
+	{
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
+	}
+
+
+	/* PID 参数实时写 0xA5: 仅 DEBUG source 下允许, 直接写 profile, ISR 下一拍生效。
+	 * 载荷: ring(1) + param_type(1) + value(4)  = 6 字节
+	 * ACK: {status:u8}  0=成功, 失败走 NACK */
+	if (cmd == JM_CMD_PID_PARAM_SET)
+	{
+		uint8_t ring, param_type;
+		jm_err_e e;
+
+		if (len < 6) /* ring(1) + param_type(1) + value(4); type=0 may extend */
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->pid_param_set == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		ring = payload[0];
+		param_type = payload[1];
+		e = proto->ops->pid_param_set(ring, param_type, &payload[2], (uint16_t)(len - 2u));
+		return (e == JM_ERR_OK) ? reply_ack(proto, cmd, 0) : reply_nack(proto, cmd, e);
+	}
+
+	/* PID 参数实时读 0xA6: 随时可读, 返回当前 profile 中的值。
+	 * 载荷: ring(1) + param_type(1) = 2 字节
+	 * 应答: {ring:u8, param_type:u8, value:4B} = 6 字节 */
+	if (cmd == JM_CMD_PID_PARAM_GET)
+	{
+		uint8_t ring, param_type;
+		uint8_t value4[4];
+		uint8_t body[6];
+		jm_err_e e;
+
+		if (len < 2) /* ring(1) + param_type(1) */
+		{
+			return reply_nack(proto, cmd, JM_ERR_LENGTH);
+		}
+		if (proto->ops == NULL || proto->ops->pid_param_get == NULL)
+		{
+			return reply_nack(proto, cmd, JM_ERR_UNSUPPORTED);
+		}
+		ring = payload[0];
+		param_type = payload[1];
+		e = proto->ops->pid_param_get(ring, param_type, value4);
+		if (e != JM_ERR_OK)
+		{
+			return reply_nack(proto, cmd, e);
+		}
+		body[0] = ring;
+		body[1] = param_type;
+		memcpy(&body[2], value4, 4);
+		reply_set(proto, cmd, body, 6);
+		return JM_ERR_OK;
+	}
+
+	/* 预留命令拦截: 0x80~0x82(多电机同步) / 0xCC~0xCF(OTA)
+	 * 这些命令码已定义但当前固件未实现 handler, 统一回 NACK(NOT_SUPPORTED, seq=0)。
+	 * 区别于 UNSUPPORTED(0x01, 命令码区间不识别): NOT_SUPPORTED 表示命令码已知但未实现,
+	 * 上位机据此区分"老固件不识别新命令"与"新固件预留未实现"。*/
+	if (cmd == JM_CMD_SYNC || cmd == JM_CMD_PRESET_AND_TRIGGER || cmd == JM_CMD_TRIGGER ||
+	    cmd == JM_CMD_OTA_START || cmd == JM_CMD_OTA_DATA ||
+	    cmd == JM_CMD_OTA_END || cmd == JM_CMD_OTA_RESUME)
+	{
+		return reply_nack(proto, cmd, JM_ERR_NOT_SUPPORTED);
 	}
 
 	/* 其余 0x00~0xB8 控制/校准/诊断类: 统一交给 set_mode 回调,

@@ -58,12 +58,11 @@
 
 ```C
 #define __ALIGNED_4 __attribute__((aligned(4)))
+#define __ALIGNED_8 __attribute__((aligned(8)))
 
-// 魔数："SERVO_V2"
-#define PARAM_MAGIC 0x53455256
 // 总参数区大小（固定1024B）
 #define PARAM_AREA_SIZE 1024
-// 最大子块数量（头部 64B 限制：12B 基础字段 + 6*8B 索引 + 4B pad = 64B）
+// 最大子块数量（头部 64B 限制：8B 版本/CRC + 6*8B 索引 + 8B pad = 64B）
 #define MAX_BLOCK_COUNT 6
 
 // 子块索引项（8B）
@@ -74,14 +73,15 @@ typedef struct __ALIGNED_4 {
 
 // 全局头部（64B）
 typedef struct __ALIGNED_4 {
-    uint32_t magic;            // 4B
     uint16_t version_major;    // 2B
     uint16_t version_minor;    // 2B
     uint32_t crc32;            // 4B
     BlockIndex_t blocks[MAX_BLOCK_COUNT]; // 6*8 = 48B
-    uint32_t reserved;         // 4B pad → 共 64B
+    uint32_t reserved[2];      // 8B pad → 共 64B
 } ParamHeader_t;
 ```
+> 说明：已移除魔数 `PARAM_MAGIC`。数据有效性由 `config_version` + CRC32 + 字段范围三重校验保证。
+> 主联合体 `motor_info_t` 采用 `__ALIGNED_8` 8 字节对齐，确保被 `(u64*)` 强转传给 Flash 读写时，u64 访问不产生未对齐故障。
 
 ### 3.2 各子块数据结构
 
@@ -96,7 +96,8 @@ typedef struct __ALIGNED_4 {
     uint32_t enable_bus_sensor;  // 0:禁用 1:启用
     uint32_t safety_limit;       // 0:禁用 1:启用
     uint32_t total_runtime_s;    // 累计运行时间(s) 掉电保存 定期写入避免频繁擦写
-    uint32_t reserved[11];       // 44B 预留
+    uint32_t save_count;         // 固化累计次数 每次0xEA保存成功自增 超过寿命阈值拒绝写入并报错
+    uint32_t reserved[10];       // 40B 预留
 } SystemParam_t;
 ```
 
@@ -144,7 +145,7 @@ typedef struct __ALIGNED_4 {
 typedef struct __ALIGNED_4 {
     float device_zero;           // 机械零点位置 (rad)
     uint32_t device_time;        // 生产日期 YYYYMMDD
-    uint32_t can_id;             // 11位标准ID
+    uint32_t can_id;             // 节点ID 1~127, 0保留为广播
     uint32_t can_baudrate;       // (bps)
     float can_timeout_s;         // 0=禁用超时 (s)
     uint32_t can_fd_enable;      // 0:传统CAN 1:CAN FD
@@ -269,4 +270,35 @@ typedef union __ALIGNED_4 {
 2. **默认值初始化**：`xxx_init()` 用 `DefaultValue` 填充，浮点补 `f` 后缀。
 3. **范围校验**：`xxx_validate()` 用 `Min`/`Max` 逐字段检查，越界返回首个 `Index`。
 4. **偏移表**：以 `BlockOffset` 为块基址，按字段顺序累加 4 字节对齐偏移，生成 `param_offset_tbl[]`（与协议层 `jm_proto_ops.c` 的 `s_param_tbl` 对应）。
-5. **Flash 读写**：按子块 `BlockOffset` + 块大小整块读写，头部校验 `magic`/`crc32`。
+5. **Flash 读写**：按子块 `BlockOffset` + 块大小整块读写，头部校验 `config_version`/`crc32`。
+
+## 五、双存储架构（EEPROM 主 + FLASH 备）
+
+`motor_info_storage` 服务同时落盘到片外 EEPROM(AT24C16) 与片内 Flash，**上电默认从 EEPROM 加载**，EEPROM 无效时回退 Flash。
+
+### 5.1 EEPROM 布局（AT24C16，2KB，起始地址 0x0000）
+
+```Plain Text
+0x0000  4B   magic  "MOTC" (0x4D4F5443)   ← 区分于 Flash，单独存放不污染 CRC
+0x0004  1024B motor_info 整块(含 CRC32)
+0x0404  ...  剩余 828B 空闲
+总占用 1028B < 2048B(2KB)
+```
+
+### 5.2 读写优先级
+
+| 场景 | 行为 |
+|------|------|
+| 上电加载 | EEPROM 有效(magic+CRC 通过) → 用 EEPROM；否则回退 Flash |
+| 固化(0xEA) | 先写 Flash（重试+回读校验），成功后写 EEPROM(magic+数据+回读校验) |
+| 首次上电 | 双端均无有效数据 → 填默认值并回写双端 |
+
+### 5.3 错误码
+
+| 存储层 | 协议码 | 含义 |
+|--------|--------|------|
+| ERR_EEPROM_WRITE(-7) | JM_ERR_EEPROM_WRITE(0x15) | EEPROM 写入失败 |
+| ERR_EEPROM_VERIFY(-8) | JM_ERR_EEPROM_VERIFY(0x16) | EEPROM 回读校验失败 |
+
+> 注意：`dev_eeprom_test()` 上电自检会覆盖 EEPROM 存储区，固件初始化时已关闭（见 `user_interface.c`）。
+> EEPROM 子设备指针 `g_motor_info_storage.eeprom_dev` 须在 `motor_info_storage_init()` 之前由调用方挂接。

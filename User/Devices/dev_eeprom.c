@@ -1,189 +1,267 @@
-
 /**
  * @file        dev_eeprom.c
- * @brief 		读写片外eeprom存储设备
- * 
+ * @brief 		读写片外 EEPROM 存储设备 (兼容 AT24C16 / MB85RC16)
+ *
  * @author      --
  * @version     1.0
  * @date        2026-06-26
- * 
+ *
  * @copyright   Copyright (c) 2026 RuidiculousTech.co, Ltd. All rights reserved.
- * 
- * 
+ *
+ *
  * @par 修改日志:
  * | 日期       | 版本 | 作者   | 修改内容   |
  * |------------|------|--------|------------|
  * | 2026-06-26    | 1.0  | -- | 初始创建   |
- * 
+ *
  * @note        本文件遵循《嵌入式C代码规范V1.0》开发
+ * @note        由 MB85RC16(FRAM) 适配 AT24C16(EEPROM):
+ *              - AT24C16 需按 16B 页分页写 + ACK polling 等待写周期 tWR;
+ *              - 块选择位(A2A1A0)在器件地址中, 按 256B 块切分自动切换器件地址;
+ *              - FRAM 无页限制/写周期, 复用同一驱动(等待立即返回)。
  */
 
 #include "dev_eeprom.h"
+
+#if defined(USE_DEV_EEPROM)
 #include "assert_report.h"
 
-#if defined(DEV_EEPROM_USING_SOFT_I2C)
-static i2c_soft_drv_t soft_i2c_dev = {0};//当eeprom使用软件I2C时，注册使用的设备句柄
-#endif
+/* 默认设备实例 */
+dev_eeprom_t dev_eeprom;
+
+/* 块大小: 8bit 内部地址 = 256B/块, 16bit = 65536B/块(单块) */
+#define DEV_EEPROM_BLOCK_8BIT       (0x0100U)
+#define DEV_EEPROM_BLOCK_16BIT      (0x10000U)
+/* ACK polling 最大重试次数 (写周期典型 5ms, 每次重试即一次快速 NACK 检测) */
+#define DEV_EEPROM_WRITE_RETRY_MAX  (50U)
 
 /*
- * @brief  eeprom设备读取内存数据
+ * @brief  构造 I2C 传输描述: 按绝对地址计算块号并合成 8bit 器件地址
+ * @param  pobj : eeprom设备句柄
+ * @param  addr : 绝对地址
+ * @param  word : 输出块内字地址
+ * @retval 设备地址已设置的 i2cDrv_t
+ */
+static i2cDrv_t dev_eeprom_build_drv(const struct dev_eeprom *pobj, uint32_t addr, uint16_t *word)
+{
+	i2cDrv_t drv = eeprom_list[pobj->id].i2c;
+	uint32_t block_size = (eeprom_list[pobj->id].addr_width == 2) ? DEV_EEPROM_BLOCK_16BIT : DEV_EEPROM_BLOCK_8BIT;
+	uint32_t block = (block_size == DEV_EEPROM_BLOCK_16BIT) ? 0U : (addr / block_size);
+	*word = (uint16_t)(addr % block_size);
+	/* 8bit 器件地址 = 7bit基础地址<<1 | 块选择位(A2A1A0) */
+	drv.dev_addr = (uint8_t)((eeprom_list[pobj->id].i2c_addr << 1) | (uint8_t)(block << 1));
+	drv.mem_addr = *word;
+	return drv;
+}
+
+/*
+ * @brief  eeprom设备读取内存数据(跨块自动切分)
  * @param  *pobj : eeprom设备句柄
- * @param  reg  : 寄存器地址(16位 eeprom地址)
+ * @param  addr : 绝对地址
  * @param  data : 读取数据的buff
  * @param  len : 读取数据的长度
  * @retval 读取结果 ：DEV_EOK正常，其他则错误
  */
-int dev_mb85rc16_read_data(struct dev_eeprom *pobj, uint32_t reg, uint8_t *data, uint16_t len)
+int dev_eeprom_read(struct dev_eeprom *pobj, uint32_t addr, uint8_t *data, uint16_t len)
 {
-	int ret = 0;
-	uint8_t addrss = reg & 0xFF;
+	if ((addr + len) > pobj->total_size) return DEV_ERROR;
 
-	if (len > eeprom_list[pobj->id].total_size) return DEV_ERROR;
-
-#if defined(DEV_EEPROM_USING_SOFT_I2C)
-	soft_i2c_dev.slave_address = eeprom_list[pobj->id].i2c_addr + ((reg / 0xFF) << 1);
-	ret = drv_i2c_write_nbytes(&soft_i2c_dev, addrss, data, len);
-#else
-	eeprom_list[pobj->id].i2c.dev_addr = eeprom_list[pobj->id].i2c_addr + ((reg / 0xFF) << 1);
-	eeprom_list[pobj->id].i2c.mem_addr = addrss;
-	while(!ret)
+	while (len > 0)
 	{
-		ret = drv_i2c_recv(eeprom_list[pobj->id].i2c, data, len); //阻塞读取返回数据
-	}
-#endif
+		uint16_t word = 0;
+		i2cDrv_t drv = dev_eeprom_build_drv(pobj, addr, &word);
+		uint32_t block_size = (eeprom_list[pobj->id].addr_width == 2) ? DEV_EEPROM_BLOCK_16BIT : DEV_EEPROM_BLOCK_8BIT;
+		uint16_t chunk = (uint16_t)(block_size - (addr % block_size));
+		if (chunk > len) chunk = len;
 
-	return ret;
+		if (drv_i2c_recv(drv, data, chunk) != DRV_EOK) return DEV_ERROR;
+
+		addr += chunk;
+		data += chunk;
+		len -= chunk;
+	}
+
+	return DEV_EOK;
 }
 
 /*
  * @brief  eeprom设备读取内存一字节的数据
  * @param  *pobj : eeprom设备句柄
- * @param  reg  : 寄存器地址(16位 eeprom地址)
+ * @param  addr : 绝对地址
  * @param  data : 读取数据的buff
- * @retval 读取结果 ：DRV_EOK正常，其他则错误
+ * @retval 读取结果 ：DEV_EOK正常，其他则错误
  */
-int dev_mb85rc16_read_byte(struct dev_eeprom *pobj, uint32_t addr, uint8_t *data)
+int dev_eeprom_read_byte(struct dev_eeprom *pobj, uint32_t addr, uint8_t *data)
 {
-	return dev_mb85rc16_read_data(pobj, addr, data, 1);
+	return dev_eeprom_read(pobj, addr, data, 1);
 }
 
 /*
- * @brief  eeprom设备写入内存数据
+ * @brief  等待上次写周期完成(ACK polling)
+ * @param  drv : 已设置器件地址的 I2C 传输描述
+ * @retval true完成/就绪, false超时
+ */
+static bool dev_eeprom_wait_write(i2cDrv_t drv)
+{
+	uint8_t retry = 0;
+	while (retry++ < DEV_EEPROM_WRITE_RETRY_MAX)
+	{
+		if (drv_i2c_ready(drv, 1) == DRV_EOK) return true;
+	}
+	return false;
+}
+
+/*
+ * @brief  eeprom设备写入内存数据(跨页自动分页 + 写周期等待)
  * @param  *pobj : eeprom设备句柄
- * @param  reg  : 寄存器地址(16位 eeprom地址)
+ * @param  addr : 绝对地址
  * @param  data : 写入数据的data区
  * @param  len : 写入数据的长度
- * @retval 写入结果 ：DRV_EOK正常，其他则错误
+ * @retval 写入结果 ：DEV_EOK正常，其他则错误
  */
-int dev_mb85rc16_write_data(struct dev_eeprom *pobj, uint32_t addr, uint8_t *data, uint16_t len)
+int dev_eeprom_write(struct dev_eeprom *pobj, uint32_t addr, const uint8_t *data, uint16_t len)
 {
-	int ret = 0;
-	uint8_t addrss = addr & 0xFF;
+	if ((addr + len) > pobj->total_size) return DEV_ERROR;
 
-	if (len > eeprom_list[pobj->id].total_size) return DEV_ERROR;
+	while (len > 0)
+	{
+		uint16_t word = 0;
+		i2cDrv_t drv = dev_eeprom_build_drv(pobj, addr, &word);
+		/* 计算块大小：与读取函数保持一致 */
+		uint32_t block_size = (eeprom_list[pobj->id].addr_width == 2) ? DEV_EEPROM_BLOCK_16BIT : DEV_EEPROM_BLOCK_8BIT;
+		/* 一次写不超过一页, 且不跨页(EEPROM 页内地址自动回绕, 必须页对齐切分)
+		 * 同时不跨块边界(AT24C16 块切换需要重新计算器件地址) */
+		uint16_t chunk = pobj->page_size - (word % pobj->page_size);
+		uint16_t block_remain = (uint16_t)(block_size - (addr % block_size));
+		if (chunk > block_remain) 
+			chunk = block_remain;  /* 限制在块边界内 */
+		if (chunk > len) 
+			chunk = len;
 
-#if defined(DEV_EEPROM_USING_SOFT_I2C)
-	soft_i2c_dev.slave_address = eeprom_list[pobj->id].i2c_addr + ((addr / 0xFF) << 1);
-	ret = drv_i2c_write_nbytes(&soft_i2c_dev, addrss, data, len);
-#else
-	eeprom_list[pobj->id].i2c.dev_addr = eeprom_list[pobj->id].i2c_addr + ((addr / 0xFF) << 1);
-	eeprom_list[pobj->id].i2c.mem_addr = addrss;
+		if (drv_i2c_send(drv, (uint8_t *)data, chunk) != DRV_EOK) 
+			return DEV_ERROR;
+		if (!dev_eeprom_wait_write(drv)) 
+			return DEV_ERROR;
 
-	ret = drv_i2c_send(eeprom_list[pobj->id].i2c, data, len);
-#endif
+		addr += chunk;
+		data += chunk;
+		len -= chunk;
+	}
 
-	return ret;
+	return DEV_EOK;
 }
 
 /*
  * @brief  eeprom设备写入内存一字节数据
  * @param  *pobj : eeprom设备句柄
- * @param  reg  : 寄存器地址(16位 eeprom地址)
- * @param  data : 写入数据的data区
- * @retval 写入结果 ：DRV_EOK正常，其他则错误
+ * @param  addr : 绝对地址
+ * @param  data : 写入的数据
+ * @retval 写入结果 ：DEV_EOK正常，其他则错误
  */
-int dev_mb85rc16_write_byte(struct dev_eeprom *pobj, uint32_t addr, uint8_t data)
+int dev_eeprom_write_byte(struct dev_eeprom *pobj, uint32_t addr, uint8_t data)
 {
-	return dev_mb85rc16_write_data(pobj, addr, &data, 1);
+	return dev_eeprom_write(pobj, addr, &data, 1);
 }
 
 /*
  * @brief  获取eeprom设备状态，判断是否准备完成
  * @param  *pobj : eeprom设备句柄
- * @retval 写入结果 ：true正常，false错误
+ * @retval true正常，false错误
  */
-bool dev_eeprom_get_state(struct dev_eeprom *pobj)
+bool dev_eeprom_is_ready(struct dev_eeprom *pobj)
 {
-	return (bool)drv_i2c_ready(eeprom_list[pobj->id].i2c, 1U);
+	uint16_t word = 0;
+	i2cDrv_t drv = dev_eeprom_build_drv(pobj, 0, &word);
+	return (drv_i2c_ready(drv, 1) == DRV_EOK);
 }
 
 /*
  * @brief  擦除设备所有内存区
  * @param  *pobj : eeprom设备句柄
- * @retval 写入结果 ：DRV_EOK正常，其他则错误
+ * @retval 写入结果 ：DEV_EOK正常，其他则错误
  */
 int dev_eeprom_erase_all(struct dev_eeprom *pobj)
 {
-	int ret = 0;
-	uint8_t data = 0xFF;
-	uint16_t address = 0;
+	uint8_t buf[16];
+	uint32_t addr = 0;
 
-	for (int i=0; i<eeprom_list[pobj->id].total_size; i++)
+	memset(buf, 0xFF, sizeof(buf));
+	while (addr < pobj->total_size)
 	{
-		address = i;
-		ret = dev_mb85rc16_write_byte(pobj, address, data);
-		if (ret != DEV_EOK) break;
+		uint16_t chunk = pobj->page_size;
+		if (chunk > (pobj->total_size - addr)) chunk = (uint16_t)(pobj->total_size - addr);
+		if (dev_eeprom_write(pobj, addr, buf, chunk) != DEV_EOK) return DEV_ERROR;
+		addr += chunk;
 	}
 
-	return ret;
+	return DEV_EOK;
 }
 
-/********************* 使用软件i2c时的驱动部分 *********************/
-#if defined(DEV_EEPROM_USING_SOFT_I2C)
-static uint8_t soft_i2c_sda_read(i2c_id_e id)
+/* 自检可写区起始地址: 必须避开 [0, 1024) 的 motor_info 参数区
+ * (motor_info_storage 从地址 0 起整块存放 1024B 含 CRC, 自检写入会破坏
+ * 整块 CRC, 下次上电校验失败 → 参数全部回落默认值)。
+ * 1024 = PARAM_AREA_SIZE, 即 8bit 内部地址器件的第 4 块起始, 同时保留
+ * "块0跨页 / 跨块边界 / 末尾块" 三种覆盖场景。 */
+#define DEV_EEPROM_TEST_BASE_ADDR   (1024U)
+
+/*
+ * @brief  芯片自检: 多块写入回读校验(跨页边界/跨块边界/末尾块)
+ * @param  *pobj : eeprom设备句柄
+ * @retval 校验结果 ：DEV_EOK通过，其他则错误
+ * @note   仅在 [DEV_EEPROM_TEST_BASE_ADDR, total_size) 内读写,
+ *         不触碰 [0, 1024) 的 motor_info 参数区。
+ *         容量不足以腾出自检区时返回 DEV_ERROR 而不是踩参数区。
+ */
+int dev_eeprom_test(struct dev_eeprom *pobj)
 {
-	return (uint8_t)drv_gpio_read(eeprom_list[id].i2c_sda_pin);
-}
+	const uint16_t N = 32;
+	uint8_t wbuf[32];
+	uint8_t rbuf[32];
+	uint32_t i, addr;
 
-static void soft_i2c_sda_dir(i2c_id_e id, i2c_sda_dir_e dir)
-{
-	uint8_t gpio_sta = (uint8_t)drv_gpio_read(eeprom_list[id].i2c_sda_pin);
+	/* 容量校验: 自检区至少要容纳三段测试, 否则拒绝自检(不退回参数区) */
+	if (pobj == NULL || pobj->total_size < (DEV_EEPROM_TEST_BASE_ADDR + 3U * N))
+		return DEV_ERROR;
 
-	gpioInit_t io_init = {
-		.mode = (dir == IN) ? DRV_INPUT : DRV_OUTPUT_PP,
-		.pull = gpio_sta ? DRV_PULLUP : DRV_PULLDOWN,
-		.speed = DRV_HIGH,
-		.alternate = 0,
-	};
-	drv_gpio_init(eeprom_list[id].i2c_sda_pin, io_init);
-}
+	/* 1) 跨页写入 (base+8 起 32B, 跨 16B 页边界, 验证分页写) */
+	addr = DEV_EEPROM_TEST_BASE_ADDR + 8U;
+	for (i = 0; i < N; i++) wbuf[i] = (uint8_t)(0x10 + i);
+	if (dev_eeprom_write(pobj, addr, wbuf, N) != DEV_EOK) return DEV_ERROR;
+	if (dev_eeprom_read(pobj, addr, rbuf, N) != DEV_EOK) return DEV_ERROR;
+	if (memcmp(wbuf, rbuf, N) != 0) return DEV_ERROR;
 
-static void soft_i2c_sda(i2c_id_e id, i2c_state_e level)
-{
-	drv_gpio_write(eeprom_list[id].i2c_sda_pin, (drvPinState_e)level);
-}
+	/* 2) 下一块起始 (base+256, 验证器件地址块选择位切换) */
+	addr = DEV_EEPROM_TEST_BASE_ADDR + 256U;
+	if ((addr + N) <= pobj->total_size)
+	{
+		for (i = 0; i < N; i++) wbuf[i] = (uint8_t)(0x40 + i);
+		if (dev_eeprom_write(pobj, addr, wbuf, N) != DEV_EOK) return DEV_ERROR;
+		if (dev_eeprom_read(pobj, addr, rbuf, N) != DEV_EOK) return DEV_ERROR;
+		if (memcmp(wbuf, rbuf, N) != 0) return DEV_ERROR;
+	}
 
-static void soft_i2c_scl(i2c_id_e id, i2c_state_e level)
-{
-	drv_gpio_write(eeprom_list[id].i2c_scl_pin, (drvPinState_e)level);
+	/* 3) 末尾块末尾 (addr=total_size-N, 验证最后一块) */
+	addr = pobj->total_size - N;
+	for (i = 0; i < N; i++) wbuf[i] = (uint8_t)(0x80 + i);
+	if (dev_eeprom_write(pobj, addr, wbuf, N) != DEV_EOK) return DEV_ERROR;
+	if (dev_eeprom_read(pobj, addr, rbuf, N) != DEV_EOK) return DEV_ERROR;
+	if (memcmp(wbuf, rbuf, N) != 0) return DEV_ERROR;
+
+	return DEV_EOK;
 }
-#endif
-/**********************************************************************/
 
 void dev_eeprom_init(struct dev_eeprom *pobj, eeprom_id_e dev_id)
 {
 	assert_report(pobj != NULL);
 	pobj->id = dev_id;
-#if defined(DEV_EEPROM_USING_SOFT_I2C)
-	memset(&soft_i2c_dev, 0, sizeof(i2c_soft_drv_t));
-	drv_i2c_init(&soft_i2c_dev, pobj->id, soft_i2c_sda_read, soft_i2c_sda_dir, soft_i2c_sda, soft_i2c_scl, eeprom_list[pobj->id].i2c_addr);
-#endif
+	pobj->page_size = eeprom_list[pobj->id].page_size;
+	pobj->total_size = eeprom_list[pobj->id].total_size;
 
-	pobj->read = dev_mb85rc16_read_data;
-	pobj->read_byte = dev_mb85rc16_read_byte;
-	pobj->write = dev_mb85rc16_write_data;
-	pobj->write_byte = dev_mb85rc16_write_byte;
-	pobj->is_ready = dev_eeprom_get_state;
+	pobj->read = dev_eeprom_read;
+	pobj->read_byte = dev_eeprom_read_byte;
+	pobj->write = dev_eeprom_write;
+	pobj->write_byte = dev_eeprom_write_byte;
+	pobj->is_ready = dev_eeprom_is_ready;
 	pobj->erase_all = dev_eeprom_erase_all;
 }
-
+#endif /* USE_DEV_EEPROM */

@@ -1,6 +1,6 @@
 /**
  * @file thread_config.h
- * @brief 
+ * @brief 线程延时与使能配置 
  * 
  * @author dalin (dalinyy@163.com)
  * @version 1.0
@@ -24,9 +24,12 @@
 
 #define THREAD_DELAY_CONTROL 1
 #define THREAD_DELAY_COMMUN  1
-#define THREAD_DELAY_PERIOD  20
+#define THREAD_DELAY_PERIOD  5 /* 周期线程基础拍 5ms(慢速故障检测节拍); 电源监控内部 4 分频保持 20ms */
 #define THREAD_DELAY_DISPLAY 10
 #define THREAD_DELAY_IDLE    1000
+
+/* 周期线程内电源监控分频: 5ms 基础拍 -> 20ms 刷新 */
+#define PERIOD_PMON_DIV 4u
 
 /* 任务启动延时 */
 #define INTO_THREAD_DELAY 500

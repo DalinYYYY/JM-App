@@ -31,6 +31,8 @@ typedef struct
 	char name[16];
 } motor_pid_profile_t;
 
+extern motor_pid_profile_t s_motor_pid_profiles[MOTOR_PID_PROFILE_MAX];
+
 /**
  * @brief 初始化PID参数管理器
  * @param motor_param 电机参数指针
@@ -63,6 +65,34 @@ void motor_pid_profile_load_from_motor_param(const motor_param_t *motor_param);
  * @param motor_param 电机参数指针
  */
 void motor_pid_profile_save_to_motor_param(motor_param_t *motor_param);
+
+/* ==================== 0xA5/0xA6 单字段读写 API ==================== */
+/* param_type: 1=kp 2=ki 3=kd 4=output_limit 5=integral_limit 6=output_filter_alpha 7=flags
+ * value4 为 4 字节小端, float 字段按 memcpy 转换, flags 为 uint32_t 直传。
+ * 0xA5(写)仅 DEBUG source 下调用; 0xA6(读)随时可调。 */
+
+/**
+ * @brief  按参数类型写入单个 PID 参数 (0xA5 调用)
+ * @param  id          profile ID (0=D轴 1=Q轴 2=速度 3=位置)
+ * @param  param_type  参数类型 (1~7)
+ * @param  value4      4 字节小端值指针
+ * @return 0=成功 -1=参数非法
+ */
+int motor_pid_profile_set_param(uint8_t id, uint8_t param_type, const uint8_t *value4);
+
+/**
+ * @brief  按参数类型读取单个 PID 参数 (0xA6 调用)
+ * @param  id          profile ID (0=D轴 1=Q轴 2=速度 3=位置)
+ * @param  param_type  参数类型 (1~7)
+ * @param  out_value4  输出 4 字节小端值
+ * @return 0=成功 -1=参数非法
+ */
+int motor_pid_profile_get_param(uint8_t id, uint8_t param_type, uint8_t *out_value4);
+
+/* A5 param_type=0 的原子批量写，entries 为 count:u8 + (type:u8,value4)*。 */
+int motor_pid_profile_apply_batch(uint8_t id, const uint8_t *entries,
+                                  uint16_t entries_len, float output_limit_max);
+int motor_pid_profile_validate(const pid_param_t *param, float output_limit_max);
 
 /**
  * @brief 恢复指定配置文件的默认值
